@@ -1224,7 +1224,7 @@
     :where(.litefold-calendar) .lfc-calendar-title-button {
       inline-size: 100%;
       justify-content: safe center;
-      padding-inline: 0.25rem;
+      padding-inline: 0;
     }
 
     :where(.litefold-calendar) .lfc-calendar-toolbar-end {
