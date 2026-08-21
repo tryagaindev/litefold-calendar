@@ -410,8 +410,11 @@ test.describe("native month pager", () => {
 		await expectPagerClean(host);
 		await expect(actionResult).toHaveText(initialActionResult ?? "");
 
-		await page.locator(".lfc-calendar-nav-button-previous").click();
-		await expect(page.locator(MONTH_SELECTOR)).toHaveText("2026-08-01");
+        const previousButton = page.locator(".lfc-calendar-nav-button-previous");
+        await previousButton.focus();
+        await previousButton.press("Enter");
+
+        await expect(page.locator(MONTH_SELECTOR)).toHaveText("2026-08-01");
 		await page.locator("[data-example-direction]").check();
 		const rtlAction = await actionResult.textContent();
 		point = await gesturePoint(viewport);
