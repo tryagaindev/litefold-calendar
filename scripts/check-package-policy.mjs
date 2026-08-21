@@ -59,7 +59,7 @@ const EXPECTED_PUBLISH_CONFIG = Object.freeze({
     provenance: true,
     tag: "alpha"
 });
-const RELEASE_NODE_VERSION = "24.19.0";
+const WORKFLOW_NODE_VERSION = "24.19.0";
 const ALPHA_VERSION = /^0\.\d+\.\d+-alpha\.\d+$/u;
 const PUBLIC_ROOT_CLASS = "litefold-calendar";
 const PUBLIC_ROOT_SELECTOR = `:where(.${PUBLIC_ROOT_CLASS})`;
@@ -1669,14 +1669,14 @@ await inspectSourceTree();
 
 await inspectWorkflowTree({
     ".github/workflows/ci.yml": {
-        LFC_NODE_MAJOR:
-        SUPPORTED_NODE_SELECTOR,
+        LFC_NODE_VERSION:
+        WORKFLOW_NODE_VERSION,
         LFC_NPM_VERSION:
             String(referenceNpmVersion)
     },
     ".github/workflows/publish-alpha.yml": {
         LFC_NODE_VERSION:
-        RELEASE_NODE_VERSION,
+        WORKFLOW_NODE_VERSION,
         LFC_NPM_VERSION:
             String(referenceNpmVersion)
     }
@@ -1815,5 +1815,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-    "Package policy passed: Node-major policy, exact npm/development dependencies, and zero runtime dependencies."
+    "Package policy passed: Node/toolchain policy, exact npm/development dependencies, and zero runtime dependencies."
 );
