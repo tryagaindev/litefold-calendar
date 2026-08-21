@@ -5,7 +5,7 @@ import { REPOSITORY_ROOT } from "./lib/process.mjs";
 
 const EXPECTED_NAME = "@tryagaindev/litefold-calendar";
 const EXPECTED_REPOSITORY = "git+https://github.com/tryagaindev/litefold-calendar.git";
-const EXPECTED_GITHUB_REPOSITORY = "TryAgainDev/litefold-calendar";
+const EXPECTED_GITHUB_REPOSITORY = "tryagaindev/litefold-calendar";
 const packageJson = JSON.parse(await readFile(join(REPOSITORY_ROOT, "package.json"), "utf8"));
 const expectedTag = `v${String(packageJson.version)}`;
 const actualTag = process.argv[2];
