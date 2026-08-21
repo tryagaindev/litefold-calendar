@@ -1,0 +1,326 @@
+name: Publish npm alpha
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-alpha-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  LFC_NODE_VERSION: "24.19.0"
+  LFC_NPM_VERSION: "12.0.2"
+
+jobs:
+  verify:
+    name: Verify release and create immutable bundle
+    if: ${{ github.event.release.prerelease == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      bundle-name: ${{ steps.release.outputs.bundle-name }}
+      source-commit: ${{ steps.release.outputs.source-commit }}
+      version: ${{ steps.release.outputs.version }}
+
+    steps:
+      - name: Check out the release tag without persisted credentials
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up exact Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.LFC_NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Set up exact npm
+        working-directory: ${{ runner.temp }}
+        run: npm install --global "npm@${LFC_NPM_VERSION}" --ignore-scripts
+
+      - name: Verify tag identity and main ancestry
+        id: release
+        env:
+          LFC_RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          node scripts/check-release-ready.mjs "${LFC_RELEASE_TAG}"
+
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor HEAD origin/main
+
+          version="${LFC_RELEASE_TAG#v}"
+          source_commit="$(git rev-parse --verify HEAD^{commit})"
+          bundle_name="tryagaindev-litefold-calendar-${version}"
+
+          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
+          printf 'source-commit=%s\n' "${source_commit}" >> "${GITHUB_OUTPUT}"
+          printf 'bundle-name=%s\n' "${bundle_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install locked development tooling
+        run: npm ci --ignore-scripts
+
+      - name: Install pinned Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the complete quality gate
+        run: npm run check
+
+      - name: Create the verified release bundle
+        run: npm run package
+
+      - name: Upload the exact release bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: npm-release-bundle-${{ github.event.release.tag_name }}
+          if-no-files-found: error
+          overwrite: false
+          path: .artifacts/${{ steps.release.outputs.bundle-name }}/*
+          retention-days: 30
+
+      - name: Upload browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-diagnostics-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  publish:
+    name: Publish verified tarball with provenance
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm
+
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+
+    env:
+      LFC_BUNDLE_DIRECTORY: ${{ runner.temp }}/release-bundle
+      LFC_RELEASE_TAG: ${{ github.event.release.tag_name }}
+      LFC_SOURCE_COMMIT: ${{ needs.verify.outputs.source-commit }}
+      LFC_VERSION: ${{ needs.verify.outputs.version }}
+
+    steps:
+      - name: Set up exact Node for npm trusted publishing
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.LFC_NODE_VERSION }}
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+          scope: "@tryagaindev"
+
+      - name: Set up exact npm
+        working-directory: ${{ runner.temp }}
+        run: npm install --global "npm@${LFC_NPM_VERSION}" --ignore-scripts
+
+      - name: Download the verified bundle without checking out source
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-release-bundle-${{ github.event.release.tag_name }}
+          path: ${{ env.LFC_BUNDLE_DIRECTORY }}
+
+      - name: Validate bundle bytes and release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tarball="tryagaindev-litefold-calendar-${LFC_VERSION}.tgz"
+          expected=(
+            "${tarball}"
+            LICENSE
+            SHA256SUMS
+            package-verification.json
+            sbom.spdx.json
+          )
+
+          mapfile -t actual < <(
+            find "${LFC_BUNDLE_DIRECTORY}" \
+              -mindepth 1 \
+              -maxdepth 1 \
+              -printf '%f\n' |
+              LC_ALL=C sort
+          )
+
+          mapfile -t expected_sorted < <(
+            printf '%s\n' "${expected[@]}" |
+              LC_ALL=C sort
+          )
+
+          diff -u \
+            <(printf '%s\n' "${expected_sorted[@]}") \
+            <(printf '%s\n' "${actual[@]}")
+
+          if find "${LFC_BUNDLE_DIRECTORY}" \
+            -mindepth 1 \
+            -maxdepth 1 \
+            ! -type f \
+            -print \
+            -quit |
+            grep -q .; then
+            echo "Release bundle must contain only flat regular files." >&2
+            exit 1
+          fi
+
+          (
+            cd "${LFC_BUNDLE_DIRECTORY}"
+
+            sha256sum --check --strict SHA256SUMS
+
+            tar \
+              --extract \
+              --gunzip \
+              --to-stdout \
+              --file "${tarball}" \
+              package/package.json \
+              > packed-package.json
+          )
+
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { readFile } from "node:fs/promises";
+          import { join } from "node:path";
+
+          const directory = process.env.LFC_BUNDLE_DIRECTORY;
+          const version = process.env.LFC_VERSION;
+          const sourceCommit = process.env.LFC_SOURCE_COMMIT;
+          const tag = process.env.LFC_RELEASE_TAG;
+          const nodeVersion = process.env.LFC_NODE_VERSION;
+          const npmVersion = process.env.LFC_NPM_VERSION;
+
+          const expectedName = "@tryagaindev/litefold-calendar";
+          const expectedRepository =
+            "git+https://github.com/tryagaindev/litefold-calendar.git";
+          const expectedFilename =
+            `tryagaindev-litefold-calendar-${version}.tgz`;
+
+          if (
+            directory === undefined ||
+            version === undefined ||
+            sourceCommit === undefined ||
+            nodeVersion === undefined ||
+            npmVersion === undefined ||
+            tag !== `v${version}`
+          ) {
+            throw new Error(
+              "Release workflow identity is incomplete or inconsistent.",
+            );
+          }
+
+          const receipt = JSON.parse(
+            await readFile(
+              join(directory, "package-verification.json"),
+              "utf8",
+            ),
+          );
+
+          const manifest = JSON.parse(
+            await readFile(
+              join(directory, "packed-package.json"),
+              "utf8",
+            ),
+          );
+
+          const tarball = await readFile(
+            join(directory, expectedFilename),
+          );
+
+          const sha256 = createHash("sha256")
+            .update(tarball)
+            .digest("hex");
+
+          const receiptNodeVersion =
+            String(receipt.toolchain?.node ?? "")
+              .replace(/^v/u, "");
+
+          if (
+            receipt.schemaVersion !== 1 ||
+            receipt.name !== expectedName ||
+            receipt.version !== version ||
+            receipt.private !== false ||
+            receipt.filename !== expectedFilename ||
+            receipt.sourceRepository !== expectedRepository ||
+            receipt.sourceCommit !== sourceCommit ||
+            receipt.sourceTreeDirty !== false ||
+            receipt.license !== "MIT" ||
+            receipt.sha256 !== sha256 ||
+            receipt.toolchain?.npm !== npmVersion ||
+            receipt.toolchain?.packageManager !== `npm@${npmVersion}` ||
+            receiptNodeVersion !== nodeVersion
+          ) {
+            throw new Error(
+              "Release receipt does not match the verified workflow identity and tarball bytes.",
+            );
+          }
+
+          const repositoryUrl =
+            typeof manifest.repository === "string"
+              ? manifest.repository
+              : manifest.repository?.url;
+
+          const publishConfig = manifest.publishConfig;
+
+          const publishConfigKeys =
+            Object.keys(publishConfig ?? {}).sort();
+
+          const expectedPublishConfigKeys = [
+            "access",
+            "provenance",
+            "tag",
+          ];
+
+          const hasExpectedPublishConfig =
+            publishConfig?.access === "public" &&
+            publishConfig?.provenance === true &&
+            publishConfig?.tag === "alpha" &&
+            JSON.stringify(publishConfigKeys) ===
+              JSON.stringify(expectedPublishConfigKeys);
+
+          const forbiddenLifecycleScript =
+            /^(?:pre|post)?(?:install|publish|pack|prepare|version)$|^prepublishOnly$|^dependencies$/u;
+
+          const hasForbiddenLifecycleScripts =
+            Object.keys(manifest.scripts ?? {}).some(
+              (name) => forbiddenLifecycleScript.test(name),
+            );
+
+          if (
+            manifest.name !== expectedName ||
+            manifest.version !== version ||
+            manifest.private !== false ||
+            manifest.license !== "MIT" ||
+            repositoryUrl !== expectedRepository ||
+            !hasExpectedPublishConfig ||
+            hasForbiddenLifecycleScripts
+          ) {
+            throw new Error(
+              "Packed package metadata is not eligible for the public alpha channel.",
+            );
+          }
+          NODE
+
+          rm -- "${LFC_BUNDLE_DIRECTORY}/packed-package.json"
+
+      - name: Publish the exact verified tarball
+        run: |
+          npm publish \
+            "${LFC_BUNDLE_DIRECTORY}/tryagaindev-litefold-calendar-${LFC_VERSION}.tgz" \
+            --registry https://registry.npmjs.org/ \
+            --access public \
+            --tag alpha \
+            --provenance \
+            --ignore-scripts

@@ -1,0 +1,64 @@
+name: Bug report
+description: Report a reproducible litefold-calendar defect.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve litefold-calendar. Search existing issues first and provide a minimal reproduction.
+
+        **Do not disclose security vulnerabilities here.** Use [private vulnerability reporting](https://github.com/tryagaindev/litefold-calendar/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: Package version or commit
+      description: Provide the exact npm version or source commit and the tarball SHA-256 when applicable.
+      placeholder: 0.1.0-alpha.0; source commit; tarball SHA-256
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include browser version, operating system, device, and relevant assistive technology.
+      placeholder: Firefox 145 on Windows 11; NVDA 2026.1
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Link a repository or provide dependency-free code and exact steps. Remove secrets and private event data.
+      placeholder: |
+        1. Create the calendar with...
+        2. Navigate to...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include sanitized visible errors and announcements. Do not paste raw production payloads.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Note frequency, regressions, workarounds, mobile/zoom behavior, and anything else relevant.
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched for existing issues and removed secrets and private data.
+          required: true
+        - label: I agree to follow the Code of Conduct.
+          required: true

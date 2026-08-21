@@ -1,0 +1,18 @@
+name: Private security reporting unavailable
+description: Request restoration of a private vulnerability-reporting channel without disclosing vulnerability details.
+title: "Private security reporting is unavailable"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this public form only when GitHub private vulnerability reporting is unavailable.
+
+        Do not include vulnerability details, affected components, reproduction steps, impact, links, screenshots, attachments, logs, credentials, event data, or other sensitive information. A maintainer will restore or establish a private channel before requesting details.
+  - type: checkboxes
+    id: no-public-details
+    attributes:
+      label: Safety confirmation
+      description: Submit the prefilled title and this confirmation only.
+      options:
+        - label: I have not included vulnerability details or sensitive information in this public issue.
+          required: true

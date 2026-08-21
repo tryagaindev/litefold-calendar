@@ -1,0 +1,83 @@
+name: Accessibility barrier
+description: Report a keyboard, touch, zoom, contrast, or assistive-technology problem.
+title: "[Accessibility]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Accessibility barriers are product defects. Describe the blocked task and the observable behavior without including private event data.
+
+        Report security-sensitive issues through [private vulnerability reporting](https://github.com/tryagaindev/litefold-calendar/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: Package version or commit
+      description: Use the exact npm version or source commit and include the tarball SHA-256 when relevant.
+      placeholder: 0.1.0-alpha.0; source commit or tarball SHA-256
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser, operating system, and device
+      placeholder: Safari on iOS 20, iPhone portrait
+    validations:
+      required: true
+  - type: input
+    id: assistive-technology
+    attributes:
+      label: Assistive technology and version
+      description: Enter None when the barrier does not involve assistive technology.
+      placeholder: VoiceOver on iOS 20, or None
+    validations:
+      required: true
+  - type: dropdown
+    id: interaction
+    attributes:
+      label: Primary interaction
+      options:
+        - Keyboard
+        - Grid event action or overflow
+        - Screen reader
+        - Touch or pointer
+        - Zoom or text resize
+        - Forced colors or contrast
+        - Reduced motion
+        - Reflow or compact layout
+        - Voice control or switch access
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: blocked-task
+    attributes:
+      label: Blocked task and impact
+      description: Explain what you were trying to accomplish and whether a workaround exists.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Focus...
+        2. Press or announce...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Include the expected focus, name, role, state, announcement, or layout when known.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched for existing issues and removed private data.
+          required: true
+        - label: I agree to follow the Code of Conduct.
+          required: true

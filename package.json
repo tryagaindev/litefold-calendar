@@ -1,0 +1,109 @@
+{
+  "name": "@tryagaindev/litefold-calendar",
+  "version": "0.1.0-alpha.0",
+  "description": "A dependency-free, mobile-first, accessible calendar component.",
+  "private": false,
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tryagaindev/litefold-calendar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tryagaindev/litefold-calendar/issues"
+  },
+  "homepage": "https://github.com/tryagaindev/litefold-calendar#readme",
+  "keywords": [
+    "accessible",
+    "calendar",
+    "dependency-free",
+    "fullcalendar-alternative",
+    "month-calendar",
+    "typescript",
+    "vanilla-js"
+  ],
+  "packageManager": "npm@12.0.2",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.x",
+      "onFail": "warn"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.0.0",
+      "onFail": "warn"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./styles.css": {
+      "types": "./dist/styles.css.d.ts",
+      "default": "./dist/styles.css"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "style": "./dist/styles.css",
+  "sideEffects": [
+    "./dist/styles.css"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:examples": "node scripts/build-examples.mjs",
+    "build:package": "node scripts/build-package.mjs",
+    "check": "npm run check:static && npm run test:unit && npm run build && npm run test:examples:built && npm run test:browser:built && npm run check:screenshots && npm run check:tarball",
+    "check:distribution": "npm run build && npm run typecheck:examples:built && npm run test:examples:built && npm run check:tarball",
+    "check:docs": "node scripts/check-docs.mjs",
+    "check:package": "node scripts/check-package-policy.mjs --built --pack",
+    "check:policy": "node scripts/check-package-policy.mjs",
+    "check:sbom": "node scripts/check-sbom.mjs",
+    "check:screenshots": "node scripts/check-screenshots.mjs",
+    "check:static": "npm run check:license && npm run check:policy && npm run check:docs && npm run lint && npm run test:tooling && npm run typecheck && npm run typecheck:examples",
+    "check:tarball": "node scripts/pack-release.mjs --verify-only",
+    "clean": "node scripts/clean.mjs",
+    "lint": "npm run lint:ts && npm run lint:styles",
+    "lint:styles": "stylelint \"src/**/*.css\" \"examples/**/*.css\"",
+    "lint:ts": "eslint .",
+    "package": "node scripts/pack-release.mjs",
+    "screenshots:update": "npm run build && node scripts/update-screenshots.mjs",
+    "test": "npm run test:unit && npm run test:examples",
+    "test:browser": "npm run build && npm run test:browser:built",
+    "test:browser:built": "playwright test",
+    "test:examples": "npm run build && npm run test:examples:built",
+    "test:examples:built": "node scripts/run-advanced-smoke.mjs",
+    "test:tooling": "node --test scripts/tests/check-sbom.test.mjs scripts/tests/node-version.test.mjs scripts/tests/release-artifacts.test.mjs",
+    "test:unit": "node scripts/run-unit-tests.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "typecheck:examples": "npm run build:package && npm run typecheck:examples:built",
+    "typecheck:examples:built": "tsc -p examples/advanced/tsconfig.json --noEmit",
+    "check:license": "node scripts/check-license.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.61.1",
+    "@types/jsdom": "28.0.3",
+    "@types/node": "24.13.3",
+    "eslint": "10.8.0",
+    "globals": "17.9.0",
+    "jsdom": "30.0.1",
+    "stylelint": "17.14.1",
+    "stylelint-config-standard": "40.0.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.66.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "tag": "alpha"
+  }
+}

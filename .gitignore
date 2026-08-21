@@ -1,0 +1,58 @@
+#Dependencies and package-manager state
+node_modules/
+/.npm/
+/.npm-cache/
+/.cache/
+.node_repl_history
+
+#Build, test, and generated artifacts
+/dist/
+/.test-dist/
+/.artifacts/
+/coverage/
+/.nyc_output/
+/test-results/
+/examples/advanced/main.js
+*.lcov
+*.tgz
+*.tsbuildinfo
+*.log
+.eslintcache
+.stylelintcache
+
+#Local environment and secrets
+.env
+.env.*
+!.env.example
+.envrc
+.direnv/
+
+#Editor files and temporary merge output
+/.vs/
+/.vscode/
+/.idea/
+/.fleet/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*.swo
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*~
+
+#Operating-system files and crash dumps
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.dmp
+*.stackdump

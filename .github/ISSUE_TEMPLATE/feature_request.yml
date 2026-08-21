@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a focused improvement to the public calendar contract.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the user problem before the proposed API. Alpha contracts may change before 1.0 when that materially reduces concepts, boilerplate, casts, or adoption friction, but proposals must preserve responsive usability, accessibility, security, framework independence, and zero runtime dependencies.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who is affected, what task is difficult, and why current hooks are insufficient?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful behavior and any public API or CSS contract.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include extension or host-side approaches you tried.
+    validations:
+      required: true
+  - type: textarea
+    id: integration
+    attributes:
+      label: Integration impact
+      description: Address wide/compact layout, managed grid/event keyboard behavior, touch, assistive technology, localization, errors, security, progressive fallback, and host integration where relevant.
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Project constraints
+      options:
+        - label: This proposal does not require a runtime, peer, optional, or bundled dependency.
+          required: true
+        - label: I considered narrow mobile layouts and accessible operation.
+          required: true
+        - label: I searched for existing issues and proposals.
+          required: true
+        - label: I agree to follow the Code of Conduct.
+          required: true

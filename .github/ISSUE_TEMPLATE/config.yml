@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/tryagaindev/litefold-calendar/security/advisories/new
+    about: Do not disclose suspected vulnerabilities in a public issue.
+  - name: Ask a usage question
+    url: https://github.com/tryagaindev/litefold-calendar/discussions
+    about: Use GitHub Discussions for integration and usage help.
+  - name: Read the support policy
+    url: https://github.com/tryagaindev/litefold-calendar/blob/main/SUPPORT.md
+    about: Review supported surfaces and the information needed for help.

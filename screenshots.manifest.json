@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "state": "final",
+  "toolchain": {
+    "node": "24.19.0",
+    "npm": "12.0.2",
+    "playwright": "1.61.1",
+    "browser": "chromium"
+  },
+  "sourceFingerprint": "32f26d12a2e05970a03e278f443ede6828df49d878cc4ef445a8b152faa46959",
+  "scenes": [
+    {
+      "id": "desktop-month-grid",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/desktop-month-grid-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "hasTouch": false,
+      "setup": [
+        "wait-ready",
+        "scroll-calendar"
+      ],
+      "alt": "Wide litefold-calendar month grid with category filters, direct event actions, and overflow",
+      "references": [
+        "README.md"
+      ],
+      "sha256": "6475e351037c465ac2e083b7e9e2d5c6c7e09e2ef52fa0ed4401a4a2069d3b1b"
+    },
+    {
+      "id": "month-year-jump",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/month-year-jump-1280x800.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "hasTouch": false,
+      "setup": [
+        "wait-ready",
+        "scroll-calendar",
+        "open-month-picker"
+      ],
+      "alt": "Native month and year jump popover over a bounded litefold-calendar month",
+      "references": [
+        "README.md"
+      ],
+      "sha256": "7974fe8ea5e7e5215dff6b43fb03fb73e01b770e568ee0e0132af18a25f40f89"
+    },
+    {
+      "id": "mobile-month-agenda-dark",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/mobile-month-agenda-dark-390x844.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "setup": [
+        "wait-ready",
+        "set-dark-theme",
+        "scroll-calendar"
+      ],
+      "alt": "Mobile dark-theme litefold-calendar with compact navigation, month grid, actionable marker, and selected-day agenda",
+      "references": [
+        "README.md"
+      ],
+      "sha256": "a871cd8011fe1e0f71bc6a1c553587b29de68aae2cc191adee8aced35f119cf1"
+    },
+    {
+      "id": "mobile-month-swipe-pull",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/mobile-month-swipe-pull-390x844.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "setup": [
+        "wait-ready",
+        "scroll-calendar",
+        "hold-touch-swipe-left"
+      ],
+      "alt": "Mobile litefold-calendar held partway through a horizontal touch swipe, revealing the adjacent month snap affordance",
+      "references": [
+        "README.md"
+      ],
+      "sha256": "9b0380258e68a7f90ee54aa85373ed702dd106cfcf37c89991f750a4508f4a1f"
+    },
+    {
+      "id": "event-details-dark",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/event-details-dark-1280x800.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "hasTouch": false,
+      "setup": [
+        "wait-ready",
+        "set-dark-theme",
+        "open-agenda-event-dialog"
+      ],
+      "alt": "Dark-theme event details dialog opened from a litefold-calendar agenda action",
+      "references": [
+        "README.md"
+      ],
+      "sha256": "d7c19a599ce3a49c03e0ec33964a56b0a87c984381237ffa32de5cf09ba8e971"
+    },
+    {
+      "id": "grid-event-keyboard-focus",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/grid-event-keyboard-focus-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "hasTouch": false,
+      "setup": [
+        "wait-ready",
+        "scroll-calendar",
+        "focus-selected-day",
+        "press-f2"
+      ],
+      "alt": "Visible keyboard focus on a litefold-calendar grid event action",
+      "references": [
+        "README.md"
+      ],
+      "sha256": "7d07228e1d38b30223ca110ebbc424b439c970cbbe62beee0272e7bf0e529545"
+    }
+  ]
+}

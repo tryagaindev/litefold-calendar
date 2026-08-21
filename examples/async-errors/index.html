@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>litefold-calendar async errors example</title>
+	<link rel="stylesheet" href="../../dist/styles.css">
+	<link rel="stylesheet" href="../example.css">
+</head>
+<body>
+	<main class="example-shell">
+		<header class="example-intro">
+			<h1>Async source and error ownership</h1>
+			<p>The package presents persistent errors by default. Turn on application ownership to see the explicit <code>"handled"</code> path.</p>
+		</header>
+
+		<form class="example-panel" data-controls>
+			<h2>Failure controls</h2>
+			<p>Extension failure mode rebuilds the instance because quarantined extensions are not retried.</p>
+			<div class="example-control-row">
+				<label class="example-check">
+					<input type="checkbox" data-host-ownership>
+					Application owns source-error UI
+				</label>
+				<label class="example-check">
+					<input type="checkbox" data-fail-extension>
+					Rebuild with a failing extension
+				</label>
+				<label class="example-check">
+					<input type="checkbox" data-fail-action>
+					Reject event actions
+				</label>
+				<button class="example-button" type="button" data-fail-next>Fail next source request</button>
+				<button class="example-button" type="button" data-refetch>Refetch</button>
+			</div>
+		</form>
+
+		<section class="example-alert" data-host-error aria-labelledby="example-host-error-title" hidden>
+			<h2 id="example-host-error-title" data-host-error-title></h2>
+			<span data-host-error-message></span>
+			<button class="example-button" type="button" data-host-retry>Try again</button>
+		</section>
+
+		<div class="example-calendar" data-calendar></div>
+
+		<div class="example-visually-hidden" data-announcer-polite role="status"></div>
+		<div class="example-visually-hidden" data-announcer-assertive role="alert"></div>
+	</main>
+
+	<script type="module" src="./main.js"></script>
+</body>
+</html>
