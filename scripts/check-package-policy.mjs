@@ -966,6 +966,7 @@ function inspectPublishWorkflow(source) {
         "actions/download-artifact@",
         "sha256sum --check --strict",
         "npm publish",
+        "--registry https://registry.npmjs.org/",
         "--access public",
         "--tag alpha",
         "--provenance",
@@ -1044,14 +1045,18 @@ function inspectPublishWorkflow(source) {
         );
     }
 
-    if (!publishJob.includes(
-            "registry-url: https://registry.npmjs.org"
-        ) ||
-        !publishJob.includes(
-            "Download the verified bundle without checking out source"
-        )) {
+    if (/^\s*registry-url\s*:/mu.test(publishJob) ||
+        /^\s*scope\s*:/mu.test(publishJob)) {
         addError(
-            "The publish job must target npmjs and consume only the verified Actions artifact."
+            "The npm OIDC publish job must not configure setup-node registry authentication; npm publish must select npmjs explicitly with --registry."
+        );
+    }
+
+    if (!publishJob.includes(
+        "Download the verified bundle without checking out source"
+    )) {
+        addError(
+            "The publish job must consume only the verified Actions artifact."
         );
     }
 }
