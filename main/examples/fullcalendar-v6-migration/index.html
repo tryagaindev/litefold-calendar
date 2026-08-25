@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>FullCalendar dayGridMonth rewrite example | litefold-calendar</title>
+	<link rel="stylesheet" href="../../dist/styles.css">
+	<link rel="stylesheet" href="../example.css">
+	<link rel="stylesheet" href="../../deployment-details.css">
+</head>
+<body>
+	<main class="example-shell">
+		<header class="example-intro">
+			<h1>Rewrite a basic dayGridMonth integration</h1>
+			<p>This standalone recipe adapts a JSON shape commonly used with FullCalendar v6. It is application code, not a compatibility layer.</p>
+		</header>
+
+		<section class="example-panel" aria-labelledby="migration-request-title">
+			<h2 id="migration-request-title">Range-aware source</h2>
+			<p data-example-range>Waiting for the first 42-day request.</p>
+			<div class="example-control-row">
+				<button class="example-button" type="button" data-example-refetch>Supersede a request</button>
+			</div>
+		</section>
+
+		<div class="example-calendar" data-example-calendar></div>
+
+		<section class="example-panel" aria-labelledby="migration-result-title">
+			<h2 id="migration-result-title">Application callbacks</h2>
+			<p><strong>Day selection:</strong> <span data-example-selection>None</span></p>
+			<p><strong>Event activation:</strong> <span data-example-activation>None</span></p>
+			<p class="example-result" data-example-status role="status">Loading adapted events.</p>
+		</section>
+	</main>
+
+	<script type="module" src="./main.js"></script>
+	<aside class="lfc-deployment-details" aria-label="Deployment details" data-deployment-channel="main">
+		<p><strong>Rolling main preview</strong></p>
+		<dl>
+			<dt>Package version</dt>
+			<dd><code>0.2.0-alpha.0</code></dd>
+			<dt>Source commit</dt>
+			<dd><code>8250ac4da9ada72a2915b8f810be404667ab47da</code></dd>
+			<dt>Deployment channel</dt>
+			<dd>Rolling main preview</dd>
+		</dl>
+	</aside>
+</body>
+</html>

@@ -1,0 +1,83 @@
+:root {
+	color-scheme: light dark;
+	font-family: system-ui, sans-serif;
+}
+
+body {
+	margin: 0 auto;
+	max-inline-size: 64rem;
+	padding: clamp(1rem, 4vw, 3rem);
+}
+
+header,
+main,
+footer {
+	max-inline-size: 52rem;
+}
+
+h1,
+h2,
+p {
+	margin-block-start: 0;
+}
+
+.lfc-pages-eyebrow {
+	font-size: 0.875rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+}
+
+section {
+	border-block-start: 0.125rem solid currentColor;
+	padding-block: 1.5rem;
+}
+
+.lfc-pages-deployment-list {
+	display: grid;
+	gap: 1rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.lfc-pages-deployment-card {
+	border: 0.0625rem solid currentColor;
+	padding: 1rem;
+}
+
+.lfc-pages-deployment-card dl {
+	display: grid;
+	gap: 0.25rem 0.75rem;
+	grid-template-columns: max-content minmax(0, 1fr);
+	margin-block-end: 0;
+}
+
+.lfc-pages-deployment-card dd {
+	margin: 0;
+	min-inline-size: 0;
+	overflow-wrap: anywhere;
+}
+
+a {
+	color: LinkText;
+}
+
+a:focus-visible {
+	outline: 0.1875rem solid Highlight;
+	outline-offset: 0.1875rem;
+}
+
+footer {
+	font-size: 0.875rem;
+	padding-block-start: 1rem;
+}
+
+@media (max-width: 32rem) {
+	.lfc-pages-deployment-card dl {
+		grid-template-columns: 1fr;
+	}
+
+	.lfc-pages-deployment-card dd:not(:last-child) {
+		margin-block-end: 0.5rem;
+	}
+}

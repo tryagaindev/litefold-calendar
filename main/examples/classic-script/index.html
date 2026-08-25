@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>litefold-calendar classic-script example</title>
+	<link rel="stylesheet" href="../../dist/styles.css">
+	<link rel="stylesheet" href="../example.css">
+	<script defer src="./main.js"></script>
+	<link rel="stylesheet" href="../../deployment-details.css">
+</head>
+<body>
+	<main class="example-shell">
+		<header class="example-intro">
+			<h1>Classic-script calendar</h1>
+			<p>The page entry uses a regular script while loading litefold-calendar from its local ESM build. Event actions remain native links or buttons.</p>
+		</header>
+
+		<p class="example-alert" data-startup-error role="alert"></p>
+		<div class="example-calendar" data-calendar></div>
+		<p class="example-result" data-result role="status"></p>
+	</main>
+	<aside class="lfc-deployment-details" aria-label="Deployment details" data-deployment-channel="main">
+		<p><strong>Rolling main preview</strong></p>
+		<dl>
+			<dt>Package version</dt>
+			<dd><code>0.2.0-alpha.0</code></dd>
+			<dt>Source commit</dt>
+			<dd><code>8250ac4da9ada72a2915b8f810be404667ab47da</code></dd>
+			<dt>Deployment channel</dt>
+			<dd>Rolling main preview</dd>
+		</dl>
+	</aside>
+</body>
+</html>
