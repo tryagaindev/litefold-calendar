@@ -9,6 +9,7 @@ const TARGETS = [
 	"coverage",
 	"dist",
 	"examples/advanced/main.js",
+	"examples/metadata.json",
 	"test-results"
 ];
 

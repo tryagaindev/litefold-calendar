@@ -10,9 +10,12 @@ Use this page to choose the shortest path to the information you need. The READM
 | Install and render a first calendar | [README quick start](../README.md#quick-start) and [basic JavaScript example](../examples/basic/) |
 | Look up public methods, inclusive bounds, month/year jumping, pull/snap paging, events, or date rules | [Public API reference](api.md) |
 | Adapt application data, caching, filters, actions, extensions, and compact toolbar content | [Application integration guide](integration-guide.md) |
+| Review the accepted `setEvents()` contract and its alternatives | [Dynamic event update decision record](dynamic-event-updates-adr.md) |
+| Reproduce the event-update timing and distribution-size evidence | [Dynamic event update measurement](dynamic-event-update-measurement.md) |
 | Rewrite a basic FullCalendar v6 `dayGridMonth` integration | [FullCalendar migration](fullcalendar-v6-migration.md) |
 | Add meaningful links and a no-JavaScript fallback | [SEO and progressive enhancement](seo-and-progressive-enhancement.md) |
 | Find which example exercises a feature | [Example coverage guide](../examples/) |
+| Verify or operate the static example deployments | [Static example deployment](example-deployment.md) |
 | Customize colors, spacing, responsive behavior, or themes | [CSS token contract](css-tokens.md) |
 | Handle loading, failure, Retry, and application-owned presentation | [Error handling](errors.md) and [async errors example](../examples/async-errors/) |
 | Verify keyboard, touch, pen, precision scrolling, zoom, contrast, and assistive technology | [Accessibility guidance](../ACCESSIBILITY.md) |

@@ -121,6 +121,20 @@ const calendar = createCalendar(host, {
 
 Litefold aborts superseded or destroyed requests and ignores stale results.  It does not cache or combine first-class event sources.  Aggregate, authorize, cache, and expand recurrence in application code before returning the snapshot.
 
+## Replace event input
+
+When the application receives a different complete static snapshot or provider, replace the event input on the rendered instance:
+
+```js
+calendar.setEvents(adaptFullCalendarEvents(nextEvents));
+```
+
+`setEvents()` is a complete replacement, not an add or merge operation.  It keeps the displayed month, selected date, current agenda reveal count, and package-owned focus when the same day or event occurrence remains.  A removed focused event falls back to its day.  The replacement aborts superseded source work, and `refetchEvents()` thereafter uses the latest accepted source.
+
+Call the method only after `render()` and before `destroy()`.  Litefold checks that lifecycle before inspecting the argument.  Invalid top-level input throws synchronous `invalid-argument` without changing current work.  Once accepted, a provider or payload failure uses the normal source-error flow and retains usable same-range data; the accepted source stays current for Retry and refetch.  If application callbacks replace events reentrantly, the last accepted replacement wins.
+
+This narrow event-data method does not update locale, time zone, `minDate`, `maxDate`, callbacks, extensions, limits, or other options.  Recreate the calendar instance when those construction-time values change.
+
 ## Rewrite callbacks
 
 ```js
@@ -148,11 +162,12 @@ Grid event activation does not select its represented day.  Use `surface` when b
 | `next()` | `next()` |
 | `today()` | `today()` |
 | `gotoDate(value)` | `gotoDate(value)` |
+| `getEventSources()` / `EventSource::remove()` / `addEventSource(value)` | `setEvents(value)` |
 | `refetchEvents()` | `refetchEvents()` |
 | `getDate()` | `getState().displayedMonth` or `getState().selectedDate` |
 | `destroy()` | `destroy()` |
 
-Litefold methods return `void` or a `PromiseLike<void>` according to the API reference.  Inclusive `minDate` and `maxDate` constraints apply consistently to controls, keyboard movement, touch paging, the month/year picker, and methods.
+Litefold navigation, lifecycle, and event-data methods return `void`; `getState()` returns an immutable snapshot.  `setEvents()` replaces the whole source rather than mirroring FullCalendar's mutable event store.  Inclusive `minDate` and `maxDate` constraints apply consistently to controls, keyboard movement, touch paging, the month/year picker, and methods.
 
 ## Replace styling hooks
 

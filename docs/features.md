@@ -14,9 +14,10 @@ This guide is the quickest way to determine whether litefold-calendar fits a pro
 | Multi-day events | One event can occupy every overlapping civil day according to its exclusive end | `CalendarEventInput` |
 | Grid event actions and overflow | Configurable direct event actions, a localized native overflow action, agenda paging, a DOM cap, and persistent `Showing X of Y` text | `maxGridEventsPerDay`, `gridMoreLabel`, `agendaPageSize`, `agendaDomLimit` |
 | Safe event links | Relative and HTTP(S) URLs become native anchors on grid and agenda surfaces after atomic validation | `CalendarEventInput.url`, `CalendarEvent.url` |
-| Static and fetched events | One option accepts an event array or an abort-aware provider that returns an array or promise-like result | `events`, `CalendarEvents`, `CalendarEventSource` |
-| Custom event data | Optional opaque metadata, inferred from a typed source and preserved for actions and extensions | `CalendarEventInput<TMetadata>.metadata` |
-| Refetch events | The current range can be requested again; same-range failures retain the last usable snapshot | `refetchEvents()` |
+| Static and fetched events | One initial option accepts an event array or an abort-aware provider that returns an array or promise-like result | `events`, `CalendarEvents`, `CalendarEventSource` |
+| Replace event input | A rendered instance can replace its complete static snapshot or provider without changing month, selection, or construction-time configuration | `Calendar<TMetadata>.setEvents()` |
+| Custom event data | Optional opaque metadata, inferred from a typed source and preserved by the generic calendar instance for replacements, actions, and extensions | `CalendarEventInput<TMetadata>.metadata`, `Calendar<TMetadata>` |
+| Refetch events | The current range can be requested again from the latest accepted source; same-range failures retain the last usable snapshot | `refetchEvents()` |
 | Date navigation | Previous, Next, and Today controls, a native month/year jump popover, an optional one-month pull/snap route, and methods to navigate, select, and focus dates | `prev()`, `next()`, `today()`, `gotoDate()`, `focusDate()`, `focusToday()`, `swipe` |
 | Calendar bounds | Optional per-instance inclusive date limits shared by controls, keyboard, pager, focus, activation, methods, and the month/year picker | `minDate`, `maxDate` |
 | Day/date click | Pointer or keyboard day selection with the native day button and strict date context | `onDaySelect` |
@@ -46,7 +47,7 @@ The component renders one current month view as a fixed 42-day grid. Dates from 
 
 Each grid cell contains a day button and a sibling summaries container; event and overflow actions live in that container rather than inside the day button, so interactive controls are never nested. In wider containers all events up to `maxGridEventsPerDay` are exposed directly. At `42rem` and below, the first actionable event remains a fully named native marker with a minimum 24 by 24 CSS-pixel target that grows toward 44 by 44 when its day cell permits; later grid actions are visually omitted unless they hold focus. Selecting a day resets and updates its paged agenda.
 
-Activating a different enabled day button within the displayed month by click, tap, Enter, or Space commits selection, agenda, ARIA, and focus synchronously. Pointer press, hover, and committed selection share the same day-number-circle starting treatment. When motion is allowed, one presentation-only radial reveal expands continuously across the cell while the selected and focus outlines remain stable; its final fill matches the already committed selected surface before transient state is removed. `prefers-reduced-motion: reduce`, same-date and adjacent-month activation, Grid More, navigation, and programmatic selection show the settled state immediately. The effect never delays `onDaySelect`, and initial, loading, data, error, paging, and refetch renders do not replay it.
+Activating a different enabled day button within the displayed month by click, tap, Enter, or Space commits selection, agenda, ARIA, and focus synchronously. Pointer press and hover use the selected day-number treatment as immediate feedback. When motion is allowed, the newly selected button transitions its whole-cell background directly from the rest surface to the committed selected surface while the date number scales subtly into place; no expanding overlay or delayed state commit is involved. Selected and focus outlines remain stable. `prefers-reduced-motion: reduce`, same-date and adjacent-month activation, Grid More, navigation, and programmatic selection show the settled state immediately. The effect never delays `onDaySelect`, and initial, loading, data, error, paging, replacement, and refetch renders do not replay it.
 
 An event with `url` is a native anchor on both surfaces. Without a URL, `onEventActivate` or an eligible context action produces a native button. When the context action is that button's only application action, click, tap, Enter, or Space invokes `onEventContextMenu` as its primary action; right-click, Context Menu, and Shift+F10 remain available on every eligible action. Without a URL or available action, the representation is static. Agenda markup uses `<ol>` and `<li>`; day numbers and event times use `<time datetime>`. `eventTimeDisplay` controls whether localized time text is visually exposed on each surface without removing the native time element, its machine-readable value, the accessible event name, or extension `timeText`. Direct grid event activation never selects its day or invokes `onDaySelect`.
 
@@ -58,7 +59,7 @@ For each day, events sort all-day first and then by start, title, and ID. `maxGr
 
 ## Events and event fetching
 
-The calendar accepts all-day, timed, point, and multi-day events through one typed `events` option. Pass a local array directly, or pass a range-aware provider that returns an array or promise-like result from application-owned work. The package never downloads a feed or caches results. It resolves an optional event `url` against the host document, accepting only validated relative or HTTP(S) destinations without credentials or control characters.
+The calendar accepts all-day, timed, point, and multi-day events through one typed `events` option. Pass a local array directly, or pass a range-aware provider that returns an array or promise-like result from application-owned work. `createCalendar<TMetadata>()` returns `Calendar<TMetadata>`, so the same metadata type applies when `setEvents()` later replaces the complete array or provider. The package never downloads a feed or caches results. It resolves an optional event `url` against the host document, accepting only validated relative or HTTP(S) destinations without credentials or control characters.
 
 Every committed visible-range change and `refetchEvents()` invocation calls the source with:
 
@@ -76,9 +77,15 @@ type CalendarEventSource<TMetadata = unknown> = (
 type CalendarEvents<TMetadata = unknown> =
 	readonly CalendarEventInput<TMetadata>[] |
 	CalendarEventSource<TMetadata>;
+
+interface Calendar<TMetadata = unknown> {
+	setEvents(events: CalendarEvents<TMetadata>): void;
+}
 ```
 
-Forward `signal` to cancellable work. A newer request supersedes the prior generation. The source result is accepted atomically: a malformed event, duplicate ID, or result beyond `sourceEventLimit` rejects the complete snapshot. A failed refresh for the same range retains the prior usable events and shows a stale-data warning.
+Forward `signal` to cancellable work. A newer request or accepted `setEvents()` call aborts and supersedes the prior generation. The source result is accepted atomically: a malformed event, duplicate ID, or result beyond `sourceEventLimit` rejects the complete snapshot. A failed refresh or accepted replacement for the same range retains the prior usable events and shows the normal stale-data warning. The accepted replacement remains current, and later Retry or `refetchEvents()` uses it rather than the construction-time source.
+
+`setEvents()` requires a rendered, live instance and checks lifecycle before inspecting its argument. Invalid top-level input throws `invalid-argument` without aborting or changing current work. An accepted replacement preserves the displayed month, selected date, current agenda reveal count within the result and DOM cap, and the exact package-owned focus target when it still exists; a removed focused event falls back to its day. Generation checks make the last accepted reentrant replacement win and prevent older success, failure, and render work from committing.
 
 `minDate` and `maxDate` constrain user interaction, not event loading. Every committed displayed month requests the full inclusive-start/exclusive-end range represented by all 42 grid cells; an in-progress pager pull requests nothing. Events on visible out-of-range dates may be returned and normalized, but their grid representations are not rendered and those days cannot be activated.
 
@@ -86,7 +93,7 @@ See the [public API reference](api.md) for strict input grammar, exclusive-end o
 
 ## Navigation and actions
 
-The built-in toolbar's DOM and focus order is Previous, Next, month/year title, then Today. Its presented month and year is a native button that opens a `popover="auto"` surface exposed as a dialog. Opening synchronizes the bounded native month select and required numeric year input, then focuses Month; unavailable months update when Year changes. A successful Jump changes to an in-range month, while a same-month submission is a no-op and never invokes `onDaySelect`. Invalid form input stays open for correction. Cancel preserves the current state. Successful Jump and Cancel close the popover and return focus to the month/year trigger. Escape also restores trigger focus; pointer/outside light-dismiss closes the popover without taking focus away from the user's new target. Application code can use `prev()`, `next()`, `today()`, `gotoDate()`, `focusDate()`, `focusToday()`, and `refetchEvents()` without querying package DOM.
+The built-in toolbar's DOM and focus order is Previous, Next, month/year title, then Today. Its presented month and year is a native button that opens a `popover="auto"` surface exposed as a dialog. Opening synchronizes the bounded native month select and required numeric year input, then focuses Month; unavailable months update when Year changes. A successful Jump changes to an in-range month, while a same-month submission is a no-op and never invokes `onDaySelect`. Invalid form input stays open for correction. Cancel preserves the current state. Successful Jump and Cancel close the popover and return focus to the month/year trigger. Escape also restores trigger focus; pointer/outside light-dismiss closes the popover without taking focus away from the user's new target. Application code can use `prev()`, `next()`, `today()`, `gotoDate()`, `focusDate()`, `focusToday()`, `setEvents()`, and `refetchEvents()` without querying package DOM.
 
 `minDate` and `maxDate` apply inclusively to every navigation, focus, and day-activation path. Previous, Next, Today, swipe, keyboard month/year movement, and the jump popover stop at those bounds. Previous, Next, and Today remain in the Tab order with `aria-disabled="true"` and guarded no-op activation when they have no in-range destination. Explicit out-of-range or unrenderable `initialDate` values and out-of-range `gotoDate()` / `focusDate()` values are rejected. When `initialDate` is omitted, initialization resolves the current date to the nearest in-range date in a renderable month when necessary.
 
@@ -115,6 +122,8 @@ Set the semantic HTML `dir` attribute on the calendar host or an ancestor to mir
 `initialDate` is optional; when omitted, the calendar starts from the date returned by `now`, whose default is the current instant from `new Date()`, and resolves to the nearest in-range date in a renderable month when necessary. An explicitly supplied `initialDate` must already be within the inclusive bounds and renderable. `timeZone` projects supplied `Date` instants, including `initialDate`, `minDate`, `maxDate`, and the result of `now()`, into an IANA time zone. It does not reinterpret event strings. Event strings are strict Gregorian civil dates or local date-times and intentionally contain no offset or zone annotation.
 
 The alpha supports Gregorian calendar arithmetic only. Locale changes presentation and week convention, not the underlying calendar system.
+
+Locale, time zone, `firstDay`, `minDate`, `maxDate`, and other non-event options remain construction-time configuration. Recreate the instance to change them; `setEvents()` does not provide general option reconciliation.
 
 ## Custom toolbar, rendering, and styling
 
@@ -153,7 +162,7 @@ The alpha does not provide:
 - Week, day, time-grid, separate list, timeline, resource, year, or multi-month views.
 - View switching, configurable grid duration, hidden weekends, week numbers, business hours, background events, or a now indicator.
 - Pre-rendered adjacent-month pager panels, carousel virtualization, or gesture-driven event prefetching.
-- Drag-and-drop, event resizing, built-in event creation/editing, or a mutable event/options API.
+- Drag-and-drop, event resizing, built-in event creation/editing, per-event mutation methods, or a general mutable-options API.
 - Date-range or time-range selection.
 - Recurrence or RRULE expansion. Expand occurrences before returning the source snapshot.
 - Multiple first-class event sources, built-in JSON/iCalendar/calendar-service feeds, or package-owned caching. Aggregate, fetch, authorize, and cache in the application source.

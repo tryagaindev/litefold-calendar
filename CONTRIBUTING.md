@@ -42,6 +42,8 @@ Keep each contract in one canonical document and link to it from shorter overvie
 | [Documentation hub](docs/README.md) | Goal-based routing across guides and examples |
 | [Internal architecture](docs/architecture.md) | Source ownership, dependency direction, transaction boundaries, and refactoring guidance |
 | [Coding conventions](docs/code-style.md) | TypeScript, structured data, civil dates, semantic HTML, accessibility, CSS, tests, and version references |
+| [Dynamic event update decision record](docs/dynamic-event-updates-adr.md) | Event-replacement alternatives, selected boundary, lifecycle, focus, agenda, and generation decisions |
+| [Dynamic event update measurement](docs/dynamic-event-update-measurement.md) | Reproducible large-event timing protocol and distribution-size evidence |
 | [Example coverage guide](examples/README.md) | Task-to-example routing and the executable public-surface coverage contract |
 | [Feature guide](docs/features.md) | Supported capabilities, terminology, and deliberate alpha scope boundaries |
 | [API reference](docs/api.md) | Normative root exports, signatures, defaults, lifecycle, dates, actions, state, and extension contracts |
@@ -55,6 +57,7 @@ Keep each contract in one canonical document and link to it from shorter overvie
 | [Browser support](docs/browser-support.md) | Rolling browser window, required platform features, and explicit exclusions |
 | [Support policy](SUPPORT.md) | Help channels, report content, and supported integration boundary |
 | [Release process](docs/releasing.md) | Public alpha preparation, immutable bundle handoff, trusted publishing, and registry verification |
+| [Static example deployment](docs/example-deployment.md) | Pages paths, identity, authority boundaries, retained releases, rollback, and stale-deployment checks |
 | [Alpha release checklist](docs/alpha-release-checklist.md) | One-time setup and per-release operator checks |
 | [Changelog](CHANGELOG.md) | User-visible additions, removals, and breaking alpha changes |
 
@@ -62,7 +65,7 @@ Avoid copying normative tables or detailed rules into multiple files. A short ta
 
 Keep the advanced example's `CompleteCalendarOptions`, `CompleteCalendarExtension`, and `calendarMethods` maps exhaustive. A new public option, method, or extension hook must receive a successful scenario, a relevant smoke assertion, and a coverage-guide entry in the same change. Put deliberate source, validation, action, extension, and presentation failures in the async-errors example instead of obscuring the advanced success path.
 
-Run `npm run check:docs` after changing Markdown headings, links, or root exports. The dependency-free check validates repository-local paths and anchors, rejects missing reference links and vague link labels, and requires every named root export to appear in `docs/api.md`. It does not validate external URLs or prove that prose and examples match runtime behavior, so review those manually and run `npm run typecheck:examples` and `npm run test:examples` when public behavior or example coverage changes. A visual change must also run `npm run screenshots:update` and `npm run check:screenshots`; the six PNGs, manifest, hashes, source fingerprint, references, and alt text change together.
+Run `npm run check:docs` after changing Markdown headings, links, or root exports. The dependency-free check validates repository-local paths and anchors, rejects missing reference links and vague link labels, and requires the exact root export set and runtime/type classification in `docs/api.md`. It does not validate external URLs or prove that prose and examples match runtime behavior, so review those manually and run `npm run typecheck:examples` and `npm run test:examples` when public behavior or example coverage changes. A visual change must also run `npm run screenshots:update` and `npm run check:screenshots`; the six PNGs, manifest, hashes, source fingerprint, references, and alt text change together.
 
 ## Implementation expectations
 

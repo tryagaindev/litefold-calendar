@@ -12,7 +12,7 @@ One event has a relative URL, so both grid and agenda representations are native
 
 This is a classic-script entry point, not a legacy or non-ESM package build. It requires the same modern evergreen browser baseline as litefold-calendar. Do not add `nomodule`; serve the repository over HTTP with JavaScript MIME types and a Content Security Policy that permits the same-origin scripts. The language behavior is defined by the [ECMA-262 `import()` contract](https://tc39.es/ecma262/multipage/ecmascript-language-expressions.html#sec-import-calls).
 
-Run `npm run build`, serve the repository root over HTTP, and open `examples/classic-script/`.
+Run `npm run demo` from the repository root, then choose **Classic-script loader** from the examples landing page.
 
 The example's unprefixed `data-*` attributes are application-owned fixture selectors. They are not package output or public API.
 

@@ -357,7 +357,7 @@ void test("a fresh toolbar touch clears stale suppression while refetch retains 
 	assert.equal(pager.viewport.scrollLeft, geometry.centerOffset);
 });
 
-void test("refetch, programmatic navigation, resize, reentrancy, and destroy cancel pending paging", async (context) => {
+void test("refetch, event replacement, navigation, resize, reentrancy, and destroy cancel pending paging", async (context) => {
 	const { dom, host } = setupDom(context);
 	let resizeCallback: ResizeObserverCallback | null = null;
 	let resizeDisconnects = 0;
@@ -401,6 +401,18 @@ void test("refetch, programmatic navigation, resize, reentrancy, and destroy can
 	assert.equal(requests, 2, "Refetch must cancel the pending 120ms pager fallback.");
 
 	setPagerScroll(dom, pager.viewport, geometry.nextOffset);
+	calendar.setEvents(() => {
+		requests += 1;
+		return [];
+	});
+	await waitForReady(calendar);
+	assert.equal(requests, 3);
+	assert.equal(calendar.getState().displayedMonth.month, 8);
+	assert.equal(pager.viewport.scrollLeft, geometry.centerOffset);
+	await delay(150);
+	assert.equal(requests, 3, "setEvents() must cancel the pending pager fallback.");
+
+	setPagerScroll(dom, pager.viewport, geometry.nextOffset);
 	const triggerResize = resizeCallback as ResizeObserverCallback | null;
 	assert.ok(triggerResize);
 	triggerResize([], {} as ResizeObserver);
@@ -413,16 +425,16 @@ void test("refetch, programmatic navigation, resize, reentrancy, and destroy can
 	assert.equal(pager.viewport.scrollLeft, geometry.centerOffset);
 	assert.equal(host.hasAttribute("data-lfc-swipe-state"), false);
 	await delay(150);
-	assert.equal(requests, 2);
+	assert.equal(requests, 3);
 
 	setPagerScroll(dom, pager.viewport, geometry.nextOffset);
 	calendar.next();
 	await waitForReady(calendar);
 	assert.equal(calendar.getState().displayedMonth.month, 9);
-	assert.equal(requests, 3);
+	assert.equal(requests, 4);
 	await delay(150);
 	assert.equal(calendar.getState().displayedMonth.month, 9);
-	assert.equal(requests, 3, "Programmatic navigation must cancel pending pager resolution.");
+	assert.equal(requests, 4, "Programmatic navigation must cancel pending pager resolution.");
 
 	setPagerScroll(dom, pager.viewport, geometry.nextOffset);
 	calendar.destroy();

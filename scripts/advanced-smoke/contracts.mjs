@@ -3,11 +3,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { REPOSITORY_ROOT } from "../lib/process.mjs";
+import { composeStyles } from "../lib/styles.mjs";
 
 const EXAMPLE_DIRECTORY = join(REPOSITORY_ROOT, "examples", "advanced");
 
 export async function verifyAdvancedStyleContracts() {
-	const packageStyles = await readFile(join(REPOSITORY_ROOT, "src", "styles.css"), "utf8");
+	const packageStyles = await composeStyles();
 	const exampleStyles = await readFile(join(EXAMPLE_DIRECTORY, "theme.css"), "utf8");
 	const narrowAgendaStart = packageStyles.indexOf("@container lfc-calendar (inline-size < 24rem)");
 	const narrowToolbarStart = packageStyles.indexOf("@container lfc-calendar (inline-size <= 20rem)");

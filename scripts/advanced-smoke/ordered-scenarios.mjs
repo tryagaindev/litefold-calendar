@@ -745,6 +745,19 @@ export async function runAdvancedSmokeScenarios(environment) {
 	);
 	clickCommand(document, "refetchEvents");
 	await waitFor(() => phase.textContent === "ready", "the explicit refetchEvents() command");
+	clickCommand(document, "setEvents");
+	await waitFor(
+		() => (host.textContent ?? "").includes("Dynamically replaced schedule") &&
+			phase.textContent === "ready",
+		"the setEvents() replacement"
+	);
+	assert.doesNotMatch(host.textContent ?? "", /Design review/u);
+	clickCommand(document, "refetchEvents");
+	await waitFor(
+		() => (host.textContent ?? "").includes("Dynamically replaced schedule") &&
+			phase.textContent === "ready",
+		"refetchEvents() using the latest replacement"
+	);
 
 	assert.equal(observedErrors.length, 0, "The advanced example must not report calendar errors.");
 	assert.equal(uncaughtErrors.length, 0, "The advanced example must not leak DOM event errors.");

@@ -1,0 +1,396 @@
+name: Deploy static examples
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      snapshot_ref:
+        description: Full pages-content commit whose main preview should be restored
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-examples-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  LFC_NODE_VERSION: "24.19.0"
+  LFC_NPM_VERSION: "12.0.2"
+
+jobs:
+  build:
+    name: Verify and stage static examples
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    permissions:
+      contents: read
+
+    outputs:
+      channel: ${{ steps.identity.outputs.channel }}
+      source-commit: ${{ steps.identity.outputs.source-commit }}
+      version: ${{ steps.identity.outputs.version }}
+
+    steps:
+      - name: Check out the requested source without persisted credentials
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.sha }}
+
+      - name: Set up exact Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.LFC_NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Set up exact npm
+        working-directory: ${{ runner.temp }}
+        run: npm install --global "npm@${LFC_NPM_VERSION}" --ignore-scripts
+
+      - name: Resolve deployment identity
+        id: identity
+        env:
+          LFC_EVENT_NAME: ${{ github.event_name }}
+          LFC_RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          source_commit="$(git rev-parse --verify HEAD^{commit})"
+          version="$(node --input-type=module -e 'import manifest from "./package.json" with { type: "json" }; process.stdout.write(manifest.version);')"
+          channel="main"
+
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "${source_commit}" origin/main
+
+          if [[ "${LFC_EVENT_NAME}" == "release" ]]; then
+            if [[ "${LFC_RELEASE_TAG}" != "v${version}" ]]; then
+              echo "Release tag ${LFC_RELEASE_TAG} does not match package version ${version}." >&2
+              exit 1
+            fi
+            channel="release"
+          fi
+
+          printf 'channel=%s\n' "${channel}" >> "${GITHUB_OUTPUT}"
+          printf 'source-commit=%s\n' "${source_commit}" >> "${GITHUB_OUTPUT}"
+          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install locked development tooling
+        run: npm ci --ignore-scripts
+
+      - name: Install pinned Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the complete quality gate with deployment metadata
+        env:
+          LFC_EXAMPLES_CHANNEL: ${{ steps.identity.outputs.channel }}
+          LFC_EXAMPLES_COMMIT: ${{ steps.identity.outputs.source-commit }}
+          LFC_EXAMPLES_VERSION: ${{ steps.identity.outputs.version }}
+        run: npm run check
+
+      - name: Stage the self-contained Pages channel
+        env:
+          LFC_PAGES_ARTIFACT: ${{ runner.temp }}/pages-channel
+        run: node scripts/build-pages.mjs --output "${LFC_PAGES_ARTIFACT}"
+
+      - name: Read the retained deployment state without write authority
+        env:
+          LFC_PREVIOUS_SITE: ${{ runner.temp }}/previous-pages-site
+        run: |
+          set -euo pipefail
+          mkdir -- "${LFC_PREVIOUS_SITE}"
+          if git show-ref --verify --quiet refs/remotes/origin/pages-content; then
+            git archive --format=tar refs/remotes/origin/pages-content |
+              tar --extract --file=- --directory="${LFC_PREVIOUS_SITE}"
+          fi
+
+      - name: Assemble the complete retained snapshot
+        env:
+          LFC_PAGES_ARTIFACT: ${{ runner.temp }}/pages-channel
+          LFC_PAGES_SNAPSHOT: ${{ runner.temp }}/pages-snapshot
+          LFC_PREVIOUS_SITE: ${{ runner.temp }}/previous-pages-site
+        run: |
+          node scripts/assemble-pages.mjs \
+            --previous "${LFC_PREVIOUS_SITE}" \
+            --channel "${LFC_PAGES_ARTIFACT}" \
+            --output "${LFC_PAGES_SNAPSHOT}"
+
+      - name: Upload the complete snapshot without deployment authority
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pages-snapshot-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          overwrite: false
+          path: ${{ runner.temp }}/pages-snapshot
+          retention-days: 7
+
+      - name: Upload browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pages-browser-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  update-snapshot:
+    name: Preserve deployment snapshot
+    needs: build
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      actions: read
+      contents: write
+
+    outputs:
+      snapshot-commit: ${{ steps.snapshot.outputs.commit }}
+
+    steps:
+      - name: Check out deployment state without executing project code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          path: pages-site
+          ref: main
+
+      - name: Download the complete verified snapshot
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: pages-snapshot-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pages-snapshot
+
+      - name: Validate and commit the complete deployment snapshot
+        id: snapshot
+        env:
+          LFC_CHANNEL: ${{ needs.build.outputs.channel }}
+          LFC_PAGES_SNAPSHOT: ${{ runner.temp }}/pages-snapshot
+          LFC_SOURCE_COMMIT: ${{ needs.build.outputs.source-commit }}
+          LFC_VERSION: ${{ needs.build.outputs.version }}
+        working-directory: pages-site
+        run: |
+          set -euo pipefail
+
+          expected_entries=(receipt.json site)
+          mapfile -t actual_entries < <(
+            find "${LFC_PAGES_SNAPSHOT}" -mindepth 1 -maxdepth 1 -printf '%f\n' |
+              LC_ALL=C sort
+          )
+          diff -u \
+            <(printf '%s\n' "${expected_entries[@]}") \
+            <(printf '%s\n' "${actual_entries[@]}")
+
+          if find "${LFC_PAGES_SNAPSHOT}" -type l -print -quit | grep -q .; then
+            echo "The complete Pages snapshot must not contain symbolic links." >&2
+            exit 1
+          fi
+          jq --exit-status \
+            --arg channel "${LFC_CHANNEL}" \
+            --arg commit "${LFC_SOURCE_COMMIT}" \
+            --arg version "${LFC_VERSION}" \
+            '. == {channel: $channel, commit: $commit, version: $version}' \
+            "${LFC_PAGES_SNAPSHOT}/receipt.json" \
+            > /dev/null
+
+          if git show-ref --verify --quiet refs/remotes/origin/pages-content; then
+            git switch --force-create pages-content refs/remotes/origin/pages-content
+          else
+            git switch --orphan pages-content
+          fi
+
+          if [[ -d releases ]]; then
+            if find releases -mindepth 1 -maxdepth 1 ! -type d -print -quit | grep -q .; then
+              echo "Retained release entries must be directories." >&2
+              exit 1
+            fi
+            while IFS= read -r retained_release; do
+              candidate_release="${LFC_PAGES_SNAPSHOT}/site/${retained_release}"
+              if [[ ! -d "${candidate_release}" ]]; then
+                echo "Candidate snapshot removed retained ${retained_release}." >&2
+                exit 1
+              fi
+              if ! diff --brief --recursive --no-dereference \
+                "${retained_release}" "${candidate_release}"; then
+                echo "Candidate snapshot changed retained ${retained_release}." >&2
+                exit 1
+              fi
+            done < <(find releases -mindepth 1 -maxdepth 1 -type d -printf '%p\n' | LC_ALL=C sort)
+          fi
+
+          retained_releases=()
+          candidate_releases=()
+          if [[ -d releases ]]; then
+            mapfile -t retained_releases < <(
+              find releases -mindepth 1 -maxdepth 1 -type d -printf '%p\n' | LC_ALL=C sort
+            )
+          fi
+          if [[ -d "${LFC_PAGES_SNAPSHOT}/site/releases" ]]; then
+            if find "${LFC_PAGES_SNAPSHOT}/site/releases" \
+              -mindepth 1 -maxdepth 1 ! -type d -print -quit | grep -q .; then
+              echo "Candidate release entries must be directories." >&2
+              exit 1
+            fi
+            mapfile -t candidate_releases < <(
+              find "${LFC_PAGES_SNAPSHOT}/site/releases" \
+                -mindepth 1 -maxdepth 1 -type d -printf 'releases/%f\n' | LC_ALL=C sort
+            )
+          fi
+          expected_releases=("${retained_releases[@]}")
+          if [[ "${LFC_CHANNEL}" == "release" ]]; then
+            expected_releases+=("releases/${LFC_VERSION}")
+          elif [[ "${LFC_CHANNEL}" != "main" ]]; then
+            echo "Unsupported deployment channel ${LFC_CHANNEL}." >&2
+            exit 1
+          fi
+          mapfile -t expected_releases < <(
+            printf '%s\n' "${expected_releases[@]}" | sed '/^$/d' | LC_ALL=C sort -u
+          )
+          if ! diff -u \
+            <(printf '%s\n' "${expected_releases[@]}") \
+            <(printf '%s\n' "${candidate_releases[@]}"); then
+            echo "Candidate snapshot has unauthorized release additions or removals." >&2
+            exit 1
+          fi
+
+          git rm --force -r --ignore-unmatch .
+          cp -a -- "${LFC_PAGES_SNAPSHOT}/site/." .
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          if ! git diff --cached --quiet; then
+            git commit -m "Deploy ${LFC_CHANNEL} examples from ${LFC_SOURCE_COMMIT}"
+            git push origin HEAD:refs/heads/pages-content
+          fi
+
+          printf 'commit=%s\n' "$(git rev-parse --verify HEAD^{commit})" >> "${GITHUB_OUTPUT}"
+
+  rollback-snapshot:
+    name: Restore retained main preview bytes
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    outputs:
+      snapshot-commit: ${{ steps.rollback.outputs.commit }}
+
+    steps:
+      - name: Check out deployment history without executing project code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          path: pages-site
+          ref: main
+
+      - name: Restore an exact retained main preview
+        id: rollback
+        env:
+          LFC_SNAPSHOT_REF: ${{ inputs.snapshot_ref }}
+        working-directory: pages-site
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${LFC_SNAPSHOT_REF}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Rollback requires a full lowercase pages-content commit." >&2
+            exit 1
+          fi
+          git cat-file -e "${LFC_SNAPSHOT_REF}^{commit}"
+          git merge-base --is-ancestor "${LFC_SNAPSHOT_REF}" refs/remotes/origin/pages-content
+          git cat-file -e "${LFC_SNAPSHOT_REF}:main/examples/metadata.json"
+          git switch --force-create pages-content refs/remotes/origin/pages-content
+          git restore --source "${LFC_SNAPSHOT_REF}" --staged --worktree -- main
+
+          restored_metadata="$(mktemp)"
+          jq --exit-status \
+            '.channel == "main" and (.commit | test("^[0-9a-f]{40}$"))' \
+            main/examples/metadata.json \
+            > /dev/null
+          jq --slurpfile main main/examples/metadata.json \
+            '.main = ($main[0] + {path: "main/examples/"})' \
+            site-manifest.json \
+            > "${restored_metadata}"
+          mv -- "${restored_metadata}" site-manifest.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          if ! git diff --cached --quiet; then
+            git commit -m "Restore main preview from ${LFC_SNAPSHOT_REF}"
+            git push origin HEAD:refs/heads/pages-content
+          fi
+
+          printf 'commit=%s\n' "$(git rev-parse --verify HEAD^{commit})" >> "${GITHUB_OUTPUT}"
+
+  package-site:
+    name: Package retained Pages snapshot
+    needs:
+      - rollback-snapshot
+      - update-snapshot
+    if: ${{ always() && !cancelled() && (needs.update-snapshot.result == 'success' || needs.rollback-snapshot.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      pages: read
+
+    env:
+      LFC_SNAPSHOT_COMMIT: ${{ needs.update-snapshot.outputs.snapshot-commit || needs.rollback-snapshot.outputs.snapshot-commit }}
+
+    steps:
+      - name: Check out the exact retained snapshot
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          ref: ${{ env.LFC_SNAPSHOT_COMMIT }}
+
+      - name: Export the snapshot without repository metadata
+        env:
+          LFC_PAGES_SITE: ${{ runner.temp }}/pages-site
+        run: |
+          set -euo pipefail
+          mkdir -- "${LFC_PAGES_SITE}"
+          git archive --format=tar HEAD | tar --extract --file=- --directory="${LFC_PAGES_SITE}"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload the retained Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/pages-site
+
+  deploy:
+    name: Deploy retained static examples
+    needs: package-site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    permissions:
+      id-token: write
+      pages: write
+
+    steps:
+      - name: Deploy the retained snapshot to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

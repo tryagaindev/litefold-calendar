@@ -40,6 +40,7 @@ When code owns both producer and consumer, return a typed interface containing t
 
 - Use kebab-case class names and the `lfc` namespace for package-owned selectors, containers, layers, keyframes, IDs, and custom data attributes.
 - Keep package selectors low-specificity and inside the package cascade layer.
+- Author package CSS in the canonical `tokens`, `base`, `toolbar`, `pager`, `month-grid`, `agenda`, `responsive`, and `preferences` module order beneath `src/styles/`. Each module contains one newline-terminated `@layer lfc` block; `scripts/lib/styles.mjs` validates and composes them into the single public `dist/styles.css` file. Do not add another public stylesheet or bypass the composer.
 - Expose reusable theming or layout values as documented `--lfc-*` tokens; reserve `--lfc-internal-*` for unsupported implementation details.
 - Use logical properties and container queries. Do not add physical-direction overrides or device-specific breakpoints when content/container behavior expresses the requirement.
 - Prefer CSS Grid, Flexbox, intrinsic sizing, and normal DOM flow for responsive placement. Do not use viewport listeners, `ResizeObserver`, layout measurement, or breakpoint-driven DOM movement to drive layout; interaction code may observe or measure geometry only when a public behavior such as native pager recentering requires it. Never use CSS `order`, reversed flow, or dense placement for interactive content.

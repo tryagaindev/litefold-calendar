@@ -97,6 +97,12 @@ The second job waits for verification, enters the protected `npm` environment, a
 
 The workflow is serialized across alpha releases so two versions cannot publish concurrently.
 
+## Release example deployment
+
+Publishing a GitHub release also triggers `.github/workflows/deploy-examples.yml`.  That workflow verifies the tagged source independently, retains the example under `releases/<package-version>/examples/`, and refuses to replace an existing version path with different bytes.  It uses the protected `github-pages` environment and has no npm publishing authority.  Conversely, `publish-alpha.yml` has no Pages authority.
+
+Monitor the npm and Pages runs as separate release results.  The release demo must show the manifest version, tagged source commit, and **Immutable release** channel before linking to it.  See the [static example deployment guide](example-deployment.md) for repository setup, rollback of the rolling preview, and stale-deployment checks.
+
 ## Post-publish verification
 
 After the workflow succeeds, verify the registry result from a clean environment:
@@ -104,7 +110,7 @@ After the workflow succeeds, verify the registry result from a clean environment
 ```sh
 npm view @tryagaindev/litefold-calendar@alpha name version dist-tags dist.integrity repository --json
 npm pack @tryagaindev/litefold-calendar@alpha --ignore-scripts
-npm install --save-exact @tryagaindev/litefold-calendar@0.1.0-alpha.0
+npm install --save-exact @tryagaindev/litefold-calendar@0.2.0-alpha.0
 npm audit signatures
 ```
 

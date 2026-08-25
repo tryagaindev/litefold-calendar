@@ -1,6 +1,6 @@
 # Async errors example
 
-Run `npm run build`, serve the repository root over HTTP, and open `examples/async-errors/`.
+Run `npm run demo` from the repository root, then choose **Async errors** from the examples landing page.
 
 Use **Fail next source request** to see a retained-data warning and package Retry behavior. **Application owns source-error UI** demonstrates the explicit `"handled"` return; all other errors keep package-owned presentation. **Reject event actions** demonstrates observable async failure from the native grid or agenda button. **Rebuild with a failing extension** demonstrates extension quarantine: checked mode produces a package-owned `extension-failed` warning while the core calendar remains usable; unchecked mode recreates a healthy instance and renders **Extension active** details. Every toggle destroys and recreates the calendar because a quarantined extension is not retried within its instance. The two pre-created live regions model a centralized application announcer.
 

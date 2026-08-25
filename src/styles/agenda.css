@@ -1,0 +1,309 @@
+@layer lfc {
+  :where(.litefold-calendar) .lfc-calendar-agenda {
+    background: var(--lfc-surface-background);
+    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+    border: 1px solid var(--lfc-internal-grid-border-color);
+    border-radius: var(--lfc-border-radius);
+    display: grid;
+    gap: var(--lfc-gap);
+    margin-block: var(--lfc-gap);
+    margin-inline: var(--lfc-gap);
+    min-inline-size: 0;
+    padding: var(--lfc-gap);
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-agenda-title {
+    font-size: 1.125em;
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 0;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-agenda-list {
+    display: grid;
+    gap: var(--lfc-gap);
+    grid-template-columns:
+      minmax(0, max-content)
+      minmax(0, max-content)
+      minmax(0, 1fr);
+    list-style: none;
+    margin: 0;
+    min-inline-size: 0;
+    padding: 0;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-agenda-list[hidden] {
+    display: none;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-agenda-footer {
+    display: grid;
+    gap: var(--lfc-gap);
+    justify-items: start;
+    min-inline-size: 0;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-agenda-item {
+    column-gap: var(--lfc-gap);
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns:
+      minmax(0, max-content)
+      minmax(0, max-content)
+      minmax(0, 1fr);
+    grid-template-columns: subgrid;
+    min-inline-size: 0;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-agenda-event {
+    align-items: safe center;
+    background: var(--lfc-event-background);
+    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+    border: 1px solid var(--lfc-event-border-color);
+    border-inline-start: var(--lfc-event-accent-width) solid var(--lfc-event-accent-color);
+    border-radius: var(--lfc-internal-event-border-radius);
+    color: var(--lfc-event-color);
+    display: grid;
+    gap: 0.25rem var(--lfc-gap);
+    grid-column: 1 / -1;
+    grid-template-columns:
+      minmax(0, max-content)
+      minmax(0, max-content)
+      minmax(0, 1fr);
+    grid-template-columns: subgrid;
+    inline-size: 100%;
+    min-block-size: max(2.75rem, var(--lfc-control-min-size));
+    min-inline-size: 0;
+    padding: max(0.5rem, var(--lfc-gap));
+    text-align: start;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-event-button {
+    appearance: none;
+    cursor: pointer;
+    text-decoration: none;
+    touch-action: manipulation;
+    transition-duration: var(--lfc-internal-motion-duration);
+    transition-property: background-color, border-color, box-shadow, color;
+    transition-timing-function: ease-out;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event
+    .lfc-calendar-event-details {
+    grid-column: 3;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event
+    .lfc-calendar-event-leading {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event
+    .lfc-calendar-event-trailing {
+    display: flex;
+    grid-column: 3;
+    min-inline-size: 0;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-time {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event
+    .lfc-calendar-time {
+    color: var(--lfc-muted-color);
+    grid-column: 2;
+    grid-row: 1;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-event-title {
+    flex: 1 1 10rem;
+    font-weight: 700;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event
+    .lfc-calendar-event-title {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-list:where(
+      :not(:has(.lfc-calendar-time:not(:empty, .lfc-visually-hidden)))
+    ) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event:where(
+      :has(> .lfc-calendar-time:is(:empty, .lfc-visually-hidden))
+    ) {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event:where(
+      :has(> .lfc-calendar-time:is(:empty, .lfc-visually-hidden))
+    )
+    :where(
+      .lfc-calendar-event-title,
+      .lfc-calendar-event-details,
+      .lfc-calendar-event-trailing
+    ) {
+    grid-column: 2;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event:where(
+      :has(> .lfc-calendar-event-leading.lfc-visually-hidden),
+      :not(
+          :has(
+              > .lfc-calendar-event-leading > .lfc-calendar-event-marker:not(:empty),
+              > .lfc-calendar-event-leading > .lfc-calendar-event-leading-content:not(:empty)
+            )
+        )
+    ) {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event:where(
+      :has(> .lfc-calendar-event-leading.lfc-visually-hidden),
+      :not(
+          :has(
+              > .lfc-calendar-event-leading > .lfc-calendar-event-marker:not(:empty),
+              > .lfc-calendar-event-leading > .lfc-calendar-event-leading-content:not(:empty)
+            )
+        )
+    )
+    .lfc-calendar-time {
+    grid-column: 1;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event:where(
+      :has(> .lfc-calendar-event-leading.lfc-visually-hidden),
+      :not(
+          :has(
+              > .lfc-calendar-event-leading > .lfc-calendar-event-marker:not(:empty),
+              > .lfc-calendar-event-leading > .lfc-calendar-event-leading-content:not(:empty)
+            )
+        )
+    )
+    :where(
+      .lfc-calendar-event-title,
+      .lfc-calendar-event-details,
+      .lfc-calendar-event-trailing
+    ) {
+    grid-column: 2;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event:where(
+      :has(> .lfc-calendar-time:is(:empty, .lfc-visually-hidden))
+    ):where(
+      :has(> .lfc-calendar-event-leading.lfc-visually-hidden),
+      :not(
+          :has(
+              > .lfc-calendar-event-leading > .lfc-calendar-event-marker:not(:empty),
+              > .lfc-calendar-event-leading > .lfc-calendar-event-leading-content:not(:empty)
+            )
+        )
+    ) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-agenda-event:where(
+      :has(> .lfc-calendar-time:is(:empty, .lfc-visually-hidden))
+    ):where(
+      :has(> .lfc-calendar-event-leading.lfc-visually-hidden),
+      :not(
+          :has(
+              > .lfc-calendar-event-leading > .lfc-calendar-event-marker:not(:empty),
+              > .lfc-calendar-event-leading > .lfc-calendar-event-leading-content:not(:empty)
+            )
+        )
+    )
+    :where(
+      .lfc-calendar-event-title,
+      .lfc-calendar-event-details,
+      .lfc-calendar-event-trailing
+    ) {
+    grid-column: 1;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-agenda-empty,
+  :where(.litefold-calendar) .lfc-calendar-agenda-overflow {
+    color: var(--lfc-muted-color);
+    margin: 0;
+    max-inline-size: 80ch;
+    overflow-wrap: anywhere;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-agenda-more {
+    justify-self: start;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-more {
+    color: var(--lfc-muted-color);
+    font-size: 0.75em;
+    font-weight: 700;
+    overflow: hidden;
+    padding-inline: 0.25rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-grid-more {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    min-block-size: max(1.5rem, var(--lfc-grid-event-min-block-size));
+    min-inline-size: 1.5rem;
+    touch-action: manipulation;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-event-marker:empty,
+  :where(.litefold-calendar) .lfc-calendar-time:empty,
+  :where(.litefold-calendar) .lfc-calendar-event-details:empty,
+  :where(.litefold-calendar) .lfc-calendar-event-trailing:empty,
+  :where(.litefold-calendar)
+    .lfc-calendar-event-leading:has(> .lfc-calendar-event-marker:empty):has(
+      > .lfc-calendar-event-leading-content:empty
+    ) {
+    display: none;
+  }
+
+  :where(.litefold-calendar)[aria-busy="true"] {
+    cursor: progress;
+  }
+
+  :where(.litefold-calendar) .lfc-visually-hidden {
+    /* stylelint-disable unit-disallowed-list -- Canonical visually-hidden sentinel. */
+    block-size: 1px;
+    border: 0;
+    clip-path: inset(50%);
+    inline-size: 1px;
+    margin: -1px;
+    /* stylelint-enable unit-disallowed-list */
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    white-space: nowrap;
+  }
+}

@@ -85,15 +85,40 @@ export async function verifyPackedBrowserInteraction(installedPackage) {
 			throw new Error(`Packed calendar did not become ready; phase was ${calendar.getState().phase}.`);
 		}
 
-		const action = host.querySelector(
+		const initialAction = host.querySelector(
 			".lfc-calendar-agenda button[data-lfc-event-id='packed-byte-event']"
 		);
-		if (!(action instanceof dom.window.HTMLButtonElement)) {
+		if (!(initialAction instanceof dom.window.HTMLButtonElement)) {
 			throw new Error("Packed calendar did not render its actionable agenda event.");
+		}
+		calendar.setEvents([{
+			id: "packed-replacement",
+			start: "2026-07-14T10:00",
+			title: "Packed replacement interaction"
+		}]);
+		for (let attempt = 0; attempt < 200 && calendar.getState().phase !== "ready"; attempt += 1) {
+			await new Promise((resolvePromise) => {
+				setTimeout(resolvePromise, 0);
+			});
+		}
+		if (calendar.getState().phase !== "ready" || initialAction.isConnected) {
+			throw new Error("Packed calendar did not commit setEvents() replacement data.");
+		}
+		calendar.refetchEvents();
+		for (let attempt = 0; attempt < 200 && calendar.getState().phase !== "ready"; attempt += 1) {
+			await new Promise((resolvePromise) => {
+				setTimeout(resolvePromise, 0);
+			});
+		}
+		const action = host.querySelector(
+			".lfc-calendar-agenda button[data-lfc-event-id='packed-replacement']"
+		);
+		if (!(action instanceof dom.window.HTMLButtonElement)) {
+			throw new Error("Packed calendar did not refetch the latest setEvents() snapshot.");
 		}
 		const nativeEvent = new dom.window.MouseEvent("click", { bubbles: true, cancelable: true });
 		action.dispatchEvent(nativeEvent);
-		if (activation?.event?.id !== "packed-byte-event" || activation.nativeEvent !== nativeEvent ||
+		if (activation?.event?.id !== "packed-replacement" || activation.nativeEvent !== nativeEvent ||
 			activation.surface !== "agenda") {
 			throw new Error("Packed calendar did not activate the rendered event through its public callback.");
 		}

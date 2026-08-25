@@ -1,6 +1,6 @@
 # Progressive-enhancement example
 
-Run `npm run build`, serve the repository root over HTTP, and open `examples/progressive-enhancement/`.
+Run `npm run demo` from the repository root, then choose **Progressive enhancement** from the examples landing page.
 
 The page starts with ordinary server-like HTML: a heading, ordered event list, native links, and `<time datetime>` values. It remains useful when JavaScript or the event source is unavailable. The fallback is a sibling of the calendar host because `fallbackElement` cannot be inside the host that rendering owns.
 

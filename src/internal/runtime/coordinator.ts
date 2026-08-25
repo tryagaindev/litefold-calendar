@@ -30,14 +30,20 @@ import {
 	createState, isExtensionSurface, isSourceIssue, phaseForCode, severityRank,
 	type InternalErrorOptions, type InternalIssue
 } from "./state.js";
+import { CalendarAnnouncementPresenter } from "../dom/announcement.js";
+import { presentCalendarIssue } from "../dom/issue-region.js";
 import { createCalendarStructure, type CalendarDom } from "../dom/structure.js";
 import { CalendarMonthPickerController } from "../dom/month-picker.js";
 import { CalendarMonthTitleRenderer } from "../dom/month-title.js";
+import { createAgendaPresentation, type AgendaEventEntry } from "../dom/agenda.js";
 import { createEventAccent } from "../dom/event-accent.js";
 import {
-	createEventContentElements, createEventRoot,
 	installEventActionListeners as installNativeEventActionListeners, registerGridEventAction
 } from "../dom/event-structure.js";
+import {
+	createEventRepresentation as createEventDomRepresentation,
+	type EventRepresentation, type EventRepresentationElements
+} from "../dom/event-representation.js";
 import { CalendarEventText } from "../dom/event-text.js";
 import { resolveTextDirection, type HostWindow } from "../dom/environment.js";
 import {
@@ -57,7 +63,7 @@ import {
 } from "./safety.js";
 import type {
 	Calendar, CalendarAnnouncement, CalendarDate, CalendarDateInput, CalendarEvent,
-	CalendarEventActionElement, CalendarEventSource, CalendarEventSurface, CalendarOptions,
+	CalendarEventActionElement, CalendarEvents, CalendarEventSource, CalendarEventSurface, CalendarOptions,
 	CalendarPhase, CalendarState
 } from "../../types.js";
 
@@ -80,24 +86,6 @@ const SOURCE_EVENT_LIMIT_MINIMUM = 1;
 let instanceSequence = 0;
 
 const HOST_OWNERS = new WeakMap<HTMLElement, object>();
-interface RenderedEventElements {
-	readonly action: CalendarEventActionElement | null;
-	readonly date: CalendarDate;
-	readonly dateString: string;
-	readonly details: HTMLElement;
-	readonly leading: HTMLElement;
-	readonly marker: HTMLElement;
-	readonly root: HTMLElement;
-	readonly surface: CalendarEventSurface;
-	readonly time: HTMLTimeElement;
-	readonly title: HTMLSpanElement;
-	readonly trailing: HTMLElement;
-}
-
-interface RenderedAgendaEvent {
-	readonly action: CalendarEventActionElement | null;
-	readonly root: HTMLElement;
-}
 
 interface DayMountRegistration {
 	readonly context: Readonly<Record<string, unknown>>;
@@ -115,7 +103,7 @@ interface EventMountRegistration<TMetadata> {
  * Generated CSS classes and data attributes other than the documented root
  * selector and tokens are private implementation details.
  */
-export class MonthCalendar<TMetadata = unknown> implements Calendar {
+export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private readonly abortControllerConstructor: typeof AbortController;
 	private readonly agendaDomLimit: number;
 	private readonly agendaPageSize: number;
@@ -124,7 +112,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 	private readonly document: Document;
 	private readonly eventBaseUrl: string;
 	private readonly eventText: CalendarEventText;
-	private readonly eventProvider: CalendarEventSource<TMetadata>;
+	private eventProvider: CalendarEventSource<TMetadata>;
 	private readonly extensions: readonly ExtensionRuntime<TMetadata>[];
 	private readonly fallbackElement: HTMLElement | null;
 	private readonly firstDay: number;
@@ -155,6 +143,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 
 	private activeController: AbortController | null = null;
 	private announcementGeneration = 0;
+	private announcementPresenter: CalendarAnnouncementPresenter | null = null;
 	private readonly actionGenerations = new Map<string, number>();
 	private agendaVisibleCount: number;
 	private currentEventsByDate: ReadonlyMap<string, readonly NormalizedCalendarEvent<TMetadata>[]> = new Map();
@@ -162,6 +151,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 	private dayButtons = new Map<string, HTMLButtonElement>();
 	private displayedMonth: CalendarDate;
 	private dom: CalendarDom | null = null;
+	private eventReplacementSequence = 0;
 	private focusedDate: CalendarDate;
 	private generation = 0;
 	private hasFatalError = false;
@@ -172,6 +162,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 	private isRendered = false;
 	private isRetrying = false;
 	private loadedRangeKey: string | null = null;
+	private latestAcceptedEventReplacement = 0;
 	private eventActions = new Map<string, CalendarEventActionElement>();
 	private gridActionsByDate = new Map<string, readonly CalendarEventActionElement[]>();
 	private gridMoreButtons = new Map<string, HTMLButtonElement>();
@@ -429,7 +420,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 		this.monthPickerController.hide(false);
 		this.generation += 1;
 		this.actionGenerations.clear();
-		this.announcementGeneration += 1;
+		this.resetInternalAnnouncement();
 		this.activeController?.abort();
 		this.activeController = null;
 		const ownsHost = HOST_OWNERS.get(this.host) === this;
@@ -458,6 +449,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 		this.integrationNodes.restoreFallback();
 		this.integrationNodes.release();
 		this.dom = null;
+		this.announcementPresenter = null;
 		this.currentEventsByDate = new Map();
 		this.currentRange = null;
 		this.dayButtons.clear();
@@ -468,6 +460,33 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 		this.hasCurrentSnapshot = false;
 		this.internalIssues = [];
 		this.setState("destroyed");
+	}
+
+	/** Replaces the complete event input and loads the current visible range. */
+	public setEvents(events: CalendarEvents<TMetadata>): void {
+		this.requireLive("setEvents");
+		const replacementSequence = ++this.eventReplacementSequence;
+		let resolvedEvents: CalendarEvents<TMetadata>;
+		try {
+			resolvedEvents = resolveCalendarEvents<TMetadata>({ events });
+		} catch (cause: unknown) {
+			throw this.createPublicMethodError(
+				"invalid-argument",
+				"setEvents",
+				"setEvents(events) requires a readable static event array or event source function.",
+				cause
+			);
+		}
+		if (!this.canContinueInteraction() ||
+			replacementSequence < this.latestAcceptedEventReplacement) {
+			return;
+		}
+		this.latestAcceptedEventReplacement = replacementSequence;
+		this.eventProvider = typeof resolvedEvents === "function"
+			? resolvedEvents
+			: () => resolvedEvents;
+		this.swipeGesture.clear();
+		this.loadVisibleEvents(false);
 	}
 
 	/** Forces the current visible range to be loaded again. */
@@ -566,6 +585,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 			},
 			toolbarEnd: this.toolbarEnd
 		});
+		this.announcementPresenter = new CalendarAnnouncementPresenter(dom);
 		if (!this.hasFatalError) {
 			this.swipeGesture.connect(dom);
 		}
@@ -726,15 +746,16 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 			if (rendered === null) {
 				return cell;
 			}
+			const { action, root } = rendered.elements;
 			compactPrimaryAssigned = registerGridEventAction(
-				rendered.root,
-				rendered.action,
+				root,
+				action,
 				gridActions,
 				eventActions,
 				getEventActionKey("grid-summary", dateString, event.event.id),
 				compactPrimaryAssigned
 			);
-			summaries.append(rendered.root);
+			summaries.append(root);
 		}
 		if (events.length > this.gridEventLimit) {
 			const more = this.document.createElement("button");
@@ -840,26 +861,50 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 		surface: CalendarEventSurface,
 		eventMounts: EventMountRegistration<TMetadata>[],
 		renderGeneration: number
-	): RenderedAgendaEvent | null {
+	): Readonly<EventRepresentation> | null {
 		const hasContextAction = this.isEventContextMenuAvailable(event.event, date, surface);
 		if (!this.isRenderGenerationCurrent(renderGeneration)) {
 			return null;
 		}
 		const dateString = formatCalendarDate(date);
-		const { action, root } = createEventRoot({
+		const timeText = this.eventText.getEventTimeText(event, date);
+		const representation = createEventDomRepresentation({
 			accessibleLabel: this.eventText.getGridEventAccessibleLabel(event, date),
 			dateString,
 			document: this.document,
-			eventId: event.event.id,
+			event,
 			hasApplicationAction: this.options.onEventActivate !== undefined || hasContextAction,
 			surface,
-			url: event.event.url
+			timeDisplay: this.options.eventTimeDisplay ?? "all",
+			timeText
 		});
-		const rendered = this.createEventContents(event, date, surface, action, root, renderGeneration);
-		if (rendered === null) {
+		const { action, details, marker, trailing } = representation.elements;
+		const makeContext = (signal: AbortSignal): Readonly<Record<string, unknown>> => ({
+			date: Object.freeze({ ...date }),
+			dateString,
+			document: this.document,
+			elements: representation.elements,
+			event: event.event,
+			signal,
+			surface,
+			timeText
+		});
+		this.renderEventMarker(marker, event.event.accentColor, makeContext);
+		if (!this.isRenderGenerationCurrent(renderGeneration)) {
 			return null;
 		}
-		root.append(rendered.leading, rendered.time, rendered.title, rendered.details, rendered.trailing);
+		this.renderExtensionSlot("renderEventLeading", representation.slots.leadingContent, makeContext);
+		if (!this.isRenderGenerationCurrent(renderGeneration)) {
+			return null;
+		}
+		this.renderExtensionSlot("renderEventDetails", details, makeContext);
+		if (!this.isRenderGenerationCurrent(renderGeneration)) {
+			return null;
+		}
+		this.renderExtensionSlot("renderEventTrailing", trailing, makeContext);
+		if (!this.isRenderGenerationCurrent(renderGeneration)) {
+			return null;
+		}
 		if (action !== null) {
 			this.installEventActionListeners(
 				action,
@@ -870,8 +915,17 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 				renderGeneration
 			);
 		}
-		eventMounts.push({ context: this.createEventMountContext(rendered, event.event) });
-		return { action, root };
+		eventMounts.push({
+			context: this.createEventMountContext(
+				representation.elements,
+				date,
+				dateString,
+				event.event,
+				surface,
+				timeText
+			)
+		});
+		return representation;
 	}
 
 	private installEventActionListeners(
@@ -971,33 +1025,16 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 		renderGeneration: number
 	): void {
 		const { agendaFooter: footer, agendaList: list, agendaTitle: title } = dom;
-		this.agendaMoreButton = null;
-		title.textContent = formatCalendarMessage(this.messages.agendaTitle, {
+		const selectedDateString = formatCalendarDate(this.selectedDate);
+		const titleText = formatCalendarMessage(this.messages.agendaTitle, {
 			date: this.eventText.formatFullDate(this.selectedDate)
 		});
 		const events = this.getEventsForDate(this.selectedDate);
-		if (!this.hasCurrentSnapshot) {
-			list.hidden = true;
-			list.replaceChildren();
-			footer.replaceChildren();
-			return;
-		}
-		if (events.length === 0) {
-			list.hidden = true;
-			list.replaceChildren();
-			const empty = this.document.createElement("p");
-			empty.className = "lfc-calendar-agenda-empty";
-			empty.textContent = this.messages.agendaEmpty;
-			footer.replaceChildren(empty);
-			return;
-		}
-
-		list.hidden = false;
-		const visibleCount = Math.min(events.length, this.agendaVisibleCount, this.agendaDomLimit);
-		const children: Node[] = [];
-		for (const event of events.slice(0, visibleCount)) {
-			const item = this.document.createElement("li");
-			item.className = "lfc-calendar-agenda-item";
+		const visibleCount = this.hasCurrentSnapshot
+			? Math.min(events.length, this.agendaVisibleCount, this.agendaDomLimit)
+			: 0;
+		const entries: Readonly<AgendaEventEntry>[] = [];
+		for (const event of this.hasCurrentSnapshot ? events.slice(0, visibleCount) : []) {
 			const rendered = this.createEventRepresentation(
 				event,
 				this.selectedDate,
@@ -1008,28 +1045,47 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 			if (rendered === null) {
 				return;
 			}
-			item.append(rendered.root);
-			if (rendered.action !== null) {
-				eventActions.set(
-					getEventActionKey("agenda", formatCalendarDate(this.selectedDate), event.event.id),
-					rendered.action
-				);
-			}
+			entries.push(Object.freeze({
+				action: rendered.elements.action,
+				eventId: event.event.id,
+				root: rendered.elements.root
+			}));
 			if (this.wasRenderInterrupted(dom, renderGeneration)) {
 				return;
 			}
-			children.push(item);
 		}
-		const footerChildren: Node[] = [];
-		if (visibleCount < events.length && visibleCount < this.agendaDomLimit) {
-			const more = this.document.createElement("button");
-			more.className = "lfc-calendar-agenda-more";
-			more.type = "button";
-			this.agendaMoreButton = more;
-			const increment = Math.min(this.agendaPageSize, this.agendaDomLimit - visibleCount, events.length - visibleCount);
-			more.textContent = formatCalendarMessage(this.messages.agendaMore, {
-				count: this.numberFormatter.format(increment)
-			});
+		const hasOverflow = this.hasCurrentSnapshot && visibleCount < events.length;
+		const canRevealMore = hasOverflow && visibleCount < this.agendaDomLimit;
+		const revealCount = canRevealMore
+			? Math.min(this.agendaPageSize, this.agendaDomLimit - visibleCount, events.length - visibleCount)
+			: 0;
+		const moreText = canRevealMore
+			? formatCalendarMessage(this.messages.agendaMore, {
+				count: this.numberFormatter.format(revealCount)
+			})
+			: null;
+		const progressText = hasOverflow
+			? formatCalendarMessage(this.messages.agendaProgress, {
+				total: this.numberFormatter.format(events.length),
+				visible: this.numberFormatter.format(visibleCount)
+			})
+			: null;
+		const presentation = createAgendaPresentation({
+			document: this.document,
+			emptyText: this.messages.agendaEmpty,
+			entries: Object.freeze(entries),
+			hasSnapshot: this.hasCurrentSnapshot,
+			moreText,
+			progressText,
+			titleText,
+			totalEventCount: events.length
+		});
+		if (this.wasRenderInterrupted(dom, renderGeneration)) {
+			return;
+		}
+
+		const more = presentation.moreButton;
+		if (more !== null) {
 			more.addEventListener("click", () => {
 				if (!this.canUseRenderedAction(more, renderGeneration)) {
 					return;
@@ -1045,7 +1101,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 					? this.dom?.agendaTitle ?? null
 					: this.eventActions.get(getEventActionKey(
 						"agenda",
-						formatCalendarDate(this.selectedDate),
+						selectedDateString,
 						firstRevealedEventId
 					)) ?? this.dom?.agendaTitle ?? null;
 				focusTarget?.focus({ preventScroll: true });
@@ -1057,98 +1113,36 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 					politeness: "polite"
 				});
 			});
-			footerChildren.push(more);
 		}
-		if (visibleCount < events.length) {
-			const overflow = this.document.createElement("p");
-			overflow.className = "lfc-calendar-agenda-overflow";
-			overflow.textContent = formatCalendarMessage(this.messages.agendaProgress, {
-				total: this.numberFormatter.format(events.length),
-				visible: this.numberFormatter.format(visibleCount)
-			});
-			footerChildren.push(overflow);
+		for (const reference of presentation.actionReferences) {
+			eventActions.set(
+				getEventActionKey("agenda", selectedDateString, reference.eventId),
+				reference.action
+			);
 		}
-		list.replaceChildren(...children);
-		footer.replaceChildren(...footerChildren);
+		title.textContent = presentation.titleText;
+		list.hidden = presentation.listHidden;
+		list.replaceChildren(...presentation.listItems);
+		footer.replaceChildren(...presentation.footerChildren);
+		this.agendaMoreButton = more;
 	}
 
-	private createEventContents(
-		event: NormalizedCalendarEvent<TMetadata>,
+	private createEventMountContext(
+		elements: Readonly<EventRepresentationElements>,
 		date: CalendarDate,
+		dateString: string,
+		event: CalendarEvent<TMetadata>,
 		surface: CalendarEventSurface,
-		action: CalendarEventActionElement | null,
-		root: HTMLElement,
-		renderGeneration: number
-	): RenderedEventElements | null {
-		const dateString = formatCalendarDate(date);
-		const timeText = this.eventText.getEventTimeText(event, date);
-		const { details, leading, leadingContent, marker, time, title, trailing } =
-			createEventContentElements(this.document, event.event.start, event.event.title, timeText,
-				this.options.eventTimeDisplay ?? "all", surface);
-		const elements = Object.freeze({ action, details, leading, marker, root, time, title, trailing });
-		const makeContext = (signal: AbortSignal): Readonly<Record<string, unknown>> => ({
+		timeText: string
+	): EventMountRegistration<TMetadata>["context"] {
+		return Object.freeze({
 			date: Object.freeze({ ...date }),
 			dateString,
 			document: this.document,
 			elements,
-			event: event.event,
-			signal,
+			event,
 			surface,
 			timeText
-		});
-		this.renderEventMarker(marker, event.event.accentColor, makeContext);
-		if (!this.isRenderGenerationCurrent(renderGeneration)) {
-			return null;
-		}
-		leading.append(marker, leadingContent);
-		this.renderExtensionSlot("renderEventLeading", leadingContent, makeContext);
-		if (!this.isRenderGenerationCurrent(renderGeneration)) {
-			return null;
-		}
-		this.renderExtensionSlot("renderEventDetails", details, makeContext);
-		if (!this.isRenderGenerationCurrent(renderGeneration)) {
-			return null;
-		}
-		this.renderExtensionSlot("renderEventTrailing", trailing, makeContext);
-		if (!this.isRenderGenerationCurrent(renderGeneration)) {
-			return null;
-		}
-		return {
-			action,
-			date: { ...date },
-			dateString,
-			details,
-			leading,
-			marker,
-			root,
-			surface,
-			time,
-			title,
-			trailing
-		};
-	}
-
-	private createEventMountContext(
-		rendered: RenderedEventElements,
-		event: CalendarEvent<TMetadata>
-	): EventMountRegistration<TMetadata>["context"] {
-		return Object.freeze({
-			date: Object.freeze({ ...rendered.date }),
-			dateString: rendered.dateString,
-			document: this.document,
-			elements: Object.freeze({
-				action: rendered.action,
-				details: rendered.details,
-				leading: rendered.leading,
-				marker: rendered.marker,
-				root: rendered.root,
-				time: rendered.time,
-				title: rendered.title,
-				trailing: rendered.trailing
-			}),
-			event,
-			surface: rendered.surface,
-			timeText: rendered.time.textContent
 		});
 	}
 
@@ -1871,8 +1865,17 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 		const rangeKey = `${bounds.start}/${bounds.end}`;
 		const hasRetainedSnapshot = this.loadedRangeKey === rangeKey && this.hasCurrentSnapshot;
 		const generation = ++this.generation;
-		this.activeController?.abort();
+		const previousController = this.activeController;
+		this.activeController = null;
+		previousController?.abort();
+		if (!this.canPrepareRequest(generation)) {
+			return;
+		}
 		const controller = new this.abortControllerConstructor();
+		if (!this.canPrepareRequest(generation)) {
+			controller.abort();
+			return;
+		}
 		this.activeController = controller;
 		this.currentRange = bounds;
 		this.isRetrying = userRetry;
@@ -2010,6 +2013,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 
 	private canApplyRequest(generation: number, controller: AbortController): boolean { return !this.isDestroyed && generation === this.generation && !controller.signal.aborted; }
 
+	private canPrepareRequest(generation: number): boolean { return this.isRendered && !this.isDestroyed && this.dom !== null && generation === this.generation; }
+
 	private getDomAfterCallback(): CalendarDom | null { return this.dom; }
 
 	private isCallbackGenerationCurrent(generation: number): boolean { return !this.isDestroyed && this.generation === generation; }
@@ -2124,6 +2129,9 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 			politeness: presentation.politeness,
 			retryable: presentation.retryable
 		});
+		this.resetInternalAnnouncementForIssues(
+			this.internalIssues.filter((candidate) => candidate.key === presentation.key)
+		);
 		this.internalIssues = Object.freeze([
 			...this.internalIssues.filter((candidate) => candidate.key !== presentation.key),
 			entry
@@ -2198,26 +2206,13 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 		const visible = [...this.internalIssues]
 			.filter((entry) => !entry.handled)
 			.sort((left, right) => severityRank(right.issue.severity) - severityRank(left.issue.severity))[0];
-		if (visible === undefined) {
-			dom.panel.hidden = true;
-			dom.panel.removeAttribute("data-lfc-code");
-			dom.panel.removeAttribute("data-lfc-severity");
-			dom.panelTitle.textContent = "";
-			dom.panelMessage.textContent = "";
-			dom.panelActions.hidden = true;
-			return;
-		}
-
-		dom.panel.hidden = false;
-		dom.panel.setAttribute("data-lfc-code", visible.issue.code);
-		dom.panel.setAttribute("data-lfc-severity", visible.issue.severity);
-		dom.panelIcon.textContent = "!";
-		dom.panelTitle.textContent = visible.issue.title;
-		dom.panelMessage.textContent = visible.issue.message;
-		dom.panelActions.hidden = !visible.retryable;
-		dom.retryButton.hidden = !visible.retryable;
-		dom.retryButton.setAttribute("aria-disabled", this.isRetrying ? "true" : "false");
-		dom.retryButton.textContent = this.isRetrying ? this.messages.retrying : this.messages.retry;
+		presentCalendarIssue(dom, {
+			issue: visible?.issue ?? null,
+			retryable: visible?.retryable ?? false,
+			retrying: this.isRetrying,
+			retryingText: this.messages.retrying,
+			retryText: this.messages.retry
+		});
 	}
 
 	private announce(announcement: CalendarAnnouncement): void {
@@ -2230,6 +2225,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 				})) {
 					throw new TypeError("onAnnounce must return void synchronously.");
 				}
+				this.resetInternalAnnouncement();
 				this.clearIssues((entry) => entry.key === "host-integration:onAnnounce", true);
 				return;
 			} catch (cause: unknown) {
@@ -2241,24 +2237,38 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 
 	private announceInternally(announcement: CalendarAnnouncement): void {
 		const dom = this.dom;
-		if (dom === null || this.isDestroyed) {
+		const presenter = this.announcementPresenter;
+		if (dom === null || presenter === null || this.isDestroyed) {
+			return;
+		}
+		const announcementUpdate = presenter.prepare(announcement);
+		if (announcementUpdate === null) {
 			return;
 		}
 		const generation = ++this.announcementGeneration;
-		dom.politeLive.textContent = "";
-		dom.assertiveLive.textContent = "";
 		const update = (): void => {
-			if (generation !== this.announcementGeneration || this.isDestroyed || this.dom !== dom) {
+			if (generation !== this.announcementGeneration || this.isDestroyed ||
+				this.dom !== dom || this.announcementPresenter !== presenter) {
 				return;
 			}
-			const region = announcement.politeness === "assertive" ? dom.assertiveLive : dom.politeLive;
-			region.textContent = announcement.message;
+			announcementUpdate();
 		};
 		try {
 			queueMicrotask(update);
 		} catch (cause: unknown) {
 			update();
 			this.reportLateHostIntegrationFailure("announce-scheduler", cause);
+		}
+	}
+
+	private resetInternalAnnouncement(): void {
+		this.announcementGeneration += 1;
+		this.announcementPresenter?.clear();
+	}
+
+	private resetInternalAnnouncementForIssues(issues: readonly InternalIssue[]): void {
+		if (issues.some((entry) => !entry.handled)) {
+			this.resetInternalAnnouncement();
 		}
 	}
 
@@ -2271,6 +2281,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 			return removed;
 		}
 		this.internalIssues = Object.freeze(this.internalIssues.filter((entry) => !predicate(entry)));
+		this.resetInternalAnnouncementForIssues(removed);
 		this.setState(this.derivePhase());
 		if (render) {
 			this.renderIssues();
@@ -2301,8 +2312,11 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 		const callback = this.options.onStateChange;
 		if (callback !== undefined && this.internalIssues.some((entry) =>
 			entry.key === "host-integration:onStateChange")) {
+			const removed = this.internalIssues.filter((entry) =>
+				entry.key === "host-integration:onStateChange");
 			this.internalIssues = Object.freeze(this.internalIssues.filter((entry) =>
 				entry.key !== "host-integration:onStateChange"));
+			this.resetInternalAnnouncementForIssues(removed);
 			phase = this.derivePhase();
 		}
 		this.state = createState(
@@ -2449,9 +2463,11 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 	private createPublicMethodError(
 		code: "invalid-argument" | "invalid-state",
 		hook: string,
-		message: string
+		message: string,
+		cause?: unknown
 	): LitefoldCalendarError {
 		return this.createError({
+			...(cause === undefined ? {} : { cause }),
 			code,
 			hook,
 			message,
@@ -2659,6 +2675,6 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar {
 export function createCalendar<TMetadata = unknown>(
 	host: HTMLElement,
 	options: CalendarOptions<TMetadata>
-): Calendar {
+): Calendar<TMetadata> {
 	return new MonthCalendar<TMetadata>(host, options);
 }

@@ -3,14 +3,15 @@ import { expect, test } from "@playwright/test";
 import { expectExampleReady, expectOnlyOneGridTabStop } from "./helpers.js";
 
 const ANIMATION_NAME = "lfc-day-selection-reveal";
-const REVEAL_RADIUS_PROPERTY = "--lfc-internal-selection-reveal-radius";
+const CONFIRM_ANIMATION_NAME = "lfc-day-selection-confirm";
+const FEEDBACK_ANIMATION_NAMES = [ANIMATION_NAME, CONFIRM_ANIMATION_NAME].sort();
 const TARGET_DATE = "2026-08-31";
 const SECOND_TARGET_DATE = "2026-08-30";
 
 test.describe("when motion is allowed", () => {
 	test.use({ reducedMotion: "no-preference" });
 
-	test("an immediate pointer click produces one continuous reveal with a seamless cleanup", async ({ page }) => {
+	test("an immediate pointer click produces one coherent selection transition with a seamless cleanup", async ({ page }) => {
 		await expectExampleReady(page, "/examples/advanced/");
 		const grid = page.getByRole("grid");
 		const target = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
@@ -34,24 +35,30 @@ test.describe("when motion is allowed", () => {
 		expect(probe.press).not.toBeNull();
 		expect(probe.press?.background).toBe(probe.selectedBackground);
 		expect(probe.press?.border).toBe(probe.accentColor);
-		expect(probe.animationCount).toBe(1);
-		expect(probe.animationNames).toEqual([ANIMATION_NAME]);
+		expect(probe.animationCount).toBe(FEEDBACK_ANIMATION_NAMES.length);
+		expect(probe.animationNames).toEqual(FEEDBACK_ANIMATION_NAMES);
 		expect(probe.animationPseudoElement).toBeNull();
 		expect(probe.animationTargetIsButton).toBe(true);
-		expect(probe.duration).toBe(220);
-		expect(probe.timingFunction).toBe("cubic-bezier(0.2, 0, 0, 1)");
-		expect(probe.start.radius).toBeCloseTo(16, 0);
-		expect(probe.middle.radius).toBeGreaterThan(probe.start.radius);
-		expect(probe.middle.radius).toBeLessThan(probe.farthestCorner);
-		expect(probe.late.radius).toBeGreaterThanOrEqual(probe.farthestCorner);
-		expect(probe.late.radius).toBeLessThan(probe.end.radius);
-		expect(probe.end.radius).toBeGreaterThan(probe.middle.radius);
-		expect(probe.end.radius / probe.farthestCorner).toBeCloseTo(1.1, 2);
-		expect(probe.end.radius).toBeLessThanOrEqual((probe.farthestCorner * 1.11) + 1);
-		expect(probe.start.overlay).toContain("radial-gradient");
-		expect(probe.start.overlay).toContain(probe.press?.background ?? "unexpected");
-		expect(probe.start.overlay).toContain(probe.press?.border ?? "unexpected");
-		expect(probe.end.overlay).toContain(probe.selectedBackground);
+		expect(probe.confirmationPseudoElement).toBeNull();
+		expect(probe.confirmationTargetIsNumber).toBe(true);
+		expect(probe.duration).toBe(160);
+		expect(probe.confirmationDuration).toBe(140);
+		expect(probe.timingFunction).toBe("ease-out");
+		expect(probe.confirmationTimingFunction).toBe("ease-out");
+		expect(probe.start.background).toBe(probe.restBackground);
+		expect(probe.middle.background).not.toBe(probe.start.background);
+		expect(probe.middle.background).not.toBe(probe.selectedBackground);
+		expect(probe.late.background).not.toBe(probe.middle.background);
+		expect(probe.end.background).not.toBe(probe.late.background);
+		expect(probe.start.backgroundImage).toBe("none");
+		expect(probe.middle.backgroundImage).toBe("none");
+		expect(probe.late.backgroundImage).toBe("none");
+		expect(probe.end.backgroundImage).toBe("none");
+		expect(probe.start.numberScale).toBeCloseTo(0.92, 2);
+		expect(probe.middle.numberScale).toBeGreaterThan(probe.start.numberScale);
+		expect(probe.late.numberScale).toBeGreaterThan(probe.middle.numberScale);
+		expect(probe.end.numberScale).toBeGreaterThan(probe.late.numberScale);
+		expect(probe.end.numberScale).toBeCloseTo(1, 3);
 		expect(probe.start.pseudoContent).toBe("none");
 		expect(probe.middle.pseudoContent).toBe("none");
 		expect(probe.end.pseudoContent).toBe("none");
@@ -71,11 +78,12 @@ test.describe("when motion is allowed", () => {
 		expect(settled.button.outlineStyle).toBe(probe.end.button.outlineStyle);
 		expect(settled.button.outlineWidth).toBe(probe.end.button.outlineWidth);
 		expect(settled.pseudoContent).toBe("none");
-		expect(settled.selectionAnimationCount).toBe(0);
+		expect(settled.feedbackAnimationCount).toBe(0);
+		expect(settled.numberScale).toBeCloseTo(1, 3);
 		expect(await selectedCell.evaluate((cell) => cell.scrollWidth <= cell.clientWidth)).toBe(true);
 	});
 
-	test("native Today navigation stays settled while direct current-day selection reveals", async ({ page }) => {
+	test("native Today navigation stays settled while direct current-day selection transitions", async ({ page }) => {
 		await expectExampleReady(page, "/examples/advanced/");
 		const grid = page.getByRole("grid");
 		const title = page.locator(".lfc-calendar-title-label-full");
@@ -84,7 +92,7 @@ test.describe("when motion is allowed", () => {
 		await page.locator(".lfc-calendar-today-button").click();
 		await expect(title).toHaveText("August 2026");
 		await expect(grid.locator(".lfc-is-selection-entry")).toHaveCount(0);
-		expect(await selectionAnimationCount(grid)).toBe(0);
+		expect(await selectionFeedbackAnimationCount(grid)).toBe(0);
 		const settledCurrentDay = grid.locator(
 			'[role="gridcell"]:has(> button[data-lfc-date="2026-08-06"])'
 		);
@@ -110,12 +118,12 @@ test.describe("when motion is allowed", () => {
 		await expect(currentDayCell).toHaveAttribute("aria-selected", "true");
 		await expect(currentDayCell).toHaveClass(/\blfc-is-selection-entry\b/u);
 		await expect(currentDayButton).toBeFocused();
-		expect(await selectionAnimationCount(currentDayButton)).toBe(1);
+		expect(await selectionFeedbackAnimationCount(currentDayButton)).toBe(FEEDBACK_ANIMATION_NAMES.length);
 		await finishSelectionAnimation(currentDayButton);
 		await expect(currentDayCell).not.toHaveClass(/\blfc-is-selection-entry\b/u);
 	});
 
-	test("rapid reselection cancels stale feedback and leaves only the latest reveal", async ({ page }) => {
+	test("rapid reselection cancels stale feedback and leaves only the latest transition", async ({ page }) => {
 		await expectExampleReady(page, "/examples/advanced/");
 		const grid = page.getByRole("grid");
 		const firstTarget = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
@@ -133,14 +141,18 @@ test.describe("when motion is allowed", () => {
 		await expect(grid.locator(".lfc-is-selection-entry")).toHaveCount(1);
 		await expect(latestCell).toHaveClass(/\blfc-is-selection-entry\b/u);
 		await expect(latestButton).toBeFocused();
-		expect(await page.evaluate((animationName) => document.getAnimations()
-			.filter((animation) => animation.animationName === animationName).length, ANIMATION_NAME)).toBe(1);
+		const feedbackAnimationCount = await page.evaluate(
+			(animationNames) => document.getAnimations()
+				.filter((animation) => animationNames.includes(animation.animationName)).length,
+			FEEDBACK_ANIMATION_NAMES
+		);
+		expect(feedbackAnimationCount).toBe(FEEDBACK_ANIMATION_NAMES.length);
 
 		await finishSelectionAnimation(latestButton);
 		await expect(grid.locator(".lfc-is-selection-entry")).toHaveCount(0);
 	});
 
-	test("keyboard activation receives the same single reveal and immediate semantics", async ({ page }) => {
+	test("keyboard activation receives the same transition and immediate semantics", async ({ page }) => {
 		await expectExampleReady(page, "/examples/advanced/");
 		const grid = page.getByRole("grid");
 		const target = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
@@ -155,7 +167,12 @@ test.describe("when motion is allowed", () => {
 		await expect(selectedButton).toBeFocused();
 		expect(await selectedButton.evaluate((button) => button.matches(":focus-visible"))).toBe(true);
 		const probe = await readSelectionTimeline(selectedButton);
-		expect(probe.animationCount).toBe(1);
+		expect(probe.animationCount).toBe(FEEDBACK_ANIMATION_NAMES.length);
+		expect(probe.animationNames).toEqual(FEEDBACK_ANIMATION_NAMES);
+		expect(probe.start.background).toBe(probe.restBackground);
+		expect(probe.middle.background).not.toBe(probe.start.background);
+		expect(probe.start.numberScale).toBeCloseTo(0.92, 2);
+		expect(probe.end.numberScale).toBeCloseTo(1, 3);
 		expect(probe.start.button).toEqual(probe.middle.button);
 		expect(probe.middle.button).toEqual(probe.late.button);
 		expect(probe.late.button).toEqual(probe.end.button);
@@ -175,7 +192,7 @@ test.describe("when motion is allowed", () => {
 test.describe("with trusted touch input", () => {
 	test.use({ hasTouch: true, reducedMotion: "no-preference" });
 
-	test("a tap commits one selection reveal from the pressed day circle", async ({ page }) => {
+	test("a tap hands off pressed-day feedback to the selection transition", async ({ page }) => {
 		await expectExampleReady(page, "/examples/advanced/");
 		const grid = page.getByRole("grid");
 		const target = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
@@ -202,9 +219,11 @@ test.describe("with trusted touch input", () => {
 		expect(probe.press).not.toBeNull();
 		expect(probe.press?.background).toBe(probe.selectedBackground);
 		expect(probe.press?.border).toBe(probe.accentColor);
-		expect(probe.animationCount).toBe(1);
-		expect(probe.start.overlay).toContain(probe.press?.background ?? "unexpected");
-		expect(probe.start.overlay).toContain(probe.press?.border ?? "unexpected");
+		expect(probe.animationCount).toBe(FEEDBACK_ANIMATION_NAMES.length);
+		expect(probe.animationNames).toEqual(FEEDBACK_ANIMATION_NAMES);
+		expect(probe.start.background).toBe(probe.restBackground);
+		expect(probe.start.backgroundImage).toBe("none");
+		expect(probe.start.numberScale).toBeCloseTo(0.92, 2);
 		await expectOnlyOneGridTabStop(grid);
 
 		await finishSelectionAnimation(selectedButton);
@@ -215,7 +234,7 @@ test.describe("with trusted touch input", () => {
 test.describe("when reduced motion is requested", () => {
 	test.use({ reducedMotion: "reduce" });
 
-	test("pointer and keyboard selection reveal their settled state immediately", async ({ page }) => {
+	test("pointer and keyboard selection render their settled state immediately", async ({ page }) => {
 		await expectExampleReady(page, "/examples/advanced/");
 		const grid = page.getByRole("grid");
 		const pointerTarget = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
@@ -224,7 +243,7 @@ test.describe("when reduced motion is requested", () => {
 		const pointerCell = grid.locator(`[role="gridcell"]:has(> button[data-lfc-date="${TARGET_DATE}"])`);
 		await expect(pointerCell).toHaveAttribute("aria-selected", "true");
 		await expect(pointerCell).not.toHaveClass(/\blfc-is-selection-entry\b/u);
-		expect(await selectionAnimationCount(pointerCell.locator(":scope > button"))).toBe(0);
+		expect(await selectionFeedbackAnimationCount(pointerCell.locator(":scope > button"))).toBe(0);
 
 		const keyboardTarget = grid.locator(`button[data-lfc-date="${SECOND_TARGET_DATE}"]`);
 		await keyboardTarget.focus();
@@ -236,7 +255,7 @@ test.describe("when reduced motion is requested", () => {
 		await expect(keyboardCell).toHaveAttribute("aria-selected", "true");
 		await expect(keyboardCell).not.toHaveClass(/\blfc-is-selection-entry\b/u);
 		await expect(keyboardButton).toBeFocused();
-		expect(await selectionAnimationCount(keyboardButton)).toBe(0);
+		expect(await selectionFeedbackAnimationCount(keyboardButton)).toBe(0);
 		await expectOnlyOneGridTabStop(grid);
 	});
 });
@@ -255,7 +274,7 @@ test.describe("when forced colors are active", () => {
 		const selectedButton = selectedCell.locator(":scope > .lfc-calendar-day-button");
 		await expect(selectedCell).toHaveAttribute("aria-selected", "true");
 		await expect(selectedCell).not.toHaveClass(/\blfc-is-selection-entry\b/u);
-		expect(await selectionAnimationCount(selectedButton)).toBe(0);
+		expect(await selectionFeedbackAnimationCount(selectedButton)).toBe(0);
 		await expect(selectedButton).toBeFocused();
 		const focusVisual = await selectedButton.evaluate((button) => {
 			const style = getComputedStyle(button);
@@ -275,7 +294,7 @@ test.describe("when forced colors are active", () => {
 });
 
 async function armSelectionProbe(button) {
-	await button.evaluate((element, animationName) => {
+	await button.evaluate((element, animationNames) => {
 		window.__lfcSelectionProbe = {
 			animationError: null,
 			pointerTrusted: null,
@@ -304,14 +323,17 @@ async function armSelectionProbe(button) {
 				return;
 			}
 			const animations = replacement.getAnimations({ subtree: true })
-				.filter((animation) => animation.animationName === animationName);
-			if (animations.length !== 1 || !(animations[0] instanceof CSSAnimation)) {
-				window.__lfcSelectionProbe.animationError = "Expected one selected-day CSS animation.";
+				.filter((animation) => animationNames.includes(animation.animationName));
+			if (animations.length !== animationNames.length ||
+				!animations.every((animation) => animation instanceof CSSAnimation)) {
+				window.__lfcSelectionProbe.animationError = "Expected both selected-day CSS animations.";
 				return;
 			}
-			animations[0].pause();
+			for (const animation of animations) {
+				animation.pause();
+			}
 		}, { once: true });
-	}, ANIMATION_NAME);
+	}, FEEDBACK_ANIMATION_NAMES);
 }
 
 async function readSelectionTimeline(button) {
@@ -320,17 +342,29 @@ async function readSelectionTimeline(button) {
 		if (probe?.animationError) {
 			throw new Error(probe.animationError);
 		}
-		const animations = element.getAnimations({ subtree: true });
+		const animations = element.getAnimations({ subtree: true })
+			.filter((animation) => options.animationNames.includes(animation.animationName));
 		const selection = animations.find((animation) => animation.animationName === options.animationName);
+		const confirmation = animations.find(
+			(animation) => animation.animationName === options.confirmAnimationName
+		);
 		if (!(selection instanceof CSSAnimation) || selection.effect === null) {
-			throw new Error("Expected the paused selected-day CSS animation.");
+			throw new Error("Expected the paused selected-day fill animation.");
+		}
+		if (!(confirmation instanceof CSSAnimation) || confirmation.effect === null) {
+			throw new Error("Expected the paused selected-day number animation.");
 		}
 		selection.pause();
+		confirmation.pause();
 		const duration = Number(selection.effect.getTiming().duration);
+		const confirmationDuration = Number(confirmation.effect.getTiming().duration);
+		const number = element.querySelector(".lfc-calendar-day-number");
+		if (!(number instanceof HTMLElement)) {
+			throw new Error("Expected the selected day number.");
+		}
 		const readButton = () => {
 			const style = getComputedStyle(element);
 			return {
-				background: style.backgroundColor,
 				color: style.color,
 				outlineColor: style.outlineColor,
 				outlineOffset: style.outlineOffset,
@@ -340,46 +374,31 @@ async function readSelectionTimeline(button) {
 		};
 		const readFrame = (time) => {
 			selection.currentTime = time;
+			confirmation.currentTime = Math.min(
+				time,
+				Math.max(0, confirmationDuration - 0.01)
+			);
 			const style = getComputedStyle(element);
-			const rawRadius = style.getPropertyValue(options.radiusProperty).trim();
-			const components = [
-				...rawRadius.matchAll(/(-?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?)(px|%)/giu)
-			];
-			if (components.length === 0) {
-				throw new Error(`Expected a computed length-percentage radius; received ${rawRadius}.`);
+			const numberScale = Number.parseFloat(getComputedStyle(number).scale);
+			if (!Number.isFinite(numberScale)) {
+				throw new Error("Expected a numeric selected-day number scale.");
 			}
-			const radius = components.reduce((total, component) => {
-				const value = Number(component[1]);
-				return total + (component[2] === "%" ? (farthestCorner * value) / 100 : value);
-			}, 0);
 			return {
+				background: style.backgroundColor,
+				backgroundImage: style.backgroundImage,
 				button: readButton(),
-				overlay: style.backgroundImage,
-				pseudoContent: getComputedStyle(element, "::after").content,
-				radius,
-				rawRadius
+				numberScale,
+				pseudoContent: getComputedStyle(element, "::after").content
 			};
 		};
-		const number = element.querySelector(".lfc-calendar-day-number");
-		if (!(number instanceof HTMLElement)) {
-			throw new Error("Expected the selected day number.");
-		}
-		const buttonBounds = element.getBoundingClientRect();
-		const numberBounds = number.getBoundingClientRect();
-		const originX = numberBounds.left - buttonBounds.left + (numberBounds.width / 2);
-		const originY = numberBounds.top - buttonBounds.top + (numberBounds.height / 2);
-		const farthestCorner = Math.max(
-			Math.hypot(originX, originY),
-			Math.hypot(buttonBounds.width - originX, originY),
-			Math.hypot(originX, buttonBounds.height - originY),
-			Math.hypot(buttonBounds.width - originX, buttonBounds.height - originY)
-		);
 		const colorProbe = document.createElement("span");
 		colorProbe.style.color = "var(--lfc-selected-background)";
 		element.append(colorProbe);
 		const selectedBackground = getComputedStyle(colorProbe).color;
 		colorProbe.style.color = "var(--lfc-accent-color)";
 		const accentColor = getComputedStyle(colorProbe).color;
+		colorProbe.style.color = "var(--lfc-internal-day-rest-background)";
+		const restBackground = getComputedStyle(colorProbe).color;
 		colorProbe.remove();
 		const start = readFrame(0);
 		const middle = readFrame(duration / 2);
@@ -388,30 +407,39 @@ async function readSelectionTimeline(button) {
 		return {
 			accentColor,
 			animationCount: animations.length,
-			animationNames: animations.map((animation) => animation.animationName),
+			animationNames: animations.map((animation) => animation.animationName).sort(),
 			animationPseudoElement: selection.effect.pseudoElement ?? null,
 			animationTargetIsButton: selection.effect.target === element,
+			confirmationDuration,
+			confirmationPseudoElement: confirmation.effect.pseudoElement ?? null,
+			confirmationTargetIsNumber: confirmation.effect.target === number,
+			confirmationTimingFunction: getComputedStyle(number).animationTimingFunction,
 			duration,
 			end,
-			farthestCorner,
 			late,
 			middle,
 			pointerTrusted: probe?.pointerTrusted ?? null,
 			pointerType: probe?.pointerType ?? null,
 			press: probe?.press ?? null,
+			restBackground,
 			selectedBackground,
 			start,
 			timingFunction: getComputedStyle(element).animationTimingFunction
 		};
 	}, {
 		animationName: ANIMATION_NAME,
-		radiusProperty: REVEAL_RADIUS_PROPERTY
+		animationNames: FEEDBACK_ANIMATION_NAMES,
+		confirmAnimationName: CONFIRM_ANIMATION_NAME
 	});
 }
 
 async function readSettledVisual(button) {
-	return button.evaluate((element, animationName) => {
+	return button.evaluate((element, animationNames) => {
 		const style = getComputedStyle(element);
+		const number = element.querySelector(".lfc-calendar-day-number");
+		if (!(number instanceof HTMLElement)) {
+			throw new Error("Expected the settled selected-day number.");
+		}
 		return {
 			button: {
 				background: style.backgroundColor,
@@ -422,11 +450,12 @@ async function readSettledVisual(button) {
 				outlineStyle: style.outlineStyle,
 				outlineWidth: style.outlineWidth
 			},
+			numberScale: Number.parseFloat(getComputedStyle(number).scale),
 			pseudoContent: getComputedStyle(element, "::after").content,
-			selectionAnimationCount: element.getAnimations({ subtree: true })
-				.filter((animation) => animation.animationName === animationName).length
+			feedbackAnimationCount: element.getAnimations({ subtree: true })
+				.filter((animation) => animationNames.includes(animation.animationName)).length
 		};
-	}, ANIMATION_NAME);
+	}, FEEDBACK_ANIMATION_NAMES);
 }
 
 async function finishSelectionAnimation(button) {
@@ -466,7 +495,10 @@ async function dayNumberCenter(button) {
 	};
 }
 
-async function selectionAnimationCount(button) {
-	return button.evaluate((element, animationName) => element.getAnimations({ subtree: true })
-		.filter((animation) => animation.animationName === animationName).length, ANIMATION_NAME);
+async function selectionFeedbackAnimationCount(button) {
+	return button.evaluate(
+		(element, animationNames) => element.getAnimations({ subtree: true })
+			.filter((animation) => animationNames.includes(animation.animationName)).length,
+		FEEDBACK_ANIMATION_NAMES
+	);
 }

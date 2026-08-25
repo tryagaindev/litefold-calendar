@@ -11,6 +11,7 @@ import {
 } from "./lib/node-version.mjs";
 import { normalizeNpmPackResult } from "./lib/npm-pack-result.mjs";
 import { REPOSITORY_ROOT, runNpm } from "./lib/process.mjs";
+import { composeStyles } from "./lib/styles.mjs";
 
 const FORBIDDEN_DEPENDENCY_FIELDS = [
     "dependencies",
@@ -1691,16 +1692,13 @@ const sourceStylePath =
     join(
         REPOSITORY_ROOT,
         "src",
-        "styles.css"
+        "styles"
     );
 
 try {
     inspectStyles(
         sourceStylePath,
-        await readFile(
-            sourceStylePath,
-            "utf8"
-        )
+        await composeStyles()
     );
 } catch (error) {
     if (!(error instanceof Error &&

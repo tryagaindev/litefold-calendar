@@ -1,0 +1,85 @@
+@layer lfc {
+  :where(.litefold-calendar),
+  :where(.litefold-calendar) *,
+  :where(.litefold-calendar) *::before,
+  :where(.litefold-calendar) *::after {
+    box-sizing: border-box;
+  }
+
+  :where(.litefold-calendar) :where(
+      .lfc-calendar-nav-button,
+      .lfc-calendar-title-button,
+      .lfc-calendar-retry,
+      .lfc-calendar-agenda-more,
+      .lfc-calendar-agenda-event,
+      .lfc-calendar-grid-more,
+      .lfc-calendar-month-picker-jump,
+      .lfc-calendar-month-picker-cancel,
+      .lfc-calendar-month-picker select,
+      .lfc-calendar-month-picker input
+    ) {
+    color: inherit;
+    font: inherit;
+  }
+
+  :where(.litefold-calendar) :where(
+      .lfc-calendar-nav-button,
+      .lfc-calendar-retry,
+      .lfc-calendar-agenda-more,
+      .lfc-calendar-month-picker-jump,
+      .lfc-calendar-month-picker-cancel
+    ) {
+    align-items: safe center;
+    appearance: none;
+    background: var(--lfc-surface-background);
+    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+    border: 1px solid var(--lfc-border-color);
+    border-radius: var(--lfc-border-radius);
+    cursor: pointer;
+    display: inline-flex;
+    justify-content: safe center;
+    max-inline-size: 100%;
+    min-block-size: max(2.75rem, var(--lfc-control-min-size));
+    min-inline-size: max(2.75rem, var(--lfc-control-min-size));
+    overflow-wrap: anywhere;
+    padding-block: 0.375rem;
+    padding-inline: 0.625rem;
+    touch-action: manipulation;
+    transition-duration: var(--lfc-internal-motion-duration);
+    transition-property: background-color, border-color, color;
+    transition-timing-function: ease-out;
+    white-space: normal;
+  }
+
+  :where(.litefold-calendar) :where(
+      .lfc-calendar-nav-button,
+      .lfc-calendar-title-button,
+      .lfc-calendar-retry,
+      .lfc-calendar-agenda-more,
+      .lfc-calendar-day-button,
+      .lfc-calendar-event-button,
+      .lfc-calendar-grid-more,
+      .lfc-calendar-month-picker-jump,
+      .lfc-calendar-month-picker-cancel,
+      .lfc-calendar-month-picker select,
+      .lfc-calendar-month-picker input
+    ):focus-visible {
+    outline: var(--lfc-internal-focus-size) solid var(--lfc-focus-ring-color);
+    outline-offset: 0.125rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  :where(.litefold-calendar) :where(
+      .lfc-calendar-nav-button,
+      .lfc-calendar-title-button,
+      .lfc-calendar-retry,
+      .lfc-calendar-agenda-more,
+      .lfc-calendar-event-button,
+      .lfc-calendar-month-picker-jump,
+      .lfc-calendar-month-picker-cancel
+    ):where([disabled], [aria-disabled="true"]) {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}

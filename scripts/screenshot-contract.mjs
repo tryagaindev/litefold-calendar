@@ -22,13 +22,21 @@ export const EXPECTED_SCENES = Object.freeze([
 ]);
 
 const SOURCE_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".mjs", ".ts"]);
-const SOURCE_INPUTS = Object.freeze([
+const GENERATED_SOURCE_FILES = new Set([
+	"examples/advanced/main.js",
+	"examples/metadata.json"
+]);
+export const SCREENSHOT_SOURCE_INPUTS = Object.freeze([
 	"package.json",
 	"package-lock.json",
 	"playwright.config.mjs",
 	"src",
 	"examples",
+	"scripts/build.mjs",
+	"scripts/build-examples.mjs",
+	"scripts/build-package.mjs",
 	"scripts/lib/node-version.mjs",
+	"scripts/lib/styles.mjs",
 	"scripts/screenshot-contract.mjs",
 	"scripts/screenshot-scenes.mjs",
 	"scripts/serve-repository.mjs",
@@ -56,14 +64,17 @@ function isRepositoryPath(path) {
 	return child !== "" && child !== ".." && !child.startsWith(`..${sep}`) && !isAbsolute(child);
 }
 
+export function isScreenshotSourceFile(repositoryRelativePath) {
+	const normalizedPath = repositoryRelativePath.replaceAll("\\", "/");
+	return !GENERATED_SOURCE_FILES.has(normalizedPath) &&
+		SOURCE_EXTENSIONS.has(extname(normalizedPath).toLowerCase());
+}
+
 async function collectFiles(path) {
 	const metadata = await stat(path);
 	if (metadata.isFile()) {
-		if (relative(REPOSITORY_ROOT, path).replaceAll("\\", "/") ===
-			"examples/advanced/main.js") {
-			return [];
-		}
-		return SOURCE_EXTENSIONS.has(extname(path).toLowerCase()) ? [path] : [];
+		const repositoryRelativePath = relative(REPOSITORY_ROOT, path).replaceAll("\\", "/");
+		return isScreenshotSourceFile(repositoryRelativePath) ? [path] : [];
 	}
 	if (!metadata.isDirectory()) {
 		return [];
@@ -77,7 +88,7 @@ async function collectFiles(path) {
 }
 
 export async function computeSourceFingerprint() {
-	const files = (await Promise.all(SOURCE_INPUTS.map((input) =>
+	const files = (await Promise.all(SCREENSHOT_SOURCE_INPUTS.map((input) =>
 		collectFiles(resolve(REPOSITORY_ROOT, input))))).flat().sort();
 	const hash = createHash("sha256");
 	for (const file of files) {

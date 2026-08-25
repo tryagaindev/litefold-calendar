@@ -53,14 +53,14 @@ Set token overrides directly on the rendered host. An application region may sel
 
 | Token | Light | Dark | Purpose |
 |---|---|---|---|
-| `--lfc-accent-color` | `#047857` | `#62E3A8` | Primary accent, selected-day outline/reveal edge, hover-day number border, and current-date number fill |
+| `--lfc-accent-color` | `#047857` | `#62E3A8` | Primary accent, selected-day outline, hover-day number border, and current-date number fill |
 | `--lfc-accent-contrast-color` | `#F4FFFB` | `#062A20` | Text placed on the accent |
 | `--lfc-focus-ring-color` | `#4E46C7` | `#C0B6FF` | Keyboard focus ring |
-| `--lfc-selected-background` | `#D4F4E5` | `#12483F` | Selected-day surface/reveal fill and eligible control/day hover background |
+| `--lfc-selected-background` | `#D4F4E5` | `#12483F` | Selected-day surface and eligible control/day hover background |
 | `--lfc-selected-color` | `#0A3B32` | `#D5FFF1` | Selected-day text and eligible control/day hover text |
 | `--lfc-today-border-color` | `#071E26` | `#062A20` | Current-date number border |
 
-On hover-capable devices, hovering an enabled, unselected, non-Today day previews the selected colors and accent border on its day-number circle without selecting the day or updating the agenda. Pointer press uses the same starting treatment. Direct activation of a different day within the displayed month uses these tokens for one continuous, presentation-only radial reveal painted in the day button's background layer. Its moving accent edge stays below selected, focus, and extension outlines, and the final gradient hands off to the matching settled fill without repainting those outlines. The settled selected surface is committed first and appears immediately when reduced motion is requested. Transient selectors, decorative layers, the keyframe, and its timing remain private; there is no public animation token.
+On hover-capable devices, hovering an enabled, unselected, non-Today day previews the selected colors and accent border on its day-number circle without selecting the day or updating the agenda. Pointer press uses the same starting treatment. Direct activation of a different day within the displayed month commits the selected surface first, then uses a short, presentation-only whole-cell background-color animation and a subtle date-number confirmation from `0.92` to `1`. Selected, focus, and extension outlines remain continuously visible. Reduced motion shows the settled treatment immediately. Transient selectors, keyframes, scale, and timing remain private; there is no public animation token.
 
 ### Events
 

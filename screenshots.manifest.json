@@ -7,7 +7,7 @@
     "playwright": "1.61.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "02df8371d5d63c108bfcbe56f261321099c68f387ae0764b5601c8680c35b81c",
+  "sourceFingerprint": "feb6f2bb77b6fccad2136c1d2badee6d3fc61bff0b5f541d08894638750e6113",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -66,7 +66,7 @@
       "references": [
         "README.md"
       ],
-      "sha256": "a871cd8011fe1e0f71bc6a1c553587b29de68aae2cc191adee8aced35f119cf1"
+      "sha256": "738ebb8a0db15d56385e2ffd3561a155cba531a0d2b8b19278f609295b566e16"
     },
     {
       "id": "mobile-month-swipe-pull",
@@ -86,7 +86,7 @@
       "references": [
         "README.md"
       ],
-      "sha256": "9b0380258e68a7f90ee54aa85373ed702dd106cfcf37c89991f750a4508f4a1f"
+      "sha256": "2233d23aff9de7478af82f1273144e89f2fe706dc51810b68111432205d25bb9"
     },
     {
       "id": "event-details-dark",
@@ -127,7 +127,7 @@
       "references": [
         "README.md"
       ],
-      "sha256": "7ae8cd33be3d545dae7861d2be957c1ad7a1b701c4515cf4b6d4a22750096b61"
+      "sha256": "7d07228e1d38b30223ca110ebbc424b439c970cbbe62beee0272e7bf0e529545"
     }
   ]
 }

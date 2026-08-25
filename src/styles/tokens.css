@@ -1,0 +1,68 @@
+@layer lfc {
+  :where(.litefold-calendar) {
+    --lfc-font-family: system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", sans-serif;
+    --lfc-font-size: 1rem;
+    --lfc-line-height: 1.5;
+    --lfc-gap: 0.75rem;
+    --lfc-border-radius: 0.5rem;
+    --lfc-control-min-size: 2.75rem;
+    --lfc-day-min-block-size: clamp(3.5rem, 13cqi, 7rem);
+    --lfc-day-padding: clamp(0.25rem, 1.5cqi, 0.75rem);
+    --lfc-compact-day-min-block-size: 3.75rem;
+    --lfc-event-accent-width: 0.0625rem;
+    --lfc-grid-event-gap: 0.125rem;
+    --lfc-grid-event-font-size: 0.75em;
+    --lfc-grid-event-min-block-size: 1.5rem;
+    --lfc-color: #102a36;
+    --lfc-muted-color: #405f68;
+    --lfc-background: #f7fcfc;
+    --lfc-surface-background: #e9f4f5;
+    --lfc-border-color: #56737b;
+    --lfc-accent-color: #047857;
+    --lfc-accent-contrast-color: #f4fffb;
+    --lfc-focus-ring-color: #4e46c7;
+    --lfc-selected-background: #d4f4e5;
+    --lfc-selected-color: #0a3b32;
+    --lfc-today-border-color: #071e26;
+    --lfc-event-background: #efeeff;
+    --lfc-event-color: #262050;
+    --lfc-event-border-color: #665cc3;
+    --lfc-event-accent-color: #a52a78;
+    --lfc-warning-background: #fff7ed;
+    --lfc-warning-color: #7c2d12;
+    --lfc-warning-border-color: #c2410c;
+    --lfc-error-background: #fef2f2;
+    --lfc-error-color: #7f1d1d;
+    --lfc-error-border-color: #b91c1c;
+    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel grid separator. */
+    --lfc-internal-cell-gap: 1px;
+    --lfc-internal-day-padding: var(--lfc-day-padding);
+    --lfc-internal-event-border-radius: min(var(--lfc-border-radius), 0.2rem);
+    --lfc-internal-focus-size: 0.1875rem;
+    --lfc-internal-grid-border-color: color-mix(
+      in oklab,
+      var(--lfc-border-color) 80%,
+      var(--lfc-background)
+    );
+    --lfc-internal-motion-duration: 120ms;
+    --lfc-internal-selection-motion-duration: 160ms;
+
+    accent-color: var(--lfc-accent-color);
+    background: var(--lfc-background);
+    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+    border: 1px solid var(--lfc-border-color);
+    border-radius: var(--lfc-border-radius);
+    color: var(--lfc-color);
+    color-scheme: light dark;
+    container: lfc-calendar / inline-size;
+    font-family: var(--lfc-font-family);
+    font-size: var(--lfc-font-size);
+    inline-size: 100%;
+    isolation: isolate;
+    line-height: var(--lfc-line-height);
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    overflow: clip;
+    text-align: start;
+  }
+}

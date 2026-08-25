@@ -10,7 +10,7 @@ npx playwright install --with-deps chromium
 npm run check
 ```
 
-The final `check:tarball` stage builds an npm tarball in a temporary directory, verifies its file allowlist and receipts, installs it into a clean consumer project without lifecycle scripts, typechecks a consumer import, evaluates the root ESM entry, and resolves the stylesheet export.
+The final `check:tarball` stage builds an npm tarball in a temporary directory, verifies its file allowlist and receipts, installs it into a clean consumer project without lifecycle scripts, typechecks a generic `Calendar<TMetadata>` consumer that calls `setEvents()`, evaluates the root ESM entry, and resolves the stylesheet export.  Its packed-byte DOM check renders the installed module, replaces and refetches events, activates the replacement, and verifies teardown.
 
 ## Retain a local verification bundle
 
@@ -49,7 +49,7 @@ After the workflow publishes an alpha:
 
 ```sh
 npm view @tryagaindev/litefold-calendar@alpha name version dist-tags repository --json
-npm install --save-exact @tryagaindev/litefold-calendar@0.1.0-alpha.0
+npm install --save-exact @tryagaindev/litefold-calendar@0.2.0-alpha.0
 npm audit signatures
 ```
 

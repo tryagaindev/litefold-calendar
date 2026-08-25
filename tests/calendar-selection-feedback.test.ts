@@ -5,6 +5,7 @@ import { createCalendar, type Calendar } from "../src/index.js";
 import { createDom, dispatchClick, installDom, waitFor } from "./helpers/dom.js";
 
 const SELECTION_ANIMATION_NAME = "lfc-day-selection-reveal";
+const SELECTION_CONFIRM_ANIMATION_NAME = "lfc-day-selection-confirm";
 
 void test("day activation marks only the committed selection render for visual feedback", async (context) => {
 	const { dom, host } = setupDom(context);
@@ -37,6 +38,8 @@ void test("day activation marks only the committed selection render for visual f
 	const activatedButton = findDayButton(host, "2026-07-16");
 	const activatedNumber = activatedButton.querySelector(".lfc-calendar-day-number");
 	assert.ok(activatedNumber);
+	dispatchAnimationEvent(dom, activatedNumber, "animationend", SELECTION_CONFIRM_ANIMATION_NAME);
+	assert.equal(activatedCell.classList.contains("lfc-is-selection-entry"), true);
 	dispatchAnimationEvent(dom, activatedNumber, "animationend", SELECTION_ANIMATION_NAME);
 	assert.equal(activatedCell.classList.contains("lfc-is-selection-entry"), true);
 	dispatchAnimationEvent(dom, activatedButton, "animationend", SELECTION_ANIMATION_NAME, "::after");
@@ -66,6 +69,11 @@ void test("day activation marks only the committed selection render for visual f
 	dispatchClick(dom, findDayButton(host, "2026-07-18"));
 	assert.ok(host.querySelector(".lfc-is-selection-entry"));
 	calendar.refetchEvents();
+	await waitForPhase(calendar, "ready");
+	assert.equal(host.querySelector(".lfc-is-selection-entry"), null);
+	dispatchClick(dom, findDayButton(host, "2026-07-17"));
+	assert.ok(host.querySelector(".lfc-is-selection-entry"));
+	calendar.setEvents([{ id: "replacement", start: "2026-07-17", title: "Replacement" }]);
 	await waitForPhase(calendar, "ready");
 	assert.equal(host.querySelector(".lfc-is-selection-entry"), null);
 

@@ -89,6 +89,22 @@ const ADVANCED_MESSAGES = Object.freeze({
 	year: "Year"
 } satisfies CalendarMessages);
 
+const REPLACEMENT_EVENTS = Object.freeze([
+	Object.freeze({
+		accentColor: "#805FC0",
+		id: "dynamic-replacement",
+		metadata: Object.freeze({
+			accessibleLabel: "Dynamically replaced schedule item",
+			actionLabel: "Open dynamically replaced schedule item",
+			itemType: "milestone",
+			statusLabel: "Updated"
+		}),
+		start: "2026-08-06T13:00",
+		title: "Dynamically replaced schedule",
+		url: "/schedule/dynamic-replacement?view=calendar#details"
+	})
+] satisfies readonly CalendarEventInput<EventData>[]);
+
 const FEATURE_SCHEDULE: readonly ScheduleRecord[] = Object.freeze([
 	Object.freeze({
 		accentCandidate: "#008577",
@@ -588,8 +604,9 @@ const calendarMethods = {
 	prev: () => { calendar.prev(); },
 	refetchEvents: () => { calendar.refetchEvents(); },
 	render: () => { calendar.render(); },
+	setEvents: () => { calendar.setEvents(REPLACEMENT_EVENTS); },
 	today: () => { calendar.today(); }
-} satisfies Record<keyof Calendar, () => unknown>;
+} satisfies Record<keyof Calendar<EventData>, () => unknown>;
 
 function runCommand(command: string): boolean {
 	if (!Object.hasOwn(calendarMethods, command)) {
@@ -612,7 +629,7 @@ function runCommand(command: string): boolean {
 	}
 
 	try {
-		calendarMethods[command as Exclude<keyof Calendar, "getState">]();
+		calendarMethods[command as Exclude<keyof Calendar<EventData>, "getState">]();
 	} catch (error: unknown) {
 		if (!(error instanceof LitefoldCalendarError)) {
 			throw error;

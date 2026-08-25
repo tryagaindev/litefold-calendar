@@ -20,7 +20,7 @@ internal/domain/*  -> internal/domain/*, public contracts
 | `internal/domain` | Gregorian civil-date parsing and arithmetic, ranges, bounds, fixed month grids, and atomic event normalization | No DOM or runtime imports. Domain code may use public types and errors. |
 | `internal/dom` | Stable semantic element creation, localized presentation, focus helpers, and bounded DOM rendering primitives | May use domain and public contracts, but does not own lifecycle, requests, or state transitions. |
 | `internal/runtime` | Option normalization, event-source generations, actions, extension isolation, integration-node leases, swipe state, observable state, and transaction coordination | May compose public, domain, DOM, and focused runtime peers. Runtime modules do not become public subpath APIs. |
-| `styles.css` | Visual states, responsive placement, direction-aware layout, motion preferences, and public CSS-token consumption | Layout remains CSS-only; script does not move controls or branch on breakpoints. |
+| `src/styles/*.css` and `scripts/lib/styles.mjs` | Ordered visual-state, responsive, direction, preference, and public-token authoring | The composer preserves the canonical cascade and emits the package's one public `dist/styles.css`; layout remains CSS-only. |
 
 Do not add internal barrel files, cross-layer cycles, or a generic catch-all helper module. Import the narrow module that owns the behavior. The repository ESLint architecture rule enforces these layer edges and permits only `calendar.ts` to compose the public surface with the runtime coordinator.
 
@@ -32,9 +32,20 @@ Do not add internal barrel files, cross-layer cycles, or a generic catch-all hel
 | Stable markup, native semantics, localized display formatting, or focus mechanics | `internal/dom` |
 | Configuration validation, async source behavior, abort/reentrancy policy, actions, extensions, integration leases, or state | `internal/runtime` |
 | Public names, callback shapes, defaults, exports, or diagnostics | Root contract modules plus the API documentation and examples |
-| Responsive placement, sizing, focus visuals, forced colors, or motion styling | `styles.css`, CSS-token documentation, and affected browser tests |
+| Responsive placement, sizing, focus visuals, forced colors, or motion styling | `src/styles/*.css`, `scripts/lib/styles.mjs`, CSS-token documentation, `scripts/tests/styles.test.mjs`, and affected browser tests |
 
 A formatter or renderer that can be tested without calendar lifecycle state should normally be a DOM or domain leaf rather than another coordinator method. A helper that decides whether a source result may commit belongs to the runtime because it participates in the transaction.
+
+## DOM presentation leaves
+
+The focused DOM presenters build or update bounded presentation state.  They never admit application work or decide whether a runtime transaction may commit.
+
+| Module | Owns | Coordinator retains |
+|---|---|---|
+| `internal/dom/agenda.ts` | Detached ordered-list items, empty/progress content, the native Show more control, and bounded action references | Snapshot selection, visible counts, commit timing, listeners, extensions, and focus restoration |
+| `internal/dom/event-representation.ts` | Native link/button/static roots, semantic time and title nodes, and extension slots shared by grid and agenda surfaces | Action generations, callback invocation, extension execution, and cleanup |
+| `internal/dom/issue-region.ts` | Rendering one accepted issue into the stable panel and updating the existing Retry control in place | Classification, severity, admission, stale diagnostics, Retry eligibility, and Retry actions |
+| `internal/dom/announcement.ts` | Live-region clearing, exact message/politeness deduplication, urgency routing, and a prepared DOM update | Message selection, `onAnnounce` ownership, generation checks, scheduling, and stale-update suppression |
 
 ## Render transaction ownership
 
@@ -49,6 +60,8 @@ A normal lifecycle follows this order:
 5. The coordinator commits the displayed month, selected date, normalized events, and observable phase as one current generation.
 6. DOM modules render from that committed snapshot; focus restoration, issue presentation, and announcements follow the same generation checks.
 7. `destroy()` aborts work, invalidates retained controls, runs extension cleanup, releases leases, restores managed fallback state, and removes package ownership.
+
+The immutable options snapshot keeps the construction-time `events` value, while the coordinator owns a separate current event provider.  `setEvents()` validates and snapshots a replacement before changing that provider, then starts a new source generation.  Abort-listener and validation-getter reentrancy must not let an older transaction reclaim provider or controller ownership from a newer accepted replacement.
 
 Keep generation checks and commit decisions in the coordinator or a focused runtime policy module. Do not let DOM renderers start requests, mutate public state, or decide whether stale work may commit.
 
@@ -93,6 +106,7 @@ Use the narrowest checks during development, then run the aggregate repository c
 npm run lint
 npm run typecheck
 npm run test:unit
+npm run test:tooling
 npm run build
 npm run test:browser
 npm run check:docs

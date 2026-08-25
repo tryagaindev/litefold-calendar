@@ -27,19 +27,20 @@ Do not add application-specific branches, URLs, entity rules, or selectors to th
 1. Install an exact prerelease and import `@tryagaindev/litefold-calendar/styles.css` from the application entry point.
 2. Adapt validated application data to `CalendarEventInput`; reject the complete snapshot if any item is malformed.
 3. Pass local events directly; keep asynchronous transport and range caching in an application-owned event provider.
-4. Set inclusive `minDate` / `maxDate` bounds when the product must limit calendar navigation or day activation.
-5. Pass an existing native filter fieldset through `toolbarEnd` when needed.
-6. Package visual decorations as one or more named extensions that return detached, noninteractive nodes.
-7. Add validated event URLs where native navigation is the correct primary action; gate occurrence-specific context commands with `isEventContextMenuAvailable`.
-8. Return promise-like results from `onEventActivate`, `onEventContextMenu`, `onDaySelect`, and `onDayContextMenu` so package error handling can observe failures.
-9. Coordinate application-owned no-JavaScript markup with `fallbackElement` when progressive fallback is required.
-10. Choose `eventTimeDisplay` only when visual time exposure should differ between grid and agenda; accessible time semantics remain on both surfaces.
-11. Map application design tokens to documented `--lfc-*` tokens in application-owned CSS and let package container queries handle responsive placement.
-12. Replace private-selector tests with public callbacks, state snapshots, roles/names, application-owned selectors, and user-visible behavior assertions.
+4. Use `setEvents()` when an existing rendered instance must receive a different complete static snapshot or provider; use `refetchEvents()` when only application-owned filter or cache state changed.
+5. Set inclusive `minDate` / `maxDate` bounds when the product must limit calendar navigation or day activation.
+6. Pass an existing native filter fieldset through `toolbarEnd` when needed.
+7. Package visual decorations as one or more named extensions that return detached, noninteractive nodes.
+8. Add validated event URLs where native navigation is the correct primary action; gate occurrence-specific context commands with `isEventContextMenuAvailable`.
+9. Return promise-like results from `onEventActivate`, `onEventContextMenu`, `onDaySelect`, and `onDayContextMenu` so package error handling can observe failures.
+10. Coordinate application-owned no-JavaScript markup with `fallbackElement` when progressive fallback is required.
+11. Choose `eventTimeDisplay` only when visual time exposure should differ between grid and agenda; accessible time semantics remain on both surfaces.
+12. Map application design tokens to documented `--lfc-*` tokens in application-owned CSS and let package container queries handle responsive placement.
+13. Replace private-selector tests with public callbacks, state snapshots, roles/names, application-owned selectors, and user-visible behavior assertions.
 
 ## Typed source adapter
 
-Event metadata is optional. A basic calendar needs no metadata interface and no generic argument. Use an application-defined type only when application data must remain available to actions or extensions; typed `events` let `createCalendar()` infer that type.
+Event metadata is optional. A basic calendar needs no metadata interface and no generic argument. Use an application-defined type only when application data must remain available to actions or extensions; typed `events` let `createCalendar()` infer that type and return `Calendar<TMetadata>`. The returned type keeps later `setEvents()` replacements on the same metadata contract as actions and extensions.
 
 Namespace IDs when records from multiple application categories can share a numeric or short identifier:
 
@@ -174,6 +175,26 @@ Application cache rules should:
 - Never retain an aborted or rejected promise.
 - Invalidate overlapping ranges after mutations.
 - Preserve failures as failures instead of silently converting them to empty arrays.
+
+## Replace event input without recreating
+
+Use `setEvents()` when the complete event array or provider identity changes after render:
+
+```ts
+const calendar = createCalendar(host, {
+	events: localEvents,
+	initialDate: "2026-08-06"
+});
+
+calendar.render();
+calendar.setEvents(remoteEvents);
+```
+
+Replacement is complete, not additive: it does not merge arrays or update any other option. The existing instance keeps its displayed month and selected date, preserves the current agenda reveal count within the new result and `agendaDomLimit`, and restores package-owned focus to the same day or event occurrence when possible. If a focused event disappears, focus falls back to its owning day; application focus outside the calendar is left alone.
+
+Call `setEvents()` only on a rendered, non-destroyed instance. Lifecycle is checked before the argument is inspected. A top-level value that cannot be accepted as an array or provider throws synchronous `invalid-argument` without aborting current work or changing the active source. Once accepted, the replacement becomes current and aborts superseded source work. Provider rejection or payload validation failure retains usable data for the same range, but the failed replacement remains current so Retry and `refetchEvents()` use it instead of silently restoring the prior source.
+
+Application callbacks may replace the source reentrantly. Each accepted call supersedes earlier work, stale completions cannot commit, and the last accepted call wins; invalid reentrant input leaves the active accepted source unchanged. Recreate the instance when locale, time zone, `minDate`, `maxDate`, callbacks, extensions, limits, integration nodes, or other construction-time configuration changes.
 
 ## Toolbar content
 
@@ -425,6 +446,7 @@ An integration is ready when:
 
 - Invalid records reject the complete snapshot instead of disappearing silently.
 - Range caching and filtering remain application-owned and respect authorization boundaries.
+- Complete static/provider replacement uses `setEvents()`; it preserves month, selection, focus fallback, and the requested agenda count, while `refetchEvents()` always uses the latest accepted source.
 - Toolbar content, extension output, and `onEventActivate` / `onEventContextMenu` / `onDaySelect` / `onDayContextMenu` actions use only documented hooks.
 - Linked, callback-driven, context-eligible, and static events use the expected anchor/button/static representation on both grid and agenda surfaces.
 - The selected `eventTimeDisplay` mode changes only visual time exposure; native time values, accessible names, and extension `timeText` remain present.
@@ -434,6 +456,7 @@ An integration is ready when:
 - Touch, pen, and horizontal precision-scroll paging changes at most one month per settle, obeys RTL and bounds, keeps one interactive grid, and does not prefetch an adjacent range; Previous/Next remain usable with `swipe: false`.
 - The month/year trigger, bounded fields, successful Jump, Cancel, Escape, light-dismiss, boundary controls, and trigger-focus return are verified in supported browsers.
 - Current initial-load, retained-refresh, action, and extension failures use persistent package presentation once, or equivalent application presentation after an explicit `"handled"` return; superseded request/action and other post-lifecycle failures remain diagnostic-only.
+- Invalid `setEvents()` lifecycle or top-level input throws synchronously without disturbing current work; accepted replacement failures retain usable same-range data, and reentrant replacements leave only the last accepted source eligible to commit.
 - Mobile, keyboard, RTL, forced-color, reduced-motion, localization, and screen-reader flows are verified by the application.
 - Container resizing changes CSS layout without source calls, callback state changes, node replacement, or focus loss; toolbar focus order remains Previous, Next, month title, Today, then application content at every breakpoint.
 - Event markers and extension-owned visual satellites are not clipped, and empty event slots do not reserve visible gaps.

@@ -67,8 +67,8 @@ export interface CalendarRange extends CalendarRangeBounds {
 
 /**
  * An abort-aware provider for the one current fixed 42-day grid.
- * Called for initial load, each committed month change, and each explicit refetch;
- * pager pulls never request an adjacent range before commit.
+ * Called for initial load, each committed month change, each explicit refetch, and
+ * when installed through `setEvents()`; pager pulls never request an adjacent range before commit.
  */
 export type CalendarEventSource<TMetadata = unknown> = (
 	this: void,
@@ -378,12 +378,14 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly toolbarEnd?: HTMLElement;
 }
 
-/** The intentionally small calendar lifecycle, state, and navigation API. */
-export interface Calendar {
+/** The intentionally small calendar lifecycle, event-data, state, and navigation API. */
+export interface Calendar<TMetadata = unknown> {
 	/** Adds the calendar to its host and starts loading the visible month; throws when the instance cannot claim the host. */
 	render(): void;
 	/** Aborts pending work, removes listeners, and clears the host. */
 	destroy(): void;
+	/** Replaces the complete static snapshot or provider and loads the current visible range; throws for invalid input or lifecycle state. */
+	setEvents(events: CalendarEvents<TMetadata>): void;
 	/** Forces the current visible range to be loaded again; throws unless the instance is rendered and live. */
 	refetchEvents(): void;
 	/** Displays and selects a supported date without moving focus; throws for an invalid argument or lifecycle state. */

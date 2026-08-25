@@ -9,7 +9,7 @@ Start with the [feature guide](features.md) to decide whether the focused month-
 | Goal | Start here |
 |---|---|
 | Create, render, and tear down a calendar | [`createCalendar()`](#create-and-render-createcalendar) and [`Calendar`](#control-the-calendar-calendar) |
-| Return local or remote events | [`CalendarEvents`](#supply-events-calendarevents-and-calendareventsource) |
+| Supply, replace, or reload local or remote events | [`CalendarEvents`](#supply-events-calendarevents-and-calendareventsource) and [`Calendar`](#control-the-calendar-calendar) |
 | Validate dates and event occupancy | [`CalendarEventInput`](#define-events-calendareventinput-and-calendarevent) |
 | Configure layout, localization, callbacks, and limits | [`CalendarOptions`](#configure-behavior-calendaroptions) |
 | Handle day and event actions | [Action callbacks](#handle-user-actions-calendaraction) |
@@ -39,7 +39,7 @@ The root module exports exactly the following symbols. Entries in the Types colu
 function createCalendar<TMetadata = unknown>(
 	host: HTMLElement,
 	options: CalendarOptions<TMetadata>
-): Calendar;
+): Calendar<TMetadata>;
 ```
 
 `events` is the only required option. Pass an array for static data or a `CalendarEventSource` for range-aware data. `TMetadata` defaults to `unknown` and is normally inferred from typed events, an action, or an extension. A basic calendar needs no generic argument.
@@ -71,7 +71,7 @@ calendar.render();
 | Module import | Does not read `window` or `document`; the ESM entry is safe to evaluate during server rendering. |
 | `createCalendar()` | Validates configuration, resolves package-owned defaults, and retains application callbacks, metadata, and nodes by reference. It does not claim or modify the host. |
 | `render()` | Claims a connected or detached host, replaces its children, adds `.litefold-calendar` and the presence-only `data-litefold-calendar` discovery marker, renders, and starts the first source request. Detached rendering still creates DOM and starts source work; insert the host into its document before relying on focus, pointer, or visual layout behavior. |
-| Active instance | Owns the host's children. Another live calendar cannot claim the same host. Mutating the original options object does not reconfigure the instance. |
+| Active instance | Owns the host's children. Another live calendar cannot claim the same host. Mutating the original options object does not reconfigure the instance; use `setEvents()` to replace event input and recreate the calendar for other configuration changes. |
 | `destroy()` | If rendered, aborts pending work, removes host listeners and generated content, conditionally restores package-managed `fallbackElement` visibility, detaches an eligible `toolbarEnd` node, removes the root markers, and leaves the owned host empty. Before render, it leaves unclaimed nodes unchanged. Destruction is terminal. |
 
 Invalid construction input throws a synchronous `LitefoldCalendarError` with code `invalid-configuration`. This includes an invalid or reversed `minDate` / `maxDate` range, a range that intersects no renderable month, and an explicitly supplied `initialDate` that is outside the inclusive range or cannot render its month. When `initialDate` is omitted, the date produced by `now` instead resolves to the nearest in-range date in a renderable month. Because no usable instance exists after a construction failure, `onError` cannot observe it; catch it at the application bootstrap boundary when startup fallback UI is required.
@@ -81,9 +81,10 @@ The root class is the supported styling hook. The data attribute is a stable pre
 ## Control the calendar: `Calendar`
 
 ```ts
-interface Calendar {
+interface Calendar<TMetadata = unknown> {
 	render(): void;
 	destroy(): void;
+	setEvents(events: CalendarEvents<TMetadata>): void;
 	refetchEvents(): void;
 	gotoDate(date: CalendarDateInput): void;
 	focusDate(date: CalendarDateInput): void;
@@ -101,7 +102,8 @@ The [advanced TypeScript example](../examples/advanced/) exposes controls for ev
 |---|---|---|
 | `render()` | Renders once and starts the visible-range request. Repeated calls on a live rendered instance are no-ops; use `refetchEvents()` to reload. | A call after `destroy()`, competing ownership, or an unavailable integration node throws synchronously without claiming or changing the host. |
 | `destroy()` | Releases package resources and clears a rendered, owned host. | Idempotent and terminal. A call before render leaves the unclaimed host unchanged. |
-| `refetchEvents()` | Revalidates static `events` or requests the current visible range from a provider again without a package cache. | Requires a rendered, live instance. A same-range failure retains the last usable snapshot. |
+| `setEvents(events)` | Replaces the complete static snapshot or provider, then starts one load for the current visible range without recreating the instance. It preserves the displayed month, selected date, current agenda reveal count, and package-owned focus where the represented day or event still exists. | Requires a rendered, live instance. Lifecycle is checked before the argument. An invalid top-level value throws `invalid-argument` without changing or aborting current work; an accepted source or payload failure follows the operational-error flow and retains usable same-range data. |
+| `refetchEvents()` | Revalidates the most recently accepted static snapshot or requests the current visible range from the most recently accepted provider again without a package cache. | Requires a rendered, live instance. A same-range failure retains the last usable snapshot. |
 | `gotoDate(date)` | Displays the containing month and selects the date without explicitly moving DOM focus. | Accepts a `CalendarDate`, strict civil string, or valid `Date`; invalid or unrenderable values, and values outside the configured range, throw `invalid-argument` without changing state. |
 | `focusDate(date)` | Displays, selects, and focuses the requested day button. | Uses the same validation, time-zone projection, and inclusive `minDate` / `maxDate` enforcement as `gotoDate()`. |
 | `today()` | Displays and selects the date returned by `now` without explicitly moving DOM focus. | A later clock failure enters the fatal `internal-error` flow; navigation quietly stops when that date is outside the configured range or no supported destination is available. |
@@ -110,6 +112,12 @@ The [advanced TypeScript example](../examples/advanced/) exposes controls for ev
 | `getState()` | Returns the latest immutable, presentation-safe snapshot without raw causes. | Safe before render and after destroy; it does not mutate or refetch. |
 
 Invalid configuration, public method arguments, and lifecycle calls are programmer errors and throw synchronous `LitefoldCalendarError` instances. Methods that require a live calendar throw `invalid-state` before `render()`, after `destroy()`, or after a fatal failure. These errors do not invoke `onError`, alter `CalendarState.issues`, or create user-facing package UI. Runtime source, validation, action, extension, host-callback, and internal failures continue through the observable operational-error pipeline.
+
+`setEvents()` checks that lifecycle first, including before inspecting a hostile argument. On a rendered, non-destroyed instance—including an instance in a recoverable source-unavailable state—the method then requires an array or function and safely snapshots a static array. A top-level inspection or snapshot failure throws synchronous `invalid-argument` without aborting an active request, changing the current source or state, or invoking `onError`.
+
+Once a replacement passes that top-level check, it becomes the current source before its load starts. The replacement clears an active pull transaction, aborts superseded source work, and uses the normal generation guards so late success, failure, validation, announcement, and render work cannot commit. A provider rejection or invalid returned payload keeps the replacement current for Retry and `refetchEvents()`; it does not restore the prior provider. Usable data for the same range stays rendered with the normal degraded-data presentation.
+
+Replacement rendering preserves the displayed month and selected date. Package-owned focus returns to the same day or event occurrence when possible, and a removed focused event falls back to its owning day; focus outside the calendar is not moved. The current agenda reveal count is retained, capped by the replacement result and `agendaDomLimit`, so new events are not revealed beyond the count the user already requested. If application callbacks call `setEvents()` reentrantly, every accepted call supersedes earlier work and the last accepted source wins; invalid reentrant input leaves the active accepted source unchanged.
 
 ### Built-in month-and-year jump
 
@@ -166,9 +174,18 @@ createCalendar(host, { events: staticEvents });
 createCalendar(host, { events: remoteSource });
 ```
 
+After rendering, replace the complete input through the typed instance. Replacement is not an add or merge operation:
+
+```ts
+const calendar = createCalendar(host, { events: staticEvents });
+calendar.render();
+
+calendar.setEvents(remoteSource);
+```
+
 Provider bounds are strict date-only strings. `start` is inclusive and `end` is exclusive. A committed visible month always requests its complete fixed 42-day grid, including adjacent-month filler days. The pull/snap pager retains that one current grid and does not render an adjacent month grid or request or prefetch its event range while the user pulls. `minDate` and `maxDate` limit selection and navigation but never clip the committed provider range, including in a partial boundary month.
 
-Every committed visible-range transition and `refetchEvents()` invocation calls a provider; a partial pager pull does not. A static array is reused and revalidated. litefold-calendar does not cache. Forward `signal` to cancellable work and stop non-fetch work when it aborts. A newer request or `destroy()` aborts the previous request, and a stale result never replaces the current snapshot.
+Every committed visible-range transition and `refetchEvents()` invocation calls the current provider; a partial pager pull does not. `setEvents()` accepts a replacement source and starts exactly one current-range load. A static array is snapshotted when accepted, then reused and revalidated. litefold-calendar does not cache. Forward `signal` to cancellable work and stop non-fetch work when it aborts. A newer request, accepted replacement, or `destroy()` aborts the previous request, and a stale result never replaces the current snapshot.
 
 The complete returned array is validated atomically. A non-array result, malformed event, duplicate ID, or result beyond `sourceEventLimit` rejects the entire snapshot. A synchronous throw or rejected promise-like result becomes an `event-source-failed` or validation error. Preserve failures as failures rather than converting them to an empty array, because an empty array means a successful range with no events.
 
@@ -292,7 +309,7 @@ type CalendarHeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 type CalendarEventTimeDisplay = "all" | "grid" | "agenda" | "none";
 ```
 
-Options are immutable for the life of an instance. Recreate the calendar to change configuration. External filter or cache state may change independently; call `refetchEvents()` after changing it. Unknown own string keys on the top-level options object, `messages`, `icons`, or an extension definition are rejected as `invalid-configuration`, so misspelled configuration does not fail silently.
+The options snapshot is immutable for the life of an instance. `setEvents()` is the one narrow replacement API; mutating `options.events` or the original options object has no effect. Recreate the calendar to change locale, time zone, date bounds, callbacks, extensions, messages, icons, limits, integration nodes, or other construction-time configuration. External filter or cache state may change independently; call `refetchEvents()` after changing it. Unknown own string keys on the top-level options object, `messages`, `icons`, or an extension definition are rejected as `invalid-configuration`, so misspelled configuration does not fail silently.
 
 Every public callback and factory declares `this: void`. Use an arrow function or a function that does not depend on a dynamic receiver.
 
@@ -302,7 +319,7 @@ The [advanced TypeScript example](../examples/advanced/) supplies every option. 
 
 | Option | Default | Purpose and lifecycle | Invalid or failed behavior |
 |---|---|---|---|
-| `events` | Required | Accepts static events or an abort-aware provider for the one current fixed 42-day grid. Providers run for initial load, each committed displayed-month change, and each explicit refetch; a partial pager pull makes no adjacent-range call. | A value that is neither an array nor a function is `invalid-configuration`. Provider and snapshot failures use the visible source-error flow. |
+| `events` | Required | Sets the initial static events or abort-aware provider for the one current fixed 42-day grid. Providers run for initial load, each committed displayed-month change, and each explicit refetch; a partial pager pull makes no adjacent-range call. Replace the complete input after render with `setEvents()`. | Invalid construction input is `invalid-configuration`. Provider and snapshot failures use the visible source-error flow; invalid top-level `setEvents()` input is `invalid-argument`. |
 | `minDate` | No configured lower bound | Sets the earliest selectable date, inclusive. A boundary may fall within a month; earlier grid dates remain visible but disabled. `Date` values use the configured time-zone projection. | An invalid or unprojectable value, or a value later than `maxDate`, is `invalid-configuration`. Absolute supported-date and complete-grid renderability limits still apply. |
 | `maxDate` | No configured upper bound | Sets the latest selectable date, inclusive. A boundary may fall within a month; later grid dates remain visible but disabled. `Date` values use the configured time-zone projection. | An invalid or unprojectable value, or a value earlier than `minDate`, is `invalid-configuration`. Absolute supported-date and complete-grid renderability limits still apply. |
 | `initialDate` | Nearest in-range date in a renderable month, starting from `now` | Selects the initial day and displayed month from a `CalendarDate`, strict string, or `Date` without moving DOM focus. | An invalid, unprojectable, or unrenderable explicit value, or an explicit value outside the configured inclusive range, is `invalid-configuration`. |
@@ -709,7 +726,7 @@ For a current operational error accepted into state, returning `"default"` or `u
 - Let only one extension define `renderEventMarker`; return `null` from it when the built-in marker should be suppressed.
 - Return action promises, but keep `onError`, `onAnnounce`, `onStateChange`, extension render/mount hooks, and cleanup functions synchronous.
 - Do not return `"handled"` for a current error merely because telemetry recorded it; that value transfers presentation ownership.
-- Do not mutate the options object and expect reconfiguration. Recreate the instance, or change application-owned source state and call `refetchEvents()`.
+- Do not mutate the options object and expect reconfiguration. Use `setEvents()` for a complete event-input replacement, `refetchEvents()` after application-owned filter or cache changes, and recreation for locale, time zone, bounds, or other construction-time configuration.
 - Treat the host as package-owned while rendered. Keep dialogs and unrelated application UI outside it, and call `destroy()` before removing a transient calendar.
 - Keep `fallbackElement` in the same document and outside the host. If application code changes its `hidden` state during the lease, the calendar skips writes while that value differs from its last write and does not restore over the differing value on destroy.
-- Do not call navigation or refetch methods before `render()` or after `destroy()`; those calls throw `invalid-state` synchronously.
+- Do not call navigation, `setEvents()`, or refetch methods before `render()` or after `destroy()`; those calls throw `invalid-state` synchronously before their arguments are inspected.

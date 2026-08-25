@@ -1,6 +1,6 @@
 # Basic example
 
-Run `npm run build`, serve the repository root over HTTP, and open `examples/basic/`.
+Run `npm run demo` from the repository root, then choose **Basic JavaScript** from the examples landing page.
 
 The example demonstrates:
 

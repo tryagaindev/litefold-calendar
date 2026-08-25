@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Runnable, framework-free examples for Litefold Calendar.">
+	<title>Examples | Litefold Calendar</title>
+	<link rel="stylesheet" href="./example.css">
+	<link rel="stylesheet" href="./index.css">
+</head>
+<body>
+	<a class="example-skip-link" href="#example-list">Skip to examples</a>
+
+	<header class="example-landing-header">
+		<div class="example-landing-header-content">
+			<p class="example-landing-kicker">Dependency-free calendar recipes</p>
+			<h1>Explore Litefold Calendar</h1>
+			<p>Start with a static event array, then move into asynchronous sources, application-owned failure handling, progressive enhancement, or migration work.</p>
+		</div>
+
+		<aside class="example-metadata" aria-labelledby="example-metadata-title" data-example-metadata-state="loading">
+			<h2 id="example-metadata-title">Build identity</h2>
+			<dl>
+				<div>
+					<dt>Version</dt>
+					<dd><code data-example-version>Loading</code></dd>
+				</div>
+				<div>
+					<dt>Source commit</dt>
+					<dd><code data-example-commit>Loading</code></dd>
+				</div>
+				<div>
+					<dt>Channel</dt>
+					<dd data-example-channel>Loading</dd>
+				</div>
+			</dl>
+			<p data-example-metadata-status>Reading generated metadata.</p>
+		</aside>
+	</header>
+
+	<main id="example-list" class="example-landing-main" tabindex="-1">
+		<section aria-labelledby="example-list-title">
+			<div class="example-landing-section-heading">
+				<h2 id="example-list-title">Choose an example</h2>
+				<p>Every recipe imports the locally built package and uses public APIs only.</p>
+			</div>
+
+			<ul class="example-card-list" role="list">
+				<li>
+					<article class="example-card">
+						<p class="example-card-tag">Start here</p>
+						<h3><a href="./basic/">Basic JavaScript</a></h3>
+						<p>Render static events, select a date, and activate an event with the smallest useful setup.</p>
+					</article>
+				</li>
+				<li>
+					<article class="example-card">
+						<p class="example-card-tag">Complete surface</p>
+						<h3><a href="./advanced/">Advanced TypeScript</a></h3>
+						<p>Exercise providers, bounds, extensions, custom toolbar content, actions, themes, direction, and state observation.</p>
+					</article>
+				</li>
+				<li>
+					<article class="example-card">
+						<p class="example-card-tag">Failure ownership</p>
+						<h3><a href="./async-errors/">Async errors</a></h3>
+						<p>Compare package-owned diagnostics with explicit application handling for source, extension, and action failures.</p>
+					</article>
+				</li>
+				<li>
+					<article class="example-card">
+						<p class="example-card-tag">Server-first</p>
+						<h3><a href="./progressive-enhancement/">Progressive enhancement</a></h3>
+						<p>Keep a server-rendered schedule useful before JavaScript loads and across enhanced-calendar failures.</p>
+					</article>
+				</li>
+				<li>
+					<article class="example-card">
+						<p class="example-card-tag">Rewrite guide</p>
+						<h3><a href="./fullcalendar-v6-migration/">FullCalendar v6 migration</a></h3>
+						<p>Adapt a common dayGridMonth data shape into a range-aware Litefold integration without a compatibility layer.</p>
+					</article>
+				</li>
+				<li>
+					<article class="example-card">
+						<p class="example-card-tag">Loader boundary</p>
+						<h3><a href="./classic-script/">Classic-script loader</a></h3>
+						<p>Use a classic entry script to load the ESM package while keeping the calendar implementation module-based.</p>
+					</article>
+				</li>
+			</ul>
+		</section>
+	</main>
+
+	<footer class="example-landing-footer">
+		<p>These examples are executable integration recipes. Package installation guidance remains in the repository README.</p>
+	</footer>
+
+	<script type="module" src="./index.js"></script>
+</body>
+</html>

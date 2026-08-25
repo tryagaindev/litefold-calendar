@@ -1,6 +1,6 @@
 # FullCalendar v6 `dayGridMonth` migration example
 
-Run `npm run build`, serve the repository root over HTTP, and open `examples/fullcalendar-v6-migration/`.
+Run `npm run demo` from the repository root, then choose **FullCalendar v6 migration** from the examples landing page.
 
 This example keeps the adapter intentionally small.  The common event fields map directly, numeric identifiers become strings, `backgroundColor` or `borderColor` becomes Litefold's marker `accentColor`, and `extendedProps` becomes typed `metadata`.  Litefold then validates the complete event snapshot before rendering it.
 

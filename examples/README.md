@@ -26,9 +26,9 @@ Published documentation uses `@tryagaindev/litefold-calendar` package specifiers
 The current methodology is sufficient for an alpha because it verifies examples at four different boundaries:
 
 1. **Build and type boundary.** `npm run build` compiles the package, compiles the advanced TypeScript example, and checks the migration adapter as strict JavaScript.  Public declarations and example usage must agree.
-2. **DOM behavior boundary.** `npm run test:examples:built` runs deterministic JSDOM smoke recipes against built output.  It covers rendering, navigation, provider supersession, actions, error recovery, extensions, progressive fallback ownership, the FullCalendar adapter, and teardown without depending on browser physics.
+2. **DOM behavior boundary.** `npm run test:examples:built` runs deterministic JSDOM smoke recipes against built output.  It covers the landing-page routes and generated identity, rendering, navigation, complete event replacement, provider supersession, actions, error recovery, extensions, progressive fallback ownership, the FullCalendar adapter, and teardown without depending on browser physics.
 3. **Browser and accessibility boundary.** `npm run test:browser:built` uses pinned Chromium for real focus, keyboard, pointer, responsive, swipe, and automated accessibility behavior.
-4. **Published-package boundary.** `npm run check:tarball` installs the packed tarball into a clean consumer, verifies imports and styles, compiles a strict TypeScript consumer, renders in JSDOM, activates an event, and destroys the instance.
+4. **Published-package boundary.** `npm run check:tarball` installs the packed tarball into a clean consumer, verifies imports and styles, compiles a generic strict TypeScript consumer, replaces and refetches events in JSDOM, activates the replacement, and destroys the instance.
 
 Canonical screenshots provide visual review of six deterministic scenes, but they are not behavioral tests.  Manual supported-browser and assistive-technology checks remain necessary for release evidence that automation cannot provide.
 
@@ -38,10 +38,12 @@ This is an appropriate alpha matrix for a dependency-free browser library.  Fram
 
 ```sh
 npm ci --ignore-scripts
-npm run build
+npm run demo
 ```
 
-Serve the repository root over HTTP and open an example directory.  To run the executable coverage layers:
+`npm run demo` builds the package and generated example assets, writes local `version`, `commit`, and `channel` identity to `examples/metadata.json`, and starts the secure repository server on `127.0.0.1`.  Open the printed `/examples/` URL and choose a recipe from the framework-free landing page.  The server exposes only `dist/` and `examples/`, rejects non-loopback binding, applies restrictive security headers, and loads no remote runtime assets.
+
+When the build output is already current, `npm run serve:repository` starts the same server without rebuilding.  To run the executable coverage layers:
 
 ```sh
 npm run typecheck:examples:built
@@ -50,7 +52,11 @@ npm run test:browser:built
 npm run check:tarball
 ```
 
-`npm run check` runs all of these with the repository policy, unit, documentation, lint, screenshot, and packaging gates.
+`npm run test:tooling` also covers landing routing, allowed methods and hosts, path restrictions, and security headers.  `npm run check` runs all of these with the repository policy, unit, documentation, lint, screenshot, and packaging gates.
+
+## Static deployments
+
+GitHub Pages presents a rolling `main` preview and retains release demos under immutable package-version paths.  Deployed landing pages and deep links show their package version, full source commit, and channel without loading analytics, trackers, CDNs, or third-party runtime assets.  See the [static example deployment guide](../docs/example-deployment.md) for the path contract, authority separation, rollback, and stale-deployment checks.
 
 ## Adding or changing an example
 

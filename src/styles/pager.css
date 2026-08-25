@@ -1,0 +1,123 @@
+@layer lfc {
+  :where(.litefold-calendar) .lfc-calendar-swipe-viewport {
+    direction: ltr;
+    display: flex;
+    margin-block-start: var(--lfc-gap);
+    margin-inline: var(--lfc-gap);
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    overscroll-behavior-inline: contain;
+    overflow: auto hidden;
+    position: relative;
+    scroll-behavior: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-swipe-viewport::-webkit-scrollbar {
+    display: none;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-grid {
+    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+    border: 1px solid var(--lfc-internal-grid-border-color);
+    border-radius: var(--lfc-border-radius);
+    flex: 0 0 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    order: 2;
+    overflow: clip;
+    scroll-snap-align: start;
+    touch-action: auto;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-swipe-lane {
+    align-self: stretch;
+    background: color-mix(
+      in oklab,
+      var(--lfc-selected-background) 72%,
+      var(--lfc-background)
+    );
+    color: var(--lfc-selected-color);
+    display: grid;
+    flex: 0 0 min(6rem, 25cqi);
+    min-inline-size: 0;
+    overflow: hidden;
+    place-items: center;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-swipe-lane-previous {
+    order: 1;
+    scroll-snap-align: start;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-swipe-lane-next {
+    order: 3;
+    scroll-snap-align: end;
+  }
+
+  :where(.litefold-calendar):dir(rtl) .lfc-calendar-swipe-lane-previous {
+    order: 3;
+    scroll-snap-align: end;
+  }
+
+  :where(.litefold-calendar):dir(rtl) .lfc-calendar-swipe-lane-next {
+    order: 1;
+    scroll-snap-align: start;
+  }
+
+  :where(.litefold-calendar):dir(rtl)
+    :where(.lfc-calendar-grid, .lfc-calendar-swipe-lane) {
+    direction: rtl;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-swipe-lane:not([data-lfc-page-available]) {
+    scroll-snap-align: none;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-swipe-lane-content {
+    display: grid;
+    gap: 0.125rem;
+    inline-size: 100%;
+    padding-inline: 0.25rem;
+    place-items: center;
+    text-align: center;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-swipe-lane:not([data-lfc-page-available])
+    .lfc-calendar-swipe-lane-content {
+    visibility: hidden;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-swipe-lane-icon {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  :where(.litefold-calendar):dir(rtl) .lfc-calendar-swipe-lane-icon {
+    transform: scaleX(-1);
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-swipe-lane-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    max-inline-size: 100%;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
+  :where(.litefold-calendar):not([data-lfc-swipe-enabled])
+    .lfc-calendar-swipe-viewport {
+    overflow-x: hidden;
+    scroll-snap-type: none;
+  }
+
+  :where(.litefold-calendar):not([data-lfc-swipe-enabled])
+    .lfc-calendar-swipe-lane {
+    display: none;
+  }
+}

@@ -404,9 +404,13 @@ function parseNamedRootExports(source) {
 	const withoutComments = source
 		.replace(/\/\*[\s\S]*?\*\//gu, "")
 		.replace(/\/\/[^\r\n]*/gu, "");
-	const names = [];
-	for (const match of withoutComments.matchAll(/export\s+(?:type\s+)?\{([\s\S]*?)\}\s+from\s+["'][^"']+["']/gu)) {
-		for (const rawSpecifier of (match[1] ?? "").split(",")) {
+	const exports = [];
+	for (const match of withoutComments.matchAll(
+		/export\s+(type\s+)?\{([\s\S]*?)\}\s+from\s+["'][^"']+["']/gu
+	)) {
+		const groupIsTypeOnly = match[1] !== undefined;
+		for (const rawSpecifier of (match[2] ?? "").split(",")) {
+			const specifierIsTypeOnly = /^\s*type\s+/u.test(rawSpecifier);
 			const specifier = rawSpecifier.trim().replace(/^type\s+/u, "");
 			if (specifier.length === 0) {
 				continue;
@@ -414,20 +418,87 @@ function parseNamedRootExports(source) {
 			const parts = specifier.split(/\s+as\s+/u);
 			const name = parts.at(-1)?.trim();
 			if (name !== undefined && /^[$A-Z_a-z][$\w]*$/u.test(name)) {
-				names.push(name);
+				exports.push({
+					kind: groupIsTypeOnly || specifierIsTypeOnly ? "type" : "runtime",
+					name
+				});
 			}
 		}
 	}
 	for (const match of withoutComments.matchAll(/export\s+\*\s+as\s+([$A-Z_a-z][$\w]*)\s+from\s+["'][^"']+["']/gu)) {
-		names.push(match[1] ?? "");
+		exports.push({ kind: "runtime", name: match[1] ?? "" });
 	}
-	for (const match of withoutComments.matchAll(/export\s+(?:declare\s+)?(?:abstract\s+)?(?:class|enum|function|interface|namespace|type)\s+([$A-Z_a-z][$\w]*)/gu)) {
-		names.push(match[1] ?? "");
+	for (const match of withoutComments.matchAll(
+		/export\s+(?:declare\s+)?(?:abstract\s+)?(class|enum|function|interface|namespace|type)\s+([$A-Z_a-z][$\w]*)/gu
+	)) {
+		exports.push({
+			kind: match[1] === "interface" || match[1] === "type" ? "type" : "runtime",
+			name: match[2] ?? ""
+		});
 	}
 	for (const match of withoutComments.matchAll(/export\s+(?:declare\s+)?(?:const|let|var)\s+([$A-Z_a-z][$\w]*)/gu)) {
-		names.push(match[1] ?? "");
+		exports.push({ kind: "runtime", name: match[1] ?? "" });
 	}
-	return names.filter((name) => name.length > 0);
+	return exports.filter(({ name }) => name.length > 0);
+}
+
+function parseDocumentedRootExports(apiDocument) {
+	const heading = "## Find a public export";
+	const headingIndex = apiDocument.indexOf(heading);
+	if (headingIndex === -1) {
+		addError(`${displayPath(API_DOCUMENT_PATH)} is missing the ${heading} section.`);
+		return [];
+	}
+	const nextHeadingIndex = apiDocument.indexOf("\n## ", headingIndex + heading.length);
+	const section = apiDocument.slice(
+		headingIndex + heading.length,
+		nextHeadingIndex === -1 ? apiDocument.length : nextHeadingIndex
+	);
+	const tableLines = section.split(/\r?\n/u).filter((line) => /^\|/u.test(line.trim()));
+	if (tableLines.length < 3) {
+		addError(`${displayPath(API_DOCUMENT_PATH)} must contain the public export table.`);
+		return [];
+	}
+
+	const parseCells = (line) => line.trim().split("|").slice(1, -1).map((cell) => cell.trim());
+	const headerCells = parseCells(tableLines[0] ?? "");
+	if (headerCells.join("|") !== "Area|Runtime values|Types") {
+		addError(
+			`${displayPath(API_DOCUMENT_PATH)} public export table must use Area, Runtime values, and Types columns.`
+		);
+	}
+
+	const documented = [];
+	for (const [rowIndex, line] of tableLines.slice(2).entries()) {
+		const cells = parseCells(line);
+		if (cells.length !== 3) {
+			addError(
+				`${displayPath(API_DOCUMENT_PATH)} public export table row ${String(rowIndex + 1)} must contain three columns.`
+			);
+			continue;
+		}
+		for (const [cellIndex, kind] of [[1, "runtime"], [2, "type"]]) {
+			const cell = cells[cellIndex] ?? "";
+			const names = [...cell.matchAll(/`([^`]+)`/gu)].map((match) => match[1] ?? "");
+			const remainder = cell.replace(/`[^`]+`/gu, "").replaceAll(",", "").trim();
+			if ((names.length === 0 && remainder !== "—") || (names.length > 0 && remainder !== "")) {
+				addError(
+					`${displayPath(API_DOCUMENT_PATH)} public export table has an invalid ${kind} cell: ${cell}.`
+				);
+				continue;
+			}
+			for (const name of names) {
+				if (!/^[$A-Z_a-z][$\w]*$/u.test(name)) {
+					addError(
+						`${displayPath(API_DOCUMENT_PATH)} public export table contains invalid symbol ${name}.`
+					);
+					continue;
+				}
+				documented.push({ kind, name });
+			}
+		}
+	}
+	return documented;
 }
 
 async function validateRootExportDocumentation() {
@@ -435,21 +506,42 @@ async function validateRootExportDocumentation() {
 		readFile(ROOT_EXPORT_PATH, "utf8"),
 		readFile(API_DOCUMENT_PATH, "utf8")
 	]);
-	const exportNames = parseNamedRootExports(indexSource);
-	const seen = new Set();
-	for (const name of exportNames) {
-		if (seen.has(name)) {
-			addError(`${displayPath(ROOT_EXPORT_PATH)} exports ${name} more than once.`);
+	const sourceExports = parseNamedRootExports(indexSource);
+	const documentedExports = parseDocumentedRootExports(apiDocument);
+	const sourceByName = new Map();
+	for (const entry of sourceExports) {
+		if (sourceByName.has(entry.name)) {
+			addError(`${displayPath(ROOT_EXPORT_PATH)} exports ${entry.name} more than once.`);
 			continue;
 		}
-		seen.add(name);
-		const escapedName = name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-		const exactName = new RegExp(`(?<![$\\p{L}\\p{M}\\p{N}_])${escapedName}(?![$\\p{L}\\p{M}\\p{N}_])`, "u");
-		if (!exactName.test(apiDocument)) {
-			addError(`${displayPath(API_DOCUMENT_PATH)} does not name root export ${name}.`);
+		sourceByName.set(entry.name, entry.kind);
+	}
+
+	const documentedByName = new Map();
+	for (const entry of documentedExports) {
+		if (documentedByName.has(entry.name)) {
+			addError(`${displayPath(API_DOCUMENT_PATH)} lists root export ${entry.name} more than once.`);
+			continue;
+		}
+		documentedByName.set(entry.name, entry.kind);
+	}
+
+	for (const [name, kind] of sourceByName) {
+		const documentedKind = documentedByName.get(name);
+		if (documentedKind === undefined) {
+			addError(`${displayPath(API_DOCUMENT_PATH)} public export table is missing ${name}.`);
+		} else if (documentedKind !== kind) {
+			addError(
+				`${displayPath(API_DOCUMENT_PATH)} classifies ${name} as ${documentedKind}; expected ${kind}.`
+			);
 		}
 	}
-	return seen.size;
+	for (const name of documentedByName.keys()) {
+		if (!sourceByName.has(name)) {
+			addError(`${displayPath(API_DOCUMENT_PATH)} lists stale root export ${name}.`);
+		}
+	}
+	return sourceByName.size;
 }
 
 const markdownFiles = await collectMarkdownFiles(REPOSITORY_ROOT);
@@ -466,6 +558,6 @@ if (errors.length > 0) {
 	process.exitCode = 1;
 } else {
 	console.log(
-		`Documentation check passed: ${String(markdownFiles.length)} Markdown files and ${String(rootExportCount)} named root exports.`
+		`Documentation check passed: ${String(markdownFiles.length)} Markdown files and ${String(rootExportCount)} exact root exports.`
 	);
 }

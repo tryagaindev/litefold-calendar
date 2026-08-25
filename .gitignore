@@ -13,6 +13,7 @@ node_modules/
 /.nyc_output/
 /test-results/
 /examples/advanced/main.js
+/examples/metadata.json
 *.lcov
 *.tgz
 *.tsbuildinfo

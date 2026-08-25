@@ -165,7 +165,7 @@ export async function startRepositoryServer({ port = DEFAULT_PORT } = {}) {
 		}
 		if (url.pathname === "/") {
 			response.statusCode = 302;
-			response.setHeader("Location", "/examples/basic/");
+			response.setHeader("Location", "/examples/");
 			response.setHeader("Content-Length", "0");
 			response.end();
 			return;
@@ -225,7 +225,7 @@ const executedDirectly = process.argv[1] !== undefined &&
 if (executedDirectly) {
 	const options = parseArguments(process.argv.slice(2));
 	const runningServer = await startRepositoryServer(options);
-	console.log(`Repository fixture server listening at ${runningServer.origin}`);
+	console.log(`Litefold Calendar examples available at ${runningServer.origin}/examples/`);
 	const shutdown = () => {
 		const forcedExit = setTimeout(() => {
 			process.exit(1);
