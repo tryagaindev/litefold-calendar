@@ -1,0 +1,35 @@
+.lfc-deployment-details {
+	background: Canvas;
+	border: 0.125rem solid currentColor;
+	color: CanvasText;
+	font: 0.875rem/1.5 system-ui, sans-serif;
+	margin-block-start: 2rem;
+	padding: 1rem;
+}
+
+.lfc-deployment-details p {
+	margin-block: 0 0.5rem;
+}
+
+.lfc-deployment-details dl {
+	display: grid;
+	gap: 0.25rem 0.75rem;
+	grid-template-columns: max-content minmax(0, 1fr);
+	margin: 0;
+}
+
+.lfc-deployment-details dd {
+	margin: 0;
+	min-inline-size: 0;
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 32rem) {
+	.lfc-deployment-details dl {
+		grid-template-columns: 1fr;
+	}
+
+	.lfc-deployment-details dd:not(:last-child) {
+		margin-block-end: 0.5rem;
+	}
+}
