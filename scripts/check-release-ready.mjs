@@ -1,41 +1,87 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { REPOSITORY_ROOT } from "./lib/process.mjs";
+import { verifyRelease } from "./lib/release-state.mjs";
 
-const EXPECTED_NAME = "@tryagaindev/litefold-calendar";
-const EXPECTED_REPOSITORY = "git+https://github.com/tryagaindev/litefold-calendar.git";
-const EXPECTED_GITHUB_REPOSITORY = "tryagaindev/litefold-calendar";
-const packageJson = JSON.parse(await readFile(join(REPOSITORY_ROOT, "package.json"), "utf8"));
-const expectedTag = `v${String(packageJson.version)}`;
-const actualTag = process.argv[2];
-const repositoryUrl = typeof packageJson.repository === "string"
-	? packageJson.repository
-	: packageJson.repository?.url;
+const SCRIPT_PATH = fileURLToPath(import.meta.url);
+const VALUE_OPTIONS = new Map([
+	["--commit", "expectedCommit"],
+	["--tag", "expectedTag"],
+	["--tag-state", "tagState"],
+	["--version", "expectedVersion"]
+]);
+const TAG_STATES = new Set(["absent", "either", "matching"]);
 
-if (packageJson.name !== EXPECTED_NAME) {
-	throw new Error(`Release package must be ${EXPECTED_NAME}.`);
-}
-if (packageJson.private !== false) {
-	throw new Error("Release publishing requires package.json private to be false.");
-}
-if (!/^0\.\d+\.\d+-alpha\.\d+$/u.test(packageJson.version)) {
-	throw new Error("Release publishing requires a 0.x alpha prerelease version.");
-}
-if (actualTag !== expectedTag) {
-	throw new Error(`Release tag must be ${expectedTag}; received ${String(actualTag)}.`);
-}
-if (repositoryUrl !== EXPECTED_REPOSITORY) {
-	throw new Error(`Release repository must be ${EXPECTED_REPOSITORY}.`);
-}
-if (process.env.GITHUB_REPOSITORY !== undefined &&
-	process.env.GITHUB_REPOSITORY !== EXPECTED_GITHUB_REPOSITORY) {
-	throw new Error(`Release workflow must run from ${EXPECTED_GITHUB_REPOSITORY}.`);
-}
-if (packageJson.publishConfig?.access !== "public" ||
-	packageJson.publishConfig?.provenance !== true ||
-	packageJson.publishConfig?.tag !== "alpha") {
-	throw new Error("Release publishConfig must require public access, provenance, and the alpha dist-tag.");
+export function parseReleaseVerificationArguments(arguments_) {
+	const options = {
+		json: false,
+		requireClean: false,
+		tagState: "either"
+	};
+	let legacyTag;
+	const seenValueOptions = new Set();
+	for (let index = 0; index < arguments_.length; index += 1) {
+		const argument = arguments_[index];
+		if (VALUE_OPTIONS.has(argument)) {
+			const property = VALUE_OPTIONS.get(argument);
+			const value = arguments_[index + 1];
+			if (value === undefined || seenValueOptions.has(argument)) {
+				throw new Error(`${argument} requires exactly one value.`);
+			}
+			options[property] = value;
+			seenValueOptions.add(argument);
+			index += 1;
+			continue;
+		}
+		if (argument === "--json" && !options.json) {
+			options.json = true;
+			continue;
+		}
+		if (argument === "--require-clean" && !options.requireClean) {
+			options.requireClean = true;
+			continue;
+		}
+		if (!argument.startsWith("-") && legacyTag === undefined) {
+			legacyTag = argument;
+			continue;
+		}
+		throw new Error(
+			"Usage: npm run release:verify -- [--version <version>] [--commit <sha>] [--tag <tag>] [--tag-state absent|either|matching] [--require-clean] [--json]"
+		);
+	}
+	if (legacyTag !== undefined) {
+		if (options.expectedTag !== undefined) {
+			throw new Error("Provide a release tag either positionally or with --tag, not both.");
+		}
+		options.expectedTag = legacyTag;
+	}
+	if (!TAG_STATES.has(options.tagState)) {
+		throw new Error("--tag-state must be absent, either, or matching.");
+	}
+	return options;
 }
 
-console.log(`Release manifest is ready for ${expectedTag}.`);
+export async function main(arguments_ = process.argv.slice(2)) {
+	const options = parseReleaseVerificationArguments(arguments_);
+	const result = await verifyRelease(options);
+	if (options.json) {
+		console.log(JSON.stringify(result));
+	} else {
+		console.log(`Release ${result.tag} is ready (commit ${result.git.head}).`);
+	}
+	return result;
+}
+
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === SCRIPT_PATH) {
+	try {
+		await main();
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (process.argv.includes("--json")) {
+			console.error(JSON.stringify({ error: message, status: "error" }));
+		} else {
+			console.error(`Release verification failed: ${message}`);
+		}
+		process.exitCode = 1;
+	}
+}

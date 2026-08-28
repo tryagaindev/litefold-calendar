@@ -17,7 +17,7 @@ The current and immediately previous stable major versions of these browsers are
 
 “Current” means the stable major release generally available when a defect is evaluated. Beta, Dev, Canary, Nightly, and Safari Technology Preview releases are useful for early testing but are not supported releases. Patch updates within a supported major should be installed before reporting a defect.
 
-The policy defines the environments in which the project accepts compatibility defects. The dated browser and assistive-technology evidence required for an alpha release is tracked separately in the [accessibility test record](../ACCESSIBILITY.md#assistive-technology-record).
+The policy defines the environments in which the project accepts compatibility defects. Automated coverage gates every release. Dated manual browser and assistive-technology evidence is risk-based: repeat affected combinations after relevant behavior or support changes, and complete the supported baseline before stable promotion. Results are tracked in the [accessibility test record](../ACCESSIBILITY.md#assistive-technology-record).
 
 ## Required platform
 
@@ -35,7 +35,13 @@ When `swipe` is enabled, the month grid normally sits in a native horizontal scr
 
 User agents and operating systems own native scroll momentum, touch slop, rubber-banding, overscroll, and snap timing. Exact motion is intentionally not normalized or guaranteed across supported browsers. With reduced motion requested, CSS scroll snapping is disabled. Direct tracking and any platform momentum remain native; after scrolling settles, the package resolves the destination and recenters by direct scroll-position assignment without authored smooth scrolling. Compatibility reports should focus on observable calendar semantics—direction, boundary enforcement, at-most-one-month commits, focus/state consistency, and recovery to the current snap point—rather than pixel-identical physics.
 
-Pinned-Chromium automation validates the managed interaction model, including trusted touch pull/snap outcomes, browser-generated horizontal-wheel paging, and that trusted pen pointer events are neither prevented nor captured. It does not establish real stylus scrolling or physical precision-device momentum; those outcomes require supported-device manual evidence. Automation also covers compact targets and density, CSS-only container transitions, DOM/focus-order alignment, RTL, forced colors, normal and reduced selection feedback, reflow, and the generic no-JavaScript fallback. The dated manual browser/assistive-technology matrix remains the promotion authority for real user-agent combinations.
+Pinned-Chromium automation validates the managed interaction model, including trusted touch pull/snap outcomes, browser-generated horizontal-wheel paging, and that trusted pen pointer events are neither prevented nor captured. It does not establish real stylus scrolling or physical precision-device momentum; those outcomes require supported-device manual evidence whenever affected. Automation also covers compact targets and density, CSS-only container transitions, DOM/focus-order alignment, RTL, forced colors, normal and reduced selection feedback, reflow, and the generic no-JavaScript fallback. Dated manual evidence remains the authority for claims about real user-agent combinations; it is repeated when relevant behavior changes rather than for every unrelated alpha.
+
+## Experimental WebMCP availability
+
+WebMCP is not a required platform capability and is outside the rolling browser-support commitment above. Its current `document.modelContext` API is experimental, selectively enabled, and may be unavailable in an otherwise supported browser. The `webMcp` option is default-off and preserves the complete ordinary calendar when that API is absent.
+
+Use exact feature detection rather than browser-name or version inference. The dated browser positions, origin trials, ChatGPT desktop limitations, and verification procedure belong to the [WebMCP site-tool guide](webmcp.md#compatibility-and-testing).
 
 ## Not supported
 

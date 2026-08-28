@@ -1,6 +1,6 @@
 # Internal architecture
 
-This guide helps contributors decide where a change belongs and which invariants must survive a refactor. The public behavior remains canonical in the [API reference](api.md); this document describes repository ownership and dependency direction rather than adding another consumer contract.
+This guide helps contributors decide where a change belongs and which invariants must survive a refactor. It describes repository ownership and dependency direction rather than adding another consumer contract. Public signatures and lifecycle belong to the [API reference](api.md), visual behavior belongs to [DESIGN.md](../DESIGN.md), interaction and accessibility behavior belongs to the [accessibility guide](../ACCESSIBILITY.md), and failure semantics belong to the [error guide](errors.md).
 
 ## Dependency direction
 
@@ -19,8 +19,8 @@ internal/domain/*  -> internal/domain/*, public contracts
 | Root facade and contracts | `index.ts`, `calendar.ts`, public types, errors, icons, messages, defaults, and pure message formatting | `calendar.ts` is the intentional composition entry into the coordinator. Other contract modules remain independent of runtime implementation. |
 | `internal/domain` | Gregorian civil-date parsing and arithmetic, ranges, bounds, fixed month grids, and atomic event normalization | No DOM or runtime imports. Domain code may use public types and errors. |
 | `internal/dom` | Stable semantic element creation, localized presentation, focus helpers, and bounded DOM rendering primitives | May use domain and public contracts, but does not own lifecycle, requests, or state transitions. |
-| `internal/runtime` | Option normalization, event-source generations, actions, extension isolation, integration-node leases, swipe state, observable state, and transaction coordination | May compose public, domain, DOM, and focused runtime peers. Runtime modules do not become public subpath APIs. |
-| `src/styles/*.css` and `scripts/lib/styles.mjs` | Ordered visual-state, responsive, direction, preference, and public-token authoring | The composer preserves the canonical cascade and emits the package's one public `dist/styles.css`; layout remains CSS-only. |
+| `internal/runtime` | Option normalization, event-source generations, actions, extension isolation, integration-node leases, optional WebMCP registration, swipe state, observable state, and transaction coordination | May compose public, domain, DOM, and focused runtime peers. Runtime modules do not become public subpath APIs. |
+| `src/styles/*.css` and `scripts/lib/styles.mjs` | Implementation of [DESIGN.md](../DESIGN.md), responsive preferences, direction, and public-token authoring | The composer preserves the canonical cascade and emits the package's one public `dist/styles.css`; layout remains CSS-only. |
 
 Do not add internal barrel files, cross-layer cycles, or a generic catch-all helper module. Import the narrow module that owns the behavior. The repository ESLint architecture rule enforces these layer edges and permits only `calendar.ts` to compose the public surface with the runtime coordinator.
 
@@ -31,8 +31,9 @@ Do not add internal barrel files, cross-layer cycles, or a generic catch-all hel
 | Civil-date parsing, comparison, projection, range math, or locale week start | `internal/domain` |
 | Stable markup, native semantics, localized display formatting, or focus mechanics | `internal/dom` |
 | Configuration validation, async source behavior, abort/reentrancy policy, actions, extensions, integration leases, or state | `internal/runtime` |
+| WebMCP schemas, registration, bounded result projection, and unregister lifecycle | A focused `internal/runtime` adapter composed by the coordinator; never DOM presentation or domain parsing |
 | Public names, callback shapes, defaults, exports, or diagnostics | Root contract modules plus the API documentation and examples |
-| Responsive placement, sizing, focus visuals, forced colors, or motion styling | `src/styles/*.css`, `scripts/lib/styles.mjs`, CSS-token documentation, `scripts/tests/styles.test.mjs`, and affected browser tests |
+| Responsive placement, sizing, focus visuals, forced colors, or motion styling | `DESIGN.md`, `src/styles/*.css`, `scripts/lib/styles.mjs`, the CSS token contract, `scripts/tests/styles.test.mjs`, and affected browser tests |
 
 A formatter or renderer that can be tested without calendar lifecycle state should normally be a DOM or domain leaf rather than another coordinator method. A helper that decides whether a source result may commit belongs to the runtime because it participates in the transaction.
 
@@ -54,12 +55,12 @@ The coordinator's `MonthCalendar` class is the sole transaction owner. Its size 
 A normal lifecycle follows this order:
 
 1. Construction snapshots and validates application options before package DOM is committed.
-2. `render()` establishes one stable package-owned shell and acquires any application-node leases.
+2. `render()` establishes one stable package-owned shell, acquires application-node leases, and begins sequential registration of any enabled WebMCP tool pair with one shared abort signal.
 3. A source generation owns one abort signal and one complete 42-day request range.
 4. A current result is validated and normalized atomically; malformed or stale results never partially commit.
 5. The coordinator commits the displayed month, selected date, normalized events, and observable phase as one current generation.
 6. DOM modules render from that committed snapshot; focus restoration, issue presentation, and announcements follow the same generation checks.
-7. `destroy()` aborts work, invalidates retained controls, runs extension cleanup, releases leases, restores managed fallback state, and removes package ownership.
+7. `destroy()` aborts work, invalidates retained controls and site-tool handlers, unregisters WebMCP tools, runs extension cleanup, releases leases, restores managed fallback state, and removes package ownership.
 
 The immutable options snapshot keeps the construction-time `events` value, while the coordinator owns a separate current event provider.  `setEvents()` validates and snapshots a replacement before changing that provider, then starts a new source generation.  Abort-listener and validation-getter reentrancy must not let an older transaction reclaim provider or controller ownership from a newer accepted replacement.
 
@@ -72,7 +73,7 @@ Keep generation checks and commit decisions in the coordinator or a focused runt
 - The toolbar, title, grid shell, agenda shell, live regions, and issue regions stay stable across ordinary renders so focus and references survive.
 - `toolbarEnd`, fallback content, and extension nodes remain application-owned. The package leases or mounts them according to their documented lifecycle instead of cloning or silently adopting them.
 - Extension failures are isolated and cleaned up without weakening core calendar semantics.
-- Responsive changes alter computed CSS layout only. They do not refetch, replace nodes, reorder focus stops, or move DOM.
+- Responsive implementation must preserve the invariants owned by the [responsive design](../DESIGN.md#responsive-model) and [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior); this architecture guide does not redefine them.
 - Private `lfc-*` classes, IDs, attributes, containers, and keyframes may change; integrations use public options, callbacks, elements, and tokens instead.
 
 ## Localized and responsive text

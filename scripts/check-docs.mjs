@@ -4,13 +4,37 @@ import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
 
 const API_DOCUMENT_PATH = join(REPOSITORY_ROOT, "docs", "api.md");
+const DOCUMENTATION_ENTRY_PATH = join(REPOSITORY_ROOT, "docs", "README.md");
 const ROOT_EXPORT_PATH = join(REPOSITORY_ROOT, "src", "index.ts");
+const DEPRECATED_WEB_MCP_PATTERN = /\bnavigator\s*(?:\?\s*)?\.\s*modelContext\b/gu;
 const EXCLUDED_DIRECTORIES = new Set([
 	".artifacts",
+	".cache",
 	".git",
 	".test-dist",
+	"coverage",
 	"dist",
-	"node_modules"
+	"node_modules",
+	"playwright-report",
+	"test-results"
+]);
+const GUARDED_TEXT_EXTENSIONS = new Set([
+	"",
+	".cjs",
+	".css",
+	".html",
+	".js",
+	".json",
+	".jsx",
+	".md",
+	".mjs",
+	".mts",
+	".scss",
+	".ts",
+	".tsx",
+	".txt",
+	".yaml",
+	".yml"
 ]);
 const VAGUE_LINK_LABELS = new Set([
 	"learn more",
@@ -21,6 +45,7 @@ const VAGUE_LINK_LABELS = new Set([
 ]);
 const errors = [];
 const anchorCache = new Map();
+const markdownLinkGraph = new Map();
 
 function addError(message) {
 	errors.push(message);
@@ -82,6 +107,20 @@ async function collectMarkdownFiles(directory) {
 		if (entry.isDirectory() && !EXCLUDED_DIRECTORIES.has(entry.name)) {
 			files.push(...await collectMarkdownFiles(path));
 		} else if (entry.isFile() && extname(entry.name).toLowerCase() === ".md") {
+			files.push(path);
+		}
+	}
+	return files;
+}
+
+async function collectGuardedTextFiles(directory) {
+	const entries = await readdir(directory, { withFileTypes: true });
+	const files = [];
+	for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+		const path = join(directory, entry.name);
+		if (entry.isDirectory() && !EXCLUDED_DIRECTORIES.has(entry.name)) {
+			files.push(...await collectGuardedTextFiles(path));
+		} else if (entry.isFile() && GUARDED_TEXT_EXTENSIONS.has(extname(entry.name).toLowerCase())) {
 			files.push(path);
 		}
 	}
@@ -317,12 +356,12 @@ async function markdownAnchors(path) {
 
 async function validateDestination(sourcePath, source, link) {
 	if (link.destination === undefined) {
-		return;
+		return undefined;
 	}
 	const line = lineNumberAt(source, link.index);
 	const rawDestination = link.destination.trim();
 	if (isExternalDestination(rawDestination) || rawDestination.startsWith("/")) {
-		return;
+		return undefined;
 	}
 	const hashIndex = rawDestination.indexOf("#");
 	const beforeHash = hashIndex === -1 ? rawDestination : rawDestination.slice(0, hashIndex);
@@ -334,7 +373,7 @@ async function validateDestination(sourcePath, source, link) {
 		? undefined
 		: decodeLinkPart(fragmentValue, sourcePath, line, "anchor");
 	if (decodedPath === undefined || fragment === undefined && fragmentValue !== undefined) {
-		return;
+		return undefined;
 	}
 
 	const targetPath = decodedPath.length === 0
@@ -343,10 +382,10 @@ async function validateDestination(sourcePath, source, link) {
 	const repositoryRelative = relative(REPOSITORY_ROOT, targetPath);
 	if (repositoryRelative.startsWith(`..${sep}`) || repositoryRelative === ".." || isAbsolute(repositoryRelative)) {
 		addError(`${displayPath(sourcePath)}:${String(line)} links outside the repository: ${rawDestination}.`);
-		return;
+		return undefined;
 	}
 	if (targetUsesExcludedDirectory(targetPath)) {
-		return;
+		return undefined;
 	}
 
 	let targetStat;
@@ -355,18 +394,17 @@ async function validateDestination(sourcePath, source, link) {
 	} catch (error) {
 		if (error instanceof Error && "code" in error && error.code === "ENOENT") {
 			addError(`${displayPath(sourcePath)}:${String(line)} links to missing path ${rawDestination}.`);
-			return;
+			return undefined;
 		}
 		throw error;
 	}
-	if (fragment === undefined || fragment.length === 0) {
-		return;
-	}
-
 	const markdownPath = targetStat.isDirectory() ? join(targetPath, "README.md") : targetPath;
+	if (fragment === undefined || fragment.length === 0) {
+		return extname(markdownPath).toLowerCase() === ".md" ? markdownPath : undefined;
+	}
 	if (extname(markdownPath).toLowerCase() !== ".md") {
 		addError(`${displayPath(sourcePath)}:${String(line)} links to anchor #${fragment} in a non-Markdown file.`);
-		return;
+		return undefined;
 	}
 	try {
 		const anchors = await markdownAnchors(markdownPath);
@@ -376,16 +414,18 @@ async function validateDestination(sourcePath, source, link) {
 	} catch (error) {
 		if (error instanceof Error && "code" in error && error.code === "ENOENT") {
 			addError(`${displayPath(sourcePath)}:${String(line)} links to missing path ${displayPath(markdownPath)}.`);
-			return;
+			return undefined;
 		}
 		throw error;
 	}
+	return markdownPath;
 }
 
 async function validateMarkdownFile(path) {
 	const source = await readFile(path, "utf8");
 	const prose = maskNonProse(source);
 	const links = [...extractInlineLinks(prose), ...extractReferenceLinks(prose)];
+	const localMarkdownTargets = new Set();
 	for (const link of links) {
 		const line = lineNumberAt(source, link.index);
 		if (link.missingReference !== undefined) {
@@ -396,7 +436,45 @@ async function validateMarkdownFile(path) {
 		if (!link.image && isVagueLinkLabel(link.label)) {
 			addError(`${displayPath(path)}:${String(line)} uses vague link label ${JSON.stringify(link.label)}.`);
 		}
-		await validateDestination(path, source, link);
+		const target = await validateDestination(path, source, link);
+		if (target !== undefined) {
+			localMarkdownTargets.add(target);
+		}
+	}
+	markdownLinkGraph.set(path, localMarkdownTargets);
+}
+
+async function validateDeprecatedWebMcpUsage(paths) {
+	for (const path of paths) {
+		const source = await readFile(path, "utf8");
+		for (const match of source.matchAll(DEPRECATED_WEB_MCP_PATTERN)) {
+			addError(
+				`${displayPath(path)}:${String(lineNumberAt(source, match.index ?? 0))} uses the deprecated navigator-scoped WebMCP API; use document.modelContext.`
+			);
+		}
+	}
+}
+
+function validateMarkdownReachability(markdownFiles) {
+	const knownFiles = new Set(markdownFiles);
+	const reachable = new Set();
+	const pending = [DOCUMENTATION_ENTRY_PATH];
+	while (pending.length > 0) {
+		const path = pending.pop();
+		if (path === undefined || reachable.has(path) || !knownFiles.has(path)) {
+			continue;
+		}
+		reachable.add(path);
+		for (const target of markdownLinkGraph.get(path) ?? []) {
+			pending.push(target);
+		}
+	}
+
+	for (const path of markdownFiles) {
+		const repositoryPath = displayPath(path);
+		if (!repositoryPath.startsWith(".github/") && !reachable.has(path)) {
+			addError(`${repositoryPath} is not reachable from docs/README.md through repository-local Markdown links.`);
+		}
 	}
 }
 
@@ -548,6 +626,8 @@ const markdownFiles = await collectMarkdownFiles(REPOSITORY_ROOT);
 for (const path of markdownFiles) {
 	await validateMarkdownFile(path);
 }
+validateMarkdownReachability(markdownFiles);
+await validateDeprecatedWebMcpUsage(await collectGuardedTextFiles(REPOSITORY_ROOT));
 const rootExportCount = await validateRootExportDocumentation();
 
 if (errors.length > 0) {

@@ -23,7 +23,7 @@
 
     :where(.litefold-calendar) .lfc-calendar-title {
       font-size: 1.125rem;
-      font-weight: 500;
+      font-weight: var(--lfc-internal-font-weight-medium);
       place-self: center stretch;
       text-align: center;
     }
@@ -104,14 +104,15 @@
 
     :where(.litefold-calendar)
       .lfc-calendar-day-summaries
-      > :where(:not(.lfc-is-compact-primary, :focus)) {
-      /* stylelint-disable unit-disallowed-list -- Canonical visually-hidden sentinel. */
-      block-size: 1px;
+      > :where(.lfc-calendar-event-summary, .lfc-calendar-grid-more):not(
+        .lfc-is-compact-primary,
+        :focus
+      ) {
+      block-size: var(--lfc-internal-visually-hidden-size);
       border: 0;
       clip-path: inset(50%);
-      inline-size: 1px;
-      margin: -1px;
-      /* stylelint-enable unit-disallowed-list */
+      inline-size: var(--lfc-internal-visually-hidden-size);
+      margin: var(--lfc-internal-visually-hidden-offset);
       min-block-size: 0;
       min-inline-size: 0;
       overflow: hidden;
@@ -123,7 +124,12 @@
 
     :where(.litefold-calendar)
       .lfc-calendar-event-summary.lfc-is-compact-primary
-      > :where(:not(.lfc-calendar-event-leading)),
+      > :where(
+        :not(
+            .lfc-calendar-event-leading,
+            .lfc-calendar-multiple-event-indicator
+          )
+      ),
     :where(.litefold-calendar)
       .lfc-calendar-event-summary.lfc-is-compact-primary
       .lfc-calendar-event-leading-content,
@@ -132,6 +138,68 @@
       .lfc-calendar-event-leading
       > :where(:not(.lfc-calendar-event-marker)) {
       display: none;
+    }
+
+    :where(.litefold-calendar) .lfc-calendar-day-summaries > .lfc-is-compact-primary,
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries
+      > .lfc-calendar-multiple-event-indicator {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries
+      > .lfc-calendar-multiple-event-indicator:not(:empty) {
+      display: inline-grid;
+      place-items: center;
+      place-self: center;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries:has(
+        > .lfc-calendar-grid-more.lfc-is-compact-primary
+      )
+      > .lfc-calendar-multiple-event-indicator {
+      display: none;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries:has(
+        > .lfc-calendar-event-summary.lfc-is-compact-primary
+          > .lfc-calendar-event-leading
+          > .lfc-calendar-event-marker:not(:empty)
+      )
+      > .lfc-calendar-multiple-event-indicator:not(:empty) {
+      justify-self: right;
+      max-inline-size: 20%;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries:has(
+        > .lfc-calendar-multiple-event-indicator:not(:empty)
+      ):has(
+        > .lfc-calendar-event-summary.lfc-is-compact-primary
+          > .lfc-calendar-event-leading
+          > .lfc-calendar-event-marker:not(:empty)
+      )
+      > .lfc-calendar-event-summary.lfc-is-compact-primary {
+      padding-right: calc(min(0.5rem, 20%) + 0.25rem);
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-event-summary.lfc-is-compact-primary
+      .lfc-calendar-event-marker
+      > * {
+      max-inline-size: 100%;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries
+      > .lfc-calendar-multiple-event-indicator
+      > .lfc-calendar-multiple-event-indicator-icon {
+      block-size: auto;
+      inline-size: 100%;
     }
 
     :where(.litefold-calendar)
@@ -210,13 +278,11 @@
     }
 
     :where(.litefold-calendar) .lfc-calendar-title-label-full {
-      /* stylelint-disable unit-disallowed-list -- Canonical visually-hidden sentinel. */
-      block-size: 1px;
+      block-size: var(--lfc-internal-visually-hidden-size);
       border: 0;
       clip-path: inset(50%);
-      inline-size: 1px;
-      margin: -1px;
-      /* stylelint-enable unit-disallowed-list */
+      inline-size: var(--lfc-internal-visually-hidden-size);
+      margin: var(--lfc-internal-visually-hidden-offset);
       overflow: hidden;
       padding: 0;
       position: absolute;
@@ -269,6 +335,24 @@
     :where(.litefold-calendar) .lfc-calendar-weekday {
       font-size: 0.875em;
       padding-inline: 0.25rem;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-grid-more.lfc-has-custom-grid-overflow-content:not(
+        .lfc-is-compact-primary,
+        :focus
+      )
+      > .lfc-calendar-grid-more-custom-content {
+      display: inline-flex;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-grid-more.lfc-has-custom-grid-overflow-content:not(
+        .lfc-is-compact-primary,
+        :focus
+      )
+      > .lfc-calendar-grid-more-default-content {
+      display: none;
     }
   }
 }

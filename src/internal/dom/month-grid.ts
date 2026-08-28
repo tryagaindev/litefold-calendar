@@ -11,6 +11,7 @@ export interface DayCellElements {
 	readonly badge: HTMLSpanElement;
 	readonly button: HTMLButtonElement;
 	readonly cell: HTMLDivElement;
+	readonly multipleEventIndicator: HTMLSpanElement;
 	readonly number: HTMLTimeElement;
 	readonly summaries: HTMLDivElement;
 }
@@ -72,12 +73,16 @@ export function createDayCellElements(options: Readonly<DayCellOptions>): DayCel
 	badge.setAttribute("aria-hidden", "true");
 	const summaries = options.document.createElement("div");
 	summaries.className = "lfc-calendar-day-summaries";
+	const multipleEventIndicator = options.document.createElement("span");
+	multipleEventIndicator.className = "lfc-calendar-multiple-event-indicator";
+	multipleEventIndicator.setAttribute("aria-hidden", "true");
+	summaries.append(multipleEventIndicator);
 	button.append(number, badge);
 	cell.append(button, summaries);
 	if (isSelectionEntry) {
 		clearSelectionEntryAfterAnimation(button, cell);
 	}
-	return { badge, button, cell, number, summaries };
+	return { badge, button, cell, multipleEventIndicator, number, summaries };
 }
 
 function installDirectPressFeedback(button: HTMLButtonElement): void {

@@ -1,8 +1,7 @@
 @layer lfc {
   :where(.litefold-calendar) .lfc-calendar-agenda {
     background: var(--lfc-surface-background);
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border: 1px solid var(--lfc-internal-grid-border-color);
+    border: var(--lfc-internal-hairline) solid var(--lfc-internal-grid-border-color);
     border-radius: var(--lfc-border-radius);
     display: grid;
     gap: var(--lfc-gap);
@@ -14,7 +13,7 @@
 
   :where(.litefold-calendar) .lfc-calendar-agenda-title {
     font-size: 1.125em;
-    font-weight: 700;
+    font-weight: var(--lfc-internal-font-weight-bold);
     line-height: 1.3;
     margin: 0;
     overflow-wrap: anywhere;
@@ -60,10 +59,9 @@
   :where(.litefold-calendar) .lfc-calendar-agenda-event {
     align-items: safe center;
     background: var(--lfc-event-background);
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border: 1px solid var(--lfc-event-border-color);
+    border: var(--lfc-internal-hairline) solid var(--lfc-event-border-color);
     border-inline-start: var(--lfc-event-accent-width) solid var(--lfc-event-accent-color);
-    border-radius: var(--lfc-internal-event-border-radius);
+    border-radius: var(--lfc-border-radius);
     color: var(--lfc-event-color);
     display: grid;
     gap: 0.25rem var(--lfc-gap);
@@ -87,7 +85,7 @@
     touch-action: manipulation;
     transition-duration: var(--lfc-internal-motion-duration);
     transition-property: background-color, border-color, box-shadow, color;
-    transition-timing-function: ease-out;
+    transition-timing-function: var(--lfc-internal-motion-easing);
   }
 
   :where(.litefold-calendar)
@@ -128,7 +126,7 @@
 
   :where(.litefold-calendar) .lfc-calendar-event-title {
     flex: 1 1 10rem;
-    font-weight: 700;
+    font-weight: var(--lfc-internal-font-weight-bold);
     min-inline-size: 0;
     overflow-wrap: anywhere;
   }
@@ -260,8 +258,8 @@
 
   :where(.litefold-calendar) .lfc-calendar-more {
     color: var(--lfc-muted-color);
-    font-size: 0.75em;
-    font-weight: 700;
+    font-size: var(--lfc-grid-event-font-size);
+    font-weight: var(--lfc-internal-font-weight-bold);
     overflow: hidden;
     padding-inline: 0.25rem;
     text-overflow: ellipsis;
@@ -294,13 +292,11 @@
   }
 
   :where(.litefold-calendar) .lfc-visually-hidden {
-    /* stylelint-disable unit-disallowed-list -- Canonical visually-hidden sentinel. */
-    block-size: 1px;
+    block-size: var(--lfc-internal-visually-hidden-size);
     border: 0;
     clip-path: inset(50%);
-    inline-size: 1px;
-    margin: -1px;
-    /* stylelint-enable unit-disallowed-list */
+    inline-size: var(--lfc-internal-visually-hidden-size);
+    margin: var(--lfc-internal-visually-hidden-offset);
     overflow: hidden;
     padding: 0;
     position: absolute;

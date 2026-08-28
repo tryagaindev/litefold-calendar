@@ -11,12 +11,13 @@
 <body>
 	<main class="example-shell">
 		<header class="example-intro">
-			<h1>Rewrite a basic dayGridMonth integration</h1>
-			<p>This standalone recipe adapts a JSON shape commonly used with FullCalendar v6. It is application code, not a compatibility layer.</p>
+			<h1>Rewrite a FullCalendar dayGridMonth view</h1>
+			<p>Supersede a range request, select a day, and activate an event while the application adapts a common FullCalendar v6 JSON shape to Litefold events.</p>
 		</header>
 
 		<section class="example-panel" aria-labelledby="migration-request-title">
 			<h2 id="migration-request-title">Range-aware source</h2>
+			<p>Use the button during a request to confirm the stale response is aborted and only the newest 42-day snapshot commits.</p>
 			<p data-example-range>Waiting for the first 42-day request.</p>
 			<div class="example-control-row">
 				<button class="example-button" type="button" data-example-refetch>Supersede a request</button>

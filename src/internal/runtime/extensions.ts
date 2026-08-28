@@ -15,7 +15,9 @@ const EXTENSION_SCHEMA = Object.freeze({
 	renderEventDetails: "hook",
 	renderEventLeading: "hook",
 	renderEventMarker: "hook",
-	renderEventTrailing: "hook"
+	renderEventTrailing: "hook",
+	renderGridOverflowContent: "hook",
+	renderMultipleEventIndicator: "hook"
 } as const satisfies Record<keyof CalendarExtension, "hook" | "id">);
 
 const EXTENSION_HOOK_NAMES = Object.freeze(
@@ -25,6 +27,17 @@ const EXTENSION_HOOK_NAMES = Object.freeze(
 	>[]
 );
 const EXTENSION_KEY_SET: ReadonlySet<string> = new Set(["id", ...EXTENSION_HOOK_NAMES]);
+const SINGLETON_EXTENSION_HOOK_NAMES = Object.freeze([
+	"renderEventMarker",
+	"renderGridOverflowContent",
+	"renderMultipleEventIndicator"
+] as const satisfies readonly (keyof CalendarExtension)[]);
+
+/** Identifies the render invocation that owns one leased extension node. */
+export interface ExtensionNodeInvocation {
+	readonly controller: AbortController;
+	readonly hookName: string;
+}
 
 /** Mutable per-extension state owned and sequenced by the calendar coordinator. */
 export interface ExtensionRuntime<TMetadata> {
@@ -32,8 +45,11 @@ export interface ExtensionRuntime<TMetadata> {
 	readonly createController: () => AbortController;
 	readonly definition: CalendarExtension<TMetadata>;
 	readonly cleanups: (() => void)[];
+	readonly gridOverflowContentFallbacks: Set<HTMLButtonElement>;
 	readonly leaseToken: object;
 	readonly markerFallbacks: Map<HTMLElement, string | null>;
+	readonly multipleEventIndicatorFallbacks: Set<HTMLElement>;
+	readonly nodeInvocations: WeakMap<Node, Readonly<ExtensionNodeInvocation>>;
 	readonly nodes: Map<Node, Node>;
 	quarantined: boolean;
 }
@@ -62,7 +78,7 @@ export function createExtensionRuntimes<TMetadata>(
 		false
 	);
 	const identifiers = new Set<string>();
-	let markerRendererId: string | null = null;
+	const singletonOwners = new Map<keyof CalendarExtension, string>();
 	const runtimes = extensionSnapshot.map((extension, index) => {
 		const extensionValue: unknown = extension;
 		if (!isConfigurationRecord(extensionValue)) {
@@ -87,13 +103,17 @@ export function createExtensionRuntimes<TMetadata>(
 				definition[hookName] = hook;
 			}
 		}
-		if (definition["renderEventMarker"] !== undefined) {
-			if (markerRendererId !== null) {
+		for (const hookName of SINGLETON_EXTENSION_HOOK_NAMES) {
+			if (definition[hookName] === undefined) {
+				continue;
+			}
+			const ownerId = singletonOwners.get(hookName);
+			if (ownerId !== undefined) {
 				throw createConfigurationError(
-					`Extensions "${markerRendererId}" and "${identifier}" both define renderEventMarker.`
+					`Extensions "${ownerId}" and "${identifier}" both define ${hookName}.`
 				);
 			}
-			markerRendererId = identifier;
+			singletonOwners.set(hookName, identifier);
 		}
 		identifiers.add(identifier);
 		const frozenDefinition = Object.freeze(definition) as Readonly<CalendarExtension<TMetadata>>;
@@ -103,8 +123,11 @@ export function createExtensionRuntimes<TMetadata>(
 			controller: createController(),
 			createController,
 			definition: frozenDefinition,
+			gridOverflowContentFallbacks: new Set<HTMLButtonElement>(),
 			leaseToken: {},
 			markerFallbacks: new Map<HTMLElement, string | null>(),
+			multipleEventIndicatorFallbacks: new Set<HTMLElement>(),
+			nodeInvocations: new WeakMap<Node, Readonly<ExtensionNodeInvocation>>(),
 			nodes: new Map<Node, Node>(),
 			quarantined: false
 		};

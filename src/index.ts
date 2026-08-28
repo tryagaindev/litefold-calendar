@@ -39,9 +39,12 @@ export type {
 	CalendarExtensionCleanup,
 	CalendarExtensionContext,
 	CalendarFirstDay,
+	CalendarGridOverflowContentContext,
 	CalendarHeadingLevel,
+	CalendarMultipleEventIndicatorContext,
 	CalendarOptions,
 	CalendarPhase,
 	CalendarRange,
-	CalendarState
+	CalendarState,
+	CalendarWebMcpOptions
 } from "./types.js";

@@ -54,16 +54,20 @@ void test("construction rejects invalid configuration before committing generate
 		}),
 		(error: unknown) => isCalendarError(error, "invalid-configuration")
 	);
-	assert.throws(
-		() => createCalendar(host, {
-			events: [],
-			extensions: [
-				{ id: "first-marker", renderEventMarker: () => null },
-				{ id: "second-marker", renderEventMarker: () => null }
-			]
-		}),
-		(error: unknown) => isCalendarError(error, "invalid-configuration")
-	);
+	for (const hook of [
+		"renderEventMarker",
+		"renderGridOverflowContent",
+		"renderMultipleEventIndicator"
+	] as const) {
+		const extensions = [
+			{ id: `first-${hook}`, [hook]: () => null },
+			{ id: `second-${hook}`, [hook]: () => null }
+		] satisfies CalendarExtension[];
+		assert.throws(
+			() => createCalendar(host, { events: [], extensions }),
+			(error: unknown) => isCalendarError(error, "invalid-configuration")
+		);
+	}
 	const staticEventsFailure = new Error("static events getter failure");
 	const hostileStaticEvents: CalendarEventInput[] = [];
 	Object.defineProperty(hostileStaticEvents, "0", {

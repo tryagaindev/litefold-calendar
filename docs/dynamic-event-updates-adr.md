@@ -75,4 +75,26 @@ The coordinator stores a mutable current `CalendarEventSource<TMetadata>` separa
 
 Public declarations, the exhaustive `Calendar` method map, API and integration documentation, the changelog, built examples, and packed-package consumer verification change together.  Focused tests cover static arrays, provider replacement, invalid top-level input, invalid payloads, stale success and failure, abort signals, recoverable source failure, before-render and after-destroy calls, callback reentrancy, exact focus restoration, removed-event fallback, preserved agenda paging, filters, and `refetchEvents()` after multiple replacements.
 
-The decision record and integration fixtures remain repository-only artifacts; the package manifest publishes `dist/` alone.  The opt-in [dynamic event update measurement](dynamic-event-update-measurement.md) reports raw and gzip size for the entry, coordinator, and complete JavaScript distribution graph, with baseline deltas when a prior build is supplied.  It also compares 10,000-event replacement with provider-state refetch and recreation over the same visible range, using five warmups and at least twenty measured runs.  Its protocol and calculations have deterministic tooling tests, while median and 95th-percentile duration remain recorded evidence rather than timing assertions in the default suite.
+The decision record, integration fixtures, and measurement harness remain repository-only artifacts; the package manifest publishes `dist/` alone. The [API reference](api.md#control-the-calendar-calendar) is authoritative for the current `setEvents()` signature and behavior when this historical rationale and the implementation differ.
+
+## Measurement protocol
+
+The opt-in harness compares `setEvents()`, application-owned provider state followed by `refetchEvents()`, and instance recreation against the same visible range and event data:
+
+```sh
+npm run measure:dynamic-events
+```
+
+The default protocol alternates two deterministic snapshots of 10,000 valid events across the fixed `2026-07-26` through `2026-09-06` visible range. Each strategy receives five warmup operations and at least twenty measured operations. Strategy order rotates between cycles, the snapshot alternates each cycle, and the report uses the median and nearest-rank 95th percentile. Pass `--runs N` for more samples, `--size-only` for distribution size only, or `--json` for machine-readable output and raw samples.
+
+The harness runs the built package in JSDOM. Use results to compare the three paths on one machine and toolchain, not as browser latency or Interaction to Next Paint data. No timing or size threshold is part of the repository gate. Lifecycle, ready-state, event-count, and visible-range mismatches still fail because they invalidate the comparison.
+
+The report also includes raw and maximum-compression gzip byte counts for `dist/index.js`, `dist/internal/runtime/coordinator.js`, and every JavaScript module beneath `dist/`. Preserve a complete prior `dist/` directory outside the candidate build, then request baseline deltas:
+
+```sh
+npm run measure:dynamic-events -- --baseline .cache/dynamic-update-baseline/dist
+```
+
+The graph total compresses each module separately and is not a tarball size. A single prior `index.js` remains accepted when only the entry delta is available. Package verification remains authoritative for publishable bytes and consumer behavior.
+
+Record Node, operating system, architecture, sample counts, median, p95, raw bytes, gzip bytes, and baseline identity when sharing results. Compare runs only when build, runtime, hardware, and protocol match. Historical local numbers are deliberately not retained as a current performance claim; use the reproducible command to gather evidence for the code under review.

@@ -133,6 +133,16 @@ export interface CalendarDayExtensionContext extends CalendarExtensionContext<"d
 	readonly isToday: boolean;
 }
 
+/** Values supplied when rendering the compact cue for a day with multiple events. */
+export interface CalendarMultipleEventIndicatorContext extends CalendarExtensionContext<"day"> {
+	/** Structured Gregorian date for the rendered day. */
+	readonly date: CalendarDate;
+	/** Strict `YYYY-MM-DD` form of `date`. */
+	readonly dateString: string;
+	/** Authoritative total number of event occurrences for the day. */
+	readonly eventCount: number;
+}
+
 /** Stable element references supplied to day extensions without exposing private selectors. */
 export interface CalendarDayElements {
 	/** Visual-only extension slot for a day badge. */
@@ -155,6 +165,21 @@ export type CalendarEventSurface = "grid-summary" | "agenda";
 
 /** Calendar surfaces on which event times remain visually displayed. */
 export type CalendarEventTimeDisplay = "all" | "grid" | "agenda" | "none";
+
+/** Values supplied when rendering visual content for the native grid-overflow action. */
+export interface CalendarGridOverflowContentContext
+	extends CalendarExtensionContext<"grid-summary"> {
+	/** Structured Gregorian date for the rendered day. */
+	readonly date: CalendarDate;
+	/** Strict `YYYY-MM-DD` form of `date`. */
+	readonly dateString: string;
+	/** Authoritative total number of event occurrences for the day. */
+	readonly eventCount: number;
+	/** Number of event occurrences omitted from the grid cell. */
+	readonly hiddenEventCount: number;
+	/** Localized built-in overflow text retained by the native action. */
+	readonly text: string;
+}
 
 /** Stable element references supplied to event extensions without exposing private selectors. */
 export interface CalendarEventElements {
@@ -187,7 +212,11 @@ export interface CalendarEventExtensionContext<TMetadata = unknown>
 	readonly elements: CalendarEventElements;
 	/** Immutable normalized event. */
 	readonly event: CalendarEvent<TMetadata>;
-	/** Localized time label, or an empty string when no time is displayed. */
+	/**
+	 * Localized time label, or an empty string when this occurrence has no time label
+	 * (for example, a later day of a timed multi-day event). `eventTimeDisplay`
+	 * affects visual exposure only and does not clear this value.
+	 */
 	readonly timeText: string;
 }
 
@@ -232,6 +261,16 @@ export interface CalendarExtension<TMetadata = unknown> {
 	readonly renderEventTrailing?: (
 		this: void,
 		context: Readonly<CalendarEventExtensionContext<TMetadata>>
+	) => Node | null | undefined;
+	/** Returns detached, noninteractive wide content for the native grid-overflow action. */
+	readonly renderGridOverflowContent?: (
+		this: void,
+		context: Readonly<CalendarGridOverflowContentContext>
+	) => Node | null | undefined;
+	/** Replaces the built-in compact multiple-event cue, or suppresses it with `null`. */
+	readonly renderMultipleEventIndicator?: (
+		this: void,
+		context: Readonly<CalendarMultipleEventIndicatorContext>
 	) => Node | null | undefined;
 }
 
@@ -308,6 +347,15 @@ export type CalendarFirstDay = "locale" | 0 | 1 | 2 | 3 | 4 | 5 | 6;
 /** Valid native heading levels for the generated calendar heading. */
 export type CalendarHeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
+/** Explicit configuration for one calendar's lifecycle-bound WebMCP tools. */
+export interface CalendarWebMcpOptions {
+	/**
+	 * Unique 1–117 character WebMCP-safe ASCII prefix used by this calendar's
+	 * `-get-events` and `-navigate` tools.
+	 */
+	readonly toolNamePrefix: string;
+}
+
 /** Immutable options for a reusable month calendar. */
 export interface CalendarOptions<TMetadata = unknown> {
 	/** Maximum agenda events retained in the DOM; defaults to `200`. */
@@ -376,6 +424,8 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly timeZone?: string;
 	/** Detached or host-descendant same-document application HTML element placed after built-in toolbar controls. */
 	readonly toolbarEnd?: HTMLElement;
+	/** Explicitly exposes bounded visible-range event and navigation tools through WebMCP; disabled when omitted or `false`. */
+	readonly webMcp?: false | Readonly<CalendarWebMcpOptions>;
 }
 
 /** The intentionally small calendar lifecycle, event-data, state, and navigation API. */

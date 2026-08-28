@@ -13,6 +13,7 @@ Persistent status/error UI appears after the toolbar and before the grid. It doe
 | Rejected current event/day action | Persistent action error | Assertive |
 | Failed extension hook | Partial-details warning; built-in UI remains | Polite |
 | Failed or invalid context-availability predicate | Context action fails closed; one recoverable integration issue | Polite |
+| Failed WebMCP registration | Site tools remain unavailable; ordinary calendar state and UI remain unchanged; diagnostic `host-integration-failed` only | Silent |
 | Fatal internal failure | Generic unavailable fallback | Assertive |
 | Successful user-initiated Retry | Resolved issue is removed | Polite recovery message |
 | Superseded request aborted by the package | No error | Silent |
@@ -49,6 +50,8 @@ Developer diagnostics identify the exact option or event field and the expected 
 ## Observe operational failures without taking over
 
 Use `onError` for telemetry, logging, or application diagnostics. For a current error accepted into state, returning nothing—or returning `"default"`—keeps the package UI and live announcement. A stale diagnostic is still delivered to this callback, but it has no package presentation to preserve or suppress.
+
+WebMCP registration rejection follows the diagnostic-only route even when it occurs during render. The error uses code `host-integration-failed` and hook `webMcp`, does not enter `CalendarState.issues`, and does not disable or degrade the ordinary calendar. Correct a name collision or host capability issue, then recreate the calendar if site tools are still required.
 
 ```ts
 const calendar = createCalendar(host, {
@@ -193,7 +196,7 @@ Attach a global `error` listener only if your telemetry stack requires it. Do no
 - Extension failures: recreate the calendar after replacing or removing the extension. Quarantine is terminal for that extension instance.
 - Fatal/internal failures: destroy and recreate after recording diagnostics. Do not manipulate private package DOM to force recovery.
 - Application actions: return their promise. A fire-and-forget async action cannot be observed by the calendar.
-- Progressive fallback: keep it independent of package error DOM. Initial loading leaves it unchanged; usable data hides it; retained-data degradation keeps it hidden; unavailable/fatal state with no usable snapshot and destroy restore its original hidden state while the package still manages the current value; retry success hides it again. Package writes are skipped while an application `hidden` mutation differs from the package's last value, and destroy preserves that differing value.
+- Progressive fallback: keep it independent of package error DOM and follow the [canonical lease and visibility lifecycle](api.md#application-integration-options); do not reimplement that lifecycle in application error presentation.
 
 ## Accessibility requirements for application ownership
 

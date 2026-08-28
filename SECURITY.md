@@ -34,7 +34,9 @@ The library runs inside an application-controlled browser document.  It does not
 
 Event-source results and ordinary event fields are untrusted input.  Options, callbacks, and extensions are trusted same-realm code with the same authority as the host application.  The application remains responsible for transport security, authorization, recurrence expansion, time-zone conversion, caching, routes, and protection of event data before it reaches the library.
 
-See the canonical [threat model](docs/litefold-calendar-threat-model.md) for trust boundaries, abuse cases, controls, and residual risk.  [docs/security-model.md](docs/security-model.md) remains the stable security-documentation pointer.
+WebMCP is an explicit, default-off same-document integration. Its arguments are untrusted, and enabling it intentionally exposes paged event titles plus raw normalized start/end civil values for the allowed portion of the currently loaded visible range to a compatible browser agent, even when `eventTimeDisplay` hides time visually. Grid density, overflow, and agenda rendering limits are not authorization filters and do not narrow otherwise eligible tool results. WebMCP grants no server permission and excludes identifiers, URLs, metadata, extensions, raw errors, and application actions. Review the [WebMCP privacy guidance](docs/webmcp.md#privacy-and-security) before enabling it for confidential schedules.
+
+See the canonical [security model](docs/security-model.md) for trust boundaries, abuse cases, controls, and residual risk.
 
 ## Security invariants
 
@@ -46,14 +48,20 @@ The following properties must hold:
 - Event snapshots are strictly and atomically validated before replacing current data.  Count and string limits bound package-owned work.
 - Raw causes, stack traces, URLs, payloads, metadata, and private extension identifiers never enter package-owned user-facing error text or sanitized state.
 - Superseded or destroyed work cannot update the active calendar.  Owned listeners, timers, controllers, node leases, transient paging state, and extension cleanups are released during teardown.
+- WebMCP never registers without explicit configuration. Tool arguments are schema- and bounds-validated; event output is fixed-page, marked untrusted, and excludes IDs, URLs, metadata, and diagnostics. Both sequential registrations share one abort signal, an observed registration failure aborts that signal, and teardown ends their lifetime. The experimental browser API provides no atomic batch or registration timeout. The navigation tool cannot activate application callbacks or event destinations.
 - Same-realm extension failures are contained where practical, but malicious or blocking extension code is not sandboxed.
 - The ESM entry is safe to import without a DOM.  Core runtime code uses no HTML-injection or dynamic-code sinks and creates no inline style attributes.
 - Operational failures remain visible and programmatically announced unless the application explicitly takes ownership.  Invalid configuration, arguments, and lifecycle use throw typed errors to the caller.
-- Public releases come from clean committed source, a protected version tag contained in `main`, a complete quality gate, an immutable verified bundle, and an npm trusted-publishing job that receives OIDC only after verification.  The publish job checks out no source and publishes the exact verified tarball with provenance.
+- Public releases originate from the exact eligible `main` push containing an allowlisted deterministic release-state change. The publisher reruns the complete gate for that exact SHA. Retained evidence includes a canonical SPDX 2.3 SBOM bound to the package version, full source SHA, and source-commit time; under the pinned toolchain, its bytes are deterministic for the same clean commit.
+- Source execution and publication authority never coincide.  Verification has read-only repository access and no npm or Pages OIDC.  The npm-authorized job checks out no source, installs or imports no candidate package, executes no project code, and publishes only the checksum-verified retained tarball.  Registry verification, repository writes, and Pages deployment remain separately scoped.
+- Remote release state fails closed.  Unavailable, ambiguous, conflicting, or malformed npm, authenticated GraphQL, GitHub, or Pages state never authorizes a transition.  Registry completion independently verifies exact integrity, a clean installation and supported imports, signatures, and SLSA provenance bound to the artifact and exact source identity.
+- Automatic rolling Pages previews move monotonically by source ancestry; only explicit retained-state rollback may move backward. Existing release directories remain immutable. Release Pages are queued through separately scoped authority after the registry-verified GitHub prerelease is public.
+
+Operational recovery and hosted controls are defined in [release administration](docs/release-administration.md).  Artifact and registry evidence details remain canonical in [package verification](docs/package-verification.md), and Pages procedures remain canonical in [example deployment](docs/example-deployment.md).
 
 ## Reportable findings
 
-Report realistic paths to compromise an application integration, repository, release artifact, or maintainer privilege.  Examples include DOM or script injection through event data, bypass of the event-link policy, sensitive diagnostic disclosure, resource-bound bypass, cross-instance or stale-generation races, package substitution, workflow privilege escalation, or publication of bytes other than the reviewed tarball.
+Report realistic paths to compromise an application integration, repository, release artifact, or maintainer privilege. Examples include DOM or script injection through event data, bypass of event-link or WebMCP output policy, unauthorized site-tool disclosure or navigation, stale or cross-instance tool registration, sensitive diagnostic disclosure, resource-bound bypass, stale-generation races, package substitution, workflow privilege escalation, or publication of bytes other than the reviewed tarball.
 
 A development-tool advisory is relevant when it can affect CI, repository integrity, or published output.  A version match without a reachable path is not sufficient by itself.
 

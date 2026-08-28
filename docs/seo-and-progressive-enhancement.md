@@ -2,6 +2,8 @@
 
 litefold-calendar renders meaningful native client-side markup and can coordinate an application-owned no-JavaScript fallback. It does not render HTML on the server, create canonical pages, inject metadata, or determine whether event data may be indexed.
 
+Optional [WebMCP site tools](webmcp.md) provide structured interaction to a compatible browser agent only after JavaScript runs. They do not make content server-rendered, crawlable, indexable, or available as a no-JavaScript fallback.
+
 ## What core renders
 
 After a usable source snapshot commits, the calendar uses:
@@ -60,22 +62,13 @@ The fallback must belong to the host document and remain outside the calendar ho
 
 ## Fallback lifecycle
 
-The package records the fallback's original `hidden` state and changes only that property while its current value still matches the package's last observed or written value:
-
-- Construction and initial loading leave the fallback unchanged.
-- The first usable source snapshot hides it, including a successful empty snapshot.
-- A degraded refresh that retains usable data keeps it hidden.
-- An unavailable or fatal state with no usable snapshot restores its original `hidden` state while the package still manages the current value.
-- A successful retry hides it again.
-- If application code changes `hidden` during the lease, package writes are skipped while that value differs, and destruction preserves the differing application value. Restoring the package's last value allows normal management to resume.
-- `destroy()` always releases the lease and restores the original state only while the package still manages the current value.
-- Invalid construction or a failed host claim leaves it untouched.
+The [API reference owns the exact fallback lifecycle](api.md#application-integration-options), including lease admission, usable and degraded snapshots, application `hidden` mutations, Retry, failure, and destruction. This recipe relies on that contract rather than restating it.
 
 Keep fallback content independently correct; the package does not reconcile or rewrite it. When fallback data changes, update it through the application's server or content workflow.
 
 ## Event URL policy
 
-`CalendarEventInput.url` is optional. The package resolves it against the host document and accepts relative references or HTTP(S) URLs up to 2,048 characters. Validation rejects empty or trim-altered input, control characters, embedded credentials, malformed URLs, and unsupported schemes. A bad URL rejects the entire source snapshot atomically.
+`CalendarEventInput.url` is optional. The package resolves it against the host document and accepts relative references or HTTP(S) URLs only when both the supplied value and resolved URL are no longer than 2,048 UTF-16 code units. Validation rejects empty or trim-altered input, control characters, embedded credentials, malformed URLs, and unsupported schemes. A bad URL rejects the entire source snapshot atomically. See the [canonical event URL contract](api.md#define-events-calendareventinput-and-calendarevent).
 
 Use same-origin relative links when possible. The application remains responsible for authorization, privacy, canonical routing, destination security, and deciding whether a link may expose an event's existence.
 
@@ -100,7 +93,7 @@ litefold-calendar deliberately does not emit JSON-LD. Rich-result schemas requir
 
 1. Load the page with JavaScript disabled and confirm the fallback is useful, ordered, linked where appropriate, and authorized.
 2. Load with a slow source and confirm the fallback stays available until usable calendar data commits.
-3. Exercise initial failure, retry success, retained-data refresh failure, fatal failure, and destroy.
+3. Exercise the fallback states required by the [canonical lifecycle](api.md#application-integration-options).
 4. Inspect the rendered agenda for native `ol`/`li`/`time`/`a` semantics; repeat with each visual time mode and confirm hidden times remain semantic and accessible.
 5. Confirm links work with ordinary navigation, new-tab commands, copy-link, and the native context menu.
 6. Test keyboard and assistive-technology reading order across the server content, calendar grid, agenda, and fallback transition.

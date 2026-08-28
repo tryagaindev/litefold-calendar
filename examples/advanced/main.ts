@@ -504,7 +504,25 @@ const advancedExtension = Object.freeze({
 		actionHint.className = "advanced-example-action-hint";
 		actionHint.textContent = "View details";
 		return actionHint;
-	}
+	},
+	renderGridOverflowContent: ({
+		dateString,
+		document: ownerDocument,
+		eventCount,
+		hiddenEventCount,
+		surface,
+		text
+	}) => {
+		const content = ownerDocument.createElement("span");
+		content.className = "advanced-example-grid-overflow-content";
+		content.dataset["exampleDate"] = dateString;
+		content.dataset["exampleEventCount"] = String(eventCount);
+		content.dataset["exampleHiddenEventCount"] = String(hiddenEventCount);
+		content.dataset["exampleSurface"] = surface;
+		content.textContent = text;
+		return content;
+	},
+	renderMultipleEventIndicator: () => undefined
 } satisfies CompleteCalendarExtension<EventData>);
 
 //EventData is inferred from the typed source and extension.
@@ -589,7 +607,10 @@ const calendarOptions = {
 	sourceEventLimit: 100,
 	swipe: true,
 	timeZone: "America/Los_Angeles",
-	toolbarEnd
+	toolbarEnd,
+	webMcp: {
+		toolNamePrefix: "litefold-advanced"
+	}
 } satisfies CompleteCalendarOptions<EventData>;
 
 const calendar = createCalendar(host, calendarOptions);

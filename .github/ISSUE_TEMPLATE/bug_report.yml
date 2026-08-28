@@ -13,7 +13,7 @@ body:
     attributes:
       label: Package version or commit
       description: Provide the exact npm version or source commit and the tarball SHA-256 when applicable.
-      placeholder: 0.1.0-alpha.0; source commit; tarball SHA-256
+      placeholder: 0.x.y-alpha.N; source commit; tarball SHA-256
     validations:
       required: true
   - type: input
@@ -21,7 +21,7 @@ body:
     attributes:
       label: Environment
       description: Include browser version, operating system, device, and relevant assistive technology.
-      placeholder: Firefox 145 on Windows 11; NVDA 2026.1
+      placeholder: Current Firefox on Windows; current NVDA
     validations:
       required: true
   - type: textarea
@@ -52,7 +52,7 @@ body:
     id: context
     attributes:
       label: Additional context
-      description: Note frequency, regressions, workarounds, mobile/zoom behavior, and anything else relevant.
+      description: Note frequency, regressions, workarounds, mobile/zoom behavior, and anything else relevant. For WebMCP, include the feature-detection result, ChatGPT workspace/model context when applicable, configured prefix, tool name, operation, and teardown behavior without pasting confidential tool output.
   - type: checkboxes
     id: confirmation
     attributes:
@@ -60,5 +60,5 @@ body:
       options:
         - label: I searched for existing issues and removed secrets and private data.
           required: true
-        - label: I agree to follow the Code of Conduct.
+        - label: I agree to follow the [Code of Conduct](https://github.com/tryagaindev/litefold-calendar/blob/main/CODE_OF_CONDUCT.md).
           required: true

@@ -2,8 +2,7 @@
   :where(.litefold-calendar) .lfc-calendar-toolbar {
     align-items: safe center;
     background: var(--lfc-background);
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border-block-end: 1px solid var(--lfc-border-color);
+    border-block-end: var(--lfc-internal-hairline) solid var(--lfc-border-color);
     display: flex;
     flex-wrap: wrap;
     gap: 0.375rem var(--lfc-gap);
@@ -32,7 +31,7 @@
   :where(.litefold-calendar) .lfc-calendar-title {
     grid-area: title;
     font-size: clamp(1.125rem, 5cqi, 1.5rem);
-    font-weight: 700;
+    font-weight: var(--lfc-internal-font-weight-bold);
     line-height: 1.25;
     margin: 0;
     min-inline-size: 0;
@@ -44,8 +43,7 @@
     align-items: safe center;
     appearance: none;
     background: transparent;
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border: 1px solid transparent;
+    border: var(--lfc-internal-hairline) solid transparent;
     border-radius: var(--lfc-border-radius);
     color: inherit;
     cursor: pointer;
@@ -65,7 +63,7 @@
     touch-action: manipulation;
     transition-duration: var(--lfc-internal-motion-duration);
     transition-property: background-color, border-color, color;
-    transition-timing-function: ease-out;
+    transition-timing-function: var(--lfc-internal-motion-easing);
   }
 
   :where(.litefold-calendar) .lfc-calendar-title-label {
@@ -96,8 +94,7 @@
 
   :where(.litefold-calendar) .lfc-calendar-month-picker {
     background: var(--lfc-background);
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border: 1px solid var(--lfc-border-color);
+    border: var(--lfc-internal-hairline) solid var(--lfc-border-color);
     border-radius: var(--lfc-border-radius);
     color: var(--lfc-color);
     font-family: var(--lfc-font-family);
@@ -122,6 +119,7 @@
 
   :where(.litefold-calendar) .lfc-calendar-month-picker-title {
     font-size: 1.25em;
+    font-weight: var(--lfc-internal-font-weight-bold);
     line-height: 1.25;
     margin: 0;
     text-wrap: balance;
@@ -140,7 +138,7 @@
 
   :where(.litefold-calendar) .lfc-calendar-month-picker-field {
     display: grid;
-    font-weight: 600;
+    font-weight: var(--lfc-internal-font-weight-semibold);
     gap: 0.25rem;
     min-inline-size: 0;
   }
@@ -150,8 +148,7 @@
       .lfc-calendar-month-picker input
     ) {
     background: var(--lfc-background);
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border: 1px solid var(--lfc-border-color);
+    border: var(--lfc-internal-hairline) solid var(--lfc-border-color);
     border-radius: var(--lfc-border-radius);
     inline-size: 100%;
     min-block-size: var(--lfc-control-min-size);
@@ -172,7 +169,7 @@
     background: var(--lfc-accent-color);
     border-color: var(--lfc-accent-color);
     color: var(--lfc-accent-contrast-color);
-    font-weight: 700;
+    font-weight: var(--lfc-internal-font-weight-bold);
   }
 
   :where(.litefold-calendar) .lfc-calendar-month-picker-cancel {
@@ -198,7 +195,7 @@
   :where(.litefold-calendar) .lfc-calendar-today-button {
     background: var(--lfc-background);
     color: var(--lfc-color);
-    font-weight: 600;
+    font-weight: var(--lfc-internal-font-weight-semibold);
     grid-area: today;
     inline-size: auto;
     justify-self: end;
@@ -209,15 +206,8 @@
     .lfc-calendar-nav-button {
     background: transparent;
     border-color: transparent;
-    border-radius: 999rem;
+    border-radius: var(--lfc-border-radius);
     padding-inline: 0.5rem;
-  }
-
-  :where(.litefold-calendar)
-    .lfc-calendar-month-stepper
-    .lfc-calendar-nav-button:not([disabled], [aria-disabled="true"]):active {
-    background: var(--lfc-selected-background);
-    color: var(--lfc-selected-color);
   }
 
   :where(.litefold-calendar) .lfc-calendar-navigation-icon {
@@ -243,8 +233,7 @@
 
   :where(.litefold-calendar) .lfc-calendar-status-panel {
     background: var(--lfc-error-background);
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border: 1px solid var(--lfc-error-border-color);
+    border: var(--lfc-internal-hairline) solid var(--lfc-error-border-color);
     border-inline-start-width: 0.375rem;
     border-radius: var(--lfc-border-radius);
     color: var(--lfc-error-color);
@@ -276,7 +265,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-status-title {
-    font-weight: 700;
+    font-weight: var(--lfc-internal-font-weight-bold);
     margin: 0;
     min-inline-size: 0;
     overflow-wrap: anywhere;

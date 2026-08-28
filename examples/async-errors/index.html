@@ -11,13 +11,13 @@
 <body>
 	<main class="example-shell">
 		<header class="example-intro">
-			<h1>Async source and error ownership</h1>
-			<p>The package presents persistent errors by default. Turn on application ownership to see the explicit <code>"handled"</code> path.</p>
+			<h1>Handle asynchronous failures</h1>
+			<p>Fail a source request, extension, or event action. Leave application ownership off to inspect the built-in error UI, then enable it to exercise the explicit <code>"handled"</code> path.</p>
 		</header>
 
 		<form class="example-panel" data-controls>
 			<h2>Failure controls</h2>
-			<p>Extension failure mode rebuilds the instance because quarantined extensions are not retried.</p>
+			<p>Changing extension failure mode creates a new calendar instance. Use Refetch to retry a source request.</p>
 			<div class="example-control-row">
 				<label class="example-check">
 					<input type="checkbox" data-host-ownership>

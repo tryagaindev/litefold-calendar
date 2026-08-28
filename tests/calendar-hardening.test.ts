@@ -485,6 +485,67 @@ void test("extension hooks stop and clean up after reentrant destroy", (context)
 	assert.equal(host.childElementCount, 0);
 });
 
+void test("extension node leases survive connected-callback teardown without blocking reuse", async (context) => {
+	const { dom, host } = setupDom(context);
+	let activeCalendar: Calendar | null = null;
+	let connections = 0;
+	class DestroyingExtensionElement extends dom.window.HTMLElement {
+		public connectedCallback(): void {
+			connections += 1;
+			activeCalendar?.destroy();
+		}
+	}
+	dom.window.customElements.define("lfc-destroying-extension", DestroyingExtensionElement);
+	const extensionNode = dom.window.document.createElement("lfc-destroying-extension");
+	let firstReturned = false;
+	const first = createCalendar(host, {
+		events: [],
+		extensions: [{
+			id: "connected-destroy",
+			renderDayBadge: () => {
+				if (firstReturned) {
+					return null;
+				}
+				firstReturned = true;
+				return extensionNode;
+			}
+		}],
+		initialDate: "2026-07-14"
+	});
+	activeCalendar = first;
+	first.render();
+
+	assert.equal(first.getState().phase, "destroyed");
+	assert.equal(extensionNode.parentNode, null);
+	assert.equal(connections, 1);
+	const connectionsBeforeReuse = connections;
+
+	activeCalendar = null;
+	const errors: LitefoldCalendarError[] = [];
+	const second = createCalendar(host, {
+		events: [],
+			extensions: [{
+			id: "connected-reuse",
+			renderDayBadge: () => {
+				if (extensionNode.parentNode === null) {
+					return extensionNode;
+				}
+				return null;
+			}
+		}],
+		initialDate: "2026-07-14",
+		onError: (error) => { errors.push(error); }
+	});
+	second.render();
+	await waitForPhase(second, "ready");
+
+	assert.ok(connections > connectionsBeforeReuse);
+	assert.equal(host.contains(extensionNode), true);
+	assert.equal(errors.some((error) => error.code === "extension-failed"), false);
+	second.destroy();
+	assert.equal(extensionNode.parentNode, null);
+});
+
 void test("Page navigation always changes month while arrows remain focus-only at the grid boundary", async (context) => {
 	const { dom, host } = setupDom(context);
 	let requests = 0;

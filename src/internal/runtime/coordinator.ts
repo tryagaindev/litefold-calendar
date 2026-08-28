@@ -36,7 +36,6 @@ import { createCalendarStructure, type CalendarDom } from "../dom/structure.js";
 import { CalendarMonthPickerController } from "../dom/month-picker.js";
 import { CalendarMonthTitleRenderer } from "../dom/month-title.js";
 import { createAgendaPresentation, type AgendaEventEntry } from "../dom/agenda.js";
-import { createEventAccent } from "../dom/event-accent.js";
 import {
 	installEventActionListeners as installNativeEventActionListeners, registerGridEventAction
 } from "../dom/event-structure.js";
@@ -53,18 +52,26 @@ import {
 import { createDayCellElements, renderMonthWeeks, renderWeekdayHeadings } from "../dom/month-grid.js";
 import { resolveCalendarIcons } from "./icon-configuration.js";
 import { IntegrationNodeController } from "./integration-nodes.js";
-import { hasNodeLease, releaseLeasedNodes, setNodeLease } from "./node-leases.js";
+import { releaseLeasedNodes } from "./node-leases.js";
 import { SwipeGestureController } from "./swipe.js";
+import {
+	CalendarWebMcpController,
+	CalendarWebMcpEventPager,
+	CalendarWebMcpNavigationTracker,
+	type CalendarWebMcpNavigationCommit,
+	type CalendarWebMcpNavigationTarget
+} from "./webmcp.js";
 import { formatCalendarMessage, type CalendarMessages } from "../../messages.js";
 import { resolveCalendarMessages } from "./message-configuration.js";
+import { ExtensionVisualRenderer } from "./extension-visuals.js";
+import { ExtensionNodeRenderer, type InvalidMountedExtensionNode } from "./extension-nodes.js";
 import {
-	containsInteractiveContent, invokeForUnknownResult, isAppendableNode, isDateInstance,
-	isHTMLElementLike, isLitefoldCalendarError, isSameDocumentNode, observeThenable
+	invokeForUnknownResult, isDateInstance, isHTMLElementLike, isLitefoldCalendarError, observeThenable
 } from "./safety.js";
 import type {
 	Calendar, CalendarAnnouncement, CalendarDate, CalendarDateInput, CalendarEvent,
 	CalendarEventActionElement, CalendarEvents, CalendarEventSource, CalendarEventSurface, CalendarOptions,
-	CalendarPhase, CalendarState
+	CalendarPhase, CalendarState, CalendarWebMcpOptions
 } from "../../types.js";
 
 const AGENDA_DOM_LIMIT_DEFAULT = 200;
@@ -114,6 +121,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private readonly eventText: CalendarEventText;
 	private eventProvider: CalendarEventSource<TMetadata>;
 	private readonly extensions: readonly ExtensionRuntime<TMetadata>[];
+	private readonly extensionNodes: ExtensionNodeRenderer<TMetadata>;
+	private readonly extensionVisuals: ExtensionVisualRenderer<TMetadata>;
 	private readonly fallbackElement: HTMLElement | null;
 	private readonly firstDay: number;
 	private readonly fullDateFormatter: Intl.DateTimeFormat;
@@ -139,6 +148,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private readonly toolbarEnd: HTMLElement | null;
 	private readonly weekdayFormatter: Intl.DateTimeFormat;
 	private readonly weekdayNarrowFormatter: Intl.DateTimeFormat;
+	private readonly webMcpController: CalendarWebMcpController | null;
 	private readonly window: HostWindow | null;
 
 	private activeController: AbortController | null = null;
@@ -163,6 +173,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private isRetrying = false;
 	private loadedRangeKey: string | null = null;
 	private latestAcceptedEventReplacement = 0;
+	private readonly webMcpNavigation = new CalendarWebMcpNavigationTracker();
 	private eventActions = new Map<string, CalendarEventActionElement>();
 	private gridActionsByDate = new Map<string, readonly CalendarEventActionElement[]>();
 	private gridMoreButtons = new Map<string, HTMLButtonElement>();
@@ -262,6 +273,34 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			resolvedOptions.extensions,
 			this.abortControllerConstructor
 		);
+		this.extensionNodes = new ExtensionNodeRenderer({
+			document: this.document,
+			host: this.host,
+			isInvocationCurrent: (runtime, controller) =>
+				this.isExtensionInvocationCurrent(runtime, controller)
+		});
+		this.extensionVisuals = new ExtensionVisualRenderer({
+			appendNode: (runtime, hookName, container, result, requirePresentationalContent) => {
+				return this.extensionNodes.append(
+					runtime,
+					hookName,
+					container,
+					result,
+					requirePresentationalContent
+				);
+			},
+			document: this.document,
+			extensions: this.extensions,
+			isDestroyed: () => this.isDestroyed,
+			isInvocationCurrent: (runtime, controller) =>
+				this.isExtensionInvocationCurrent(runtime, controller),
+			quarantine: (runtime, hookName, cause, surface) => {
+				this.quarantineExtension(runtime, hookName, cause, surface);
+			},
+			reportLateFailure: (runtime, hookName, cause, surface) => {
+				this.reportLateExtensionFailure(runtime, hookName, cause, surface);
+			}
+		});
 		this.options = Object.freeze({
 			...resolvedOptions,
 			events,
@@ -359,6 +398,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			resolveMonthTarget: (month, preferredDay) => this.bounds.resolveMonthTarget(month, preferredDay)
 		});
 		this.state = createState("idle", null, [], this.displayedMonth, this.selectedDate);
+		this.webMcpController = this.createWebMcpController(resolvedOptions.webMcp);
 	}
 
 	/** Adds the calendar to its host and starts loading the visible month. */
@@ -402,6 +442,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			this.integrationNodes.updateFallback(this.hasCurrentSnapshot, this.hasFatalError);
 			if (this.renderCalendar()) {
 				this.loadVisibleEvents(false);
+				this.webMcpController?.register();
 			}
 		} catch (cause: unknown) {
 			this.isRendered = true;
@@ -419,6 +460,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		this.isRendered = false;
 		this.monthPickerController.hide(false);
 		this.generation += 1;
+		this.webMcpController?.destroy();
 		this.actionGenerations.clear();
 		this.resetInternalAnnouncement();
 		this.activeController?.abort();
@@ -429,7 +471,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			runtime.controller.abort();
 			const cleanupErrors = this.runExtensionCleanups(runtime);
 			cleanupErrors.push(...releaseLeasedNodes(runtime.nodes, runtime.leaseToken));
-			runtime.markerFallbacks.clear();
+			cleanupErrors.push(...this.extensionVisuals.clearFallbackTracking(runtime));
 			if (cleanupErrors.length > 0) {
 				this.reportExtensionCleanupErrors(runtime, cleanupErrors, false);
 			}
@@ -553,6 +595,66 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		return this.state;
 	}
 
+	private createWebMcpController(
+		webMcp: false | Readonly<CalendarWebMcpOptions> | undefined
+	): CalendarWebMcpController | null {
+		if (webMcp === undefined || webMcp === false) {
+			return null;
+		}
+		const eventPager = new CalendarWebMcpEventPager<TMetadata>();
+		return new CalendarWebMcpController({
+			abortControllerConstructor: this.abortControllerConstructor,
+			document: this.document,
+			getEventPage: (date, offset, limit) => eventPager.getPage(
+				this.currentEventsByDate, date, offset, limit, (candidate) => this.bounds.isDateAllowed(candidate)
+			),
+			getGeneration: () => this.generation,
+			getNavigationRevision: () => this.webMcpNavigation.revision,
+			getState: () => this.state,
+			hasCurrentSnapshot: () => this.hasCurrentSnapshot,
+			isLive: () => this.canContinueInteraction(),
+			navigate: (target) => this.commitWebMcpNavigation(target),
+			reportRegistrationFailure: (cause) => {
+				this.reportWebMcpRegistrationFailure(cause);
+			},
+			webMcp
+		});
+	}
+
+	private commitWebMcpNavigation(
+		target: CalendarWebMcpNavigationTarget
+	): Readonly<CalendarWebMcpNavigationCommit> {
+		const selectedDateBefore = formatCalendarDate(this.selectedDate);
+		const generationBefore = this.generation;
+		const navigationRevision = this.webMcpNavigation.begin();
+		try {
+			switch (target.target) {
+				case "date":
+					this.gotoDate(target.date);
+					break;
+				case "today":
+					this.today();
+					break;
+				case "previous-month":
+					this.prev();
+					break;
+				case "next-month":
+					this.next();
+					break;
+			}
+		} catch (cause: unknown) {
+			this.webMcpNavigation.cancel(navigationRevision);
+			throw cause;
+		}
+		this.webMcpNavigation.complete(navigationRevision);
+		return Object.freeze({
+			changed: selectedDateBefore !== formatCalendarDate(this.selectedDate),
+			generation: this.generation,
+			navigationRevision,
+			startedLoad: generationBefore !== this.generation
+		});
+	}
+
 	private createStructure(): CalendarDom {
 		const dom = createCalendarStructure({
 			document: this.document,
@@ -657,6 +759,10 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		if (this.wasRenderInterrupted(dom, renderGeneration)) {
 			return;
 		}
+		this.validateMountedExtensionNodes();
+		if (this.wasRenderInterrupted(dom, renderGeneration)) {
+			return;
+		}
 		this.dayButtons = dayButtons;
 		this.eventActions = eventActions;
 		this.gridActionsByDate = gridActionsByDate;
@@ -707,7 +813,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		const accessibleLabel = isAllowed
 			? this.eventText.getDayAccessibleLabel(date, events.length)
 			: this.eventText.formatFullDate(date);
-		const { badge, button, cell, number, summaries } = createDayCellElements({
+		const { badge, button, cell, multipleEventIndicator, number, summaries } = createDayCellElements({
 			accessibleLabel,
 			dateString,
 			dayNumber: this.dayFormatter.format(toUtcDate(date)),
@@ -732,6 +838,17 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		}));
 		if (!this.isRenderGenerationCurrent(renderGeneration)) {
 			return cell;
+		}
+		if (events.length > 1) {
+			this.extensionVisuals.renderMultipleEventIndicator(
+				multipleEventIndicator,
+				date,
+				dateString,
+				events.length
+			);
+			if (!this.isRenderGenerationCurrent(renderGeneration)) {
+				return cell;
+			}
 		}
 		const gridActions: CalendarEventActionElement[] = [];
 		let compactPrimaryAssigned = false;
@@ -768,14 +885,33 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				more.classList.add("lfc-is-compact-primary");
 			}
 			const hiddenCount = events.length - this.gridEventLimit;
-			more.textContent = formatCalendarMessage(this.messages.gridMore, {
+			const overflowText = formatCalendarMessage(this.messages.gridMore, {
 				count: this.numberFormatter.format(hiddenCount)
 			});
+			const customContent = this.document.createElement("span");
+			customContent.className = "lfc-calendar-grid-more-custom-content";
+			customContent.setAttribute("aria-hidden", "true");
+			const defaultContent = this.document.createElement("span");
+			defaultContent.className = "lfc-calendar-grid-more-default-content";
+			defaultContent.textContent = overflowText;
+			more.append(customContent, defaultContent);
 			more.setAttribute("aria-label", formatCalendarMessage(this.messages.gridMoreLabel, {
 				count: this.numberFormatter.format(hiddenCount),
 				date: this.eventText.formatFullDate(date),
 				eventLabel: hiddenCount === 1 ? this.messages.event : this.messages.events
 			}));
+			this.extensionVisuals.renderGridOverflowContent(
+				more,
+				customContent,
+				date,
+				dateString,
+				events.length,
+				hiddenCount,
+				overflowText
+			);
+			if (!this.isRenderGenerationCurrent(renderGeneration)) {
+				return cell;
+			}
 			more.addEventListener("click", () => {
 				if (!this.canUseRenderedAction(more, renderGeneration)) {
 					return;
@@ -889,7 +1025,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			surface,
 			timeText
 		});
-		this.renderEventMarker(marker, event.event.accentColor, makeContext);
+		this.extensionVisuals.renderEventMarker(marker, event.event.accentColor, makeContext);
 		if (!this.isRenderGenerationCurrent(renderGeneration)) {
 			return null;
 		}
@@ -1187,7 +1323,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				if (result === null || result === undefined) {
 					continue;
 				}
-				this.appendExtensionNode(runtime, hookName, container, result);
+				this.extensionNodes.append(runtime, hookName, container, result);
 			} catch (cause: unknown) {
 				if (!this.isExtensionInvocationCurrent(runtime, controller)) {
 					this.reportLateExtensionFailure(runtime, hookName, cause, surface);
@@ -1198,103 +1334,26 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		}
 	}
 
-	private renderEventMarker(
-		container: HTMLElement,
-		accentColor: string | null,
-		createContext: (signal: AbortSignal) => Readonly<Record<string, unknown>>
-	): void {
-		if (this.isDestroyed) {
-			return;
-		}
-		const runtime = this.extensions.find((candidate) =>
-			!candidate.quarantined && candidate.definition.renderEventMarker !== undefined);
-		if (runtime === undefined) {
-			container.append(createEventAccent(this.document, accentColor));
-			return;
-		}
-		const hook = runtime.definition.renderEventMarker as ((context: unknown) => unknown) | undefined;
-		if (hook === undefined) {
-			container.append(createEventAccent(this.document, accentColor));
-			return;
-		}
-		const controller = runtime.controller;
-		const context = Object.freeze(createContext(controller.signal));
-		const surface = context["surface"];
-		try {
-			const result = hook(context);
-			const returnedThenable = observeThenable(result, (cause) => {
-				this.reportLateExtensionFailure(
+	private validateMountedExtensionNodes(): void {
+		for (const runtime of this.extensions) {
+			if (this.wasRuntimeDestroyed() || this.wasExtensionQuarantined(runtime)) {
+				continue;
+			}
+			let failure: Readonly<InvalidMountedExtensionNode> | null;
+			try {
+				failure = this.extensionNodes.getMountedValidationFailure(runtime);
+			} catch (cause: unknown) {
+				this.quarantineExtension(runtime, "render", cause, undefined);
+				continue;
+			}
+			if (failure !== null) {
+				this.quarantineExtension(
 					runtime,
-					"renderEventMarker",
-					cause,
-					surface
+					failure.hookName,
+					failure.cause,
+					undefined
 				);
-			});
-			if (!this.isExtensionInvocationCurrent(runtime, controller)) {
-				if (returnedThenable) {
-					this.reportLateExtensionFailure(
-						runtime,
-						"renderEventMarker",
-						new TypeError("renderEventMarker must return a node or null synchronously."),
-						surface
-					);
-				}
-				return;
 			}
-			if (returnedThenable) {
-				throw new TypeError("renderEventMarker must return a node or null synchronously.");
-			}
-			if (result === null) {
-				runtime.markerFallbacks.set(container, accentColor);
-				return;
-			}
-			if (result === undefined) {
-				throw new TypeError("renderEventMarker must return a node or null.");
-			}
-			this.appendExtensionNode(runtime, "renderEventMarker", container, result);
-			runtime.markerFallbacks.set(container, accentColor);
-		} catch (cause: unknown) {
-			if (!this.isExtensionInvocationCurrent(runtime, controller)) {
-				this.reportLateExtensionFailure(runtime, "renderEventMarker", cause, surface);
-				return;
-			}
-			this.quarantineExtension(
-				runtime,
-				"renderEventMarker",
-				cause,
-				surface
-			);
-			if (this.canRestoreEventMarker(container)) {
-				container.append(createEventAccent(this.document, accentColor));
-			}
-		}
-	}
-
-	private appendExtensionNode(
-		runtime: ExtensionRuntime<TMetadata>,
-		hookName: string,
-		container: HTMLElement,
-		result: unknown
-	): void {
-		if (!isSameDocumentNode(this.document, result) || !isAppendableNode(result)) {
-			throw new TypeError(`${hookName} must return only appendable nodes owned by the host document.`);
-		}
-		if (result.parentNode !== null || result.contains(this.host) || hasNodeLease(result)) {
-			throw new TypeError(`${hookName} must return a detached node that does not contain the calendar host.`);
-		}
-		const ownedNodes = result.nodeType === 11 ? [...result.childNodes] : [result];
-		for (const node of ownedNodes) {
-			if (!isSameDocumentNode(this.document, node) || !isAppendableNode(node) || hasNodeLease(node)) {
-				throw new TypeError(`${hookName} returned a node that is invalid or already leased.`);
-			}
-			if (containsInteractiveContent(node)) {
-				throw new TypeError(`${hookName} must return noninteractive content.`);
-			}
-		}
-		container.append(result);
-		for (const node of ownedNodes) {
-			setNodeLease(node, runtime.leaseToken);
-			runtime.nodes.set(node, container);
 		}
 	}
 
@@ -1411,7 +1470,10 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			if (cleanupErrors.length > 0) {
 				this.handleExtensionPreparationErrors(runtime, cleanupErrors);
 			} else {
-				runtime.markerFallbacks.clear();
+				const fallbackErrors = this.extensionVisuals.clearFallbackTracking(runtime);
+				if (fallbackErrors.length > 0) {
+					this.handleExtensionPreparationErrors(runtime, fallbackErrors);
+				}
 			}
 		}
 	}
@@ -1496,9 +1558,9 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		runtime.quarantined = true;
 		runtime.controller.abort();
 		const nodeErrors = releaseLeasedNodes(runtime.nodes, runtime.leaseToken);
-		const markerErrors = this.restoreExtensionMarkers(runtime);
+		const fallbackErrors = this.extensionVisuals.restoreFallbacks(runtime);
 		const cleanupErrors = this.runExtensionCleanups(runtime);
-		const isolationErrors = [...nodeErrors, ...markerErrors, ...cleanupErrors];
+		const isolationErrors = [...nodeErrors, ...fallbackErrors, ...cleanupErrors];
 		const combinedCause = isolationErrors.length === 0
 			? cause
 			: new AggregateError([cause, ...isolationErrors], "An extension hook and its cleanup failed.");
@@ -1522,24 +1584,6 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				retryable: false
 			});
 		}
-	}
-
-	private restoreExtensionMarkers(runtime: ExtensionRuntime<TMetadata>): unknown[] {
-		const errors: unknown[] = [];
-		if (!this.isDestroyed) {
-			for (const [container, accentColor] of runtime.markerFallbacks) {
-				if (container.childNodes.length > 0) {
-					continue;
-				}
-				try {
-					container.append(createEventAccent(this.document, accentColor));
-				} catch (cause: unknown) {
-					errors.push(cause);
-				}
-			}
-		}
-		runtime.markerFallbacks.clear();
-		return errors;
 	}
 
 	private handleRenderedGridActionKeydown(
@@ -1625,6 +1669,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		const isVisible = compareCalendarDates(target, range.start) >= 0 && compareCalendarDates(target, range.end) < 0;
 		if (changesDisplayedMonth) {
 			this.monthPickerController.hide(false);
+			this.webMcpNavigation.claim();
 			this.focusedDate = target;
 			this.displayedMonth = { day: 1, month: target.month, year: target.year };
 			this.selectedDate = target;
@@ -1761,6 +1806,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		this.monthPickerController.hide(false);
 		const changesMonth = date.year !== this.displayedMonth.year || date.month !== this.displayedMonth.month;
 		const changesSelection = compareCalendarDates(date, this.selectedDate) !== 0;
+		this.webMcpNavigation.claim();
 		this.selectionEntryDate = animateSelection && changesSelection && !changesMonth
 			? formatCalendarDate(date)
 			: null;
@@ -1846,6 +1892,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			this.swipeGesture.clear();
 		}
 		this.monthPickerController.hide(false);
+		this.webMcpNavigation.claim();
 		this.displayedMonth = { day: 1, month: date.month, year: date.year };
 		this.selectedDate = date;
 		this.focusedDate = date;
@@ -2032,10 +2079,6 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private wasRuntimeDestroyed(): boolean { return this.isDestroyed; }
 
 	private wasExtensionQuarantined(runtime: ExtensionRuntime<TMetadata>): boolean { return runtime.quarantined; }
-
-	private canRestoreEventMarker(container: HTMLElement): boolean {
-		return !this.isDestroyed && container.childNodes.length === 0;
-	}
 
 	private clearBusyState(): void {
 		this.host.removeAttribute("aria-busy");
@@ -2327,6 +2370,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			this.selectedDate
 		);
 		if (callback === undefined) {
+			this.webMcpController?.notifyStateChanged();
 			return;
 		}
 		try {
@@ -2339,6 +2383,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		} catch (cause: unknown) {
 			this.recordHostIntegrationFailure("onStateChange", cause, false, "default");
 		}
+		this.webMcpController?.notifyStateChanged();
 	}
 
 	private recordHostIntegrationFailure(
@@ -2376,6 +2421,21 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		this.deliverError(error);
 	}
 
+	private reportWebMcpRegistrationFailure(cause: unknown): void {
+		const error = this.createError({
+			cause,
+			code: "host-integration-failed",
+			hook: "webMcp",
+			message: "WebMCP tool registration failed.",
+			recoverable: true,
+			severity: "warning",
+			stale: true,
+			userMessage: this.messages.internalErrorMessage,
+			userTitle: this.messages.internalErrorTitle
+		});
+		this.deliverError(error);
+	}
+
 	private handleFatalError(cause: unknown, focusWasRemoved = false): void {
 		if (this.isDestroyed) {
 			return;
@@ -2393,6 +2453,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		}
 		this.hasFatalError = true;
 		this.generation += 1;
+		this.webMcpController?.destroy();
 		this.actionGenerations.clear();
 		const activeBeforeFallback = getOwnedActiveElement(this.document, this.host);
 		const focusWasInPicker = activeBeforeFallback !== null &&
@@ -2410,7 +2471,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			runtime.controller.abort();
 			const cleanupErrors = this.runExtensionCleanups(runtime);
 			cleanupErrors.push(...releaseLeasedNodes(runtime.nodes, runtime.leaseToken));
-			runtime.markerFallbacks.clear();
+			cleanupErrors.push(...this.extensionVisuals.clearFallbackTracking(runtime));
 			if (cleanupErrors.length > 0) {
 				this.reportExtensionCleanupErrors(runtime, cleanupErrors, false);
 			}

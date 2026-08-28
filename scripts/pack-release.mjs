@@ -197,6 +197,19 @@ async function repositoryState() {
 	if (!FULL_GIT_SHA_PATTERN.test(commit)) {
 		throw new Error(`Git HEAD must resolve to a full 40-character commit SHA; found ${commit}.`);
 	}
+	const epochResult = await run(
+		"git",
+		["show", "-s", "--format=%ct", "HEAD^{commit}"],
+		{ capture: true }
+	);
+	const sourceDateEpochText = epochResult.stdout.trim();
+	if (!/^(?:0|[1-9][0-9]*)$/u.test(sourceDateEpochText)) {
+		throw new Error(`Git HEAD must have a nonnegative integer committer epoch; found ${sourceDateEpochText}.`);
+	}
+	const sourceDateEpoch = Number(sourceDateEpochText);
+	if (!Number.isSafeInteger(sourceDateEpoch)) {
+		throw new Error("Git HEAD committer epoch is outside the safe integer range.");
+	}
 
 	const statusResult = await run(
 		"git",
@@ -209,7 +222,7 @@ async function repositoryState() {
 		throw new Error(`Release packaging requires a clean tracked and untracked source tree:\n${preview}`);
 	}
 
-	return { commit, root: expectedRoot };
+	return { commit, root: expectedRoot, sourceDateEpoch };
 }
 
 function repositoryUrl(packageJson) {
@@ -309,7 +322,14 @@ async function produceReleaseBundle(artifactDirectory) {
 	await run(process.execPath, [POLICY_SCRIPT, "--built", "--pack"]);
 
 	await copyFile(join(REPOSITORY_ROOT, LICENSE_FILENAME), join(artifactDirectory, LICENSE_FILENAME));
-	const sbomResult = await run(process.execPath, [SBOM_SCRIPT, "--json"], { capture: true });
+	const sbomResult = await run(process.execPath, [
+		SBOM_SCRIPT,
+		"--json",
+		"--source-commit",
+		initialRepository.commit,
+		"--source-date-epoch",
+		String(initialRepository.sourceDateEpoch)
+	], { capture: true });
 	const sbomBytes = `${JSON.stringify(JSON.parse(sbomResult.stdout), null, 2)}\n`;
 	if (sbomResult.stdout !== sbomBytes) {
 		throw new Error("SBOM generator did not return canonical JSON bytes.");

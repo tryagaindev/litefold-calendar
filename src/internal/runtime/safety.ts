@@ -28,6 +28,24 @@ export function containsInteractiveContent(root: Node): boolean {
 	return false;
 }
 
+/** Returns whether extension output can contribute visible content. */
+export function containsPresentationalContent(root: Node): boolean {
+	const pending: Node[] = [root];
+	while (pending.length > 0) {
+		const node = pending.pop();
+		if (node === undefined) {
+			continue;
+		}
+		if (node.nodeType === 1 || (node.nodeType === 3 && (node.nodeValue ?? "").trim().length > 0)) {
+			return true;
+		}
+		for (const child of node.childNodes) {
+			pending.push(child);
+		}
+	}
+	return false;
+}
+
 /** Returns whether an unknown value is a non-null object or function-property carrier. */
 export function isRecord(value: unknown): value is Record<PropertyKey, unknown> {
 	return typeof value === "object" && value !== null;

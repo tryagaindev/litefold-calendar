@@ -7,7 +7,7 @@ The examples are small integration recipes, not a parallel documentation site.  
 | Goal | Example |
 | --- | --- |
 | Render a calendar from a static event array | [Basic JavaScript](basic/) |
-| Exercise the complete successful TypeScript surface | [Advanced TypeScript](advanced/) |
+| Exercise the complete successful TypeScript surface, including optional WebMCP site tools | [Advanced TypeScript](advanced/) |
 | Present provider, action, and extension failures | [Async errors](async-errors/) |
 | Load the ESM package from a classic script entry point | [Classic-script loader](classic-script/) |
 | Rewrite a common FullCalendar month view | [FullCalendar migration](fullcalendar-v6-migration/) |
@@ -26,8 +26,8 @@ Published documentation uses `@tryagaindev/litefold-calendar` package specifiers
 The current methodology is sufficient for an alpha because it verifies examples at four different boundaries:
 
 1. **Build and type boundary.** `npm run build` compiles the package, compiles the advanced TypeScript example, and checks the migration adapter as strict JavaScript.  Public declarations and example usage must agree.
-2. **DOM behavior boundary.** `npm run test:examples:built` runs deterministic JSDOM smoke recipes against built output.  It covers the landing-page routes and generated identity, rendering, navigation, complete event replacement, provider supersession, actions, error recovery, extensions, progressive fallback ownership, the FullCalendar adapter, and teardown without depending on browser physics.
-3. **Browser and accessibility boundary.** `npm run test:browser:built` uses pinned Chromium for real focus, keyboard, pointer, responsive, swipe, and automated accessibility behavior.
+2. **DOM behavior boundary.** `npm run test:examples:built` runs deterministic JSDOM smoke recipes against built output. It covers landing routes and identity, rendering, navigation, event replacement, provider supersession, actions, error recovery, extensions, progressive fallback, the FullCalendar adapter, and teardown without depending on browser physics.
+3. **Browser and accessibility boundary.** `npm run test:browser:built` uses pinned Chromium for real focus, keyboard, pointer, CSS-only responsive transitions, swipe, accessibility behavior, and advanced-example WebMCP registration/navigation/readback through a controlled `document.modelContext` fixture.
 4. **Published-package boundary.** `npm run check:tarball` installs the packed tarball into a clean consumer, verifies imports and styles, compiles a generic strict TypeScript consumer, replaces and refetches events in JSDOM, activates the replacement, and destroys the instance.
 
 Canonical screenshots provide visual review of six deterministic scenes, but they are not behavioral tests.  Manual supported-browser and assistive-technology checks remain necessary for release evidence that automation cannot provide.
@@ -62,4 +62,4 @@ GitHub Pages presents a rolling `main` preview and retains release demos under i
 
 Keep examples dependency-free, deterministic, and safe to publish as source.  Use sanitized fixture data, application-owned URLs, native semantics, and public package APIs only.  Do not reach into private `lfc-*` DOM structure except in repository tests that explicitly verify a documented behavior.
 
-A new public option, method, extension hook, CSS token, error route, or migration claim must have one clear example owner and focused executable coverage.  Update this guide, the canonical API or integration document, affected tests, and the changelog in the same change.
+A new public option, method, extension hook, CSS token, error route, WebMCP tool contract, or migration claim must have one clear example owner and focused executable coverage. Update this guide, the canonical API, WebMCP, or integration document, affected tests, and the changelog in the same change.

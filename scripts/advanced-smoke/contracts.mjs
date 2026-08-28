@@ -32,10 +32,15 @@ export async function verifyAdvancedStyleContracts() {
 		/\.lfc-calendar-more\s*\{[^}]*\bpadding-inline:\s*0\.25rem;/u,
 		"Expected the grid overflow row to preserve an inline text inset."
 	);
-	assert.equal(
-		[...packageStyles.matchAll(/border-radius:\s*var\(--lfc-internal-event-border-radius\);/gu)].length,
-		2,
-		"Expected grid summaries and agenda rows to share the capped event radius."
+	assert.match(
+		packageStyles,
+		/\.lfc-calendar-event-summary\s*\{[^}]*\bborder-radius:\s*var\(--lfc-border-radius\);/u,
+		"Expected grid summaries to use the public component radius."
+	);
+	assert.match(
+		packageStyles,
+		/\.lfc-calendar-agenda-event\s*\{[^}]*\bborder-radius:\s*var\(--lfc-border-radius\);/u,
+		"Expected agenda rows to use the public component radius."
 	);
 	assert.match(
 		packageStyles,

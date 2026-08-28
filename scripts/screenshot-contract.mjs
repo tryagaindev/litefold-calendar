@@ -70,6 +70,29 @@ export function isScreenshotSourceFile(repositoryRelativePath) {
 		SOURCE_EXTENSIONS.has(extname(normalizedPath).toLowerCase());
 }
 
+export function canonicalizeScreenshotSource(repositoryRelativePath, contents) {
+	const normalizedPath = repositoryRelativePath.replaceAll("\\", "/");
+	if (normalizedPath !== "package.json" && normalizedPath !== "package-lock.json") {
+		return Buffer.isBuffer(contents) ? contents : Buffer.from(contents);
+	}
+
+	const manifest = JSON.parse(Buffer.isBuffer(contents) ? contents.toString("utf8") : contents);
+	if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) {
+		throw new Error(`${normalizedPath} must contain a JSON object.`);
+	}
+	if (Object.hasOwn(manifest, "version")) {
+		manifest.version = "<root-version>";
+	}
+	if (normalizedPath === "package-lock.json" &&
+		manifest.packages?.[""] !== null &&
+		typeof manifest.packages?.[""] === "object" &&
+		!Array.isArray(manifest.packages[""]) &&
+		Object.hasOwn(manifest.packages[""], "version")) {
+		manifest.packages[""].version = "<root-version>";
+	}
+	return Buffer.from(JSON.stringify(manifest));
+}
+
 async function collectFiles(path) {
 	const metadata = await stat(path);
 	if (metadata.isFile()) {
@@ -97,7 +120,10 @@ export async function computeSourceFingerprint() {
 		}
 		hash.update(relative(REPOSITORY_ROOT, file).replaceAll("\\", "/"));
 		hash.update("\0");
-		hash.update(await readFile(file));
+		hash.update(canonicalizeScreenshotSource(
+			relative(REPOSITORY_ROOT, file).replaceAll("\\", "/"),
+			await readFile(file)
+		));
 		hash.update("\0");
 	}
 	return hash.digest("hex");

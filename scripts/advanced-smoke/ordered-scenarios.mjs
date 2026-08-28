@@ -352,15 +352,89 @@ export async function runAdvancedSmokeScenarios(environment) {
 		2,
 		"Expected maxGridEventsPerDay to cap visual summaries."
 	);
+	const multipleEventIndicator = requireElement(
+		selectedCell,
+		":scope .lfc-calendar-day-summaries > .lfc-calendar-multiple-event-indicator",
+		dom.window.HTMLSpanElement
+	);
 	assert.equal(
-		selectedCell.querySelector(":scope .lfc-calendar-day-summaries > .lfc-calendar-more")?.textContent,
+		multipleEventIndicator.getAttribute("aria-hidden"),
+		"true",
+		"The decorative multiple-event cue must remain outside the accessibility tree."
+	);
+	const defaultMultipleEventIcon = requireElement(
+		multipleEventIndicator,
+		".lfc-calendar-multiple-event-indicator-icon",
+		dom.window.SVGSVGElement
+	);
+	assert.equal(
+		defaultMultipleEventIcon.querySelectorAll(".lfc-calendar-multiple-event-indicator-card").length,
+		2,
+		"Returning undefined from the compact hook must retain the built-in stacked-card cue."
+	);
+	assert.ok(
+		selectedCell.querySelector(
+			'[data-example-event-surface="grid-summary"] .advanced-example-event-marker'
+		) instanceof dom.window.HTMLSpanElement,
+		"The built-in multiple-event cue must coexist with a custom event marker."
+	);
+	const selectedOverflowAction = requireElement(
+		selectedCell,
+		":scope .lfc-calendar-grid-more",
+		dom.window.HTMLButtonElement
+	);
+	const defaultOverflowContent = requireElement(
+		selectedOverflowAction,
+		":scope > .lfc-calendar-grid-more-default-content",
+		dom.window.HTMLSpanElement
+	);
+	const customOverflowSlot = requireElement(
+		selectedOverflowAction,
+		":scope > .lfc-calendar-grid-more-custom-content",
+		dom.window.HTMLSpanElement
+	);
+	const customOverflowContent = requireElement(
+		customOverflowSlot,
+		":scope > .advanced-example-grid-overflow-content",
+		dom.window.HTMLSpanElement
+	);
+	assert.equal(
+		defaultOverflowContent.textContent,
 		"51 additional",
-		"Expected the overflow count in its dedicated grid summary row."
+		"Expected the canonical localized overflow text to remain in the native action."
+	);
+	assert.equal(customOverflowSlot.getAttribute("aria-hidden"), "true");
+	assert.equal(customOverflowContent.ownerDocument, document);
+	assert.equal(customOverflowContent.textContent, "51 additional");
+	assert.deepEqual(
+		{
+			date: customOverflowContent.dataset["exampleDate"],
+			eventCount: customOverflowContent.dataset["exampleEventCount"],
+			hiddenEventCount: customOverflowContent.dataset["exampleHiddenEventCount"],
+			surface: customOverflowContent.dataset["exampleSurface"]
+		},
+		{
+			date: "2026-08-06",
+			eventCount: "53",
+			hiddenEventCount: "51",
+			surface: "grid-summary"
+		},
+		"Expected the custom wide overflow content to receive authoritative context."
+	);
+	assert.equal(
+		customOverflowContent.querySelector("a, button, input, select, textarea, [tabindex]"),
+		null,
+		"Custom overflow content must remain noninteractive."
+	);
+	assert.equal(
+		selectedOverflowAction.classList.contains("lfc-has-custom-grid-overflow-content"),
+		true,
+		"Expected the native overflow action to expose its custom wide-content state."
 	);
 	assert.match(
-		selectedCell.querySelector(":scope .lfc-calendar-grid-more")?.getAttribute("aria-label") ?? "",
+		selectedOverflowAction.getAttribute("aria-label") ?? "",
 		/^View 51 more items for /u,
-		"Expected the localized date/count name on the native overflow action."
+		"Custom visual content must not replace the native overflow action's localized name."
 	);
 
 	selectedDay.dispatchEvent(new dom.window.KeyboardEvent("keydown", {
@@ -410,10 +484,18 @@ export async function runAdvancedSmokeScenarios(environment) {
 	);
 	overflowAction.click();
 	await waitFor(() => selectedDate.textContent === "2026-08-06", "the native grid overflow action");
-	assert.equal(actionResult.textContent, actionBeforeOverflow, "Grid overflow must not call onDaySelect.");
+	assert.equal(
+		actionResult.textContent,
+		actionBeforeOverflow,
+		"Custom overflow content must not change the native action or call onDaySelect."
+	);
 	const agendaHeadingId = agenda.getAttribute("aria-labelledby");
 	assert.notEqual(agendaHeadingId, null);
-	assert.equal(document.activeElement, document.getElementById(agendaHeadingId));
+	assert.equal(
+		document.activeElement,
+		document.getElementById(agendaHeadingId),
+		"The native overflow action must still transfer focus to the agenda heading."
+	);
 
 	const initialAgendaActions = getAgendaActions(host);
 	assert.equal(initialAgendaActions.length, 10, "Expected the configured initial agenda page size.");

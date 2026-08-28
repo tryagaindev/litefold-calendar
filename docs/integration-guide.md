@@ -30,7 +30,7 @@ Do not add application-specific branches, URLs, entity rules, or selectors to th
 4. Use `setEvents()` when an existing rendered instance must receive a different complete static snapshot or provider; use `refetchEvents()` when only application-owned filter or cache state changed.
 5. Set inclusive `minDate` / `maxDate` bounds when the product must limit calendar navigation or day activation.
 6. Pass an existing native filter fieldset through `toolbarEnd` when needed.
-7. Package visual decorations as one or more named extensions that return detached, noninteractive nodes.
+7. Package visual decorations as one or more named extensions that return detached, same-document, noninteractive nodes; use the dedicated multiple-event and overflow-content hooks instead of inspecting package structure.
 8. Add validated event URLs where native navigation is the correct primary action; gate occurrence-specific context commands with `isEventContextMenuAvailable`.
 9. Return promise-like results from `onEventActivate`, `onEventContextMenu`, `onDaySelect`, and `onDayContextMenu` so package error handling can observe failures.
 10. Coordinate application-owned no-JavaScript markup with `fallbackElement` when progressive fallback is required.
@@ -85,7 +85,7 @@ function toCalendarInput(record: ApplicationRecord): CalendarEventInput<EventDat
 }
 ```
 
-Build optional fields conditionally because the package uses `exactOptionalPropertyTypes`. Validate required values before returning the array. Event URLs must be relative or HTTP(S), no longer than 2,048 characters, and free of whitespace changes, control characters, and credentials; the package resolves them against the host document and validates the snapshot again. When adaptation runs inside an event provider, a thrown adapter error rejects the complete result and activates the package's safe error presentation; keep raw response details in trusted application diagnostics only.
+Build optional fields conditionally because the package uses `exactOptionalPropertyTypes`. Validate required values before returning the array. Event URLs must be relative or HTTP(S), free of whitespace changes, control characters, and credentials, and no longer than 2,048 UTF-16 code units both before and after resolution against the host document. The package validates the complete snapshot again; see the [canonical event input contract](api.md#define-events-calendareventinput-and-calendarevent). When adaptation runs inside an event provider, a thrown adapter error rejects the complete result and activates the package's safe error presentation; keep raw response details in trusted application diagnostics only.
 
 An in-memory or already-cached source can return its array without artificial asynchronous work:
 
@@ -105,7 +105,7 @@ const remoteEvents: CalendarEventSource<EventData> = async ({ end, signal, start
 };
 ```
 
-The provider always receives the complete fixed 42-day grid for the committed displayed month. Configured `minDate` and `maxDate` bounds do not clip `start` or `end`; preserve the inclusive-start/exclusive-end query contract even when the first or last grid contains disabled days. A pager pull does not request or prefetch either adjacent range, so application caching must react only to provider calls rather than inferred gesture direction.
+Treat the supplied provider range as authoritative rather than deriving requests from viewport or gesture state. The [event-source contract](api.md#supply-events-calendarevents-and-calendareventsource) owns exact invocation, range, cancellation, replacement, and commit behavior.
 
 ## Bound one calendar instance
 
@@ -120,15 +120,32 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The title jump popover, Previous, Next, Today, pull/snap paging, grid keyboard commands, public navigation methods, and day activation all use the same bounds. Partial first and last months remain visible; days outside the range are unavailable. An explicit `initialDate` must be in range and renderable, while an omitted initial date resolves the configured current date to the nearest in-range date in a renderable month. Keep application-owned controls aligned by applying the same `min` and `max` values to any external date input that calls `gotoDate()` or `focusDate()`.
+Keep application-owned date controls aligned by applying the same bounds to external inputs that call `gotoDate()` or `focusDate()`. The [API configuration contract](api.md#data-date-and-layout-options) owns exact bound admission, navigation, and initial-date behavior.
+
+## WebMCP site tools
+
+WebMCP is an optional document-wide integration, so assign each calendar a stable semantic prefix and keep the ordinary UI complete. The package treats an unavailable API as a progressive no-op. Drive the opt-in from application or server policy rather than browser detection; a server-rendered flag can map directly to the explicit `false` branch:
+
+```ts
+const webMcpEnabled = host.dataset.webMcpEnabled === "true";
+
+const calendar = createCalendar(host, {
+	events: remoteEvents,
+	webMcp: webMcpEnabled
+		? { toolNamePrefix: "team-schedule" }
+		: false
+});
+```
+
+Use role-based prefixes such as `my-schedule` and `public-calendar` when a page can host more than one calendar. Do not use array positions, counters, random values, tenant secrets, user identifiers, or localized labels. Tool names live in the document registry and are part of the application integration contract.
+
+The two registered tools page through presentation-safe events in the currently loaded 42-day visible range or navigate through the existing public paths. `<prefix>-get-events` can cover the allowed range or filter one date; it never fetches to satisfy a read. Neither tool exposes IDs, URLs, metadata, extension nodes, raw errors, or application activation commands. The read tool does expose each returned title and raw normalized `start`, `end`, and `isAllDay` value even when `eventTimeDisplay` hides time visually, so apply the same signed-in authorization and privacy decision used for the visible calendar.
+
+See the [WebMCP site-tool guide](webmcp.md) for exact tool schemas, lifecycle, compatibility, privacy, and testing. Do not build directly on `document.modelContext` when the calendar option covers the intended operation; package-owned registration keeps cleanup aligned with `destroy()`.
 
 ## Native pull/snap paging
 
-`swipe` remains an optional boolean and defaults to `true`; no additional pager option or CSS token is exposed. The enabled route accepts touch, pen, and horizontal precision-scroll input, maps direction through inherited RTL, and commits at most one month after the native scroller settles. Mouse dragging is not synthesized. Vertical page scrolling and pinch zoom continue to belong to the browser.
-
-The visible Previous/Next lanes are decorative and contain no adjacent grid or event data. The calendar keeps one interactive 42-day grid and one committed `CalendarState.range`; partial pulls do not call the source, run extensions for another month, or publish speculative state. Set `swipe: false` when the host context must disable horizontal gesture paging; native toolbar buttons, Page Up/Down, the picker, and public methods remain available.
-
-Do not intercept and redispatch the calendar's touch, pointer, wheel, or scroll events, and do not query or mutate private scroll positions, snap points, or pager descendants. Browser and operating-system momentum, rubber-banding, overscroll, and snap timing vary by input stack and are not part of the package contract. Test semantic outcomes on supported devices instead: direction, one-month commit, bounds, focus/state retention, and return to the current snap point.
+Leave `swipe` enabled unless the host context must disable direct-input paging. Do not intercept package touch, pointer, wheel, or scroll events, and do not query or mutate private pager descendants. The [API option](api.md#data-date-and-layout-options) owns public behavior, the [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior) owns input and verification requirements, and [DESIGN.md](../DESIGN.md#pager-direction-and-motion) owns exact presentation.
 
 ### Accent conversion
 
@@ -162,7 +179,7 @@ const calendar = createCalendar(host, {
 });
 ```
 
-`"all"`, `"grid"`, `"agenda"`, and `"none"` affect visual exposure only. Every timed or all-day representation keeps its native `<time datetime>` element, accessible event name, and localized extension `timeText`. Use CSS tokens to adjust density; do not hide internal time slots with private selectors.
+Choose among `"all"`, `"grid"`, `"agenda"`, and `"none"` through the public option rather than hiding internal time slots. The [API option](api.md#data-date-and-layout-options) and [accessibility semantics](../ACCESSIBILITY.md#interaction-model) own the observable contract; use public tokens for density.
 
 ## Application-owned cache and filters
 
@@ -190,11 +207,7 @@ calendar.render();
 calendar.setEvents(remoteEvents);
 ```
 
-Replacement is complete, not additive: it does not merge arrays or update any other option. The existing instance keeps its displayed month and selected date, preserves the current agenda reveal count within the new result and `agendaDomLimit`, and restores package-owned focus to the same day or event occurrence when possible. If a focused event disappears, focus falls back to its owning day; application focus outside the calendar is left alone.
-
-Call `setEvents()` only on a rendered, non-destroyed instance. Lifecycle is checked before the argument is inspected. A top-level value that cannot be accepted as an array or provider throws synchronous `invalid-argument` without aborting current work or changing the active source. Once accepted, the replacement becomes current and aborts superseded source work. Provider rejection or payload validation failure retains usable data for the same range, but the failed replacement remains current so Retry and `refetchEvents()` use it instead of silently restoring the prior source.
-
-Application callbacks may replace the source reentrantly. Each accepted call supersedes earlier work, stale completions cannot commit, and the last accepted call wins; invalid reentrant input leaves the active accepted source unchanged. Recreate the instance when locale, time zone, `minDate`, `maxDate`, callbacks, extensions, limits, integration nodes, or other construction-time configuration changes.
+Replacement is complete rather than additive. Use `setEvents()` only for event-input replacement and recreate the instance for other configuration changes. The [canonical `setEvents()` contract](api.md#control-the-calendar-calendar) owns lifecycle admission, preserved state and focus, cancellation, retained data, Retry, and reentrancy.
 
 ## Toolbar content
 
@@ -209,13 +222,11 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The package temporarily moves the same node into its toolbar. State, names, labels, and listeners remain application-owned. `destroy()` detaches the unchanged node so it can be reinserted or passed to a replacement calendar instance.
-
-The built-in DOM and focus sequence is Previous, Next, month title, then Today; `toolbarEnd` follows. At `42rem` and below, application content moves to a second row. At `20rem` and below, Previous/Next and title occupy the first built-in row, Today is on the second, and application content is on the third. Keep custom content flexible, keyboard operable, and valid at each width; do not use CSS `order` or private selectors to interleave it with built-in controls.
+The package temporarily mounts the same node while its state, names, labels, and listeners remain application-owned. Keep custom content flexible and keyboard operable. The [API integration-node contract](api.md#application-integration-options) owns mounting and release, [DESIGN.md](../DESIGN.md#responsive-model) owns composition, and the [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior) owns focus order. Do not interleave content through private selectors.
 
 ## Add metadata-driven visuals without private selectors
 
-Render hooks must create a new, detached, same-document node for each invocation. Output is wholly noninteractive. Event representations are anchors when `url` is present, buttons when a callback action is available without a URL, and static otherwise. Map metadata through a finite application-owned palette instead of turning arbitrary values into classes or attributes:
+Render hooks must synchronously create a new, detached, same-document node for each invocation. Output is wholly noninteractive. Event representations are anchors when `url` is present, buttons when a callback action is available without a URL, and static otherwise. Map metadata through a finite application-owned palette instead of turning arbitrary values into classes or attributes:
 
 ```ts
 const EVENT_CLASS_BY_KIND = {
@@ -232,6 +243,18 @@ const MARKER_CLASS_BY_KIND = {
 
 const applicationExtension: CalendarExtension<EventData> = {
 	id: "application",
+	renderMultipleEventIndicator({ document: ownerDocument, eventCount }) {
+		const indicator = ownerDocument.createElement("span");
+		indicator.classList.add("application-calendar-multiple-indicator");
+		indicator.textContent = String(eventCount);
+		return indicator;
+	},
+	renderGridOverflowContent({ document: ownerDocument, text }) {
+		const content = ownerDocument.createElement("span");
+		content.classList.add("application-calendar-overflow-content");
+		content.textContent = text;
+		return content;
+	},
 	renderEventMarker({ document: ownerDocument, event }) {
 		const kind = event.metadata?.kind;
 		const markerClass = kind === undefined ? null : MARKER_CLASS_BY_KIND[kind];
@@ -282,7 +305,13 @@ const applicationExtension: CalendarExtension<EventData> = {
 };
 ```
 
-The marker hook above replaces the built-in marker for appointments and milestones, and returns `null` to suppress it for tasks or missing metadata. At most one extension may define `renderEventMarker`; multiple owners are rejected during construction.
+The marker hook above replaces the built-in marker for appointments and milestones, and returns `null` to suppress it for tasks or missing metadata. It remains independent of the day-level multiple-event indicator, so an application marker can keep its complete visual composition.
+
+`renderMultipleEventIndicator` runs once for every in-range day with at least two total event occurrences, independent of `maxGridEventsPerDay`. Its context exposes `surface: "day"`, `date`, `dateString`, and the authoritative `eventCount`. Omitting the hook or returning `undefined` keeps the package's compact stacked-card cue; returning `null` suppresses it; returning a node replaces it. The package hides the cue above `42rem` and when the native overflow action is the compact-primary control.
+
+`renderGridOverflowContent` runs whenever the native grid-overflow action exists. Its context exposes `surface: "grid-summary"`, `date`, `dateString`, total `eventCount`, `hiddenEventCount`, and the localized default `text`. A returned node supplies only the non-compact visual content. Omitting the hook or returning `null` / `undefined` retains the default. The custom slot is `aria-hidden`; the native button keeps one canonical localized text node, its accessible name, activation behavior, and agenda focus transfer. Compact-primary and focused overflow actions continue to show that canonical text.
+
+Each of `renderEventMarker`, `renderMultipleEventIndicator`, and `renderGridOverflowContent` has independent singleton ownership; multiple owners of the same hook are rejected during construction. Crossing the `42rem` container boundary changes CSS visibility only, so it does not invoke hooks again, replace nodes, rerender, or measure width.
 
 Style the finite palette in application CSS, without inline styles or package-private selectors:
 
@@ -325,7 +354,7 @@ function findAgendaOccurrence(
 
 Add the application-owned surface attribute from the extension context when focus must return to one representation. This action lookup intentionally returns `null` for a static event. Extension code can use `CalendarEventElements.root` when it needs the representation regardless of interactivity.
 
-Use `context.signal` for signal-aware listeners or observers. A mount hook may return a synchronous cleanup. Application classes, attributes, nodes, styles, listeners, and assets remain the application's cleanup and Content Security Policy responsibility. If an extension fails, its nodes are removed and the extension is quarantined for that calendar instance while core UI remains available.
+Use `context.signal` for signal-aware listeners or observers. A mount hook may return a synchronous cleanup. Application classes, attributes, nodes, styles, listeners, and assets remain the application's cleanup and Content Security Policy responsibility. If an extension throws, returns an invalid or asynchronous result, or fails cleanup, package-mounted nodes are removed only while they remain under their expected package parent; application-reparented nodes are released and preserved. The extension is quarantined, singleton presentation slots return to package defaults, and core UI remains available. The new hooks expose no package selector, CSS token, or message key; style their output only through application-owned classes. See the [canonical extension lifecycle](api.md#extend-rendering-calendarextension).
 
 ## Progressive fallback
 
@@ -340,9 +369,7 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The element must belong to the host document, stay outside the host, and be available for one calendar's exclusive lease. Construction and initial loading leave its current `hidden` state unchanged. The first usable snapshot hides it, including a successful empty snapshot. A degraded refresh with retained usable data keeps it hidden. When an unavailable or fatal state has no usable snapshot, the package restores the original state; a successful retry hides it again. Each write occurs only while the current value still matches the package's last observed or written value. If application code changes `hidden` during the lease, package writes are skipped while that value differs, and `destroy()` preserves the differing application value. If application code later restores the package's last value, normal package management can resume. `destroy()` always releases the lease and restores the original value only while the package still manages the current value. Invalid construction or a failed host claim leaves it untouched.
-
-The application owns the fallback's content, authorization, freshness, canonical links, metadata, structured data, and privacy policy. See [SEO and progressive enhancement](seo-and-progressive-enhancement.md).
+The application owns the fallback's content, authorization, freshness, canonical links, metadata, structured data, and privacy policy. The [API reference owns lease and visibility lifecycle](api.md#application-integration-options); [SEO and progressive enhancement](seo-and-progressive-enhancement.md) owns the server-content recipe and verification guidance.
 
 ## Actions and errors
 
@@ -387,36 +414,15 @@ const calendar = createCalendar(host, {
 });
 ```
 
-`dateString` is the represented occurrence date and `surface` is `"grid-summary"` or `"agenda"`. For a multi-day event, the occurrence date can differ from `event.start`, so use it for commands and focus restoration. Direct grid activation never selects its day. For a native anchor, call `nativeEvent.preventDefault()` synchronously only when the callback provides a complete alternative to navigation.
+Use the occurrence `dateString` rather than assuming `event.start`, and call `nativeEvent.preventDefault()` synchronously only when a linked event has a complete alternative action. Position keyboard-invoked context UI from the supplied element when coordinates are not meaningful.
 
-`isEventContextMenuAvailable` is a synchronous, per-occurrence predicate. It receives date, event, and surface but no DOM element or native event. A throw, non-boolean, or thenable fails closed and reports one recoverable `host-integration-failed` issue. When a linked event is ineligible, the package leaves the browser's native context menu untouched. An eligible non-link event with no `onEventActivate` callback remains a native button; because the context callback is its only application action, click, tap, Enter, or Space invokes `onEventContextMenu` as its primary action. A keyboard-generated click may supply zero coordinates, so position any application surface from the callback's `element` bounds when no meaningful pointer location is available.
-
-`onError` observes current operational failures and diagnostic-only late or stale failures; it does not receive synchronous errors thrown for invalid public arguments or lifecycle ordering. Returning `"default"` preserves persistent package-owned presentation for a current error. Return the exact value `"handled"` only after the application has committed an equivalent visible and accessible error experience. A non-abort failure from a superseded request or action arrives with `stale: true` but does not enter state or produce package UI or announcements, so its disposition has no presentation to transfer. Validate user-controlled arguments and catch typed failures at the application command boundary as described in [Handle programmer errors](errors.md#handle-programmer-errors).
+The [action contract](api.md#handle-user-actions-calendaraction) owns callback shapes, representation, admission, concurrency, and failure behavior. The [error guide](errors.md) owns current versus diagnostic failures, `"default"` versus `"handled"` presentation, programmer errors, and recovery.
 
 ## Token bridge
 
-Keep application token mapping outside the package:
+Keep application token mapping outside the package and set overrides on the same host passed to `createCalendar()`. [DESIGN.md](../DESIGN.md) owns the canonical roles and defaults; the [CSS token contract](css-tokens.md#apply-token-overrides) provides the single supported bridge example, cascade rules, and CSP implications.
 
-```css
-.litefold-calendar[data-application-calendar] {
-	--lfc-font-family: var(--app-font-family, system-ui, sans-serif);
-	--lfc-color: var(--app-body-color, #202124);
-	--lfc-muted-color: var(--app-muted-color, #5F6368);
-	--lfc-background: var(--app-page-background, #FFFFFF);
-	--lfc-surface-background: var(--app-surface-background, #FFFFFF);
-	--lfc-border-color: var(--app-border-color, #C7CBD1);
-	--lfc-accent-color: var(--app-primary-color, #2457D6);
-	--lfc-focus-ring-color: var(--app-focus-color, #123B92);
-	--lfc-event-accent-width: 0.0625rem;
-	--lfc-grid-event-font-size: 0.75em;
-	--lfc-grid-event-min-block-size: 1.5rem;
-	--lfc-compact-day-min-block-size: 3.75rem;
-}
-```
-
-Place the application-owned `data-application-calendar` attribute on the same host passed to `createCalendar()`. The compound selector targets that rendered host directly, so its tokens override package defaults instead of relying on inheritance from an ancestor. The attribute is not package output; do not copy package-private selectors into application CSS.
-
-The package owns its named inline-size container, CSS-only thresholds, and native paging viewport. Allow the host to reflect its actual available width; do not add viewport listeners, `ResizeObserver`, breakpoint-driven option changes, DOM movement, or private scroll styling. Container resizing changes presentation without refetching events, replacing owned nodes, or moving focus.
+Allow the host to reflect its actual available width and leave exact responsive behavior to [DESIGN.md](../DESIGN.md#responsive-model). Do not override private responsive or pager internals.
 
 ## Classic-script entry point
 
@@ -444,21 +450,12 @@ The loader has no static module syntax or module-script tag, but it still requir
 
 An integration is ready when:
 
-- Invalid records reject the complete snapshot instead of disappearing silently.
-- Range caching and filtering remain application-owned and respect authorization boundaries.
-- Complete static/provider replacement uses `setEvents()`; it preserves month, selection, focus fallback, and the requested agenda count, while `refetchEvents()` always uses the latest accepted source.
-- Toolbar content, extension output, and `onEventActivate` / `onEventContextMenu` / `onDaySelect` / `onDayContextMenu` actions use only documented hooks.
-- Linked, callback-driven, context-eligible, and static events use the expected anchor/button/static representation on both grid and agenda surfaces.
-- The selected `eventTimeDisplay` mode changes only visual time exposure; native time values, accessible names, and extension `timeText` remain present.
-- F2 enters visible grid actions; Up/Down does not wrap; Escape/F2/Shift+Tab returns to the day; Tab exits toward the agenda; direct event activation does not select a day.
-- Progressive fallback state is correct during initial load, empty success, retained refresh failure, unavailable/fatal failure, retry, application `hidden` mutation, and destroy.
-- Configured bounds are mirrored by application-owned date inputs, while providers still accept each complete 42-day request.
-- Touch, pen, and horizontal precision-scroll paging changes at most one month per settle, obeys RTL and bounds, keeps one interactive grid, and does not prefetch an adjacent range; Previous/Next remain usable with `swipe: false`.
-- The month/year trigger, bounded fields, successful Jump, Cancel, Escape, light-dismiss, boundary controls, and trigger-focus return are verified in supported browsers.
-- Current initial-load, retained-refresh, action, and extension failures use persistent package presentation once, or equivalent application presentation after an explicit `"handled"` return; superseded request/action and other post-lifecycle failures remain diagnostic-only.
-- Invalid `setEvents()` lifecycle or top-level input throws synchronously without disturbing current work; accepted replacement failures retain usable same-range data, and reentrant replacements leave only the last accepted source eligible to commit.
-- Mobile, keyboard, RTL, forced-color, reduced-motion, localization, and screen-reader flows are verified by the application.
-- Container resizing changes CSS layout without source calls, callback state changes, node replacement, or focus loss; toolbar focus order remains Previous, Next, month title, Today, then application content at every breakpoint.
-- Event markers and extension-owned visual satellites are not clipped, and empty event slots do not reserve visible gaps.
-- No production or test code depends on private `.lfc-*` classes or `data-lfc-*` attributes.
+- Data adapters, authorization, range caching, filtering, and diagnostic handling remain application-owned and fail atomically.
+- Event replacement, actions, toolbar content, extensions, and fallback coordination use documented public hooks without private selectors.
+- Multiple-event and grid-overflow customizations preserve canonical overflow text and native behavior, and container resizing changes only CSS visibility without rerunning their hooks.
+- Lifecycle, validation, replacement, fallback, and extension scenarios satisfy the [API reference](api.md) and failures satisfy the [error guide](errors.md).
+- Keyboard, direct-input, RTL, zoom, forced-color, reduced-motion, localization, and screen-reader flows satisfy the [accessibility verification matrix](../ACCESSIBILITY.md#testing).
+- Visual overrides satisfy [DESIGN.md](../DESIGN.md) and the [CSS token contract](css-tokens.md), including affected screenshot evidence.
+- No-JavaScript content and indexing policy satisfy the [progressive-enhancement verification](seo-and-progressive-enhancement.md#verify-progressive-behavior).
+- Any WebMCP opt-in uses stable unique prefixes, preserves the normal UI when unsupported, exposes only authorized event summaries, and unregisters during teardown.
 - A production install adds no transitive runtime dependency or remote asset.

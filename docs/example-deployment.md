@@ -1,47 +1,52 @@
 # Static example deployment
 
-The repository deploys the verified examples to GitHub Pages without changing the npm release path.  The Pages index makes current development easy to inspect while keeping every published release demo at a version-specific URL.
+GitHub Pages is the package's developer demo.  It leads with a runnable basic example, exact-version installation, minimal setup code, task-oriented examples, API/integration documentation, and commit-pinned source.  Deployment and supply-chain rationale remains in this guide rather than in the demo UI.
 
 ## URL and identity contract
 
 | Channel | Path below the Pages root | Update rule |
 | --- | --- | --- |
-| Rolling main preview | `main/examples/` | Replaced after a verified push to `main`, or restored from retained deployment history |
-| Immutable release | `releases/<package-version>/examples/` | Created from the matching published GitHub release tag; different bytes can never replace it |
+| Rolling main preview | `main/examples/` | Replaced after successful CI for the exact `main` commit, or restored from retained deployment history |
+| Immutable release | `releases/<package-version>/examples/` | Added by a separate release operation for the exact protected package tag; different bytes can never replace it |
 
-The Pages root reads `site-manifest.json` and links to both channels.  Each examples landing page reads its same-origin `metadata.json`.  Every directly opened example also receives a static deployment-details region during staging.  All three surfaces show the package version, full source commit, and either **Rolling main preview** or **Immutable release**.
+The Pages root selects the greatest SemVer release from `site-manifest.json` and makes that immutable basic example the primary Run action.  When no valid release exists, it falls back to the rolling `main` preview and an `@alpha` installation command.  Release installation uses the exact manifest version.
 
-`main` is intentionally mutable and may include unreleased behavior.  A release URL is the version-specific demonstration.  It is not proof that npm publishing succeeded: the Pages and npm workflows are independent, and operators must verify each result separately.
+Snapshot assembly stamps the root shell from the final retained manifest, including the selected Run routes, exact installation command, release history, channel, full commit, and commit-pinned source links.  Those links and identities remain correct when JavaScript is disabled or the manifest request fails.  In the browser, a same-origin, `no-store` manifest request refreshes the already-valid shell only after the complete response passes validation.
+
+The examples landing page likewise provides useful static recipe navigation before JavaScript runs, then requests its same-origin metadata with `no-store` to add exact provenance and commit-pinned repository links.  A missing or malformed metadata file must not break the recipe cards.  Copy controls use a polite status region and select the command for manual copying when the Clipboard API is unavailable.
+
+Every example landing page and directly opened recipe identifies its package version, full source commit, and either **Rolling main preview** or **Immutable release**.  Deep links provide developer navigation back to the examples plus commit-pinned recipe source, API, and integration guidance.  All deployed assets remain repository-owned and same-origin; the site has no analytics, trackers, CDNs, or third-party runtime assets.
 
 ## Build and authority boundaries
 
-`.github/workflows/deploy-examples.yml` runs the complete repository gate before staging a deployment.  The read-only build job:
+`deploy-examples.yml` is the only Pages owner. It deploys verified rolling `main` previews and exposes two explicit operations: `release` adds an immutable snapshot for an exact protected `v<version>` tag, while `rollback` restores an exact retained `main/` snapshot.
 
-- Generates `examples/metadata.json` from the package version, checked-out commit, and deployment channel.
-- Copies only browser runtime files from `dist/` and `examples/`.
-- Injects visible deployment identity into deep-linked examples.
-- Statically rejects direct literal remote scripts, stylesheets, media, module imports, workers, sockets, beacons, and fetch targets.
-- Injects a restrictive self-only Content Security Policy into every staged page so the browser blocks remote runtime requests that static inspection does not identify.
-- Reads the retained `pages-content` branch and assembles a complete candidate containing the rolling preview and every prior release.
-- Refuses a release when its version path already contains different bytes.
+After npm and the GitHub prerelease are complete, `publish-alpha.yml` queues the Pages workflow with **Operation** `release` and the exact tag as **Release ref**. This handoff is intentionally separate: npm/GitHub publication does not receive Pages authority, and a Pages failure does not make an already-published npm version replaceable. A maintainer may rerun the same release operation when the retained and requested bytes match exactly.
 
-The next job has repository write permission but does not execute project code.  It validates the complete artifact, commits it to `pages-content`, and preserves that branch as auditable deployment state.  A final job enters the protected `github-pages` environment and receives only `pages: write` and Pages OIDC authority.
+Before a Pages snapshot can be retained, repository tooling:
 
-The npm workflow uses the separate protected `npm` environment and npm trusted-publishing identity.  The Pages workflow contains no npm token, registry command, or publish permission; the npm publish job has no Pages authority.  Do not combine the environments or add npm publication to the Pages workflow.
+- Generates `examples/metadata.json` from the package version, exact source commit, and channel.
+- Copies only the browser runtime files from `dist/` and `examples/`.
+- Injects the self-only Content Security Policy and developer provenance navigation into every staged page.
+- Rejects direct literal remote scripts, stylesheets, media, module imports, workers, sockets, beacons, and fetch targets.
+- Reads retained `pages-content` history and refuses deletion or byte-different replacement of an existing release directory.
+- Validates retained `main` metadata and accepts a new rolling preview only when its source commit is equal to or descended from the currently retained preview commit.
 
-All deployed assets are repository-owned and same-origin.  The site includes no analytics, trackers, CDNs, or third-party runtime assets.
+The source-executing build stage has read-only repository permission and no npm or Pages deployment authority. The retained-snapshot job has narrowly scoped repository write permission. Its credential-stripped, unprivileged child runs only the repository's pinned deployment assembler; it does not run application build code. Final deployments queue in order behind one repository-wide lock so overlapping preview, release, and rollback operations cannot displace a retained snapshot before it is considered. Each final job confirms that its packaged snapshot is still the retained branch head, then enters the independently protected `github-pages` environment with only Pages and Pages-OIDC authority. Pages jobs have no npm token or publishing authority.
 
 ## Repository setup
 
-Repository administrators must configure Pages to use **GitHub Actions** as its source and protect the `github-pages` environment independently from `npm`.  Allow the workflow token to maintain `pages-content`, restrict direct or force pushes to that branch, and keep `main`, release tags, workflow files, and environment rules under review.
+Repository administrators must configure Pages to use **GitHub Actions** as its source and protect the `github-pages` environment independently from `npm`.  Set the deployment-branch policy on both protected environments to allow `main` only, preventing a manual workflow dispatch from another ref from entering either environment.  Allow the workflow token to maintain `pages-content`, restrict direct and force pushes to that branch, and keep `main`, `v*` tags, workflow files, and environment rules under review.
 
-The workflow creates `pages-content` on its first successful deployment.  Do not select that branch as the legacy Pages source; it is retained state for the Actions deployment.  Do not edit `main/`, `releases/`, or `site-manifest.json` by hand.
+The workflow creates `pages-content` on its first successful deployment.  It is retained deployment state, not a legacy Pages source.  Do not edit `main/`, `releases/`, or `site-manifest.json` by hand.
+
+These are external settings; repository checks cannot prove that they are enabled. Verify them before the first release and after relevant repository or ownership changes.
 
 ## Roll back the rolling preview
 
-A rollback restores the exact `main/` bytes from a prior `pages-content` commit.  It does not rebuild an old source revision, rewrite an immutable release, or remove later release directories.
+A rollback restores exact retained `main/` bytes.  It does not rebuild an old source revision, rewrite an immutable release, remove a later release directory, or change npm.
 
-1. Fetch the deployment branch and identify the snapshot whose `main/` metadata names the intended source commit:
+1. Fetch the retained history and find the snapshot whose `main/` metadata names the desired source commit:
 
    ```sh
    git fetch origin pages-content
@@ -49,25 +54,30 @@ A rollback restores the exact `main/` bytes from a prior `pages-content` commit.
    git show <snapshot-commit>:main/examples/metadata.json
    ```
 
-2. Run **Deploy static examples** manually and enter that full lowercase `pages-content` commit as `snapshot_ref`.
-3. Confirm the workflow created a new `pages-content` commit, deployed it through `github-pages`, and left every `releases/<version>/` directory unchanged.
-4. Check the live `main/examples/metadata.json` and a deep-linked example before treating the rollback as complete.
+2. Open **Deploy static examples**, choose **Operation** `rollback`, and set **Snapshot ref** to that full 40-character lowercase `pages-content` commit. Leave **Release ref** empty.
+3. Confirm the workflow restores only `main/`, updates the root manifest to that preview identity, and leaves every `releases/<version>/` directory byte-for-byte unchanged.
+4. Check the live `main/examples/metadata.json` and a representative deep link.
 
-The restored preview is deliberately behind repository `main`; its visible source commit distinguishes an intentional rollback from an unexplained stale deployment.  Move forward by rerunning the successful workflow for the desired current `main` commit, not by editing deployment state.
+The restored preview is deliberately behind repository `main`; its visible source commit distinguishes an intentional rollback from an unexplained stale deployment.  Move forward by deploying a later CI-approved `main` commit, not by editing retained state.
+
+An automatic deployment never moves the retained preview backward or onto divergent history. The explicit `rollback` operation is the sole backward path; after rollback, automatic deployment may move forward only along ancestry from that restored source commit.
 
 ## Detect stale or inconsistent deployments
 
-For the rolling preview, compare the live `main/examples/metadata.json` commit with the commit from the most recent successful `main` deployment run and with `git rev-parse origin/main`.  A mismatch is expected only during an intentional rollback or while a newer run is still in progress.
+For the rolling preview, compare the live `main/examples/metadata.json` commit with the exact commit reported by the latest successful preview deployment.  A mismatch is expected only during an intentional rollback or while a newer deployment is still completing.
 
 For a release, confirm all of the following:
 
 - `releases/<version>/examples/metadata.json` reports that exact version and the `release` channel.
-- Its commit equals `git rev-list -n 1 v<version>`.
+- Its full commit equals the package verification receipt and protected `v<version>` tag.
 - The root `site-manifest.json` points that version to the same immutable directory.
-- The Pages workflow for the GitHub release succeeded independently of the npm workflow.
+- The representative recipe deep link loads and exposes the same provenance.
+- The successful Pages run's release-ref input and the live metadata agree with the published package version, protected tag, and commit.
 
-If identity is missing or inconsistent, do not copy files into `pages-content`.  Inspect the failed run, correct source or workflow configuration, and rerun the exact event.  An exact release rerun is a no-op; a byte-different rerun fails before deployment.  Publish a corrected package version when release behavior itself is wrong.
+If identity is missing or inconsistent, do not copy files into `pages-content` or edit the site manually. Rerun **Deploy static examples** with **Operation** `release` and **Release ref** set to the exact protected tag only when retained and public bytes match. A byte-different rerun fails closed; corrected behavior requires a greater package version.
 
 ## Verification
 
-`npm run test:tooling` covers metadata validation, runtime-file filtering, direct remote-resource rejection, staged Content Security Policy, deep-link deployment identity, retained release paths, exact release reruns, byte-different overwrite rejection, workflow permissions, and rollback selection.  `npm run check` remains the release and deployment gate.
+Tooling tests cover metadata validation, SemVer release ordering, release-only static fallback and fetch failure, `main` fallback, missing metadata, copy fallback, commit-pinned links, runtime-file filtering, remote-resource rejection, CSP, retained release paths, idempotent snapshots, byte-different overwrite rejection, push-safe CI concurrency, monotonic preview ancestry, workflow permissions, and rollback selection.  Browser coverage exercises all six routes, keyboard/focus behavior, full-SHA reflow at 320 CSS pixels, dark mode, forced colors, reduced motion, and automated accessibility rules.  `npm run check` remains the complete repository gate.
+
+[Back to the documentation hub](README.md)

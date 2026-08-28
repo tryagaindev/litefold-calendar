@@ -13,6 +13,7 @@ Do not duplicate exact package or runtime patch versions in prose. Name the supp
 - Keep public contracts runtime-independent except for the intentional `calendar.ts` composition edge. Internal runtime code may depend on DOM and domain modules; DOM may depend on DOM and domain modules; domain remains independent. Do not add internal barrels. See the [internal architecture guide](architecture.md).
 - Use a single root JavaScript/TypeScript import and the documented stylesheet export in consumer examples. Additional JavaScript API subpaths require evidence that they materially improve adoption.
 - Validate configuration and application data at the boundary. Diagnostics identify the option or field and corrective action without echoing private event values.
+- Treat browser-agent tool arguments as untrusted boundary input. Keep WebMCP schemas structural and JSON-safe, use the current `document.modelContext` API behind feature detection, and do not add ambient experimental browser globals to consumer-facing types.
 
 ## Preserve structured values
 
@@ -41,11 +42,9 @@ When code owns both producer and consumer, return a typed interface containing t
 - Use kebab-case class names and the `lfc` namespace for package-owned selectors, containers, layers, keyframes, IDs, and custom data attributes.
 - Keep package selectors low-specificity and inside the package cascade layer.
 - Author package CSS in the canonical `tokens`, `base`, `toolbar`, `pager`, `month-grid`, `agenda`, `responsive`, and `preferences` module order beneath `src/styles/`. Each module contains one newline-terminated `@layer lfc` block; `scripts/lib/styles.mjs` validates and composes them into the single public `dist/styles.css` file. Do not add another public stylesheet or bypass the composer.
-- Expose reusable theming or layout values as documented `--lfc-*` tokens; reserve `--lfc-internal-*` for unsupported implementation details.
-- Use logical properties and container queries. Do not add physical-direction overrides or device-specific breakpoints when content/container behavior expresses the requirement.
-- Prefer CSS Grid, Flexbox, intrinsic sizing, and normal DOM flow for responsive placement. Do not use viewport listeners, `ResizeObserver`, layout measurement, or breakpoint-driven DOM movement to drive layout; interaction code may observe or measure geometry only when a public behavior such as native pager recentering requires it. Never use CSS `order`, reversed flow, or dense placement for interactive content.
-- Use `rem` for component layout, spacing, and target sizes; use `em` for type-relative internals; use `cqi` for fluid inline-container sizing. Pixel units are limited to deliberate `1px` hairlines and the canonical `1px` / `-1px` visually hidden sentinel.
-- Keep the Stylelint pixel-unit prohibition enabled. Scope any hairline or visually hidden exception to the narrowest rule and explain it adjacent to the disable directive.
+- Follow [DESIGN.md](../DESIGN.md) for visual roles, values, state distinctions, and responsive composition. Expose reusable application-facing values through its documented `--lfc-*` map; reserve `--lfc-internal-*` for unsupported implementation details.
+- Use logical properties, container queries, CSS Grid, Flexbox, intrinsic sizing, and normal DOM flow to implement that design. Do not add physical-direction overrides, device-category breakpoints, viewport listeners, `ResizeObserver`, layout measurement, breakpoint-driven DOM movement, CSS `order`, reversed flow, or dense placement for interactive content. Interaction code may observe geometry only when a public behavior such as native pager recentering requires it.
+- Enforce the [design system's unit policy and documented pixel exceptions](../DESIGN.md#layout). Keep the Stylelint pixel-unit prohibition enabled and scope each allowed hairline or visually hidden literal to its canonical internal token declaration with an adjacent explanation.
 - Do not add inline styles, remote assets, downloaded fonts, or consumer-specific selectors to core.
 
 ## Tests and fixtures

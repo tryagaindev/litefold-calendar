@@ -7,7 +7,7 @@
     "playwright": "1.61.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "feb6f2bb77b6fccad2136c1d2badee6d3fc61bff0b5f541d08894638750e6113",
+  "sourceFingerprint": "899c31f9fab55e0d20d7f12674ab21f4036fed1211ee824cac52ea2f5d951e2c",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -26,7 +26,7 @@
       "references": [
         "README.md"
       ],
-      "sha256": "6475e351037c465ac2e083b7e9e2d5c6c7e09e2ef52fa0ed4401a4a2069d3b1b"
+      "sha256": "c125bb37d63a5dec686f084b5069ad077fe1a0fd375b0c5886cbdb0a7220aef6"
     },
     {
       "id": "month-year-jump",
@@ -46,7 +46,7 @@
       "references": [
         "README.md"
       ],
-      "sha256": "7974fe8ea5e7e5215dff6b43fb03fb73e01b770e568ee0e0132af18a25f40f89"
+      "sha256": "3b0db9fc867b3715ae811b94cbb64e0aa6743e0a92359f1a287b47708e4eade9"
     },
     {
       "id": "mobile-month-agenda-dark",
@@ -62,11 +62,11 @@
         "set-dark-theme",
         "scroll-calendar"
       ],
-      "alt": "Mobile dark-theme litefold-calendar with compact navigation, month grid, actionable marker, and selected-day agenda",
+      "alt": "Mobile dark-theme litefold-calendar with compact navigation, custom event marker, multiple-event cue, and selected-day agenda",
       "references": [
         "README.md"
       ],
-      "sha256": "738ebb8a0db15d56385e2ffd3561a155cba531a0d2b8b19278f609295b566e16"
+      "sha256": "508bb036ac4f6d96c10687b516137ef011b8de70accfd617aea48c6b7a9c2789"
     },
     {
       "id": "mobile-month-swipe-pull",
@@ -86,7 +86,7 @@
       "references": [
         "README.md"
       ],
-      "sha256": "2233d23aff9de7478af82f1273144e89f2fe706dc51810b68111432205d25bb9"
+      "sha256": "137a0c998ce43ecabe3425cac7a091a168306509f645d8a1e5b96f51a68ebdf4"
     },
     {
       "id": "event-details-dark",
@@ -106,7 +106,7 @@
       "references": [
         "README.md"
       ],
-      "sha256": "d7c19a599ce3a49c03e0ec33964a56b0a87c984381237ffa32de5cf09ba8e971"
+      "sha256": "2bf5cb7369ac4326d7e2d08fc09551364c369836c35dd0283fb1433ca5969ee3"
     },
     {
       "id": "grid-event-keyboard-focus",
@@ -127,7 +127,7 @@
       "references": [
         "README.md"
       ],
-      "sha256": "7d07228e1d38b30223ca110ebbc424b439c970cbbe62beee0272e7bf0e529545"
+      "sha256": "bf733a6b8b147aa8a7730d77a48548be45808f4a3f951a2307d02371e4e73eea"
     }
   ]
 }

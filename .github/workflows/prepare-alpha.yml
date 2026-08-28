@@ -1,0 +1,200 @@
+name: Prepare alpha release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version change to prepare
+        required: true
+        default: Continue alpha
+        type: choice
+        options:
+          - Continue alpha
+          - Next patch alpha
+          - Next minor alpha
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-alpha-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  LFC_NODE_VERSION: "24.19.0"
+  LFC_NPM_VERSION: "12.0.2"
+
+jobs:
+  prepare:
+    name: Prepare release files without write authority
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+
+    outputs:
+      branch: ${{ steps.release.outputs.branch }}
+      version: ${{ steps.release.outputs.version }}
+
+    steps:
+      - name: Check out the trusted default branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Set up exact Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.LFC_NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Set up exact npm
+        working-directory: ${{ runner.temp }}
+        run: npm install --global "npm@${LFC_NPM_VERSION}" --ignore-scripts
+
+      - name: Install locked release tooling
+        run: npm ci --ignore-scripts
+
+      - name: Prepare and validate release state
+        id: release
+        env:
+          LFC_BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+
+          case "${LFC_BUMP}" in
+            "Continue alpha") bump=prerelease ;;
+            "Next patch alpha") bump=prepatch ;;
+            "Next minor alpha") bump=preminor ;;
+            *) echo "Unsupported release bump choice." >&2; exit 1 ;;
+          esac
+
+          npm run release:prepare -- --bump "${bump}" --json
+
+          version="$(node --input-type=module -e 'import manifest from "./package.json" with { type: "json" }; process.stdout.write(manifest.version);')"
+          branch="release/v${version}"
+
+          mapfile -t changed < <(git diff --name-only | LC_ALL=C sort)
+          expected=(CHANGELOG.md package-lock.json package.json)
+          diff -u \
+            <(printf '%s\n' "${expected[@]}") \
+            <(printf '%s\n' "${changed[@]}")
+
+          if git ls-remote --exit-code --heads origin "refs/heads/${branch}" > /dev/null 2>&1; then
+            echo "Release preparation branch ${branch} already exists." >&2
+            exit 1
+          fi
+
+          npm run release:verify \
+            -- --version "${version}" --tag-state absent
+
+          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
+          printf 'branch=%s\n' "${branch}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload only the prepared release files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: alpha-preparation-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          overwrite: false
+          path: |
+            CHANGELOG.md
+            package-lock.json
+            package.json
+          retention-days: 1
+
+  create-branch:
+    name: Create the reviewed release branch
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download the prepared release files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: alpha-preparation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/alpha-preparation
+
+      - name: Validate and commit without repository credentials
+        env:
+          LFC_BRANCH: ${{ needs.prepare.outputs.branch }}
+          LFC_PREPARATION: ${{ runner.temp }}/alpha-preparation
+          LFC_SOURCE_COMMIT: ${{ github.sha }}
+          LFC_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          expected=(CHANGELOG.md package-lock.json package.json)
+          mapfile -t actual < <(
+            find "${LFC_PREPARATION}" -mindepth 1 -maxdepth 1 -type f -printf '%f\n' |
+              LC_ALL=C sort
+          )
+          diff -u \
+            <(printf '%s\n' "${expected[@]}") \
+            <(printf '%s\n' "${actual[@]}")
+          test -z "$(find "${LFC_PREPARATION}" -mindepth 1 ! -type f -print -quit)"
+          [[ "${LFC_SOURCE_COMMIT}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${LFC_VERSION}" =~ ^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]
+          test "${LFC_BRANCH}" = "release/v${LFC_VERSION}"
+          test "$(jq --exit-status --raw-output .version "${LFC_PREPARATION}/package.json")" = "${LFC_VERSION}"
+          test "$(jq --exit-status --raw-output .version "${LFC_PREPARATION}/package-lock.json")" = "${LFC_VERSION}"
+          test "$(jq --exit-status --raw-output '.packages[""].version' "${LFC_PREPARATION}/package-lock.json")" = "${LFC_VERSION}"
+
+          canonical_origin="https://github.com/${GITHUB_REPOSITORY}.git"
+          if git -c credential.helper= ls-remote --exit-code --heads \
+            "${canonical_origin}" "refs/heads/${LFC_BRANCH}" > /dev/null 2>&1; then
+            echo "Release preparation branch ${LFC_BRANCH} already exists." >&2
+            exit 1
+          fi
+
+          repository="${RUNNER_TEMP}/prepared-repository"
+          mkdir -- "${repository}"
+          git -C "${repository}" init
+          git -C "${repository}" remote add origin "${canonical_origin}"
+          git -C "${repository}" -c credential.helper= fetch --no-tags --depth=1 \
+            origin "${LFC_SOURCE_COMMIT}"
+          git -C "${repository}" switch --detach FETCH_HEAD
+          test "$(git -C "${repository}" rev-parse --verify HEAD^{commit})" = "${LFC_SOURCE_COMMIT}"
+          cp -- "${LFC_PREPARATION}/CHANGELOG.md" \
+            "${LFC_PREPARATION}/package-lock.json" \
+            "${LFC_PREPARATION}/package.json" \
+            "${repository}"
+          mapfile -t changed < <(git -C "${repository}" diff --name-only | LC_ALL=C sort)
+          diff -u \
+            <(printf '%s\n' "${expected[@]}") \
+            <(printf '%s\n' "${changed[@]}")
+
+          git -C "${repository}" config user.name "github-actions[bot]"
+          git -C "${repository}" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "${repository}" switch --create "${LFC_BRANCH}"
+          git -C "${repository}" add -- CHANGELOG.md package-lock.json package.json
+          git -C "${repository}" commit -m "chore: prepare ${LFC_VERSION} release"
+
+      - name: Push only the prepared branch without force
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LFC_BRANCH: ${{ needs.prepare.outputs.branch }}
+          LFC_VERSION: ${{ needs.prepare.outputs.version }}
+        working-directory: ${{ runner.temp }}/prepared-repository
+        run: |
+          set -euo pipefail
+
+          gh auth setup-git
+          git push origin "HEAD:refs/heads/${LFC_BRANCH}"
+          compare_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${LFC_BRANCH}?expand=1"
+          {
+            printf '## Alpha %s is ready for review\n\n' "${LFC_VERSION}"
+            printf '[Open the prefilled release pull request](%s) and merge it after CI succeeds.\n' "${compare_url}"
+          } >> "${GITHUB_STEP_SUMMARY}"

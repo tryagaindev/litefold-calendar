@@ -1,4 +1,15 @@
 @layer lfc {
+  :where(.litefold-calendar) :where(
+      .lfc-calendar-nav-button,
+      .lfc-calendar-title-button,
+      .lfc-calendar-retry,
+      .lfc-calendar-agenda-more,
+      .lfc-calendar-month-picker-cancel
+    ):not([disabled], [aria-disabled="true"]):active {
+    background: var(--lfc-selected-background);
+    color: var(--lfc-selected-color);
+  }
+
   @media (hover: hover) {
     :where(.litefold-calendar) :where(
         .lfc-calendar-nav-button,
@@ -43,7 +54,7 @@
 
   @keyframes lfc-day-selection-confirm {
     from {
-      scale: 0.92;
+      scale: var(--lfc-internal-selection-start-scale);
     }
 
     to {
@@ -58,17 +69,17 @@
       animation-duration: var(--lfc-internal-selection-motion-duration);
       animation-fill-mode: both;
       animation-name: lfc-day-selection-reveal;
-      animation-timing-function: ease-out;
+      animation-timing-function: var(--lfc-internal-motion-easing);
       background-image: none;
     }
 
     :where(.litefold-calendar)
       .lfc-calendar-day.lfc-is-selection-entry
       .lfc-calendar-day-number {
-      animation-duration: 140ms;
+      animation-duration: var(--lfc-internal-selection-confirm-duration);
       animation-fill-mode: both;
       animation-name: lfc-day-selection-confirm;
-      animation-timing-function: ease-out;
+      animation-timing-function: var(--lfc-internal-motion-easing);
     }
   }
 

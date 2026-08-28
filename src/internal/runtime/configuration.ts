@@ -2,7 +2,9 @@ import { MAX_SOURCE_EVENT_LIMIT } from "../domain/event-normalization.js";
 import { resolveCalendarFirstDay } from "../domain/grid.js";
 import { LitefoldCalendarError } from "../../errors.js";
 import type { CalendarIcons } from "../../icons.js";
-import type { CalendarEventTimeDisplay, CalendarOptions } from "../../types.js";
+import type {
+	CalendarEventTimeDisplay, CalendarOptions, CalendarWebMcpOptions
+} from "../../types.js";
 import {
 	containsInteractiveContent,
 	invokeForUnknownResult,
@@ -40,7 +42,8 @@ const CALENDAR_OPTION_SCHEMA = Object.freeze({
 	sourceEventLimit: "value",
 	swipe: "value",
 	timeZone: "value",
-	toolbarEnd: "value"
+	toolbarEnd: "value",
+	webMcp: "value"
 } as const satisfies Record<keyof CalendarOptions, "callback" | "value">);
 
 const CALENDAR_OPTION_KEYS = Object.freeze(
@@ -48,6 +51,10 @@ const CALENDAR_OPTION_KEYS = Object.freeze(
 );
 const CALENDAR_OPTION_KEY_SET: ReadonlySet<string> = new Set(CALENDAR_OPTION_KEYS);
 const CONFIGURATION_ARRAY_LIMIT = MAX_SOURCE_EVENT_LIMIT + 1;
+const WEB_MCP_OPTION_KEY_SET: ReadonlySet<string> = new Set(["toolNamePrefix"]);
+const WEB_MCP_TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]+$/u;
+const WEB_MCP_TOOL_NAME_SUFFIX_LENGTH = "-get-events".length;
+const WEB_MCP_TOOL_NAME_MAXIMUM_LENGTH = 128;
 
 export function createConfigurationError(message: string, cause?: unknown): LitefoldCalendarError {
 	return new LitefoldCalendarError({
@@ -84,9 +91,11 @@ export function assertKnownConfigurationKeys(
 	} catch (cause: unknown) {
 		throw createConfigurationError(`${path} could not be inspected.`, cause);
 	}
-	const unknownKey = keys.find((key) => typeof key === "string" && !allowedKeys.has(key));
-	if (typeof unknownKey === "string") {
-		throw createConfigurationError(`${path}.${unknownKey} is not a supported option.`);
+	const unknownKey = keys.find((key) => typeof key !== "string" || !allowedKeys.has(key));
+	if (unknownKey !== undefined) {
+		throw createConfigurationError(typeof unknownKey === "string"
+			? `${path}.${unknownKey} is not a supported option.`
+			: `${path} contains an unsupported symbol key.`);
 	}
 }
 
@@ -146,7 +155,37 @@ export function snapshotCalendarOptions<TMetadata>(
 		}
 	}
 	normalizeEventTimeDisplay(snapshot["eventTimeDisplay"]);
+	const webMcp = normalizeWebMcpOptions(snapshot["webMcp"]);
+	if (webMcp !== undefined) {
+		snapshot["webMcp"] = webMcp;
+	}
 	return Object.freeze(snapshot) as Readonly<CalendarOptions<TMetadata>>;
+}
+
+/** Validates and snapshots explicit WebMCP integration configuration. */
+export function normalizeWebMcpOptions(
+	value: unknown
+): false | Readonly<CalendarWebMcpOptions> | undefined {
+	if (value === undefined || value === false) {
+		return value;
+	}
+	if (!isConfigurationRecord(value)) {
+		throw createConfigurationError("webMcp must be false or an options object.");
+	}
+	assertKnownConfigurationKeys(value, WEB_MCP_OPTION_KEY_SET, "webMcp");
+	const toolNamePrefix = readConfigurationValue(
+		value,
+		"toolNamePrefix",
+		"webMcp.toolNamePrefix"
+	);
+	const maximumPrefixLength = WEB_MCP_TOOL_NAME_MAXIMUM_LENGTH - WEB_MCP_TOOL_NAME_SUFFIX_LENGTH;
+	if (typeof toolNamePrefix !== "string" || toolNamePrefix.length === 0 ||
+		toolNamePrefix.length > maximumPrefixLength || !WEB_MCP_TOOL_NAME_PATTERN.test(toolNamePrefix)) {
+		throw createConfigurationError(
+			`webMcp.toolNamePrefix must contain 1 through ${maximumPrefixLength.toString()} ASCII letters, digits, underscores, hyphens, or periods.`
+		);
+	}
+	return Object.freeze({ toolNamePrefix });
 }
 
 export function normalizeIntegerOption(

@@ -917,10 +917,6 @@ function hasPullRequestTargetTrigger(source) {
     return false;
 }
 
-function countOccurrences(source, value) {
-    return source.split(value).length - 1;
-}
-
 function normalizeSimpleYamlScalar(value) {
     const trimmed = value.trim();
 
@@ -953,111 +949,12 @@ function inspectCiWorkflow(source) {
             ".github/workflows/ci.yml must install the lockfile with lifecycle scripts disabled."
         );
     }
-}
 
-function inspectPublishWorkflow(source) {
-    const required = [
-        "release:",
-        "prerelease == true",
-        "git merge-base --is-ancestor HEAD origin/main",
-        "npm ci --ignore-scripts",
-        "npm run check",
-        "npm run package",
-        "environment: npm",
-        "actions/download-artifact@",
-        "sha256sum --check --strict",
-        "npm publish",
-        "--registry https://registry.npmjs.org/",
-        "--access public",
-        "--tag alpha",
-        "--provenance",
-        "--ignore-scripts"
-    ];
-
-    for (const value of required) {
-        if (!source.includes(value)) {
-            addError(
-                `.github/workflows/publish-alpha.yml must include ${JSON.stringify(value)}.`
-            );
-        }
-    }
-
-    if (countOccurrences(
-        source,
-        "id-token: write"
-    ) !== 1) {
+    if (!source.includes(
+        "group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'push' && github.sha || github.ref }}"
+    ) || !source.includes("cancel-in-progress: true")) {
         addError(
-            ".github/workflows/publish-alpha.yml must grant id-token: write to exactly one job."
-        );
-    }
-
-    if (countOccurrences(
-        source,
-        "npm publish"
-    ) !== 1) {
-        addError(
-            ".github/workflows/publish-alpha.yml must contain exactly one npm publish command."
-        );
-    }
-
-    if (/NPM_TOKEN|NODE_AUTH_TOKEN|secrets\.[A-Za-z0-9_]*npm/iu.test(source)) {
-        addError(
-            ".github/workflows/publish-alpha.yml must use trusted publishing without an npm token secret."
-        );
-    }
-
-    const publishJobIndex =
-        source.indexOf("\n  publish:\n");
-
-    if (publishJobIndex < 0) {
-        addError(
-            ".github/workflows/publish-alpha.yml must separate verify and publish jobs."
-        );
-        return;
-    }
-
-    const verifyJob =
-        source.slice(0, publishJobIndex);
-
-    const publishJob =
-        source.slice(publishJobIndex);
-
-    if (verifyJob.includes("id-token: write")) {
-        addError(
-            "The release verification job must not receive npm OIDC authority."
-        );
-    }
-
-    if (!publishJob.includes("needs: verify") ||
-        !publishJob.includes("actions: read") ||
-        !publishJob.includes("contents: read") ||
-        !publishJob.includes("id-token: write")) {
-        addError(
-            "The publish job must depend on verification and use explicit least-privilege permissions."
-        );
-    }
-
-    if (publishJob.includes("actions/checkout@") ||
-        publishJob.includes("npm ci") ||
-        publishJob.includes("npm run ") ||
-        publishJob.includes("node scripts/")) {
-        addError(
-            "The npm OIDC publish job must not check out or execute project source or install project dependencies."
-        );
-    }
-
-    if (/^\s*registry-url\s*:/mu.test(publishJob) ||
-        /^\s*scope\s*:/mu.test(publishJob)) {
-        addError(
-            "The npm OIDC publish job must not configure setup-node registry authentication; npm publish must select npmjs explicitly with --registry."
-        );
-    }
-
-    if (!publishJob.includes(
-        "Download the verified bundle without checking out source"
-    )) {
-        addError(
-            "The publish job must consume only the verified Actions artifact."
+            ".github/workflows/ci.yml must isolate push runs by SHA and cancel superseded ref-scoped pull request runs."
         );
     }
 }
@@ -1173,9 +1070,6 @@ async function inspectWorkflowTree(
             if (workflowPath ===
                 ".github/workflows/ci.yml") {
                 inspectCiWorkflow(source);
-            } else if (workflowPath ===
-                ".github/workflows/publish-alpha.yml") {
-                inspectPublishWorkflow(source);
             }
 
             const expectedEnvironment =
@@ -1675,6 +1569,18 @@ await inspectSourceTree();
 
 await inspectWorkflowTree({
     ".github/workflows/ci.yml": {
+        LFC_NODE_VERSION:
+        WORKFLOW_NODE_VERSION,
+        LFC_NPM_VERSION:
+            String(referenceNpmVersion)
+    },
+    ".github/workflows/deploy-examples.yml": {
+        LFC_NODE_VERSION:
+        WORKFLOW_NODE_VERSION,
+        LFC_NPM_VERSION:
+            String(referenceNpmVersion)
+    },
+    ".github/workflows/prepare-alpha.yml": {
         LFC_NODE_VERSION:
         WORKFLOW_NODE_VERSION,
         LFC_NPM_VERSION:

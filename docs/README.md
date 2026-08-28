@@ -2,52 +2,42 @@
 
 Use this page to choose the shortest path to the information you need. The README remains the package overview and first-run guide; these documents cover the detailed public contracts.
 
-## Start by goal
+## Evaluate and start
 
-| Goal | Guide |
-|---|---|
-| Evaluate capabilities and deliberate omissions | [Features and alpha scope](features.md) |
+| Goal | Canonical guide |
+| --- | --- |
+| Decide whether the focused month-and-agenda model fits | [Features and alpha scope](features.md) |
 | Install and render a first calendar | [README quick start](../README.md#quick-start) and [basic JavaScript example](../examples/basic/) |
-| Look up public methods, inclusive bounds, month/year jumping, pull/snap paging, events, or date rules | [Public API reference](api.md) |
-| Adapt application data, caching, filters, actions, extensions, and compact toolbar content | [Application integration guide](integration-guide.md) |
-| Review the accepted `setEvents()` contract and its alternatives | [Dynamic event update decision record](dynamic-event-updates-adr.md) |
-| Reproduce the event-update timing and distribution-size evidence | [Dynamic event update measurement](dynamic-event-update-measurement.md) |
-| Rewrite a basic FullCalendar v6 `dayGridMonth` integration | [FullCalendar migration](fullcalendar-v6-migration.md) |
-| Add meaningful links and a no-JavaScript fallback | [SEO and progressive enhancement](seo-and-progressive-enhancement.md) |
-| Find which example exercises a feature | [Example coverage guide](../examples/) |
-| Verify or operate the static example deployments | [Static example deployment](example-deployment.md) |
-| Customize colors, spacing, responsive behavior, or themes | [CSS token contract](css-tokens.md) |
-| Handle loading, failure, Retry, and application-owned presentation | [Error handling](errors.md) and [async errors example](../examples/async-errors/) |
-| Verify keyboard, touch, pen, precision scrolling, zoom, contrast, and assistive technology | [Accessibility guidance](../ACCESSIBILITY.md) |
-| Check pager fallbacks, supported browsers, and excluded legacy environments | [Browser support](browser-support.md) |
-| Verify a local package artifact before release | [Package verification](package-verification.md) |
-| Prepare and publish a public alpha | [Release process](releasing.md) and [operator checklist](alpha-release-checklist.md) |
-| Understand internal ownership, dependency direction, and refactoring boundaries | [Internal architecture](architecture.md) |
-| Reproduce and validate the six canonical images | [Screenshot contract](screenshots/README.md) |
-| Get help or report a problem | [Support policy](../SUPPORT.md) |
-| Apply repository source and documentation conventions | [Coding conventions](code-style.md) |
+| Find a runnable scenario | [Examples and executable coverage](../examples/) |
+| Rewrite a FullCalendar v6 `dayGridMonth` integration | [FullCalendar migration](fullcalendar-v6-migration.md) |
 
-## Examples
+## Integrate
 
-The [example coverage guide](../examples/) maps public features to runnable fixtures and explains the compile-time and smoke-test drift guards.
+| Goal | Canonical guide |
+| --- | --- |
+| Look up exports, signatures, defaults, dates, events, methods, state, or lifecycle | [Public API reference](api.md) |
+| Adapt application data, caching, filters, actions, extensions, and toolbar content | [Application integration guide](integration-guide.md) |
+| Opt a calendar into experimental browser site tools | [WebMCP site-tool integration](webmcp.md) |
+| Handle loading, failure, Retry, and presentation ownership | [Error handling](errors.md) |
+| Apply stable CSS tokens, cascade layers, and CSP-safe overrides | [CSS token contract](css-tokens.md) and [design system](../DESIGN.md) |
+| Add a no-JavaScript fallback and meaningful event links | [SEO and progressive enhancement](seo-and-progressive-enhancement.md) |
+| Verify keyboard, direct input, zoom, contrast, and assistive technology | [Accessibility](../ACCESSIBILITY.md) |
+| Check supported browsers and platform fallbacks | [Browser support](browser-support.md) |
+| Get usage help or report a problem | [Support policy](../SUPPORT.md) |
 
-- [Basic JavaScript](../examples/basic/) — the smallest complete integration.
-- [Advanced TypeScript](../examples/advanced/) — the complete successful-feature showcase, including inclusive bounds, native pull/snap paging and month/year jump, compact toolbar placement, typed metadata, caching, filters, extensions, and an application-owned dialog.
-- [Async errors](../examples/async-errors/) — loading, retained-data warnings, Retry, and explicit error ownership.
-- [Classic-script loader](../examples/classic-script/) — a classic page entry that loads the ESM package with `import()`.
-- [FullCalendar v6 migration](../examples/fullcalendar-v6-migration/) — a dependency-free rewrite of basic `dayGridMonth` concepts.
-- [Progressive enhancement](../examples/progressive-enhancement/) — native fallback HTML coordinated with a client calendar.
+## Contribute and maintain
 
-## Project contracts
+| Goal | Canonical guide |
+| --- | --- |
+| Set up development and submit a change | [Contributing](../CONTRIBUTING.md) and [coding conventions](code-style.md) |
+| Understand dependency direction and transaction ownership | [Internal architecture](architecture.md) |
+| Review the `setEvents()` decision and reproduce its measurement | [Dynamic event update decision record](dynamic-event-updates-adr.md) |
+| Review trust boundaries and report a vulnerability | [Security model](security-model.md) and [security policy](../SECURITY.md) |
+| Reproduce the six canonical images | [Screenshot contract](screenshots/README.md) |
+| Verify package artifacts as a consumer | [Package verification](package-verification.md) |
+| Prepare and publish an alpha | [Release process](releasing.md) |
+| Configure publishing or recover an exceptional release | [Release administration](release-administration.md) |
+| Operate rolling and immutable example deployments | [Static example deployment](example-deployment.md) |
+| Review project changes and governance | [Changelog](../CHANGELOG.md), [maintainers](../MAINTAINERS.md), and [Code of Conduct](../CODE_OF_CONDUCT.md) |
 
-- [Accessibility](../ACCESSIBILITY.md)
-- [Browser support](browser-support.md)
-- [Security model](security-model.md) and [private reporting](../SECURITY.md)
-- [Support](../SUPPORT.md)
-- [Release process](releasing.md) and [alpha checklist](alpha-release-checklist.md)
-- [Release notes](../CHANGELOG.md)
-- [Contributing](../CONTRIBUTING.md)
-- [Internal architecture](architecture.md)
-- [Coding conventions](code-style.md)
-
-The package is a public alpha.  Public contracts are documented here and in the generated TypeScript declarations; private `lfc-*` DOM details are not integration APIs.  Before `1.0.0`, an API or default may change when that materially improves developer experience, but declarations, tests, documentation, migration guidance, examples, accessibility behavior, and security guarantees must stay synchronized.
+This page is the sole documentation index. Individual guides own one contract or task and link here rather than reproducing another index. Public behavior is defined by these guides and the generated TypeScript declarations; private `lfc-*` DOM details are not integration APIs.
