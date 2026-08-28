@@ -22,11 +22,30 @@ npm ci --ignore-scripts
 npx --no-install playwright install chromium
 ```
 
+Codex Cloud and local environments may instead run the repository setup while network access is available:
+
+```shell
+npm run setup
+```
+
+The setup command does not require an existing `node_modules` directory. It prepares the manifest-selected npm client through Corepack, performs the locked install, downloads pinned Chromium (including operating-system packages when running as root), and copies Google Chrome's web-quality agent skills into `${CODEX_HOME:-~/.codex}/skills`. These artifacts remain available after network access is disabled. Set `LFC_SETUP_WITH_OS_DEPS=1` to request browser system packages as a non-root user, `LFC_SETUP_SKIP_BROWSER=1` when intentionally preparing only non-browser work, or `LFC_WEB_QUALITY_SKILLS_REF` to test a specific upstream skills ref.
+
+Plain `npm install` and `npm ci` intentionally do not run environment setup as a lifecycle hook. Installation must remain noninteractive and limited to the dependency tree; setup can modify the selected npm shim, install operating-system browser packages, download a browser, and write Codex skills outside the repository. Run `npm run setup` explicitly during the network-enabled phase instead.
+
 On a fresh Linux machine, use `npx --no-install playwright install --with-deps chromium` when the operating-system browser dependencies are also absent. CI, package verification, Playwright, and screenshot tooling compare the runtime by major version 24 rather than one exact patch. Generated receipts and screenshot metadata record the exact patch that actually ran for auditability, while npm, Playwright, and Chromium remain exact-pinned. Exact-pinned development dependencies may declare their own minimum compatible patch within Node 24, so keep the local 24.x runtime current.
+
+Dependency setup requires outbound HTTPS access to these dependency-specific hosts:
+
+- `registry.npmjs.org` for npm metadata, tarballs, audit data, and the pinned npm client.
+- `cdn.playwright.dev` for the primary pinned Chromium download.
+- `playwright.download.prss.microsoft.com` for Playwright's Chromium download fallback.
+- `github.com` for Google Chrome's web-quality agent skills.
+
+Cloning the repository and installing operating-system packages with Playwright's optional `--with-deps` flag additionally require the Git host and distribution mirrors selected by the local environment; those are not JavaScript dependency hosts owned by this repository.
 
 Keep text files UTF-8 with LF line endings. The repository's Git attributes and EditorConfig settings enforce this consistently across operating systems and editors.
 
-Run every repository check exposed by `npm run` before submitting. At minimum, changes must pass documentation validation, `DESIGN.md` linting, code linting, type checking, unit tests, package and example builds, built-output smoke tests, pinned-Chromium behavior, automated accessibility, screenshot validation, package-policy verification, and any affected manual accessibility checks. `npm run check:static` includes `npm run check:design`, and CI reaches that aggregate through the repository check.
+Run every repository check exposed by `npm run` before submitting. At minimum, changes must pass documentation validation, `DESIGN.md` linting, code linting, type checking, unit tests, package and example builds, built-output smoke tests, pinned-Chromium behavior, automated accessibility, screenshot validation, package-policy verification, and any affected manual accessibility checks. `npm run check:static` includes `npm run check:design`, and CI reaches that aggregate through the repository check. When Chromium is unavailable, use `npm run check:fast` to run the complete non-browser portion of the gate; it is a development shortcut, not a substitute for the browser scenarios required before merge.
 
 Do not add `dependencies`, `peerDependencies`, `optionalDependencies`, bundled dependencies, install hooks, remote assets, CDNs, fonts, or icons. Development dependencies and browser tooling must be exact-pinned and justified in the pull request; Node follows the supported 24.x release line.
 

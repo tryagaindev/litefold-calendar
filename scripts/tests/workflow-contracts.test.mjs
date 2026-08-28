@@ -103,13 +103,14 @@ void test("the OIDC publisher consumes only the verified five-file bundle", asyn
 	assert.doesNotMatch(source, /NPM_TOKEN|NODE_AUTH_TOKEN|registry-release-state\.mjs|release-verification\.mjs|verify-release-state\.mjs/u);
 });
 
-void test("two first-publication candidates share one lock and only current main may claim npm E404", async () => {
+void test("first-publication candidates share one lock and only current main may claim npm E404", async () => {
 	const source = await workflow("publish-alpha.yml");
 	const publish = job(source, "publish");
 	assert.match(
 		source,
-		/^concurrency:\s*\n\s*group: npm-alpha-\$\{\{ github\.repository \}\}\s*\n\s*queue: max\s*\n\s*cancel-in-progress: false/mu
+		/^concurrency:\s*\n\s*group: npm-alpha-\$\{\{ github\.repository \}\}\s*\n\s*cancel-in-progress: false/mu
 	);
+	assert.doesNotMatch(source, /^\s*queue:/mu);
 	assert.doesNotMatch(publish, /^\s*concurrency:|group:[^\n]*(?:version|needs\.verify)/mu);
 	assert.equal(
 		occurrences(publish, /repos\/\$\{GITHUB_REPOSITORY\}\/contents\/package\.json\?ref=main/gu),
@@ -263,8 +264,9 @@ void test("Pages independently handles rolling main, immutable releases, and rol
 	assert.match(packageSite, /needs\.update-snapshot\.outputs\.snapshot-commit \|\| needs\.rollback-snapshot\.outputs\.snapshot-commit/u);
 	assert.match(
 		deploy,
-		/concurrency:[\s\S]*?group: static-examples-deploy-\$\{\{ github\.repository \}\}\s*\n\s+queue: max\s*\n\s+cancel-in-progress: false/u
+		/concurrency:[\s\S]*?group: static-examples-deploy-\$\{\{ github\.repository \}\}\s*\n\s+cancel-in-progress: false/u
 	);
+	assert.doesNotMatch(source, /^\s*queue:/mu);
 	assert.match(deploy, /current_snapshot[\s\S]*?LFC_SNAPSHOT_COMMIT[\s\S]*?actions\/deploy-pages@/u);
 	assert.doesNotMatch(source, /npm publish|NPM_TOKEN|NODE_AUTH_TOKEN/u);
 

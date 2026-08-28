@@ -751,7 +751,6 @@ jobs:
 
     concurrency:
       group: static-examples-deploy-${{ github.repository }}
-      queue: max
       cancel-in-progress: false
 
     environment:

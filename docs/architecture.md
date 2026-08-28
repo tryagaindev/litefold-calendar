@@ -111,8 +111,13 @@ npm run test:tooling
 npm run build
 npm run test:browser
 npm run check:docs
+npm run check:fast
 npm run check
 ```
+
+`npm run check:fast` runs the aggregate without Playwright for quick validation in an environment that does not have the pinned Chromium binary. The normal `npm run check` adds the browser suite and remains the required complete gate.
+
+Before an offline Codex Cloud or local session, run `npm run setup` during the network-enabled setup phase. It caches the exact npm client, locked development dependencies, pinned Chromium runtime, and Google Chrome web-quality skills used for later implementation and review. Dependency installation does not invoke this broader machine setup automatically.
 
 DOM, CSS, interaction, or accessibility changes also require the affected pinned-Chromium scenarios and the relevant manual checks in the [accessibility guide](../ACCESSIBILITY.md). Public behavior changes require synchronized declarations, examples, API documentation, migration guidance, release notes, and screenshot evidence when a canonical scene changes.
 
