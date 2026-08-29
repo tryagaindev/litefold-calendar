@@ -154,6 +154,12 @@ p {
 	margin-block-start: 0;
 }
 
+h1,
+h2,
+h3 {
+	overflow-wrap: anywhere;
+}
+
 h1 {
 	font-size: clamp(2.35rem, 7vw, 4.75rem);
 	letter-spacing: -0.045em;

@@ -160,7 +160,7 @@ test("examples landing exposes six keyboard-visible task cards", async ({ page }
 test.describe("large-text developer-page reflow", () => {
 	test.use({ bypassCSP: true });
 
-	test("Pages shell wraps its package eyebrow at 200% text", async ({ baseURL, page }) => {
+	test("Pages shell wraps its eyebrow and hero heading at 200% text", async ({ baseURL, page }) => {
 		if (typeof baseURL !== "string") {
 			throw new Error("Pages shell browser coverage requires a base URL.");
 		}
@@ -170,6 +170,10 @@ test.describe("large-text developer-page reflow", () => {
 
 		const eyebrow = page.locator(".lfc-pages-eyebrow");
 		await expect.poll(() => eyebrow.evaluate((element) =>
+			element.scrollWidth - element.clientWidth
+		)).toBeLessThanOrEqual(1);
+		const heroHeading = page.getByRole("heading", { level: 1 });
+		await expect.poll(() => heroHeading.evaluate((element) =>
 			element.scrollWidth - element.clientWidth
 		)).toBeLessThanOrEqual(1);
 		await expectNoDocumentHorizontalOverflow(page);
