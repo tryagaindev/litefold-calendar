@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Async errors | litefold-calendar</title>
+	<link rel="stylesheet" href="../../dist/styles.css">
+	<link rel="stylesheet" href="../example.css">
+	<link rel="stylesheet" href="../../deployment-details.css">
+</head>
+<body>
+	<main class="example-shell">
+		<header class="example-intro">
+			<h1>Handle asynchronous failures</h1>
+			<p>Trigger source, action, and render-hook failures. Compare the package's default presentation with an application-owned source error.</p>
+		</header>
+
+		<section class="example-panel" data-controls aria-labelledby="failure-controls-title">
+			<h2 id="failure-controls-title">Failure controls</h2>
+			<p>Source failures retain the last successful events. Changing render-hook mode creates a new calendar instance.</p>
+			<div class="example-control-row">
+				<label class="example-check">
+					<input type="checkbox" data-host-ownership>
+					Use application source-error UI
+				</label>
+				<label class="example-check">
+					<input type="checkbox" data-fail-render-hooks>
+					Make render hooks fail
+				</label>
+				<label class="example-check">
+					<input type="checkbox" data-fail-action>
+					Make event actions reject
+				</label>
+				<button class="example-button" type="button" data-fail-next>Fail next source request</button>
+				<button class="example-button" type="button" data-refetch>Refetch events</button>
+			</div>
+		</section>
+
+		<section class="example-alert" data-host-error aria-labelledby="example-host-error-title" hidden>
+			<h2 id="example-host-error-title" data-host-error-title></h2>
+			<span data-host-error-message></span>
+			<button class="example-button" type="button" data-host-retry>Try again</button>
+		</section>
+
+		<div class="example-calendar" data-calendar></div>
+
+		<div class="example-visually-hidden" data-announcer-polite role="status" aria-atomic="true"></div>
+		<div class="example-visually-hidden" data-announcer-assertive role="alert" aria-atomic="true"></div>
+	</main>
+
+	<script type="module" src="./main.js"></script>
+	<footer class="lfc-developer-footer" data-deployment-channel="release">
+		<nav aria-label="Developer resources">
+			<ul class="lfc-developer-footer-links">
+				<li><a href="../">All examples</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/tree/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e/examples/async-errors/">Recipe source</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e/docs/api.md">API reference</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e/docs/integration-guide.md">Integration guide</a></li>
+			</ul>
+		</nav>
+		<dl>
+			<dt>Package version</dt>
+			<dd><code>0.3.0-alpha.0</code></dd>
+			<dt>Deployment channel</dt>
+			<dd>Immutable release</dd>
+			<dt>Source commit</dt>
+			<dd><a href="https://github.com/tryagaindev/litefold-calendar/commit/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e"><code>c06f4134d18a21f6ca71ec2fc62683c5cb81c39e</code></a></dd>
+		</dl>
+	</footer>
+</body>
+</html>

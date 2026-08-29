@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
+	<meta name="color-scheme" content="light dark" data-example-color-scheme>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>litefold-calendar advanced example</title>
+	<link rel="stylesheet" href="../../dist/styles.css">
+	<link rel="stylesheet" href="../example.css">
+	<link rel="stylesheet" href="./theme.css">
+	<link rel="stylesheet" href="../../deployment-details.css">
+</head>
+<body>
+	<main class="example-shell advanced-example-shell">
+		<header class="example-intro">
+			<h1>Exercise the complete TypeScript API</h1>
+			<p>Explore a typed event source, application-owned controls, render hooks, date bounds, themes, and committed state updates.</p>
+		</header>
+
+		<section class="example-panel advanced-example-controls" aria-labelledby="advanced-example-controls-title">
+			<h2 id="advanced-example-controls-title">Exercise the public API</h2>
+			<p>Each control calls the method named on the button. Results appear in the observable-state panel.</p>
+			<div class="example-control-row advanced-example-button-row">
+				<button class="example-button" type="button" data-example-command="prev">Previous via API</button>
+				<button class="example-button" type="button" data-example-command="next">Next via API</button>
+				<button class="example-button" type="button" data-example-command="today">Today via API</button>
+				<button class="example-button" type="button" data-example-command="focusToday">Focus today</button>
+				<button class="example-button" type="button" data-example-command="refetchEvents">Refetch current source</button>
+				<button class="example-button" type="button" data-example-command="setEvents">Replace event source</button>
+				<button class="example-button" type="button" data-example-command="getState">Read current state</button>
+			</div>
+
+			<div class="example-field-row advanced-example-field-row">
+				<label for="advanced-example-target-date">Target date</label>
+				<input class="example-field" id="advanced-example-target-date" type="date" value="2026-08-07" min="2026-07-15" max="2027-09-15" required aria-describedby="advanced-example-target-date-help" aria-errormessage="advanced-example-target-date-error" data-example-target-date>
+				<button class="example-button" type="button" data-example-command="gotoDate">Show its month</button>
+				<button class="example-button" type="button" data-example-command="focusDate">Select and focus it</button>
+				<p class="advanced-example-field-error" id="advanced-example-target-date-error" data-example-target-date-error hidden>Choose a date from July 15, 2026 through September 15, 2027.</p>
+			</div>
+			<p id="advanced-example-target-date-help">Show its month passes a time-zone-projected <code>Date</code>; Select and focus it passes the exact civil-date string.</p>
+
+			<div class="example-field-row advanced-example-field-row">
+				<label for="advanced-example-theme">Theme</label>
+				<select class="example-field" id="advanced-example-theme" data-example-theme-control>
+					<option value="system">System</option>
+					<option value="light">Light</option>
+					<option value="dark">Dark</option>
+				</select>
+				<label class="example-check advanced-example-check" for="advanced-example-direction">
+					<input id="advanced-example-direction" type="checkbox" data-example-direction>
+					Right-to-left layout
+				</label>
+			</div>
+		</section>
+
+		<section class="advanced-example-calendar-section" aria-labelledby="advanced-example-calendar-title">
+			<h2 id="advanced-example-calendar-title">Schedule</h2>
+			<p class="advanced-example-calendar-note" data-example-bounds-note>Selectable dates run from July 15, 2026 through September 15, 2027. Activate the underlined month and year to jump within those inclusive bounds.</p>
+			<p class="advanced-example-calendar-note" id="advanced-example-grid-instructions" data-example-grid-instructions>Select a date, then press <kbd>F2</kbd> to enter its visible event actions. Use <kbd>Up</kbd> and <kbd>Down</kbd> without wrapping; press <kbd>Escape</kbd> or <kbd>F2</kbd> to return to the day.</p>
+			<section class="example-panel" data-example-fallback aria-labelledby="advanced-example-fallback-title">
+				<h3 id="advanced-example-fallback-title">Schedule for August 6, 2026</h3>
+				<ol>
+					<li><a href="./?event=design-review&amp;from=fallback#advanced-example-fallback-title"><time datetime="2026-08-06T09:30">9:30 AM</time> Design review</a></li>
+					<li><time datetime="2026-08-06T10:00">10:00 AM</time> Launch checkpoint</li>
+				</ol>
+			</section>
+			<div class="example-calendar advanced-example-calendar" data-example-calendar aria-describedby="advanced-example-grid-instructions">
+				<fieldset class="advanced-example-layers" data-example-toolbar-end>
+					<legend>Event categories</legend>
+					<label><input type="checkbox" value="appointment" data-example-type-filter checked> Appointments</label>
+					<label><input type="checkbox" value="milestone" data-example-type-filter checked> Milestones</label>
+					<label><input type="checkbox" value="task" data-example-type-filter checked> Tasks</label>
+				</fieldset>
+			</div>
+		</section>
+
+		<section class="example-panel advanced-example-observation" aria-labelledby="advanced-example-state-title">
+			<h2 id="advanced-example-state-title">Observe state and actions</h2>
+			<dl class="advanced-example-state">
+				<div><dt>Phase</dt><dd data-example-state-phase>idle</dd></div>
+				<div><dt>Displayed month</dt><dd data-example-state-month>Not rendered</dd></div>
+				<div><dt>Selected date</dt><dd data-example-state-selected>Not rendered</dd></div>
+				<div><dt>Requested range</dt><dd data-example-state-range>Not requested</dd></div>
+				<div><dt>Issues</dt><dd data-example-state-issues>0</dd></div>
+			</dl>
+			<p><strong>Last application action:</strong> <span data-example-action-result>None yet.</span></p>
+		</section>
+	</main>
+
+	<div class="advanced-example-visually-hidden">
+		<p aria-live="polite" aria-atomic="true" data-example-announcer-polite></p>
+		<p aria-live="assertive" aria-atomic="true" data-example-announcer-assertive></p>
+	</div>
+
+	<dialog
+		class="advanced-example-dialog"
+		data-example-event-dialog
+		aria-labelledby="advanced-example-dialog-title"
+	>
+		<div class="advanced-example-dialog-content">
+			<p class="advanced-example-dialog-eyebrow">Event details</p>
+			<h2 id="advanced-example-dialog-title" data-example-event-dialog-title>Event details</h2>
+
+			<dl class="advanced-example-event-details">
+				<div>
+					<dt>Category</dt>
+					<dd data-example-event-dialog-category></dd>
+				</div>
+				<div>
+					<dt>Status</dt>
+					<dd data-example-event-dialog-status></dd>
+				</div>
+				<div>
+					<dt>Occurrence</dt>
+					<dd><time data-example-event-dialog-occurrence></time></dd>
+				</div>
+				<div>
+					<dt>Starts</dt>
+					<dd><time data-example-event-dialog-start></time></dd>
+				</div>
+				<div>
+					<dt>Ends <span>(exclusive)</span></dt>
+					<dd>
+						<time data-example-event-dialog-end></time>
+						<span data-example-event-dialog-no-end hidden>No end time</span>
+					</dd>
+				</div>
+			</dl>
+
+			<form class="advanced-example-dialog-actions" method="dialog">
+				<button class="example-button example-button--primary" type="submit" value="close" autofocus>Close</button>
+			</form>
+		</div>
+	</dialog>
+
+	<script type="module" src="./main.js"></script>
+	<footer class="lfc-developer-footer" data-deployment-channel="release">
+		<nav aria-label="Developer resources">
+			<ul class="lfc-developer-footer-links">
+				<li><a href="../">All examples</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/tree/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e/examples/advanced/">Recipe source</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e/docs/api.md">API reference</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e/docs/integration-guide.md">Integration guide</a></li>
+			</ul>
+		</nav>
+		<dl>
+			<dt>Package version</dt>
+			<dd><code>0.3.0-alpha.0</code></dd>
+			<dt>Deployment channel</dt>
+			<dd>Immutable release</dd>
+			<dt>Source commit</dt>
+			<dd><a href="https://github.com/tryagaindev/litefold-calendar/commit/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e"><code>c06f4134d18a21f6ca71ec2fc62683c5cb81c39e</code></a></dd>
+		</dl>
+	</footer>
+</body>
+</html>

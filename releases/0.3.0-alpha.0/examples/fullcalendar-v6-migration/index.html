@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>FullCalendar dayGridMonth rewrite example | litefold-calendar</title>
+	<link rel="stylesheet" href="../../dist/styles.css">
+	<link rel="stylesheet" href="../example.css">
+	<link rel="stylesheet" href="../../deployment-details.css">
+</head>
+<body>
+	<main class="example-shell">
+		<header class="example-intro">
+			<h1>Rewrite a FullCalendar dayGridMonth view</h1>
+			<p>See a small adapter turn a common FullCalendar v6 event shape into a range-aware Litefold source with equivalent day and event callbacks.</p>
+		</header>
+
+		<section class="example-panel" aria-labelledby="migration-request-title">
+			<h2 id="migration-request-title">Range-aware source</h2>
+			<p>The button starts two refetches. The second aborts the first, so only the latest 42-day snapshot can render.</p>
+			<p data-example-range>Waiting for the first 42-day request.</p>
+			<div class="example-control-row">
+				<button class="example-button" type="button" data-example-refetch>Trigger overlapping refetches</button>
+			</div>
+		</section>
+
+		<div class="example-calendar" data-example-calendar></div>
+
+		<section class="example-panel" aria-labelledby="migration-result-title">
+			<h2 id="migration-result-title">Application callbacks</h2>
+			<p><strong>Day selection:</strong> <span data-example-selection>None</span></p>
+			<p><strong>Event activation:</strong> <span data-example-activation>None</span></p>
+			<p class="example-result" data-example-status role="status" aria-atomic="true">Loading adapted events.</p>
+		</section>
+	</main>
+
+	<script type="module" src="./main.js"></script>
+	<footer class="lfc-developer-footer" data-deployment-channel="release">
+		<nav aria-label="Developer resources">
+			<ul class="lfc-developer-footer-links">
+				<li><a href="../">All examples</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/tree/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e/examples/fullcalendar-v6-migration/">Recipe source</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e/docs/api.md">API reference</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e/docs/integration-guide.md">Integration guide</a></li>
+			</ul>
+		</nav>
+		<dl>
+			<dt>Package version</dt>
+			<dd><code>0.3.0-alpha.0</code></dd>
+			<dt>Deployment channel</dt>
+			<dd>Immutable release</dd>
+			<dt>Source commit</dt>
+			<dd><a href="https://github.com/tryagaindev/litefold-calendar/commit/c06f4134d18a21f6ca71ec2fc62683c5cb81c39e"><code>c06f4134d18a21f6ca71ec2fc62683c5cb81c39e</code></a></dd>
+		</dl>
+	</footer>
+</body>
+</html>
