@@ -298,8 +298,10 @@ void test("Pages independently handles rolling main, immutable releases, and rol
 	assert.match(update, /channel_input="\$\(mktemp -d\)"[\s\S]*?chmod --recursive go-w,a\+rX "\$\{channel_input\}"/u);
 	assert.match(update, /state_worktree="\$\{state_parent\}\/state"[\s\S]*?git worktree add --detach/u);
 	assert.match(update, /find "\$\{previous_site\}" -type l[\s\S]*?must not contain symbolic links/u);
+	assert.match(update, /assembly_tooling="\$\(mktemp -d\)"[\s\S]*?cp -a -- scripts node_modules "\$\{assembly_tooling\}\/"[\s\S]*?chmod --recursive go-w,a\+rX "\$\{assembly_tooling\}"[\s\S]*?sudo --user=nobody test -r/u);
 	assert.match(update, /chmod --recursive go-w,a\+rX "\$\{previous_site\}"[\s\S]*?sudo --user=nobody env --ignore-environment/u);
-	assert.match(update, /sudo --user=nobody env --ignore-environment[\s\S]*?node_path[\s\S]*?scripts\/assemble-pages\.mjs/u);
+	assert.match(update, /sudo --user=nobody env --ignore-environment[\s\S]*?node_path[\s\S]*?assembly_tooling[\s\S]*?scripts\/assemble-pages\.mjs/u);
+	assert.doesNotMatch(update, /"\$\{node_path\}" scripts\/assemble-pages\.mjs/u);
 	assert.match(update, /ref: \$\{\{ github\.sha \}\}[\s\S]*?git merge-base --is-ancestor[\s\S]*?retained_main_commit[\s\S]*?LFC_SOURCE_COMMIT/u);
 	assert.match(update, /git -C "\$\{state_worktree\}" add --all/u);
 	assert.match(update, /test ! -e "\$\{state_worktree\}\/node_modules"[\s\S]*?--exclude=\.git/u);

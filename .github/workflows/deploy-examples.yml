@@ -234,6 +234,11 @@ jobs:
           origin_url="$(git remote get-url origin)"
           test "${origin_url%.git}" = "${canonical_origin%.git}"
           node_path="$(command -v node)"
+          assembly_tooling="$(mktemp -d)"
+          cp -a -- scripts node_modules "${assembly_tooling}/"
+          chmod --recursive go-w,a+rX "${assembly_tooling}"
+          sudo --user=nobody test -r \
+            "${assembly_tooling}/scripts/assemble-pages.mjs"
           channel_input="$(mktemp -d)"
           cp -a -- "${LFC_PAGES_CHANNEL}" "${channel_input}/channel"
           chmod --recursive go-w,a+rX "${channel_input}"
@@ -286,7 +291,7 @@ jobs:
             sudo --user=nobody env --ignore-environment \
               HOME="${assembly_parent}" \
               PATH="${PATH}" \
-              "${node_path}" scripts/assemble-pages.mjs \
+              "${node_path}" "${assembly_tooling}/scripts/assemble-pages.mjs" \
                 --previous "${previous_site}" \
                 --channel "${channel_input}/channel" \
                 --output "${assembly_parent}/snapshot"
@@ -357,7 +362,8 @@ jobs:
             exit 1
           fi
           git worktree remove --force "${state_worktree}"
-          rm --force --recursive "${channel_input}" "${state_parent}"
+          rm --force --recursive \
+            "${assembly_tooling}" "${channel_input}" "${state_parent}"
           printf 'commit=%s\n' "${snapshot_commit}" >> "${GITHUB_OUTPUT}"
 
   prepare-rollback:
