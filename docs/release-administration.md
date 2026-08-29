@@ -2,6 +2,8 @@
 
 This guide is for repository and npm administrators. It covers one-time hosted setup, registry mutations, and failed-release recovery. Release operators should normally use the [alpha release operations runbook](release-operations.md).
 
+The steady-state process is deliberately short: run **Prepare alpha release**, review and merge its three-file pull request, approve the protected npm environment, advance `latest` to the published alpha, and verify the automatic GitHub release and Pages deployment. The current-main dispatch documented below exists only to recover the unpublished `0.3.0-alpha.0` attempt and must be removed after that release succeeds.
+
 ## One-time hosted prerequisites
 
 Verify these settings before enabling publication and after any owner, repository, workflow filename, environment, or package-ownership change.
@@ -64,9 +66,16 @@ npm view @tryagaindev/litefold-calendar dist-tags --json --registry https://regi
 
 Replace `EXACT_VERSION` with the workflow candidate. Both tags must select it before the workflow publishes the immutable GitHub prerelease. Do not remove `latest`, point it at an unpublished or different version, or give the publish-only OIDC identity general dist-tag administration authority. If the workflow's polling window expires, complete and verify this exact tag update, then rerun the failed jobs for the original release attempt.
 
-## Historical tag exception
+## Historical tag exceptions
 
-`v0.1.0-alpha.0` predates the protected automated-tag and immutable-release policy.  Its historical tag shape or remote identity must not be changed to simulate the new guarantees.  Treat it as a documented pre-immutability exception; every future version must satisfy the exact-SHA tag ruleset and immutable-release policy.
+Two published prereleases predate the protected annotated-tag and immutable-release policy. Their lightweight tags are accepted only at these exact identities:
+
+| Tag | Exact commit |
+| --- | --- |
+| `v0.1.0-alpha.0` | `17d8db664834d8e6e8ded8689df404827c11bfa3` |
+| `v0.2.0-alpha.0` | `8250ac4da9ada72a2915b8f810be404667ab47da` |
+
+Never move, recreate, annotate, or otherwise rewrite either historical tag to simulate current guarantees. No other lightweight release tag is permitted; every later version must satisfy the exact-SHA annotated-tag ruleset and immutable-release policy.
 
 ## Publication authority
 
@@ -74,19 +83,27 @@ The workflow deliberately separates source execution from publication authority:
 
 | Phase | Source checkout or execution | Authority and output |
 | --- | --- | --- |
-| Classify and verify | Exact pushed `github.sha`; full repository gate | Read-only repository access; retains the package bundle and release notes |
+| Classify and verify | Exact pushed `github.sha`, or the temporary recovery workflow's exact live `main` commit; full repository gate | Read-only repository access; retains the package bundle and release notes |
 | Stage GitHub release | No checkout and no project-code execution | Repository write access; creates or validates the exact tag, draft prerelease, notes, and assets |
 | Publish npm | No checkout, install, or candidate import | Protected `npm` environment and npm OIDC; publishes only the checksum-verified tarball under `alpha` |
 | Synchronize npm channels | No workflow credential | An authenticated npm owner advances `latest` to the exact published alpha |
 | Verify and finalize | Clean public-package consumer, then a source-free release job | Requires `alpha` and `latest` to match, verifies registry bytes/imports/signatures/provenance, publishes the immutable GitHub prerelease, then completes successfully so native `workflow_run` starts Pages |
 
-`publish-alpha.yml` starts on pushes to `main`, but only a changed alpha version with an exact first-parent diff limited to `package.json`, `package-lock.json`, and `CHANGELOG.md` enters publication. It always uses the push's `github.sha`; there is no operator-supplied historical SHA.
+`publish-alpha.yml` normally starts on pushes to `main`, but only a changed alpha version with an exact first-parent diff limited to `package.json`, `package-lock.json`, and `CHANGELOG.md` enters publication. The temporary `workflow_dispatch` recovery does not accept a ref or historical source selector: its input must repeat the exact current `main` commit, and the workflow independently requires that input, `github.sha`, the workflow definition commit, and freshly fetched `origin/main` all identify the same commit.
 
-Release Pages start through the `workflow_run`-only `deploy-examples.yml` after successful completion of the publisher that verified npm and made the immutable prerelease public. The same-repository event supplies the exact publisher head commit; there is no release-ref input. Manual retained-main recovery is isolated in the `workflow_dispatch`-only `rollback-examples.yml`; it accepts a retained snapshot commit, never a release ref. Both workflows use the same queued workflow-level lock, so one run owns retained-state validation through final deployment before the next begins. See [static example deployment](example-deployment.md) for both procedures.
+Release Pages start through the `workflow_run`-only `deploy-examples.yml` after successful completion of the publisher that verified npm and made the immutable prerelease public. It accepts the publisher's normal `push` event and this exact guarded `workflow_dispatch` recovery event; both paths supply the publisher's verified full head commit and neither accepts a release-ref input. Manual retained-main recovery is isolated in the `workflow_dispatch`-only `rollback-examples.yml`; it accepts a retained snapshot commit, never a release ref. Both Pages workflows use the same queued workflow-level lock, so one run owns retained-state validation through final deployment before the next begins. See [static example deployment](example-deployment.md) for both procedures.
+
+The staging and finalization jobs intentionally have no checkout. Every GitHub CLI release mutation in those jobs names the repository explicitly; asset upload uses this shape:
+
+```sh
+gh release upload --repo "${GITHUB_REPOSITORY}" "${LFC_TAG}" "${LFC_BUNDLE_DIRECTORY}/${name}"
+```
+
+Do not add a checkout merely to give `gh` repository context. Keeping the write-capable jobs source-free is part of the authority boundary.
 
 Reruns accept existing state only when identity and bytes match exactly:
 
-- An npm version is complete only when registry integrity matches the retained tarball and both `alpha` and `latest` identify the exact version. A clean exact-version install and both supported imports must succeed with lifecycle scripts disabled. Signatures and SLSA provenance must bind the exact package bytes, repository, `refs/heads/main`, push commit, workflow, and GitHub-hosted builder.
+- An npm version is complete only when registry integrity matches the retained tarball and both `alpha` and `latest` identify the exact version. A clean exact-version install and both supported imports must succeed with lifecycle scripts disabled. Signatures and SLSA provenance must bind the exact package bytes, repository, `refs/heads/main`, source commit, workflow, GitHub-hosted builder, and the actual publisher event: normally `push`, or the one guarded `workflow_dispatch` recovery.
 - A tag, draft, published prerelease, or asset is reusable only at the same full commit with identical notes and bytes.
 - A release Pages path is reusable only when its version, tag commit, manifest, and bytes match exactly.
 - Authentication, network, malformed response, missing provenance, and ambiguous or conflicting public state abort the transition.
@@ -102,86 +119,57 @@ A rerun of an existing run uses that run's original commit SHA, ref, and workflo
 
 If the original run is no longer rerunnable, or any public identity cannot be proved to match, do not recreate the attempt from another commit. Use the recovery matrix and prepare a greater alpha where required.
 
-## Forward repair before public release state exists
+## One-time current-main recovery for `0.3.0-alpha.0`
 
-This exceptional path repairs a release commit already pushed to `main` when its workflow itself must change. It preserves the intended version without rewriting published history. Use it only when all of these statements are independently true:
+This temporary path fixes the publisher workflow without changing the candidate package. It is not a historical-commit dispatcher and is not a template for normal releases. Use it only for the already staged but still unpublished `0.3.0-alpha.0` attempt.
 
-- npm returns `E404` for the exact candidate version;
-- the candidate's remote `v<version>` tag is absent;
-- GitHub has no draft or published release for the candidate;
-- no release asset or Pages release directory exists for the candidate;
-- `origin/main` still points to the failed release commit, and no newer work must be preserved separately; and
-- the failure happened before any public release identity was created.
+The reviewed recovery commit is valid only when all of these invariants hold:
 
-If any statement is false or cannot be proved, stop. Do not move a tag, delete a draft, overwrite an asset, rewrite `main`, or reuse the version. Prepare a greater alpha instead.
+- npm has no `@tryagaindev/litefold-calendar@0.3.0-alpha.0` version;
+- the existing GitHub object is unpublished draft release `379092928` for `v0.3.0-alpha.0`, its tag targets failed release commit `84fc9288bf6e8ab9678c6f0e4ade9add5846c72d`, and all five retained assets and release notes match the recorded evidence;
+- `CHANGELOG.md`, `package.json`, and `package-lock.json` are byte-for-byte unchanged from the failed release commit;
+- the recovery commit changes only the workflow, workflow-policy tests, and release guides named in the workflow's operational allowlist;
+- the rebuilt package tarball SHA-256 equals the retained failed-attempt digest `f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894` committed in `publish-alpha.yml`; and
+- the recovery commit is the freshly fetched head of `main`, its parent is the exact failed release commit pinned in the workflow, and there is no intervening source or package change.
 
-The publisher requires the final release commit's first parent to contain the predecessor version and the final commit to change exactly `CHANGELOG.md`, `package-lock.json`, and `package.json`. Therefore this recovery is one atomic push containing two ordinary commits; do not squash them and do not force-push.
+The operational allowlist is exactly:
 
-Before step 1, replace `0.3.0-alpha.0` in the checks below with the exact failed candidate. These are read-only. The npm command must return `E404`, both Git commands that search for candidate state must print nothing, and the two commit commands must print the same full SHA:
+- `.github/workflows/deploy-examples.yml`
+- `.github/workflows/publish-alpha.yml`
+- `docs/release-administration.md`
+- `docs/release-operations.md`
+- `docs/releasing.md`
+- `scripts/tests/publish-alpha-policy.test.mjs`
+- `scripts/tests/workflow-contracts.test.mjs`
 
-```sh
-npm view "@tryagaindev/litefold-calendar@0.3.0-alpha.0" version --registry https://registry.npmjs.org/
-git ls-remote --tags origin refs/tags/v0.3.0-alpha.0
-git fetch origin refs/heads/main:refs/remotes/origin/main refs/heads/pages-content:refs/remotes/origin/pages-content
-git rev-parse HEAD
-git rev-parse origin/main
-git ls-tree --name-only origin/pages-content "releases/0.3.0-alpha.0"
-```
+No source, build output, package manifest, lockfile, changelog, or other repository file may change in the recovery commit.
 
-In GitHub, open **Releases**, search for `tag:v0.3.0-alpha.0`, then search for `draft:true tag:v0.3.0-alpha.0`; both searches must have no result. Open **Tags** and confirm the candidate is absent. A release result, draft, asset, tag, npm version, Pages directory, or mismatched commit is a stop condition.
+Before deleting anything, independently record the draft release ID, tag target, release-note digest, asset names, and asset SHA-256 values. Query npm's exact version and require a definite not-found result; an authentication failure, network error, or malformed response is not proof of absence. Confirm that no published GitHub release or Pages release directory exists for the candidate.
 
-1. Require a clean worktree and create a local backup branch at the failed commit. For the example candidate, use `git status --short` and require no output, then run `git branch backup/failed-v0.3.0-alpha.0`. Do not push or delete the backup until recovery completes.
-2. Restore only the three release-state files from the failed commit's first parent:
+Only after every check passes may an administrator delete the exact unpublished `v0.3.0-alpha.0` draft and its exact candidate tag so the corrected workflow can recreate them from the retained bytes. Do not delete either historical tag, any published release, or any unrelated draft. If a tag ruleset blocks deletion, the draft or tag identity differs, npm contains the version, Pages already contains the release, or any retained byte cannot be proved, stop and publish a greater alpha instead.
 
-   ```sh
-   git restore --source=HEAD^ -- CHANGELOG.md package-lock.json package.json
-   ```
+After the reviewed recovery commit is the live `main` head:
 
-3. Apply the reviewed workflow or source repair and add its user-visible or operationally significant notes under `CHANGELOG.md` `[Unreleased]`. Run the focused tests and `npm run check:static`, review every changed file, verify the protected Git identity, and commit the complete repair plus the restored predecessor release state as the carrier commit.
-4. Regenerate the same candidate with the appropriate bump. For a failed `0.3.0-alpha.0` attempt whose restored predecessor is `0.2.x`, use:
+1. Open **Actions** → **Publish npm alpha** → **Run workflow**.
+2. Leave **Use workflow from** set to `main`.
+3. Copy the full 40-character lowercase SHA of the current `main` head into **Current main commit**. This field confirms the live workflow commit; it cannot select another commit, branch, tag, or release.
+4. Run the workflow and confirm classification, the complete repository gate, exact retained-tarball comparison, draft staging, and protected npm approval all use that same SHA.
+5. Approve the `npm` environment and complete the ordinary `latest`, npm, GitHub release, and Pages checks in the operations runbook.
 
-   ```sh
-   npm run release:prepare -- --bump preminor --dry-run
-   npm run release:prepare -- --bump preminor
-   npm run release:verify
-   ```
+The provenance verifier accepts the actual event recorded by GitHub: `push` for normal releases or `workflow_dispatch` for this recovery. In either case, the statement, signing certificate, source digest, workflow digest, `refs/heads/main`, and current `main` commit must agree. A successful recovery publisher completion automatically starts the publisher-linked release Pages deployment.
 
-5. Confirm the working-tree diff contains exactly `CHANGELOG.md`, `package-lock.json`, and `package.json`, review their contents, and commit them as `chore: release <version>`.
-6. Run the complete `npm run check` gate from a clean worktree. Confirm the last commit changes exactly the three release-state files, its parent contains the predecessor version, and both new commits use the protected GitHub no-reply email.
-7. Immediately before pushing, repeat every npm and GitHub collision check from the start of this procedure. The exact-version `npm view` must still return `E404`. In GitHub, repeat both release searches and the tag check; all must still have no result. Then run the commands below. They must all succeed and print no output. They prove that the reviewed `HEAD` is exactly two commits above the unchanged remote failure, the worktree is clean, both commits use Basi's protected address as author and committer, the remote candidate tag is absent, and `pages-content` still has no candidate release directory. Another operator must substitute their own candidate version and protected GitHub no-reply address.
-
-   ```sh
-   git fetch origin refs/heads/main:refs/remotes/origin/main refs/heads/pages-content:refs/remotes/origin/pages-content
-   test "$(git rev-parse HEAD~2)" = "$(git rev-parse origin/main)"
-   test "$(git rev-list --count origin/main..HEAD)" -eq 2
-   test -z "$(git status --short)"
-   test "$(git log -2 --format='%ae%n%ce' | sort -u)" = "6586019+redbasi@users.noreply.github.com"
-   test -z "$(git ls-remote --tags origin refs/tags/v0.3.0-alpha.0)"
-   test -z "$(git ls-tree --name-only origin/pages-content 'releases/0.3.0-alpha.0')"
-   ```
-
-   A failure means the remote moved, the wrong commit is checked out, the repair contains more or fewer than two commits, the tree is dirty, the Git identity is wrong, or public candidate state appeared. Stop and investigate; do not push.
-8. Push the reviewed `HEAD` explicitly to remote `main` without force, then prove the remote ref equals that same commit:
-
-   ```sh
-   git push --atomic origin HEAD:refs/heads/main
-   test "$(git rev-parse HEAD)" = "$(git ls-remote --heads origin refs/heads/main | awk 'NR == 1 { print $1 }')"
-   ```
-
-9. Treat the resulting publisher run as a fresh release attempt. Retain the local backup branch until npm, the immutable GitHub prerelease, and Pages all verify successfully.
-
-This procedure is not valid after npm publication or any tag, draft, asset, or release identity exists. It is also not a way to change already-published package bytes.
+After npm, the immutable GitHub prerelease, and Pages all verify, immediately remove the `workflow_dispatch` trigger, recovery constants and branches, and recovery-only tests and instructions in a reviewed cleanup pull request. That same-version `main` push must classify as ineligible and publish nothing. The next release then uses only the simple push-driven steady-state process.
 
 ## Recovery matrix
 
 | State | Recovery |
 | --- | --- |
-| Failure before npm publication | Resolve only transient infrastructure, authentication, or hosted-state configuration, then rerun the original exact-push attempt. No npm version is public; a matching staged tag, draft, and assets may already exist and will be reused. If source or workflow files must change and every public identity is absent, follow [Forward repair before public release state exists](#forward-repair-before-public-release-state-exists). Otherwise prepare a greater alpha. |
-| npm accepted identical verified bytes but the run ended afterward | Rerun the original publication attempt for that exact push so event identity, artifact, and provenance remain unchanged. There is no arbitrary historical-SHA dispatch. If the original attempt cannot be resumed safely, do not move `main` or substitute another event; stop, deprecate the incomplete version when appropriate, and prepare a greater alpha. |
+| Failure before npm publication | Resolve only transient infrastructure, authentication, or hosted-state configuration, then rerun the original exact-push attempt. A matching staged tag, draft, and assets may be reused. The sole exception is the documented one-time current-main recovery for the still-unpublished `0.3.0-alpha.0`; otherwise, a workflow or source repair requires a greater alpha. |
+| npm accepted identical verified bytes but the run ended afterward | Rerun the original publication attempt for that exact push so event identity, artifact, and provenance remain unchanged. The temporary dispatch is not valid after npm publication and never accepts a historical SHA. If the original attempt cannot be resumed safely, stop, deprecate the incomplete version when appropriate, and prepare a greater alpha. |
 | npm accepted the candidate under `alpha`, but `latest` still selects the predecessor | Confirm the candidate's exact version and retained integrity, advance only `latest` to that candidate with an authenticated owner, then rerun the original failed jobs. |
 | npm contains the version with different or unverifiable bytes | Stop.  Do not reuse the version.  Investigate, deprecate when appropriate, and prepare a greater alpha. |
-| Tag, draft, or asset exists with matching identity | Rerun with the exact version and commit; the stage is idempotent. |
-| Tag, draft, or asset conflicts | Do not move, delete, or overwrite it as part of a rerun.  Investigate and prepare a greater alpha when the conflict represents public release state. |
+| Tag, draft, or asset exists with matching identity | Rerun with the exact version and commit; the stage is idempotent. For the one-time `0.3.0-alpha.0` workflow repair only, follow the stricter evidence and exact-draft cleanup procedure above. |
+| Tag, draft, or asset conflicts | Do not move, delete, or overwrite it as part of a rerun. The one-time recovery permits deletion only of the exact verified unpublished `v0.3.0-alpha.0` draft and tag; any conflict is a stop condition requiring a greater alpha. |
 | Published npm alpha is defective | Deprecate the exact version with a replacement message and publish a greater alpha.  Avoid `npm unpublish` except for a genuine security/legal need allowed by npm policy. |
 | Immutable GitHub prerelease is defective | Leave it intact and publish a corrected greater alpha. |
 | Rolling `main` Pages preview is defective | Run **Roll back static examples** from `main` with **Snapshot ref** set to the exact 40-character lowercase `pages-content` commit documented by the deployment guide. This separate manual workflow is rollback-only. |

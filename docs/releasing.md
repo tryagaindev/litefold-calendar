@@ -4,6 +4,8 @@ This is the day-to-day release path for `@tryagaindev/litefold-calendar`. Alpha 
 
 Operators should follow the checkbox-driven [alpha release operations runbook](release-operations.md). This guide defines the policy and workflow design behind those steps.
 
+The normal process is intentionally simple: prepare the release pull request, merge it, approve trusted publication, advance the temporary `latest` tag, and verify the automatic GitHub release and Pages deployment. A temporary current-main dispatch exists only to recover the still-unpublished `0.3.0-alpha.0` attempt and must be removed after that release succeeds.
+
 Repository or npm administrators must complete the [hosted prerequisites](release-administration.md#one-time-hosted-prerequisites) first. A release operator needs permission to run Actions, open and merge the prepared release pull request, and coordinate approval for the protected `npm` environment. A separate authorized reviewer should be available when the environment prohibits self-approval.
 
 Before starting, make sure `CHANGELOG.md` has meaningful `Unreleased` notes and all implementation, documentation, test, accessibility, and screenshot work for the release is already on `main`. The preparation workflow changes release metadata only; it does not collect unfinished work from another branch.
@@ -34,7 +36,7 @@ Merging pushes the release commit to `main` and starts **Publish npm alpha**. Or
 
 Before the protected `npm` job is approved, the workflow reruns `npm run check`, creates the five-file evidence bundle, and stages the exact tag, draft prerelease, notes, and assets. Confirm the workflow run header names the expected `main` commit, wait for **Stage exact tag, draft, and release assets**, and review the draft release for the expected version, full source commit, changelog, and five uploaded asset names. GitHub's automatic source-code archives are excluded from that asset count. Then approve the `npm` environment; the final run summary is written only after registry verification and finalization.
 
-The approved job is source-free: it downloads and checksum-verifies the retained bundle, then publishes only that tarball through npm trusted publishing under `alpha`. It does not check out or execute repository source.
+The approved job is source-free: it downloads and checksum-verifies the retained bundle, then publishes only that tarball through npm trusted publishing under `alpha`. It does not check out or execute repository source. The source-free GitHub release jobs pass `--repo` explicitly to GitHub CLI; they must not gain a checkout merely to infer repository context.
 
 When the publish job reports that npm accepted the version, an authenticated npm owner must atomically advance `latest` to the exact candidate while registry verification polls:
 
@@ -48,7 +50,7 @@ Do not create or push a version tag, create a GitHub release, publish with npm l
 
 ### 4. Verify the published identities
 
-After approval, **Publish npm alpha** verifies npm and then makes the GitHub prerelease public. Its successful completion triggers **Deploy static examples** through GitHub's native `workflow_run` event. A started Pages run is not proof of a completed deployment; open the publisher-linked run and wait for it to succeed.
+After approval, **Publish npm alpha** verifies npm and then makes the GitHub prerelease public. Its successful completion triggers **Deploy static examples** through GitHub's native `workflow_run` event, including the one-time guarded recovery event. A started Pages run is not proof of a completed deployment; open the publisher-linked run and wait for it to succeed.
 
 Confirm all of these identify the same version and full commit:
 
@@ -72,9 +74,17 @@ npm run release:verify
 
 Use `prepatch` or `preminor` instead of `prerelease` for the other two choices. `release:prepare` validates staged bytes before atomically replacing the three files and restores the originals if replacement fails. `release:verify` is read-only and allows those expected local changes; it does not query hosted services. Review `git diff` after the command. This local path does not create a branch, pull request, tag, release, or publication.
 
+## Historical release tags
+
+The lightweight tags `v0.1.0-alpha.0` at `17d8db664834d8e6e8ded8689df404827c11bfa3` and `v0.2.0-alpha.0` at `8250ac4da9ada72a2915b8f810be404667ab47da` are exact pre-policy exceptions. Never move, recreate, or annotate them. No other lightweight release tag is permitted.
+
 ## Failure handling
 
-Do not work around a failed workflow with a local publish, force push, unrelated tag movement, replaced asset, or reused package version. The one expected registry-administration action is advancing `latest` to the exact already-published candidate. A rerun of **Publish npm alpha** keeps that run's original commit SHA, ref, and publisher workflow definition, so use it only after resolving a transient infrastructure, authentication, or hosted-state configuration failure without changing repository source or the publisher workflow. Open the run for the original release merge commit and confirm its SHA and version before rerunning. If source or publisher workflow files must change, stop and use administration recovery; prepare a greater alpha when required. There is no manual arbitrary-commit publication path.
+Do not work around a failed workflow with a local publish, force push, unrelated tag movement, replaced asset, or reused package version. The one expected registry-administration action is advancing `latest` to the exact already-published candidate. A rerun of **Publish npm alpha** keeps that run's original commit SHA, ref, and publisher workflow definition, so use it only after resolving a transient infrastructure, authentication, or hosted-state configuration failure without changing repository source or the publisher workflow. Open the run for the original release merge commit and confirm its SHA and version before rerunning. If source or publisher workflow files must change, stop and use administration recovery; prepare a greater alpha when required. There is no arbitrary or historical-commit publication path.
+
+The sole temporary exception is the [one-time current-main recovery](release-administration.md#one-time-current-main-recovery-for-030-alpha0) for the still-unpublished `0.3.0-alpha.0`. Its dispatch input only confirms the exact live `main` workflow commit; the input, `github.sha`, workflow SHA, and freshly fetched `origin/main` must agree. Release-state files stay unchanged, changed files are restricted to the operational allowlist, and the rebuilt tarball must equal the retained digest. Provenance records the actual `workflow_dispatch` event while keeping the same current source and workflow commit.
+
+That recovery may delete and recreate only the exact verified unpublished `v0.3.0-alpha.0` draft and tag, and only after npm absence plus retained note/asset evidence are proved. Any published or conflicting state, unavailable evidence, or tag-protection failure is a stop condition: publish a greater alpha instead. After successful npm, immutable GitHub release, and Pages verification, remove the recovery trigger and recovery-only policy in a reviewed cleanup so the simple push-driven path is again the only publisher entry point.
 
 Only rerun when existing npm, tag, draft/release, assets, and Pages state are absent or match the retained bytes exactly. Conflicting or ambiguous state fails closed. Published npm versions are immutable: if bytes are defective, deprecate that version with upgrade guidance and prepare a greater alpha. Use the [recovery matrix](release-administration.md#recovery-matrix) for the exact failure stage.
 

@@ -299,7 +299,7 @@ function invocation(attempt, runId = RUN_ID) {
 	return `${SERVER_URL}/${REPOSITORY}/actions/runs/${runId}/attempts/${String(attempt)}`;
 }
 
-function provenanceStatement(attempt = 3) {
+function provenanceStatement(attempt = 3, eventName = "push") {
 	return {
 		_type: "https://in-toto.io/Statement/v1",
 		predicate: {
@@ -314,7 +314,7 @@ function provenanceStatement(attempt = 3) {
 				},
 				internalParameters: {
 					github: {
-						event_name: "push",
+						event_name: eventName,
 						repository_id: PROVENANCE_ENVIRONMENT.GITHUB_REPOSITORY_ID,
 						repository_owner_id: PROVENANCE_ENVIRONMENT.GITHUB_REPOSITORY_OWNER_ID
 					}
@@ -353,7 +353,7 @@ function provenanceBundle(statement = provenanceStatement()) {
 	};
 }
 
-function provenanceCertificate(attempt = 3) {
+function provenanceCertificate(attempt = 3, eventName = "push") {
 	const workflowIdentity =
 		`${SERVER_URL}/${REPOSITORY}/.github/workflows/publish-alpha.yml@refs/heads/main`;
 	return {
@@ -361,7 +361,7 @@ function provenanceCertificate(attempt = 3) {
 		buildConfigURI: workflowIdentity,
 		buildSignerDigest: SOURCE_COMMIT,
 		buildSignerURI: workflowIdentity,
-		buildTrigger: "push",
+		buildTrigger: eventName,
 		issuer: "https://token.actions.githubusercontent.com",
 		runInvocationURI: invocation(attempt),
 		runnerEnvironment: "github-hosted",
@@ -424,9 +424,10 @@ async function runExtractor(context, module, report) {
 
 async function runPolicy(context, module, options = {}) {
 	const directory = await temporaryDirectory(context, "lfc-provenance-policy-");
-	const statement = options.statement ?? provenanceStatement(options.attempt);
+	const eventName = options.eventName ?? "push";
+	const statement = options.statement ?? provenanceStatement(options.attempt, eventName);
 	const bundle = options.bundle ?? provenanceBundle(statement);
-	const certificate = options.certificate ?? provenanceCertificate(options.attempt);
+	const certificate = options.certificate ?? provenanceCertificate(options.attempt, eventName);
 	const verification = options.verification ?? verificationResult(certificate);
 	await writeFile(
 		join(directory, "provenance.sigstore.json"),
@@ -440,7 +441,12 @@ async function runPolicy(context, module, options = {}) {
 	);
 	return runInlineModule(module, {
 		cwd: directory,
-		env: { ...process.env, ...PROVENANCE_ENVIRONMENT, ...options.environment }
+		env: {
+			...process.env,
+			...PROVENANCE_ENVIRONMENT,
+			GITHUB_EVENT_NAME: eventName,
+			...options.environment
+		}
 	});
 }
 
@@ -481,6 +487,15 @@ void test("the workflow provenance policy accepts the current or an earlier atte
 	await runPolicy(context, policy, { attempt: 1 });
 });
 
+void test("the workflow provenance policy accepts a matching current-main dispatch identity", async (context) => {
+	const workflow = await readFile(WORKFLOW_PATH, "utf8");
+	const policy = inlineModule(workflow, "LFC_PROVENANCE_POLICY");
+	await runPolicy(context, policy, {
+		attempt: 3,
+		eventName: "workflow_dispatch"
+	});
+});
+
 void test("the workflow provenance policy rejects conflicting source and builder identities", async (context) => {
 	const workflow = await readFile(WORKFLOW_PATH, "utf8");
 	const policy = inlineModule(workflow, "LFC_PROVENANCE_POLICY");
@@ -499,7 +514,14 @@ void test("the workflow provenance policy rejects conflicting source and builder
 		(options) => { options.certificate.runnerEnvironment = "self-hosted"; },
 		(options) => { options.certificate.sourceRepositoryIdentifier = "1"; },
 		(options) => { options.certificate.runInvocationURI = invocation(2); },
+		(options) => { options.certificate.buildTrigger = "workflow_dispatch"; },
 		(options) => { options.environment.GITHUB_REPOSITORY = "attacker/repository"; },
+		(options) => {
+			options.environment.GITHUB_EVENT_NAME = "pull_request";
+			options.statement.predicate.buildDefinition.internalParameters.github.event_name =
+				"pull_request";
+			options.certificate.buildTrigger = "pull_request";
+		},
 		(options) => { options.verification.push(structuredClone(options.verification[0])); },
 		(options) => { options.bundle.dsseEnvelope.payload = "not-base64-json"; }
 	];

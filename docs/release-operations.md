@@ -2,6 +2,8 @@
 
 Follow this runbook to publish `@tryagaindev/litefold-calendar` versions shaped like `0.x.y-alpha.N`. It assumes the operator is new to this repository but can follow exact instructions. The first stable release needs a separate procedure because npm's temporary alpha-as-`latest` rule must end first.
 
+For a normal release, the operator runs **Prepare alpha release**, reviews and merges its three-file pull request, reviews the staged draft, approves the protected npm environment, advances `latest`, and verifies npm, the immutable GitHub prerelease, and automatic Pages deployment. Do not use the recovery instructions unless the administration guide explicitly identifies the current release as eligible.
+
 The five GitHub Actions workflows used here are:
 
 - **Prepare alpha release** (`prepare-alpha.yml`)
@@ -14,7 +16,7 @@ Read the [release policy](releasing.md) and confirm the [hosted prerequisites](r
 
 ## Stop rules
 
-> Stop rather than improvise if a check fails or public state is unclear. Never publish from a local shell, create a tag or GitHub release manually, force-push, move or delete a release tag, replace a release asset, remove npm's `latest` tag, retry from an arbitrary commit, or continue after an unavailable or malformed registry response. Never share an npm OTP, token, CLI authentication URL, or authenticated browser session with automation.
+> Stop rather than improvise if a check fails or public state is unclear. Never publish from a local shell, create a tag or GitHub release manually, force-push, move or delete a release tag, replace a release asset, remove npm's `latest` tag, retry from an arbitrary commit, or continue after an unavailable or malformed registry response. The sole deletion exception is the exact verified unpublished `v0.3.0-alpha.0` draft and tag during the documented one-time recovery. Never share an npm OTP, token, CLI authentication URL, or authenticated browser session with automation.
 
 ## Roles
 
@@ -84,6 +86,8 @@ After login, rerun `npm whoami`. Do not give an assistant or automation access t
 
 For `0.3.0-alpha.0` only, the accepted predecessor is `alpha=0.2.0-alpha.0` and `latest=0.1.0-alpha.0`. After that transition, both predecessor tags must match before another alpha release begins. Stop if the registry response is missing, malformed, or different from the expected history.
 
+The lightweight tags `v0.1.0-alpha.0` at `17d8db664834d8e6e8ded8689df404827c11bfa3` and `v0.2.0-alpha.0` at `8250ac4da9ada72a2915b8f810be404667ab47da` are exact historical exceptions. Do not move, recreate, or annotate them. No other lightweight release tag is accepted.
+
 ## 2. Prepare the release pull request
 
 1. Open the repository's **Actions** tab.
@@ -141,7 +145,7 @@ The merge starts **Publish npm alpha** for `RELEASE_SHA`.
 5. Select the `npm` environment, then select **Approve and deploy**. If self-approval is prohibited, ask the authorized environment reviewer to perform this exact approval.
 6. Wait until the job reports that npm accepted `EXACT_VERSION` under `alpha`.
 
-The workflow publishes through npm trusted publishing. Never run `npm publish` locally and never add an `NPM_TOKEN` to GitHub.
+The workflow publishes through npm trusted publishing. Never run `npm publish` locally and never add an `NPM_TOKEN` to GitHub. Its GitHub release writer is intentionally source-free and supplies `--repo` explicitly to GitHub CLI commands; do not add a checkout to that job.
 
 ## 5. Advance the temporary npm `latest` tag
 
@@ -176,7 +180,7 @@ Do not edit the tag, release, notes, or assets after publication.
 
 ## 7. Verify the automatic release Pages deployment
 
-A successful **Publish npm alpha** completion automatically triggers **Deploy static examples** through GitHub's native `workflow_run` event. Do not manually dispatch a release deployment and do not supply a release ref.
+A successful **Publish npm alpha** completion automatically triggers **Deploy static examples** through GitHub's native `workflow_run` event. This includes the one-time guarded publisher recovery described below. Do not manually dispatch a release deployment and do not supply a release ref.
 
 Automatic and rollback Pages runs share one non-canceling workflow-level queue so retained-state writes cannot race deployment. A publisher-linked run may legitimately remain queued behind earlier Pages work. Do not cancel it, rerun around it, or weaken the queue; wait for that exact run to start and finish.
 
@@ -198,15 +202,45 @@ https://tryagaindev.github.io/litefold-calendar/site-manifest.json
 
 Record the Pages run, metadata URL, and UTC completion time. The release is complete only after every npm, tag, GitHub release, and Pages identity matches.
 
+## One-time `0.3.0-alpha.0` workflow recovery
+
+Use these steps only when an administrator has completed the evidence checks in [One-time current-main recovery for `0.3.0-alpha.0`](release-administration.md#one-time-current-main-recovery-for-030-alpha0). This path repairs the workflow while keeping the candidate's release-state files and package bytes unchanged. It cannot publish an arbitrary or historical commit.
+
+Before opening Actions, have an administrator confirm all of the following:
+
+- [ ] npm definitely has no `@tryagaindev/litefold-calendar@0.3.0-alpha.0`; an error other than a definite not-found result is a stop condition.
+- [ ] Unpublished draft release `379092928`, its exact `v0.3.0-alpha.0` tag target `84fc9288bf6e8ab9678c6f0e4ade9add5846c72d`, its notes, five asset names, and asset digests match the retained failed-run evidence.
+- [ ] `CHANGELOG.md`, `package.json`, and `package-lock.json` are unchanged from the failed release commit.
+- [ ] The recovery commit changes only the workflow, workflow-policy tests, and release guides in the workflow's operational allowlist.
+- [ ] The workflow pins the failed release parent and retained tarball SHA-256 `f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894`, and the rebuilt tarball must match that digest.
+- [ ] There is no published candidate release or candidate Pages directory.
+
+After recording the evidence, the administrator may delete only that exact unpublished draft and its exact `v0.3.0-alpha.0` tag. Stop and prepare a greater alpha if deletion is blocked by a ruleset, either identity differs, npm contains the version, any evidence is unavailable, or any public state conflicts. Never delete a published release or either historical lightweight tag.
+
+To start the guarded recovery:
+
+1. Open the repository's **Actions** tab.
+2. Select **Publish npm alpha**.
+3. Select **Run workflow**.
+4. Set **Use workflow from** to `main`.
+5. Open the latest commit on `main` and copy its full 40-character lowercase SHA.
+6. Paste that SHA into **Current main commit**. This input only confirms the exact live `main` workflow commit; it cannot select a different commit, branch, tag, or release.
+7. Select **Run workflow**.
+8. Open the new run and confirm its branch and full commit both match the SHA you pasted.
+9. Confirm classification, the complete repository gate, exact retained-tarball check, and draft staging succeed before approving the `npm` environment.
+10. Continue with sections 5 through 7 of this runbook. Provenance must record `workflow_dispatch` and bind the same source/workflow SHA; Pages starts automatically after the publisher succeeds.
+
+After npm, the immutable GitHub prerelease, and Pages all pass, create and merge the reviewed cleanup that removes the publisher's `workflow_dispatch` trigger, recovery pins and branches, recovery-only tests, and this temporary procedure. Confirm that cleanup's same-version push performs no publication. Future releases then use only the normal push-driven path.
+
 ## Recovery decisions
 
 A rerun of an existing GitHub Actions run keeps that run's original commit SHA, ref, and workflow definition. Use one only after a transient infrastructure, authentication, or hosted-state configuration problem is resolved without changing repository source or that workflow. If recovery requires a source or package change, stop: the original run cannot consume it. Rerunning a successful publisher solely to emit a missing downstream event is different: the publisher retains its original identity, but the newly created Pages run uses the current default-branch `deploy-examples.yml` definition while still checking out `RELEASE_SHA` for release source and assembly tooling. Review that current workflow and validate the new Pages run independently.
 
 | Observed state | Required action |
 | --- | --- |
-| Failure before npm publication | Resolve only transient infrastructure, authentication, or hosted-state configuration, then rerun the original publisher attempt. If source or workflow files must change, stop and use the administration recovery procedure; prepare a greater alpha when required. |
+| Failure before npm publication | Resolve only transient infrastructure, authentication, or hosted-state configuration, then rerun the original publisher attempt. The documented current-main dispatch is allowed only for the exact still-unpublished `0.3.0-alpha.0` workflow repair; other workflow or source changes require a greater alpha. |
 | npm has the exact candidate, but `latest` is old | Verify exact integrity, run the documented `npm dist-tag add`, then rerun failed jobs in the original publisher run. |
-| npm bytes, tag, release, notes, or assets conflict or cannot be proved | Stop. Do not delete, move, overwrite, or reuse the version. Investigate and prepare a greater alpha when required. |
+| npm bytes, tag, release, notes, or assets conflict or cannot be proved | Stop. Do not delete, move, overwrite, or reuse the version. The one-time recovery permits deletion only after the exact unpublished `v0.3.0-alpha.0` evidence matches; a conflict still requires a greater alpha. |
 | The publisher-linked Pages run failed | Rerun that original **Deploy static examples** run only for a transient or hosted-state failure. If repository or workflow files must change, stop and use administration recovery; an already-published package requires a greater alpha. |
 | No publisher-linked Pages run was created | Confirm the original publisher succeeded, review the current default-branch `deploy-examples.yml`, then select **Re-run all jobs** on that original publisher. Its successful completion emits a new native event. Confirm the new Pages run uses `RELEASE_SHA` and validate it independently. |
 | Published package or immutable prerelease is defective | Leave immutable state intact, deprecate the package version when appropriate, and publish a corrected greater alpha. |
