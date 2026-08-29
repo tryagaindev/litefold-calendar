@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+<!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
+
+## [0.3.0-alpha.0] - 2026-08-29
+
 ### Added
 
 - Added a specification-compliant `DESIGN.md` as the canonical source for the package visual identity, exact light/dark defaults, responsive composition, component states, and public CSS token mapping.
