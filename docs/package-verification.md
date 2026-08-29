@@ -90,7 +90,7 @@ Tree shaking and package contents answer different questions. The extension file
 
 ## Registry and release evidence
 
-The publisher retries npm's eventually consistent reads and verifies the exact version, matching `alpha` and `latest` dist-tags, registry integrity, provenance/signatures, clean installation, root import, documented extension import, and stylesheet import before publishing the GitHub prerelease. The immutable Pages example is a separately queued deployment for the same exact tag and commit.
+The publisher retries npm's eventually consistent reads and verifies the exact version, matching `alpha` and `latest` dist-tags, registry integrity, provenance/signatures, clean installation, root import, documented extension import, and stylesheet import before publishing the GitHub prerelease. Successful publisher completion triggers the separately authorized immutable Pages deployment through a same-repository `workflow_run` event bound to the same exact commit.
 
 Inspect an exact published version rather than relying only on movable dist-tags:
 

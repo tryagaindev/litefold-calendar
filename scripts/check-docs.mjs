@@ -2,6 +2,12 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { extractExtensionEntries, readPackageManifest } from "./lib/package-entries.mjs";
+import {
+	githubMarkdownHeadingSlugs,
+	markdownExplicitAnchors,
+	markdownVisibleText,
+	maskMarkdownNonProse
+} from "./lib/markdown-heading.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
 
 const API_DOCUMENT_PATH = join(REPOSITORY_ROOT, "docs", "api.md");
@@ -66,38 +72,8 @@ function lineNumberAt(source, index) {
 	return line;
 }
 
-function maskCharacters(value) {
-	return value.replace(/[^\r\n]/gu, " ");
-}
-
-function maskFencedContent(source) {
-	let masked = source.replace(/<!--[\s\S]*?-->/gu, (comment) => maskCharacters(comment));
-	const lines = masked.split(/(?<=\n)/u);
-	let fenceMarker;
-	masked = lines.map((line) => {
-		const fence = /^\s{0,3}(`{3,}|~{3,})/u.exec(line);
-		if (fenceMarker === undefined) {
-			if (fence === null) {
-				return line;
-			}
-			fenceMarker = fence[1];
-			return maskCharacters(line);
-		}
-		if (fence !== null &&
-			fenceMarker !== undefined &&
-			fence[1]?.[0] === fenceMarker[0] &&
-			(fence[1]?.length ?? 0) >= fenceMarker.length) {
-			fenceMarker = undefined;
-		}
-		return maskCharacters(line);
-	}).join("");
-
-	return masked;
-}
-
 function maskNonProse(source) {
-	return maskFencedContent(source)
-		.replace(/(`+)([^\r\n]*?)\1/gu, (code) => maskCharacters(code));
+	return maskMarkdownNonProse(source, { inlineCode: true });
 }
 
 async function collectMarkdownFiles(directory) {
@@ -283,9 +259,7 @@ function extractReferenceLinks(source) {
 }
 
 function normalizeLinkLabel(label) {
-	return label
-		.replace(/<[^>]*>/gu, " ")
-		.replace(/[`*_~]/gu, "")
+	return markdownVisibleText(label)
 		.replace(/\s+/gu, " ")
 		.trim()
 		.replace(/[.!?:;]+$/gu, "")
@@ -315,41 +289,15 @@ function decodeLinkPart(value, sourcePath, line, kind) {
 	}
 }
 
-function githubSlug(value) {
-	return value
-		.replace(/<[^>]*>/gu, "")
-		.replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
-		.replace(/[`*_~]/gu, "")
-		.trim()
-		.toLowerCase()
-		.replace(/[^\p{L}\p{M}\p{N} _-]/gu, "")
-		.replace(/\s+/gu, "-");
-}
-
 async function markdownAnchors(path) {
 	const cached = anchorCache.get(path);
 	if (cached !== undefined) {
 		return cached;
 	}
 	const source = await readFile(path, "utf8");
-	const prose = maskFencedContent(source);
-	const anchors = new Set();
-	const occurrences = new Map();
-	const addHeading = (heading) => {
-		const base = githubSlug(heading);
-		const occurrence = occurrences.get(base) ?? 0;
-		occurrences.set(base, occurrence + 1);
-		anchors.add(occurrence === 0 ? base : `${base}-${String(occurrence)}`);
-	};
-
-	for (const match of prose.matchAll(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/gmu)) {
-		addHeading(match[1] ?? "");
-	}
-	for (const match of prose.matchAll(/^([^\r\n]+)\r?\n\s{0,3}(?:=+|-+)\s*$/gmu)) {
-		addHeading(match[1] ?? "");
-	}
-	for (const match of prose.matchAll(/<(?:a|[^>]+)\s+(?:id|name)\s*=\s*["']([^"']+)["'][^>]*>/giu)) {
-		anchors.add(match[1] ?? "");
+	const anchors = new Set(githubMarkdownHeadingSlugs(source));
+	for (const anchor of markdownExplicitAnchors(source)) {
+		anchors.add(anchor);
 	}
 	anchorCache.set(path, anchors);
 	return anchors;

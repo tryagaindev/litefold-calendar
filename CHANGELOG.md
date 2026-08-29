@@ -6,10 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-<!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
-
-## [0.3.0-alpha.0] - 2026-08-29
-
 ### Added
 
 - Added a specification-compliant `DESIGN.md` as the canonical source for the package visual identity, exact light/dark defaults, responsive composition, component states, and public CSS token mapping.
@@ -26,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Static event inputs now snapshot supported event fields as well as array membership while preserving opaque metadata by reference.
 - Simplified successful WebMCP `get-events` results by removing the redundant always-true `dataAvailable` field; `ok` remains the success discriminant.
 - Reconciled package CSS with the design system by making base typography explicit, applying the shared component radius to event rows and navigation controls, and centralizing private visual primitives and the documented pixel exceptions.
-- Simplified alpha publication around the exact eligible `main` push, a source-free protected npm publisher, and a separately authorized Pages release operation, and consolidated repository documentation around one index and one canonical guide per contract.
+- Simplified alpha publication around the exact eligible `main` push, a source-free protected npm publisher, and a native same-repository handoff to the separately authorized Pages workflow, and added a step-by-step operations runbook.
 
 ### Fixed
 
@@ -35,6 +31,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Prevented same-month `gotoDate()` and Today navigation from refetching an unchanged visible range, and preserved expanded agenda disclosure for an identical target.
 - Routed destroy-time integration-node detach failures through the configured diagnostic sink.
 - Corrected example teardown for the browser back/forward cache, static-demo links, no-end-time semantics, live activation feedback, and dirty-build provenance.
+- Hardened changelog-comment, documentation-anchor, and Pages-metadata validation against hidden release state, GFM parser differences, and pathological version input; removed invalid null fixtures from compile-only public API checks.
+- Bound retained Pages assembly tooling to the exact approved upstream commit and confined the loopback repository server to its selected public directory, including encoded Windows path separators.
 
 ## [0.2.0-alpha.0] - 2026-08-25
 

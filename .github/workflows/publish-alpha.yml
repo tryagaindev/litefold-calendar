@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - .github/workflows/publish-alpha.yml
       - CHANGELOG.md
       - package-lock.json
       - package.json
@@ -168,32 +169,35 @@ jobs:
           LFC_VERSION: ${{ steps.identity.outputs.version }}
         run: |
           set -euo pipefail
+          registry_raw="${RUNNER_TEMP}/registry.raw.json"
+          registry_json="${RUNNER_TEMP}/registry.json"
+          registry_error="${RUNNER_TEMP}/registry.err"
           set +e
           npm view @tryagaindev/litefold-calendar versions dist-tags --json \
-            > registry.raw.json 2> registry.err
+            > "${registry_raw}" 2> "${registry_error}"
           registry_status=$?
           set -e
           if [[ "${registry_status}" -eq 0 ]]; then
             node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" \
-              registry.raw.json registry.json
-            metadata="$(<registry.json)"
+              "${registry_raw}" "${registry_json}"
+            metadata="$(<"${registry_json}")"
             registry_state="$(
               jq --compact-output --sort-keys '
                 {
                   "dist-tags": ."dist-tags",
                   versions: (.versions | if type == "string" then [.] else . end | sort)
                 }
-              ' registry.json
+              ' "${registry_json}"
             )"
-            registry_alpha="$(jq --raw-output '."dist-tags".alpha // empty' registry.json)"
+            registry_alpha="$(jq --raw-output '."dist-tags".alpha // empty' "${registry_json}")"
             registry_kind=present
-          elif grep -Eq 'E404|404 Not Found' registry.err; then
+          elif grep -Eq 'E404|404 Not Found' "${registry_error}"; then
             metadata='{"versions":[],"dist-tags":{}}'
             registry_state='{"status":"absent"}'
             registry_alpha=''
             registry_kind=absent
           else
-            cat registry.err >&2
+            cat "${registry_error}" >&2
             exit "${registry_status}"
           fi
           export LFC_REGISTRY_METADATA="${metadata}"
@@ -1174,33 +1178,5 @@ jobs:
             printf -- '- npm: `@tryagaindev/litefold-calendar@%s`\n' "${LFC_TAG#v}"
             printf -- '- Registry integrity, signatures/provenance, clean imports, and dist-tags: verified.\n'
             printf -- '- Protected tag, notes, immutable prerelease, and asset digests: revalidated.\n'
-            printf -- '- Release Pages dispatch: pending the follow-on job.\n'
-          } >> "${GITHUB_STEP_SUMMARY}"
-
-  dispatch-release-pages:
-    name: Queue the immutable release demo
-    needs:
-      - publish-release
-      - verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    permissions:
-      actions: write
-      contents: read
-
-    steps:
-      - name: Dispatch the exact release tag to the Pages workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-          LFC_TAG: ${{ needs.verify.outputs.tag }}
-        run: |
-          gh workflow run deploy-examples.yml \
-            --ref main \
-            --raw-field operation=release \
-            --raw-field release_ref="${LFC_TAG}"
-          {
-            printf '## Queued release Pages\n\n'
-            printf -- '- Release ref: `%s`\n' "${LFC_TAG}"
-            printf -- '- Workflow: `deploy-examples.yml`\n'
+            printf -- '- Release Pages: `Deploy static examples` starts after this workflow completes successfully.\n'
           } >> "${GITHUB_STEP_SUMMARY}"

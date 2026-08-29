@@ -4,34 +4,23 @@ on:
   workflow_run:
     workflows:
       - CI
+      - Publish npm alpha
     types:
       - completed
     branches:
       - main
   workflow_dispatch:
     inputs:
-      operation:
-        description: Deployment operation
-        required: true
-        default: release
-        type: choice
-        options:
-          - release
-          - rollback
-      release_ref:
-        description: Exact v-prefixed release tag to deploy
-        required: false
-        type: string
       snapshot_ref:
         description: Full pages-content commit whose main preview should be restored
-        required: false
+        required: true
         type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: static-examples-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'release' && format('release-{0}', inputs.release_ref) || github.event_name == 'workflow_dispatch' && inputs.operation == 'rollback' && format('rollback-{0}', inputs.snapshot_ref) || format('main-{0}', github.event.workflow_run.head_sha) }}
+  group: static-examples-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && format('rollback-{0}', inputs.snapshot_ref) || format('workflow-run-{0}', github.event.workflow_run.id) }}
   cancel-in-progress: false
 
 env:
@@ -43,13 +32,11 @@ jobs:
     name: Stage a verified Pages channel
     if: >-
       ${{
-        (github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push' &&
-          github.event.workflow_run.head_branch == 'main') ||
-        (github.event_name == 'workflow_dispatch' &&
-          github.ref == 'refs/heads/main' &&
-          inputs.operation == 'release')
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -60,6 +47,7 @@ jobs:
     outputs:
       channel: ${{ steps.identity.outputs.channel }}
       channel-artifact: ${{ steps.artifact.outputs.name }}
+      eligible: ${{ steps.identity.outputs.eligible }}
       source-commit: ${{ steps.identity.outputs.source-commit }}
       version: ${{ steps.identity.outputs.version }}
 
@@ -69,60 +57,81 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.release_ref }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Resolve the deployment identity
+        id: identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LFC_UPSTREAM_WORKFLOW: ${{ github.event.workflow_run.name }}
+          LFC_UPSTREAM_WORKFLOW_PATH: ${{ github.event.workflow_run.path }}
+          LFC_WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          source_commit="$(git rev-parse --verify HEAD^{commit})"
+          version="$(jq --exit-status --raw-output '.version' package.json)"
+          upstream_workflow_path="${LFC_UPSTREAM_WORKFLOW_PATH%@*}"
+          git fetch --force --tags origin main
+          test "${source_commit}" = "${LFC_WORKFLOW_RUN_SHA}"
+          git merge-base --is-ancestor "${source_commit}" origin/main
+
+          eligible=true
+          if [[ "${LFC_UPSTREAM_WORKFLOW}" == "CI" &&
+            "${upstream_workflow_path}" == ".github/workflows/ci.yml" ]]; then
+            channel="main"
+          elif [[ "${LFC_UPSTREAM_WORKFLOW}" == "Publish npm alpha" &&
+            "${upstream_workflow_path}" == ".github/workflows/publish-alpha.yml" ]]; then
+            parent_version="$(git show HEAD^1:package.json | jq --exit-status --raw-output '.version')"
+            if [[ "${version}" == "${parent_version}" ]]; then
+              eligible=false
+              channel=""
+            else
+              channel="release"
+            fi
+          else
+            echo "Unexpected upstream workflow identity: ${LFC_UPSTREAM_WORKFLOW} (${LFC_UPSTREAM_WORKFLOW_PATH})" >&2
+            exit 1
+          fi
+
+          if [[ "${eligible}" == "true" && "${channel}" == "release" ]]; then
+            release_ref="v${version}"
+            channel="release"
+            if [[ ! "${version}" =~ ^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
+              echo "A changed release version must be an exact supported alpha." >&2
+              exit 1
+            fi
+            test "$(git rev-parse --verify "${release_ref}^{commit}")" = "${source_commit}"
+            release="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${release_ref}")"
+            jq --exit-status --arg commit "${source_commit}" --arg tag "${release_ref}" '
+              .draft == false and .prerelease == true and .immutable == true and
+              .tag_name == $tag and .target_commitish == $commit
+            ' <<< "${release}" > /dev/null
+          fi
+
+          printf 'eligible=%s\n' "${eligible}" >> "${GITHUB_OUTPUT}"
+          printf 'channel=%s\n' "${channel}" >> "${GITHUB_OUTPUT}"
+          printf 'source-commit=%s\n' "${source_commit}" >> "${GITHUB_OUTPUT}"
+          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Set up exact Node
+        if: ${{ steps.identity.outputs.eligible == 'true' }}
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: ${{ env.LFC_NODE_VERSION }}
           package-manager-cache: false
 
       - name: Set up exact npm
+        if: ${{ steps.identity.outputs.eligible == 'true' }}
         working-directory: ${{ runner.temp }}
         run: npm install --global "npm@${LFC_NPM_VERSION}" --ignore-scripts
 
-      - name: Resolve the deployment identity
-        id: identity
-        env:
-          GH_TOKEN: ${{ github.token }}
-          LFC_EVENT_NAME: ${{ github.event_name }}
-          LFC_RELEASE_REF: ${{ inputs.release_ref }}
-          LFC_WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          set -euo pipefail
-
-          source_commit="$(git rev-parse --verify HEAD^{commit})"
-          version="$(node --input-type=module -e 'import manifest from "./package.json" with { type: "json" }; process.stdout.write(manifest.version);')"
-          git fetch --no-tags origin main
-
-          if [[ "${LFC_EVENT_NAME}" == "workflow_run" ]]; then
-            channel="main"
-            test "${source_commit}" = "${LFC_WORKFLOW_RUN_SHA}"
-            git merge-base --is-ancestor "${source_commit}" origin/main
-          else
-            channel="release"
-            if [[ ! "${LFC_RELEASE_REF}" =~ ^v0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ||
-              "${LFC_RELEASE_REF}" != "v${version}" ]]; then
-              echo "Release deployment requires the exact manifest tag." >&2
-              exit 1
-            fi
-            test "$(git rev-parse --verify "${LFC_RELEASE_REF}^{commit}")" = "${source_commit}"
-            git merge-base --is-ancestor "${source_commit}" origin/main
-            release="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${LFC_RELEASE_REF}")"
-            jq --exit-status --arg commit "${source_commit}" --arg tag "${LFC_RELEASE_REF}" '
-              .draft == false and .prerelease == true and .immutable == true and
-              .tag_name == $tag and .target_commitish == $commit
-            ' <<< "${release}" > /dev/null
-          fi
-
-          printf 'channel=%s\n' "${channel}" >> "${GITHUB_OUTPUT}"
-          printf 'source-commit=%s\n' "${source_commit}" >> "${GITHUB_OUTPUT}"
-          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
-
       - name: Install locked development tooling
+        if: ${{ steps.identity.outputs.eligible == 'true' }}
         run: npm ci --ignore-scripts
 
       - name: Build the verified Pages channel
+        if: ${{ steps.identity.outputs.eligible == 'true' }}
         env:
           LFC_EXAMPLES_CHANNEL: ${{ steps.identity.outputs.channel }}
           LFC_EXAMPLES_COMMIT: ${{ steps.identity.outputs.source-commit }}
@@ -130,17 +139,20 @@ jobs:
         run: npm run build
 
       - name: Stage the self-contained Pages channel
+        if: ${{ steps.identity.outputs.eligible == 'true' }}
         env:
           LFC_PAGES_ARTIFACT: ${{ runner.temp }}/pages-channel
         run: node scripts/build-pages.mjs --output "${LFC_PAGES_ARTIFACT}"
 
       - name: Name the raw verified channel artifact
+        if: ${{ steps.identity.outputs.eligible == 'true' }}
         id: artifact
         run: |
           printf 'name=pages-channel-%s-%s\n' \
             "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload the raw verified channel without deployment authority
+        if: ${{ steps.identity.outputs.eligible == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.artifact.outputs.name }}
@@ -152,7 +164,7 @@ jobs:
   update-snapshot:
     name: Preserve deployment snapshot
     needs: build
-    if: ${{ needs.build.result == 'success' }}
+    if: ${{ needs.build.result == 'success' && needs.build.outputs.eligible == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -170,7 +182,7 @@ jobs:
           fetch-depth: 0
           path: pages-site
           persist-credentials: false
-          ref: ${{ github.sha }}
+          ref: ${{ needs.build.outputs.source-commit }}
 
       - name: Set up exact Node for canonical Pages assembly
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -203,6 +215,8 @@ jobs:
         working-directory: pages-site
         run: |
           set -euo pipefail
+
+          test "$(git rev-parse --verify 'HEAD^{commit}')" = "${LFC_SOURCE_COMMIT}"
 
           if find "${LFC_PAGES_CHANNEL}" -type l -print -quit | grep -q .; then
             echo "The Pages artifact must not contain symbolic links." >&2
@@ -371,8 +385,7 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' &&
-        github.ref == 'refs/heads/main' &&
-        inputs.operation == 'rollback'
+        github.ref == 'refs/heads/main'
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -494,8 +507,7 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' &&
-        github.ref == 'refs/heads/main' &&
-        inputs.operation == 'rollback'
+        github.ref == 'refs/heads/main'
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 10

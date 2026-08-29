@@ -57,7 +57,8 @@ flowchart LR
   R --> B[Verified artifacts]
   B --> N[Protected source-free npm publish]
   N --> G[Immutable GitHub prerelease]
-  G --> Q[Separately queued Pages release]
+  G --> Q[Native successful-workflow trigger]
+  Q --> H[Separately authorized Pages release]
 ```
 
 ## Assets and objectives
@@ -125,7 +126,7 @@ Release-authority paths remain the highest supply-chain priority. Executable ren
 | `.github/workflows/ci.yml` | Pull-request and main verification without publication authority |
 | `.github/workflows/prepare-alpha.yml` | Default-branch preparation and generated release-state branch without publication authority |
 | `.github/workflows/publish-alpha.yml` | Exact-`push` release classification, artifact handoff, isolated trusted publishing, tag and prerelease creation |
-| `.github/workflows/deploy-examples.yml` | Rolling previews, separate release deployment, retained history, rollback, and isolated Pages authority |
+| `.github/workflows/deploy-examples.yml` | Canonical workflow name-and-path and same-repository identity, rolling previews, separate release deployment, retained history, rollback, and isolated Pages authority |
 
 ## Validation expectations
 
@@ -144,6 +145,7 @@ External GitHub, Pages, npm, browser origin-trial, and ChatGPT workspace setting
 
 Related operating guidance:
 
+- [Alpha release operations](release-operations.md) defines the step-by-step operator runbook.
 - [Release administration](release-administration.md) defines publication controls and recovery.
 - [Package verification](package-verification.md) defines artifact evidence.
 - [First-party extensions](first-party-extensions.md) defines optional component boundaries.

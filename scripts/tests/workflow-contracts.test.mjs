@@ -60,7 +60,7 @@ void test("alpha publication is classified from the exact push to main", async (
 	const event = trigger(source);
 	const classify = job(source, "classify");
 	const verify = job(source, "verify");
-	assert.match(event, /push:[\s\S]*?branches:[\s\S]*?- main[\s\S]*?paths:[\s\S]*?- CHANGELOG\.md[\s\S]*?- package-lock\.json[\s\S]*?- package\.json/u);
+	assert.match(event, /push:[\s\S]*?branches:[\s\S]*?- main[\s\S]*?paths:[\s\S]*?- \.github\/workflows\/publish-alpha\.yml[\s\S]*?- CHANGELOG\.md[\s\S]*?- package-lock\.json[\s\S]*?- package\.json/u);
 	assert.doesNotMatch(event, /workflow_run:|workflow_dispatch:|release:/u);
 	assert.match(classify, /LFC_SOURCE_COMMIT: \$\{\{ github\.sha \}\}/u);
 	assert.match(classify, /fetch-depth: 2[\s\S]*?persist-credentials: false/u);
@@ -74,6 +74,17 @@ void test("alpha publication is classified from the exact push to main", async (
 	assert.match(verify, /git diff --name-only HEAD\^1 HEAD/u);
 	assert.match(verify, /expected_files=\(CHANGELOG\.md package-lock\.json package\.json\)/u);
 	assert.match(verify, /npm run release:verify[\s\S]*?--commit "\$\{source_commit\}"[\s\S]*?--require-clean/u);
+	assert.match(verify, /registry_raw="\$\{RUNNER_TEMP\}\/registry\.raw\.json"/u);
+	assert.match(verify, /registry_json="\$\{RUNNER_TEMP\}\/registry\.json"/u);
+	assert.match(verify, /registry_error="\$\{RUNNER_TEMP\}\/registry\.err"/u);
+	assert.match(verify, /> "\$\{registry_raw\}" 2> "\$\{registry_error\}"/u);
+	assert.match(
+		verify,
+		/LFC_NORMALIZE_NPM_VIEW_JSON\}"[\s\S]*?"\$\{registry_raw\}" "\$\{registry_json\}"/u
+	);
+	assert.equal(occurrences(verify, /registry\.raw\.json/gu), 1);
+	assert.equal(occurrences(verify, /registry\.json/gu), 1);
+	assert.equal(occurrences(verify, /registry\.err/gu), 1);
 	assert.match(verify, /npm run check/u);
 	assert.match(verify, /npm run package/u);
 });
@@ -266,13 +277,13 @@ void test("draft assets and final release publication are digest-bound and sourc
 	assert.doesNotMatch(publishRelease, /actions\/checkout@|actions\/download-artifact@|npm |node scripts\//u);
 });
 
-void test("release demos are dispatched separately with the exact published tag", async () => {
+void test("the publisher relies on the native downstream workflow handoff", async () => {
 	const source = await workflow("publish-alpha.yml");
-	const dispatch = job(source, "dispatch-release-pages");
-	assert.match(dispatch, /needs:[\s\S]*?- publish-release/u);
-	assert.match(dispatch, /actions: write/u);
-	assert.doesNotMatch(dispatch, /contents: write|id-token: write|pages: write/u);
-	assert.match(dispatch, /LFC_TAG: \$\{\{ needs\.verify\.outputs\.tag \}\}[\s\S]*?gh workflow run deploy-examples\.yml[\s\S]*?--ref main[\s\S]*?--raw-field operation=release[\s\S]*?--raw-field release_ref="\$\{LFC_TAG\}"/u);
+	assert.doesNotMatch(source, /dispatch-release-pages|gh workflow run|actions: write/u);
+	assert.match(
+		source,
+		/Release Pages: `Deploy static examples` starts after this workflow completes successfully/u
+	);
 });
 
 void test("Pages independently handles rolling main, immutable releases, and rollback", async () => {
@@ -284,15 +295,36 @@ void test("Pages independently handles rolling main, immutable releases, and rol
 	const rollback = job(source, "rollback-snapshot");
 	const packageSite = job(source, "package-site");
 	const deploy = job(source, "deploy");
-	assert.match(event, /workflow_run:[\s\S]*?- CI[\s\S]*?workflow_dispatch:[\s\S]*?operation:[\s\S]*?release_ref:[\s\S]*?snapshot_ref:/u);
+	assert.match(event, /workflow_run:[\s\S]*?- CI[\s\S]*?- Publish npm alpha[\s\S]*?workflow_dispatch:[\s\S]*?snapshot_ref:/u);
+	assert.match(event, /workflow_run:[\s\S]*?branches:\s*\n\s+- main/u);
+	assert.doesNotMatch(event, /operation:|release_ref:/u);
 	assert.doesNotMatch(source, /^ {2}classify:/mu);
-	assert.match(source, /group: static-examples-\$\{\{ github\.repository \}\}-\$\{\{[\s\S]*?format\('release-\{0\}', inputs\.release_ref\)[\s\S]*?format\('rollback-\{0\}', inputs\.snapshot_ref\)[\s\S]*?format\('main-\{0\}', github\.event\.workflow_run\.head_sha\) \}\}/u);
-	assert.match(build, /github\.event\.workflow_run\.head_sha \|\| inputs\.release_ref/u);
-	assert.match(build, /channel="main"[\s\S]*?channel="release"/u);
-	assert.match(build, /releases\/tags\/\$\{LFC_RELEASE_REF\}/u);
-	assert.match(build, /\.draft == false and \.prerelease == true and \.immutable == true/u);
+	assert.match(source, /group: static-examples-\$\{\{ github\.repository \}\}-\$\{\{[\s\S]*?format\('rollback-\{0\}', inputs\.snapshot_ref\)[\s\S]*?format\('workflow-run-\{0\}', github\.event\.workflow_run\.id\) \}\}/u);
+	assert.match(
+		build,
+		/github\.event_name == 'workflow_run'[\s\S]*?conclusion == 'success'[\s\S]*?event == 'push'[\s\S]*?head_branch == 'main'[\s\S]*?head_repository\.full_name == github\.repository/u
+	);
+	assert.match(build, /outputs:[\s\S]*?eligible: \$\{\{ steps\.identity\.outputs\.eligible \}\}[\s\S]*?source-commit: \$\{\{ steps\.identity\.outputs\.source-commit \}\}/u);
+	assert.match(build, /ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/u);
+	assert.match(build, /source_commit="\$\(git rev-parse --verify HEAD\^\{commit\}\)"[\s\S]*?test "\$\{source_commit\}" = "\$\{LFC_WORKFLOW_RUN_SHA\}"[\s\S]*?git merge-base --is-ancestor "\$\{source_commit\}" origin\/main/u);
+	assert.match(build, /LFC_UPSTREAM_WORKFLOW: \$\{\{ github\.event\.workflow_run\.name \}\}[\s\S]*?LFC_UPSTREAM_WORKFLOW_PATH: \$\{\{ github\.event\.workflow_run\.path \}\}/u);
+	assert.match(build, /upstream_workflow_path="\$\{LFC_UPSTREAM_WORKFLOW_PATH%@\*\}"/u);
+	assert.match(build, /LFC_UPSTREAM_WORKFLOW\}" == "CI" &&[\s\S]*?upstream_workflow_path\}" == "\.github\/workflows\/ci\.yml"[\s\S]*?channel="main"/u);
+	assert.match(build, /LFC_UPSTREAM_WORKFLOW\}" == "Publish npm alpha" &&[\s\S]*?upstream_workflow_path\}" == "\.github\/workflows\/publish-alpha\.yml"[\s\S]*?parent_version[\s\S]*?eligible=false[\s\S]*?channel="release"/u);
+	assert.match(build, /Unexpected upstream workflow identity:[\s\S]*?LFC_UPSTREAM_WORKFLOW_PATH/u);
+	assert.match(build, /eligible.*channel.*release[\s\S]*?release_ref="v\$\{version\}"[\s\S]*?\^0\\\.\[0-9\]\+\\\.\[0-9\]\+-alpha\\\.\[0-9\]\+\$[\s\S]*?release_ref\}\^\{commit\}[\s\S]*?= "\$\{source_commit\}"/u);
+	assert.match(build, /Resolve the deployment identity[\s\S]*?Set up exact Node[\s\S]*?Set up exact npm[\s\S]*?npm ci --ignore-scripts[\s\S]*?npm run build/u);
+	assert.equal(
+		occurrences(build, /^\s+if: \$\{\{ steps\.identity\.outputs\.eligible == 'true' \}\}$/gmu),
+		7
+	);
+	assert.match(build, /releases\/tags\/\$\{release_ref\}/u);
+	assert.match(build, /\.draft == false and \.prerelease == true and \.immutable == true and[\s\S]*?\.tag_name == \$tag and \.target_commitish == \$commit/u);
+	assert.match(build, /printf 'eligible=%s[\s\S]*?printf 'channel=%s[\s\S]*?printf 'source-commit=%s[\s\S]*?printf 'version=%s/u);
+	assert.doesNotMatch(source, /inputs\.operation|inputs\.release_ref|gh workflow run/u);
 	assert.match(build, /name=pages-channel-%s-%s[\s\S]*?path: \$\{\{ runner\.temp \}\}\/pages-channel/u);
 	assert.doesNotMatch(build, /assemble-pages\.mjs|pages-content|previous-pages-site/u);
+	assert.match(update, /needs\.build\.outputs\.eligible == 'true'/u);
 	assert.match(update, /expected_channel_entries=\(channel\.json content shell\)/u);
 	assert.match(update, /for attempt in \$\(seq 1 6\)[\s\S]*?--force-with-lease=refs\/heads\/pages-content:\$\{expected_head\}/u);
 	assert.match(update, /channel_input="\$\(mktemp -d\)"[\s\S]*?chmod --recursive go-w,a\+rX "\$\{channel_input\}"/u);
@@ -302,12 +334,15 @@ void test("Pages independently handles rolling main, immutable releases, and rol
 	assert.match(update, /chmod --recursive go-w,a\+rX "\$\{previous_site\}"[\s\S]*?sudo --user=nobody env --ignore-environment/u);
 	assert.match(update, /sudo --user=nobody env --ignore-environment[\s\S]*?node_path[\s\S]*?assembly_tooling[\s\S]*?scripts\/assemble-pages\.mjs/u);
 	assert.doesNotMatch(update, /"\$\{node_path\}" scripts\/assemble-pages\.mjs/u);
-	assert.match(update, /ref: \$\{\{ github\.sha \}\}[\s\S]*?git merge-base --is-ancestor[\s\S]*?retained_main_commit[\s\S]*?LFC_SOURCE_COMMIT/u);
+	assert.match(update, /ref: \$\{\{ needs\.build\.outputs\.source-commit \}\}[\s\S]*?git rev-parse --verify 'HEAD\^\{commit\}'[\s\S]*?LFC_SOURCE_COMMIT/u);
+	assert.doesNotMatch(update, /ref: \$\{\{ github\.sha \}\}/u);
+	assert.match(update, /git merge-base --is-ancestor[\s\S]*?retained_main_commit[\s\S]*?LFC_SOURCE_COMMIT/u);
 	assert.match(update, /git -C "\$\{state_worktree\}" add --all/u);
 	assert.match(update, /test ! -e "\$\{state_worktree\}\/node_modules"[\s\S]*?--exclude=\.git/u);
 	assert.match(update, /diff --cached --quiet[\s\S]*?observed_pages_commit[\s\S]*?current_pages_commit/u);
 	assert.doesNotMatch(update, /^\s+git add --all$/mu);
-	assert.match(prepareRollback, /inputs\.operation == 'rollback'/u);
+	assert.match(prepareRollback, /github\.event_name == 'workflow_dispatch'[\s\S]*?github\.ref == 'refs\/heads\/main'/u);
+	assert.doesNotMatch(prepareRollback, /inputs\.operation/u);
 	assert.match(prepareRollback, /git merge-base --is-ancestor "\$\{LFC_SNAPSHOT_REF\}"/u);
 	assert.match(rollback, /changed or removed immutable/u);
 	assert.match(rollback, /ref: \$\{\{ github\.sha \}\}[\s\S]*?trusted_shell="\$\(mktemp -d\)"/u);

@@ -70,8 +70,8 @@ function parseArguments(arguments_) {
 	return { host, port };
 }
 
-function isWithinRepository(candidate) {
-	const childPath = relative(REPOSITORY_ROOT, candidate);
+function isWithinDirectory(directory, candidate) {
+	const childPath = relative(directory, candidate);
 	return childPath !== "" && !childPath.startsWith(`..${sep}`) && childPath !== ".." &&
 		!isAbsolute(childPath);
 }
@@ -101,6 +101,9 @@ async function resolvePublicFile(pathname) {
 	} catch {
 		return null;
 	}
+	if (decodedPath.includes("\0") || decodedPath.includes("\\")) {
+		return null;
+	}
 
 	const segments = decodedPath.split("/").filter((segment) => segment.length > 0);
 	if (segments.length === 0 || !PUBLIC_PREFIXES.includes(segments[0]) ||
@@ -108,17 +111,24 @@ async function resolvePublicFile(pathname) {
 		return null;
 	}
 
-	let candidate = resolve(REPOSITORY_ROOT, ...segments);
-	if (decodedPath.endsWith("/")) {
-		candidate = resolve(candidate, "index.html");
-	}
-
 	try {
-		if (!(await stat(candidate)).isFile()) {
+		const canonicalRepositoryRoot = await realpath(REPOSITORY_ROOT);
+		const publicRoot = resolve(REPOSITORY_ROOT, segments[0]);
+		const canonicalPublicRoot = await realpath(publicRoot);
+		if (!isWithinDirectory(canonicalRepositoryRoot, canonicalPublicRoot)) {
 			return null;
 		}
+
+		let candidate = resolve(canonicalPublicRoot, ...segments.slice(1));
+		if (decodedPath.endsWith("/")) {
+			candidate = resolve(candidate, "index.html");
+		}
 		const canonicalPath = await realpath(candidate);
-		return isWithinRepository(canonicalPath) ? canonicalPath : null;
+		if (!isWithinDirectory(canonicalPublicRoot, canonicalPath) ||
+			!(await stat(canonicalPath)).isFile()) {
+			return null;
+		}
+		return canonicalPath;
 	} catch {
 		return null;
 	}

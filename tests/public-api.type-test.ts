@@ -16,7 +16,10 @@ interface DetailedMetadata extends BaseMetadata {
 }
 
 /** Compile-only assertions for public callback and instance contracts. */
-export function verifyPublicApiTypeContracts(): void {
+export function verifyPublicApiTypeContracts(
+	baseCalendar: Calendar<BaseMetadata>,
+	detailedCalendar: Calendar<DetailedMetadata>
+): void {
 	let observations = 0;
 	const cleanup: CalendarRenderCleanup = () => { observations += 1; };
 	const hooks: CalendarRenderHooks = {
@@ -67,8 +70,6 @@ export function verifyPublicApiTypeContracts(): void {
 	void invalidStateObserver;
 	void invalidMountHook;
 
-	const baseCalendar = null as unknown as Calendar<BaseMetadata>;
-	const detailedCalendar = null as unknown as Calendar<DetailedMetadata>;
 	// @ts-expect-error Calendar metadata is invariant; widening would make setEvents unsafe.
 	const widenedCalendar: Calendar<BaseMetadata> = detailedCalendar;
 	// @ts-expect-error Calendar metadata is invariant; narrowing would overstate accepted input.

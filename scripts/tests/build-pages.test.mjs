@@ -215,6 +215,34 @@ async function emptyPreviousDirectory(context) {
 	return directory;
 }
 
+void test("deployment manifests bound SemVer validation without narrowing supported syntax", () => {
+	for (const version of [
+		"1.2.3-1alpha",
+		"1.2.3--",
+		"1.2.3-alpha.1+build.7",
+		`1.2.3-${"a".repeat(122)}`
+	]) {
+		assert.doesNotThrow(() => validateManifest({
+			main: null,
+			releases: [deploymentEntry("release", version)],
+			schemaVersion: 1
+		}));
+	}
+
+	for (const version of [
+		"1.2.3-01",
+		"1.2.3-alpha..1",
+		`1.2.3-${"a".repeat(123)}`,
+		`1.2.3-${"a".repeat(120)}!`
+	]) {
+		assert.throws(() => validateManifest({
+			main: null,
+			releases: [deploymentEntry("release", version)],
+			schemaVersion: 1
+		}), /Invalid release deployment metadata/u);
+	}
+});
+
 async function snapshotOutput(context) {
 	const parent = await mkdtemp(join(tmpdir(), "lfc-pages-snapshot-parent-"));
 	context.after(() => rm(parent, { force: true, recursive: true }));

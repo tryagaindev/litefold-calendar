@@ -57,8 +57,33 @@ function isValidUtcDate(value) {
 	return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+function maskCharacters(value) {
+	return value.replace(/[^\r\n]/g, " ");
+}
+
+function maskHtmlComments(source) {
+	const fragments = [];
+	let cursor = 0;
+	while (cursor < source.length) {
+		const commentStart = source.indexOf("<!--", cursor);
+		if (commentStart === -1) {
+			fragments.push(source.slice(cursor));
+			break;
+		}
+		fragments.push(source.slice(cursor, commentStart));
+		const commentEnd = source.indexOf("-->", commentStart + 4);
+		if (commentEnd === -1) {
+			throw new Error("CHANGELOG.md contains an unterminated HTML comment.");
+		}
+		const afterComment = commentEnd + 3;
+		fragments.push(maskCharacters(source.slice(commentStart, afterComment)));
+		cursor = afterComment;
+	}
+	return fragments.join("");
+}
+
 function hasMeaningfulNotes(body) {
-	const source = body.replaceAll(/<!--[\s\S]*?-->/gu, "").trim();
+	const source = maskHtmlComments(body).trim();
 	if (source.length === 0 || PLACEHOLDER_PATTERN.test(source)) {
 		return false;
 	}
@@ -68,7 +93,7 @@ function hasMeaningfulNotes(body) {
 }
 
 function isEmptyUnreleased(body) {
-	return body.replaceAll(/<!--[\s\S]*?-->/gu, "").trim().length === 0;
+	return maskHtmlComments(body).trim().length === 0;
 }
 
 function displayPath(path, root) {
@@ -98,7 +123,8 @@ function normalizeOriginUrl(value) {
 
 /** Parses and validates the release sections in CHANGELOG.md. */
 export function parseChangelog(text) {
-	for (const line of text.split(/\r?\n/u)) {
+	const visibleText = maskHtmlComments(text);
+	for (const line of visibleText.split(/\r?\n/u)) {
 		if (/^[ \t]{0,3}##[ \t]*\[/u.test(line) &&
 			!/^## \[[^\]]+\](?: - \d{4}-\d{2}-\d{2})?[ \t]*$/u.test(line)) {
 			throw new Error(`Malformed bracketed changelog heading: ${line}`);
@@ -106,7 +132,7 @@ export function parseChangelog(text) {
 	}
 
 	const headings = [];
-	for (const match of text.matchAll(CHANGELOG_HEADING_PATTERN)) {
+	for (const match of visibleText.matchAll(CHANGELOG_HEADING_PATTERN)) {
 		headings.push({
 			bodyStart: findLineEnd(text, match.index + match[0].length),
 			date: match[2] ?? null,

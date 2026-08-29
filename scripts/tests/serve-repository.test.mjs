@@ -82,6 +82,9 @@ void test("repository server routes the landing page without weakening its bound
 			"/package.json",
 			"/examples/%2e%2e/package.json",
 			"/examples/%2e%2e%2fpackage.json",
+			"/examples/x%5c..%5c..%5cpackage.json",
+			"/examples/x%5c..%5c..%5c.git%5cHEAD",
+			"/examples/index.html%00.txt",
 			"/examples/.private",
 			"/examples%5cindex.html"
 		]) {

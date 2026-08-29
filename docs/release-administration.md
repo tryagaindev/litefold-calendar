@@ -1,6 +1,6 @@
 # Alpha release administration and recovery
 
-This guide is for repository and npm administrators. It covers one-time hosted setup, registry mutations, and failed-release recovery. Release operators should normally use the [four-step release process](releasing.md#normal-release-path).
+This guide is for repository and npm administrators. It covers one-time hosted setup, registry mutations, and failed-release recovery. Release operators should normally use the [alpha release operations runbook](release-operations.md).
 
 ## One-time hosted prerequisites
 
@@ -40,6 +40,14 @@ npm whoami --registry https://registry.npmjs.org/
 npm view @tryagaindev/litefold-calendar dist-tags --json --registry https://registry.npmjs.org/
 ```
 
+If `npm whoami` reports that authentication is absent, the npm owner runs this exact command and completes the browser and second-factor flow privately:
+
+```sh
+npm login --registry https://registry.npmjs.org/
+```
+
+Rerun `npm whoami` afterward. Never share the npm browser session, CLI authentication URL, OTP, or token with an assistant or automation.
+
 If npm reports that the package does not exist, stop here and follow the bootstrap case above. Do not interpret a failed or malformed registry response as an empty tag set. The exact historical state `alpha=0.2.0-alpha.0` and `latest=0.1.0-alpha.0` is accepted only to transition the next release into the new invariant; later releases require the two predecessor tags to match.
 
 Complete npm's second-factor flow if it is required for a registry mutation. Do not record an OTP in a command transcript, issue, or release note.
@@ -68,11 +76,11 @@ The workflow deliberately separates source execution from publication authority:
 | Stage GitHub release | No checkout and no project-code execution | Repository write access; creates or validates the exact tag, draft prerelease, notes, and assets |
 | Publish npm | No checkout, install, or candidate import | Protected `npm` environment and npm OIDC; publishes only the checksum-verified tarball under `alpha` |
 | Synchronize npm channels | No workflow credential | An authenticated npm owner advances `latest` to the exact published alpha |
-| Verify and finalize | Clean public-package consumer, then a source-free release job | Requires `alpha` and `latest` to match, verifies registry bytes/imports/signatures/provenance, publishes the immutable GitHub prerelease, then queues Pages |
+| Verify and finalize | Clean public-package consumer, then a source-free release job | Requires `alpha` and `latest` to match, verifies registry bytes/imports/signatures/provenance, publishes the immutable GitHub prerelease, then completes successfully so native `workflow_run` starts Pages |
 
 `publish-alpha.yml` starts on pushes to `main`, but only a changed alpha version with an exact first-parent diff limited to `package.json`, `package-lock.json`, and `CHANGELOG.md` enters publication. It always uses the push's `github.sha`; there is no operator-supplied historical SHA.
 
-Release Pages are queued through `deploy-examples.yml` only after npm verification and the public immutable prerelease. That workflow separately owns Pages build, retained state, rollback, and deployment authority. See [static example deployment](example-deployment.md) for its operating procedure.
+Release Pages start through `deploy-examples.yml` only after successful completion of the publisher that verified npm and made the immutable prerelease public. The same-repository `workflow_run` event supplies the exact publisher head commit; there is no release-ref input. The Pages workflow separately owns build, retained state, rollback, and deployment authority. See [static example deployment](example-deployment.md) for its operating procedure.
 
 Reruns accept existing state only when identity and bytes match exactly:
 
@@ -83,10 +91,12 @@ Reruns accept existing state only when identity and bytes match exactly:
 
 ## Rerun procedure
 
+A rerun of an existing run uses that run's original commit SHA, ref, and workflow definition. It can consume corrected hosted settings or registry state, but it cannot consume repository source or that workflow's changes merged later. Use this procedure only for a resolved transient infrastructure, authentication, or hosted-state failure. If package or source files must change, stop and follow the recovery matrix; prepare a greater alpha when required.
+
 1. Open the original **Publish npm alpha** run for the release merge commit. Do not start a different workflow or manufacture another event.
 2. Confirm the run's full commit SHA and candidate version match the retained bundle and any existing npm, tag, draft/release, or asset state.
-3. Use **Re-run failed jobs** (or **Re-run all jobs** when the failed dependency chain requires it).
-4. After completion, independently verify npm and GitHub identities, then verify the separately queued Pages run.
+3. Confirm recovery required no source or workflow change, then use **Re-run failed jobs** (or **Re-run all jobs** when the failed dependency chain requires it).
+4. After completion, independently verify npm and GitHub identities, then verify the publisher-linked Pages run. If GitHub did not create that run after a successful publisher completion, review the current default-branch `deploy-examples.yml`, select **Re-run all jobs** on the original publisher, and validate the newly created Pages run independently. The publisher rerun retains its original identity, but the new downstream run uses the current Pages workflow definition while pinning release source and assembly tooling to the publisher SHA.
 
 If the original run is no longer rerunnable, or any public identity cannot be proved to match, do not recreate the attempt from another commit. Use the recovery matrix and prepare a greater alpha where required.
 
@@ -94,7 +104,7 @@ If the original run is no longer rerunnable, or any public identity cannot be pr
 
 | State | Recovery |
 | --- | --- |
-| Failure before npm publication | Fix only non-public configuration or transient infrastructure, then rerun the original exact-push attempt. No npm version is public; a matching staged tag, draft, and assets may already exist and will be reused. If source must change, prepare a greater alpha instead. |
+| Failure before npm publication | Resolve only transient infrastructure, authentication, or hosted-state configuration, then rerun the original exact-push attempt. No npm version is public; a matching staged tag, draft, and assets may already exist and will be reused. If source or workflow files must change, stop and prepare a greater alpha or use an explicitly reviewed administrative recovery before any publication. |
 | npm accepted identical verified bytes but the run ended afterward | Rerun the original publication attempt for that exact push so event identity, artifact, and provenance remain unchanged. There is no arbitrary historical-SHA dispatch. If the original attempt cannot be resumed safely, do not move `main` or substitute another event; stop, deprecate the incomplete version when appropriate, and prepare a greater alpha. |
 | npm accepted the candidate under `alpha`, but `latest` still selects the predecessor | Confirm the candidate's exact version and retained integrity, advance only `latest` to that candidate with an authenticated owner, then rerun the original failed jobs. |
 | npm contains the version with different or unverifiable bytes | Stop.  Do not reuse the version.  Investigate, deprecate when appropriate, and prepare a greater alpha. |
@@ -102,8 +112,8 @@ If the original run is no longer rerunnable, or any public identity cannot be pr
 | Tag, draft, or asset conflicts | Do not move, delete, or overwrite it as part of a rerun.  Investigate and prepare a greater alpha when the conflict represents public release state. |
 | Published npm alpha is defective | Deprecate the exact version with a replacement message and publish a greater alpha.  Avoid `npm unpublish` except for a genuine security/legal need allowed by npm policy. |
 | Immutable GitHub prerelease is defective | Leave it intact and publish a corrected greater alpha. |
-| Rolling `main` Pages preview is defective | Run **Deploy static examples** with **Operation** set to **rollback** and **Snapshot ref** set to the exact 40-character lowercase `pages-content` commit documented by the deployment guide. |
-| Release Pages verification failed | Rerun **Deploy static examples** with **Operation** set to **release** and **Release ref** set to the exact protected `v<version>` tag. Never replace a release path with different bytes. |
+| Rolling `main` Pages preview is defective | Run **Deploy static examples** from `main` with **Snapshot ref** set to the exact 40-character lowercase `pages-content` commit documented by the deployment guide. This manual dispatch is rollback-only. |
+| Release Pages verification failed | For a transient or hosted-state failure, rerun the original publisher-linked **Deploy static examples** run. An existing rerun cannot consume later workflow changes. If no downstream run exists, review the current default-branch Pages workflow, select **Re-run all jobs** on the successful original publisher, and independently validate the newly created Pages run. If release source or assembly tooling must change, publish a corrected greater alpha. Never dispatch a release by ref or replace a release path with different bytes. |
 
 Registry administration such as moving a dist-tag or deprecating a version requires an authenticated npm owner and is intentionally outside trusted publication. Before deprecating, replace every uppercase placeholder below and inspect both versions:
 

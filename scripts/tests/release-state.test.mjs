@@ -111,6 +111,61 @@ void test("release preparation rejects placeholders and inconsistent state", () 
 	);
 });
 
+void test("changelog HTML comments cannot hide or manufacture release state", () => {
+	const unterminated = fixture({
+		changelog: fixture().changelog.replace(
+			["### Added", "", "- Added a useful feature."].join("\n"),
+			["<!--", "- Hidden release note."].join("\n")
+		)
+	});
+	assert.throws(
+		() => createPreparedReleaseTexts(unterminated, {
+			bump: "prerelease",
+			date: "2026-08-26"
+		}),
+		/unterminated HTML comment/u
+	);
+
+	const hiddenHeading = fixture({
+		changelog: fixture().changelog.replace(
+			"## [Unreleased]",
+			["## [Unreleased]", "", "<!--", "## [9.9.9] - 2026-08-26", "-->"].join("\n")
+		)
+	});
+	assert.deepEqual(
+		readReleaseStateTexts(hiddenHeading).changelog.releases.map((entry) => entry.name),
+		["0.2.0-alpha.0"]
+	);
+
+	const visibleNote = fixture({
+		changelog: fixture().changelog.replace(
+			"- Added a useful feature.",
+			["<!-- - Hidden note. -->", "- Added a visible feature."].join("\n")
+		)
+	});
+	const prepared = createPreparedReleaseTexts(visibleNote, {
+		bump: "prerelease",
+		date: "2026-08-26"
+	});
+	assert.match(prepared.texts.changelog, /Added a visible feature/u);
+	assert.match(prepared.texts.changelog, /Add user-visible changes/u);
+	assert.deepEqual(validatePreparedReleaseState(readReleaseStateTexts(prepared.texts)), {
+		tag: "v0.2.0-alpha.1",
+		version: "0.2.0-alpha.1"
+	});
+
+	const astralComment = fixture({
+		changelog: fixture().changelog.replace(
+			["### Added", "", "- Added a useful feature.", ""].join("\n"),
+			["<!-- 🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀 -->", "", "- Added a visible feature.", ""].join("\n")
+		)
+	});
+	assert.throws(
+		() => validatePreparedReleaseState(readReleaseStateTexts(astralComment)),
+		/\[Unreleased\] section must be empty/u
+	);
+});
+
 void test("atomic release writes restore originals after a replacement failure", async (context) => {
 	const repositoryRoot = await mkdtemp(join(tmpdir(), "lfc-release-state-test-"));
 	context.after(() => rm(repositoryRoot, { force: true, recursive: true }));

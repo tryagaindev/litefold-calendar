@@ -55,7 +55,8 @@ Put information in its authoritative document and link to it from shorter overvi
 | Extension composition and first-party extension conventions | [First-party extension guide](docs/first-party-extensions.md) |
 | Visual roles and values | [Design system](DESIGN.md) |
 | WebMCP schemas and compatibility | [Site-tool guide](docs/webmcp.md) |
-| Normal publication steps | [Release process](docs/releasing.md) |
+| Normal publication steps | [Alpha release operations runbook](docs/release-operations.md) |
+| Release policy and workflow design | [Release policy](docs/releasing.md) |
 
 Keep contract-bearing artifacts synchronized:
 

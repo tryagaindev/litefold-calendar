@@ -1,6 +1,6 @@
 # Static example deployment
 
-This guide is for maintainers operating the GitHub Pages developer demo. Contributors do not deploy examples manually: successful CI updates the rolling `main` preview, and the alpha publisher queues immutable release snapshots.
+This guide is for maintainers operating the GitHub Pages developer demo. Contributors do not deploy examples manually: successful CI updates the rolling `main` preview, and successful alpha publication triggers immutable release snapshots.
 
 ## URL and identity contract
 
@@ -20,11 +20,11 @@ All deployed assets are repository-owned and same-origin. The demo has no analyt
 | Operation | Trigger | Maintainer action |
 | --- | --- | --- |
 | Update rolling preview | Successful `CI` run for a push to `main` | None; inspect the resulting **Deploy static examples** run |
-| Add release snapshot | Queued by **Publish npm alpha** after npm and GitHub release verification | None normally; wait for and verify the separate Pages run |
-| Retry release snapshot | Manual **Deploy static examples** dispatch from `main` | Set **Operation** to `release` and **Release ref** to the exact protected `v<version>` tag; leave **Snapshot ref** empty |
-| Restore rolling preview | Manual **Deploy static examples** dispatch from `main` | Set **Operation** to `rollback` and **Snapshot ref** to an exact retained commit; leave **Release ref** empty |
+| Add release snapshot | Successful **Publish npm alpha** completion after npm and GitHub release verification | None; verify the publisher-linked **Deploy static examples** run |
+| Retry release snapshot | Rerun the original publisher-linked **Deploy static examples** run only after a transient or hosted-state failure | Do not dispatch a release or supply a ref; if no downstream run exists, rerun the original publisher |
+| Restore rolling preview | Manual **Deploy static examples** dispatch from `main` | Set **Snapshot ref** to an exact retained commit |
 
-There is no manual rolling-preview operation. To move a preview forward after a rollback, let CI succeed for a later `main` commit that descends from the restored source commit.
+Manual dispatch is rollback-only. There is no manual rolling-preview or release operation. To move a preview forward after a rollback, let CI succeed for a later `main` commit that descends from the restored source commit.
 
 ## Repository setup
 
@@ -41,9 +41,9 @@ These settings are hosted state and cannot be proved by repository tests. Rechec
 
 ## Build and authority boundaries
 
-`deploy-examples.yml` is the only Pages owner. It deploys verified rolling `main` previews and exposes two explicit operations: `release` adds an immutable snapshot for an exact protected `v<version>` tag, while `rollback` restores an exact retained `main/` snapshot.
+`deploy-examples.yml` is the only Pages owner. Successful same-repository `CI` and **Publish npm alpha** workflow completions supply an exact `main` head commit for rolling and release channels. Its only manual operation restores an exact retained `main/` snapshot.
 
-After npm verification and publication of the immutable GitHub prerelease, `publish-alpha.yml` queues **Operation** `release` with the exact tag as **Release ref**. npm/GitHub publication has no Pages authority, and a Pages failure does not make an already-published package version replaceable. A maintainer may retry the same release operation only when retained and requested identities and bytes match exactly.
+After npm verification and publication of the immutable GitHub prerelease, successful completion of `publish-alpha.yml` triggers Pages through GitHub's native `workflow_run` event. Pages verifies the canonical workflow name-and-path pair, same-repository push, full head commit, first-parent version change, protected tag, immutable prerelease, and main ancestry before building the release channel. npm/GitHub publication has no Pages authority, and a Pages failure does not make an already-published package version replaceable.
 
 Before a Pages snapshot can be retained, repository tooling:
 
@@ -54,7 +54,7 @@ Before a Pages snapshot can be retained, repository tooling:
 - Reads retained `pages-content` history and refuses deletion or byte-different replacement of an existing release directory.
 - Validates retained `main` metadata and accepts a new rolling preview only when its source commit is equal to or descended from the currently retained preview commit.
 
-The source-executing build stage has read-only repository permission and no npm or Pages deployment authority. The retained-snapshot job has narrowly scoped repository write permission; its credential-stripped, unprivileged child runs only the pinned assembler, not application build code. Final deployments share one repository-wide lock, confirm that the packaged snapshot is still the retained branch head, and then enter the protected `github-pages` environment with only Pages and Pages-OIDC authority. Pages jobs have no npm publication authority.
+The source-executing build stage has read-only repository permission and no npm or Pages deployment authority. The retained-snapshot job checks out the same exact upstream head commit and runs the assembler from that revision; it does not use tooling from a newer default-branch commit. It has narrowly scoped repository write permission, and its credential-stripped, unprivileged child runs only that pinned assembler, not application build code. Final deployments share one repository-wide lock, confirm that the packaged snapshot is still the retained branch head, and then enter the protected `github-pages` environment with only Pages and Pages-OIDC authority. Pages jobs have no npm publication authority.
 
 ## Verify a deployment
 
@@ -68,7 +68,7 @@ For a rolling preview:
 
 For a release:
 
-- Confirm the Pages run used **Operation** `release` and the exact protected `v<version>` **Release ref**.
+- Confirm the Pages run was triggered by the successful **Publish npm alpha** run and used that run's exact full head commit. Do not confuse it with the CI-linked rolling-main run that may have the same commit.
 - Confirm `releases/<version>/examples/metadata.json` reports the exact version, `release` channel, and the full commit from `package-verification.json` and the protected tag.
 - Confirm `site-manifest.json` maps that version to the same immutable directory.
 - Open the release landing page and one recipe deep link; confirm the visible provenance and source links match.
@@ -95,19 +95,19 @@ A rollback restores exact retained `main/` bytes.  It does not rebuild an old so
 
    The first command must exit successfully. Confirm that the metadata names the exact source commit and version you intend to restore.
 
-3. Open **Deploy static examples** from `main`, choose **Operation** `rollback`, set **Snapshot ref** to that same 40-character commit, and leave **Release ref** empty.
-4. Wait for every job to succeed. Confirm that `main/` contains the selected retained bytes, the trusted root shell is restamped, the manifest's `main` entry matches the restored metadata, and all `releases/<version>/` directories remain unchanged.
+3. Open **Deploy static examples** from `main`, select **Run workflow**, and set **Snapshot ref** to that same 40-character commit.
+4. Wait for **Prepare an exact retained main rollback**, **Restore the validated retained main snapshot**, **Package retained Pages snapshot**, and **Deploy retained static examples** to succeed. **Stage a verified Pages channel** and **Preserve deployment snapshot** must be skipped. Confirm that `main/` contains the selected retained bytes, the trusted root shell is restamped, the manifest's `main` entry matches the restored metadata, and all `releases/<version>/` directories remain unchanged.
 5. Repeat the rolling-preview checks in [Verify a deployment](#verify-a-deployment).
 
 The restored preview is deliberately behind repository `main`; its visible source commit distinguishes an intentional rollback from an unexplained stale deployment. Move forward through a later CI-approved descendant commit, never by editing retained state.
 
-An automatic deployment never moves the retained preview backward or onto divergent history. The explicit `rollback` operation is the sole backward path; after rollback, automatic deployment may move forward only along ancestry from that restored source commit.
+An automatic deployment never moves the retained preview backward or onto divergent history. The rollback-only manual dispatch is the sole backward path; after rollback, automatic deployment may move forward only along ancestry from that restored source commit.
 
 ## Recover an inconsistent release deployment
 
-If release metadata or a deep link is missing, first compare the Pages run input, protected tag, GitHub prerelease, package receipt, retained `pages-content` state, and live site. Do not copy files into `pages-content` or edit the site manually.
+If release metadata or a deep link is missing, first compare the upstream publisher run and head SHA, protected tag, GitHub prerelease, package receipt, retained `pages-content` state, and live site. Do not copy files into `pages-content` or edit the site manually.
 
-Retry **Deploy static examples** from `main` with **Operation** `release` and the exact protected tag only when all existing identities and bytes match. The workflow accepts an identical retry and rejects a byte-different replacement. If the published example itself must change, publish a greater package version.
+Rerun the original publisher-linked **Deploy static examples** run only when all existing identities and bytes match and the failure was transient or caused by hosted state. That rerun keeps the original commit SHA, ref, and workflow definition; it cannot consume later changes. If GitHub never created the downstream run, review the current default-branch `deploy-examples.yml`, then select **Re-run all jobs** on the successful original **Publish npm alpha** run. The publisher retains its original identity, while the new downstream run uses the current Pages workflow definition and still pins release source and assembly tooling to the publisher SHA. Validate that new run independently. Never use the rollback-only dispatch for a release. If release source, assembly tooling, or published example bytes must change, stop and publish a greater package version.
 
 ## Verification
 

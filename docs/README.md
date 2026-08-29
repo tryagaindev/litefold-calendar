@@ -37,7 +37,8 @@ Start with the [project README](../README.md) for installation and a first rende
 | Review trust boundaries and report a vulnerability | [Security model](security-model.md) and [security policy](../SECURITY.md) |
 | Reproduce the six canonical images | [Screenshot contract](screenshots/README.md) |
 | Verify package artifacts as a consumer | [Package verification](package-verification.md) |
-| Prepare and publish an alpha | [Release process](releasing.md) |
+| Follow the alpha release steps as an operator | [Alpha release operations runbook](release-operations.md) |
+| Understand alpha release policy and design | [Release process](releasing.md) |
 | Configure publishing or recover an exceptional release | [Release administration](release-administration.md) |
 | Operate rolling and immutable example deployments | [Static example deployment](example-deployment.md) |
 | Review project changes and governance | [Changelog](../CHANGELOG.md), [maintainers](../MAINTAINERS.md), and [Code of Conduct](../CODE_OF_CONDUCT.md) |
