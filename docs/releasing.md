@@ -1,131 +1,81 @@
-# Public alpha release process
+# Release a public alpha
 
-This repository publishes `@tryagaindev/litefold-calendar` as a public npm prerelease.  Alpha versions use `0.x.y-alpha.N`, the npm `alpha` dist-tag, and a matching Git tag such as `v0.1.0-alpha.0`.  Never publish an alpha under `latest`.
+This is the day-to-day release path for `@tryagaindev/litefold-calendar`. Alpha versions use `0.x.y-alpha.N`, npm's `alpha` dist-tag, and an immutable `v<version>` GitHub prerelease. Stable releases and npm's `latest` dist-tag are outside this process.
 
-## Release authority and prerequisites
+Repository or npm administrators must complete the [hosted prerequisites](release-administration.md#one-time-hosted-prerequisites) first. A release operator needs permission to run Actions, open and merge the prepared release pull request, and coordinate approval for the protected `npm` environment. A separate authorized reviewer should be available when the environment prohibits self-approval.
 
-Before the first public release, repository and npm administrators must confirm all of the following:
+Before starting, make sure `CHANGELOG.md` has meaningful `Unreleased` notes and all implementation, documentation, test, accessibility, and screenshot work for the release is already on `main`. The preparation workflow changes release metadata only; it does not collect unfinished work from another branch.
 
-- The canonical GitHub repository is public and exactly matches the `repository.url` in `package.json`.
-- The `@tryagaindev` npm scope and `@tryagaindev/litefold-calendar` package are controlled by the intended maintainers.
-- npm maintainer accounts use two-factor authentication.
-- The npm trusted publisher is bound to the exact GitHub owner, repository, workflow filename `publish-alpha.yml`, and `npm` environment, with only the `npm publish` action allowed.
-- The GitHub `npm` environment is protected and may be approved only by release maintainers.
-- `main` and `v*` tags are protected, required CI checks are enabled, and secret scanning, push protection, and private vulnerability reporting are enabled.
+## Normal release path
 
-Trusted publishing is the normal release path and requires no long-lived npm token in GitHub.  npm requires a package to exist before a trusted publisher can be configured.  When the reserved name has never been published, an authorized maintainer must perform one initial public publish with human two-factor authentication, then configure the trusted publisher before subsequent releases.  Published versions are immutable: do not manually bootstrap the same version that the workflow is expected to publish.  Either use a disposable bootstrap prerelease and then increment the manifest, or treat the manual publish as the first alpha and increment before the first provenance-backed workflow release.  Do not add an `NPM_TOKEN` secret as a workaround.
+### 1. Choose the version bump
 
-After that bootstrap publish, npm 12 can create the exact binding from an authenticated maintainer workstation:
+In GitHub Actions, open **Prepare alpha release**, choose **Run workflow**, select `main`, and choose one bump:
 
-```sh
-npm trust github @tryagaindev/litefold-calendar \
-  --repo TryAgainDev/litefold-calendar \
-  --file publish-alpha.yml \
-  --env npm \
-  --allow-publish
-```
+| Choice | Result |
+| --- | --- |
+| Continue alpha | Increment the current release line's `alpha.N` value |
+| Next patch alpha | Increment the patch and start at `alpha.0` |
+| Next minor alpha | Increment the minor and start at `alpha.0` |
 
-Review the resulting package settings on npmjs.com.  After the trusted publisher succeeds, set package publishing access to require two-factor authentication and disallow traditional tokens.  Do not grant `npm stage publish` unless the release model is deliberately changed and reviewed.
+The workflow validates the current state, updates `package.json`, both root version fields in `package-lock.json`, promotes `Unreleased` notes in `CHANGELOG.md`, and creates `release/v<version>`. It does not open a pull request or publish anything. When the run succeeds, use its summary link to open the prefilled pull request.
 
-## Required toolchain
+### 2. Review and merge the release pull request
 
-Use a current stable Node.js 24.x release and the exact npm version selected by `packageManager`:
+Confirm that the pull request changes only `package.json`, `package-lock.json`, and `CHANGELOG.md`, and that the dated changelog section describes the intended release. The preparation workflow rejects empty or placeholder-only notes, reused or decreasing versions, and partial manifest updates.
 
-```sh
-node --version
-npm --version
-npm ci --ignore-scripts
-npx playwright install --with-deps chromium
-```
+Merge only after the required checks pass. Intentional visual changes must already be reconciled with [`DESIGN.md`](../DESIGN.md), regenerated through the [screenshot procedure](screenshots/README.md#update-captures), and reviewed at native dimensions. Interaction, semantic, focus, browser-support, or accessibility changes also require the risk-based manual evidence in the [accessibility guide](../ACCESSIBILITY.md#testing).
 
-The repository accepts supported Node 24 patch releases, while npm, development dependencies, Playwright, and Chromium are exact-pinned.  Release receipts record the exact Node patch that produced the tarball.
+### 3. Review and approve npm publication
 
-## Prepare the release commit
+Merging pushes the release commit to `main` and starts **Publish npm alpha**. Ordinary `main` pushes are classified and exit without publishing. An eligible release commit must have a changed version and a first-parent diff containing exactly the three release-state files.
 
-1. Update `package.json` and `package-lock.json` to the next `0.x.y-alpha.N` version.
-2. Move user-visible entries from `Unreleased` into a dated changelog section.
-3. Update API documentation, examples, migration guidance, tests, and screenshots for every observable change.
-4. Run the complete local gate from a clean checkout:
+Before the protected `npm` job is approved, the workflow reruns `npm run check`, creates the five-file evidence bundle, and stages the exact tag, draft prerelease, notes, and assets. Review the run summary and draft release for the expected version, full source commit, changelog, and asset names. Then approve the `npm` environment.
 
-```sh
-npm run screenshots:update
-npm run check
-```
+The approved job is source-free: it downloads and checksum-verifies the retained bundle, then publishes only that tarball through npm trusted publishing. It does not check out or execute repository source.
 
-Review every screenshot at native dimensions.  A visual change is incomplete until implementation, canonical PNGs, hashes, source fingerprint, references, and alt text agree.
+Do not create or push a version tag, create a GitHub release, publish with npm locally, or deploy the release demo yourself during the normal path. The workflow owns those transitions.
 
-The source commit used for a release must be on `main`, have no tracked or untracked changes, and contain no application-specific branding, private data, credentials, or generated release bundles.
+### 4. Verify the published identities
 
-## Create the GitHub prerelease
+After approval, **Publish npm alpha** verifies npm and then makes the GitHub prerelease public. It finally queues **Deploy static examples** for the same exact tag. A queued Pages run is not proof of a completed deployment; open that separate run and wait for it to succeed.
 
-After the release commit passes CI:
+Confirm all of these identify the same version and full commit:
+
+- npm accepted the verified tarball and `alpha` resolves to that version.
+- npm integrity, signatures/provenance, clean installation, root import, extension import, and stylesheet import passed.
+- `latest` is absent or points to a stable version.
+- The protected tag and immutable GitHub prerelease identify the verified source commit and carry the release bundle.
+- The separate Pages run used **Operation** `release` and the exact `v<version>` **Release ref**.
+- `releases/<version>/examples/metadata.json` and the root `site-manifest.json` report the version, full commit, and `release` channel.
+
+See [package verification](package-verification.md#registry-and-release-evidence) for independent registry checks and [static example deployment](example-deployment.md#verify-a-deployment) for Pages checks.
+
+## Local preparation and verification
+
+The Actions workflow above is the normal path. Maintainers can preview the release-state transformation locally. Start from the repository root with a clean worktree and the canonical `origin`; the non-dry-run command intentionally leaves exactly three modified files.
 
 ```sh
-git switch main
-git pull --ff-only
-git tag -s v0.1.0-alpha.0 -m "v0.1.0-alpha.0"
-git push origin main
-git push origin v0.1.0-alpha.0
+npm run release:prepare -- --bump prerelease --dry-run
+npm run release:prepare -- --bump prerelease
+npm run release:verify
 ```
 
-Use the actual manifest version instead of the example above.  Create a GitHub **prerelease** from that protected tag.  Publishing the GitHub prerelease triggers `.github/workflows/publish-alpha.yml`.
+Use `prepatch` or `preminor` instead of `prerelease` for the other two choices. `release:prepare` validates staged bytes before atomically replacing the three files and restores the originals if replacement fails. `release:verify` is read-only and allows those expected local changes; it does not query hosted services. Review `git diff` after the command. This local path does not create a branch, pull request, tag, release, or publication.
 
-## What the publish workflow does
+## Failure handling
 
-The workflow separates untrusted project execution from npm publishing authority.
+Do not work around a failed workflow with a local publish, force push, moved tag, replaced asset, or reused package version. Open the **Publish npm alpha** run for the original release merge commit, confirm its SHA and version, and use GitHub's rerun action. A rerun keeps the original push identity; there is no manual arbitrary-commit publication path.
 
-### Verify job
+Only rerun when existing npm, tag, draft/release, assets, and Pages state are absent or match the retained bytes exactly. Conflicting or ambiguous state fails closed. Published npm versions are immutable: if bytes are defective, deprecate that version with upgrade guidance and prepare a greater alpha. Use the [recovery matrix](release-administration.md#recovery-matrix) for the exact failure stage.
 
-The first job has read-only repository permission and no npm OIDC authority.  It:
+## Operator checklist
 
-- Checks out the exact release tag without persisted Git credentials.
-- Verifies the package name, public alpha version, repository metadata, publish policy, and tag/version match.
-- Confirms the tagged commit remains contained in `origin/main`.
-- Installs the lockfile with lifecycle scripts disabled and installs the pinned Chromium build.
-- Runs `npm run check`, including static policy, unit tests, examples, browser/accessibility tests, screenshot validation, and clean tarball-consumer verification.
-- Runs `npm run package` to create one immutable five-file bundle containing the tarball, checksums, verification receipt, SPDX SBOM, and MIT license.
-- Uploads that exact bundle as a non-overwriting GitHub Actions artifact.
-
-### Publish job
-
-The second job waits for verification, enters the protected `npm` environment, and is the only job granted `id-token: write`.  It does not check out source code or install project dependencies.  It:
-
-- Downloads the exact artifact created by the verify job.
-- Requires exactly the five expected flat regular files.
-- Rechecks SHA-256 values, release identity, source commit, toolchain receipt, packed manifest, public access, provenance policy, and alpha dist-tag.
-- Publishes the verified tarball with `npm publish --access public --tag alpha --provenance --ignore-scripts` through npm trusted publishing.
-
-The workflow is serialized across alpha releases so two versions cannot publish concurrently.
-
-## Release example deployment
-
-Publishing a GitHub release also triggers `.github/workflows/deploy-examples.yml`.  That workflow verifies the tagged source independently, retains the example under `releases/<package-version>/examples/`, and refuses to replace an existing version path with different bytes.  It uses the protected `github-pages` environment and has no npm publishing authority.  Conversely, `publish-alpha.yml` has no Pages authority.
-
-Monitor the npm and Pages runs as separate release results.  The release demo must show the manifest version, tagged source commit, and **Immutable release** channel before linking to it.  See the [static example deployment guide](example-deployment.md) for repository setup, rollback of the rolling preview, and stale-deployment checks.
-
-## Post-publish verification
-
-After the workflow succeeds, verify the registry result from a clean environment:
-
-```sh
-npm view @tryagaindev/litefold-calendar@alpha name version dist-tags dist.integrity repository --json
-npm pack @tryagaindev/litefold-calendar@alpha --ignore-scripts
-npm install --save-exact @tryagaindev/litefold-calendar@0.2.0-alpha.0
-npm audit signatures
-```
-
-Confirm that:
-
-- The `alpha` dist-tag points to the intended version and `latest` was not changed.
-- Registry integrity and package contents agree with the workflow receipt.
-- npm displays provenance for the release.
-- A clean ESM consumer can import the root module and `styles.css` export.
-- The GitHub release links to the correct tag, changelog notes, and repository commit.
-
-## Failed or withdrawn releases
-
-Published npm versions are immutable.  Do not replace, recreate, or retag the same version after a failed validation or bad release.  Correct the source, increment `alpha.N`, and issue a new tag and prerelease.
-
-When an already-published alpha should no longer be used, deprecate that exact version with a useful replacement message and publish a corrected version.  Avoid `npm unpublish` except where npm policy and a genuine security or legal need require it.
-
-Use the [alpha release checklist](alpha-release-checklist.md) for the operator-facing sequence and [package verification](package-verification.md) for artifact details.
+- [ ] Run **Prepare alpha release** from `main` with the intended bump.
+- [ ] Open the compare link and confirm the pull request changes only `package.json`, `package-lock.json`, and `CHANGELOG.md`.
+- [ ] Confirm release notes and all affected design, screenshots, documentation, examples, tests, and risk-based accessibility evidence are complete.
+- [ ] Merge only after required pull-request checks pass.
+- [ ] Confirm **Publish npm alpha** selected the merge's exact `main` commit and expected version.
+- [ ] Review the retained bundle and staged draft, then approve the protected `npm` environment.
+- [ ] Confirm matching npm, protected tag, immutable GitHub prerelease, and completed Pages identities.
+- [ ] On any failure or uncertain public state, stop and use the documented recovery path.

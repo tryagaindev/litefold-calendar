@@ -10,6 +10,7 @@ export type CalendarErrorCode =
 	| "event-data-invalid"
 	| "event-limit-exceeded"
 	| "extension-failed"
+	| "render-hook-failed"
 	| "action-failed"
 	| "host-integration-failed"
 	| "internal-error";
@@ -21,7 +22,6 @@ export type CalendarErrorPhase =
 	| "state"
 	| "source"
 	| "validation"
-	| "extension"
 	| "action"
 	| "integration"
 	| "render"
@@ -30,7 +30,7 @@ export type CalendarErrorPhase =
 /** The user-facing importance assigned to a calendar error. */
 export type CalendarErrorSeverity = "warning" | "error" | "fatal";
 
-/** A calendar rendering surface used by extensions and contextual errors. */
+/** A calendar rendering surface used by render hooks and contextual errors. */
 export type CalendarSurface = "day" | "grid-summary" | "agenda";
 
 /** Inclusive start and exclusive end bounds without request-control state. */
@@ -49,8 +49,10 @@ export interface LitefoldCalendarErrorOptions {
 	readonly code: CalendarErrorCode;
 	/** Zero-based source-event index associated with validation, when known. */
 	readonly eventIndex?: number;
-	/** Trusted extension identifier associated with the failure, when applicable. */
+	/** Trusted registered-extension identifier associated with the failure, when applicable. */
 	readonly extensionId?: string;
+	/** Trusted render-hook identifier associated with the failure, when applicable. */
+	readonly renderHookId?: string;
 	/** Trusted lifecycle or action hook name associated with the failure, when applicable. */
 	readonly hook?: string;
 	/** Developer-facing diagnostic message that must not be rendered to end users. */
@@ -91,7 +93,7 @@ export interface CalendarIssue {
  * A typed calendar failure containing separate diagnostic and user-safe text.
  *
  * The original failure remains available through `cause` for trusted application diagnostics. Causes, stack traces,
- * extension identifiers, and hook names must never be copied into rendered output or calendar state.
+ * extension identifiers, render-hook identifiers, and hook names must never be copied into rendered output or calendar state.
  */
 export class LitefoldCalendarError extends Error {
 	/** Stable machine-readable failure category. */
@@ -100,8 +102,11 @@ export class LitefoldCalendarError extends Error {
 	/** Zero-based source-event index associated with validation, when known. */
 	public readonly eventIndex: number | undefined;
 
-	/** Trusted extension identifier associated with the failure, when applicable. */
+	/** Trusted registered-extension identifier associated with the failure, when applicable. */
 	public readonly extensionId: string | undefined;
+
+	/** Trusted render-hook identifier associated with the failure, when applicable. */
+	public readonly renderHookId: string | undefined;
 
 	/** Trusted lifecycle or action hook name associated with the failure, when applicable. */
 	public readonly hook: string | undefined;
@@ -137,6 +142,7 @@ export class LitefoldCalendarError extends Error {
 		this.code = options.code;
 		this.eventIndex = options.eventIndex;
 		this.extensionId = options.extensionId;
+		this.renderHookId = options.renderHookId;
 		this.hook = options.hook;
 		this.phase = options.phase;
 		this.range = options.range === undefined

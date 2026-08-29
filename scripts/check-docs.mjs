@@ -1,16 +1,41 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
+import { extractExtensionEntries, readPackageManifest } from "./lib/package-entries.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
 
 const API_DOCUMENT_PATH = join(REPOSITORY_ROOT, "docs", "api.md");
+const DOCUMENTATION_ENTRY_PATH = join(REPOSITORY_ROOT, "docs", "README.md");
 const ROOT_EXPORT_PATH = join(REPOSITORY_ROOT, "src", "index.ts");
+const DEPRECATED_WEB_MCP_PATTERN = /\bnavigator\s*(?:\?\s*)?\.\s*modelContext\b/gu;
 const EXCLUDED_DIRECTORIES = new Set([
 	".artifacts",
+	".cache",
 	".git",
 	".test-dist",
+	"coverage",
 	"dist",
-	"node_modules"
+	"node_modules",
+	"playwright-report",
+	"test-results"
+]);
+const GUARDED_TEXT_EXTENSIONS = new Set([
+	"",
+	".cjs",
+	".css",
+	".html",
+	".js",
+	".json",
+	".jsx",
+	".md",
+	".mjs",
+	".mts",
+	".scss",
+	".ts",
+	".tsx",
+	".txt",
+	".yaml",
+	".yml"
 ]);
 const VAGUE_LINK_LABELS = new Set([
 	"learn more",
@@ -21,6 +46,7 @@ const VAGUE_LINK_LABELS = new Set([
 ]);
 const errors = [];
 const anchorCache = new Map();
+const markdownLinkGraph = new Map();
 
 function addError(message) {
 	errors.push(message);
@@ -82,6 +108,20 @@ async function collectMarkdownFiles(directory) {
 		if (entry.isDirectory() && !EXCLUDED_DIRECTORIES.has(entry.name)) {
 			files.push(...await collectMarkdownFiles(path));
 		} else if (entry.isFile() && extname(entry.name).toLowerCase() === ".md") {
+			files.push(path);
+		}
+	}
+	return files;
+}
+
+async function collectGuardedTextFiles(directory) {
+	const entries = await readdir(directory, { withFileTypes: true });
+	const files = [];
+	for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+		const path = join(directory, entry.name);
+		if (entry.isDirectory() && !EXCLUDED_DIRECTORIES.has(entry.name)) {
+			files.push(...await collectGuardedTextFiles(path));
+		} else if (entry.isFile() && GUARDED_TEXT_EXTENSIONS.has(extname(entry.name).toLowerCase())) {
 			files.push(path);
 		}
 	}
@@ -317,12 +357,12 @@ async function markdownAnchors(path) {
 
 async function validateDestination(sourcePath, source, link) {
 	if (link.destination === undefined) {
-		return;
+		return undefined;
 	}
 	const line = lineNumberAt(source, link.index);
 	const rawDestination = link.destination.trim();
 	if (isExternalDestination(rawDestination) || rawDestination.startsWith("/")) {
-		return;
+		return undefined;
 	}
 	const hashIndex = rawDestination.indexOf("#");
 	const beforeHash = hashIndex === -1 ? rawDestination : rawDestination.slice(0, hashIndex);
@@ -334,7 +374,7 @@ async function validateDestination(sourcePath, source, link) {
 		? undefined
 		: decodeLinkPart(fragmentValue, sourcePath, line, "anchor");
 	if (decodedPath === undefined || fragment === undefined && fragmentValue !== undefined) {
-		return;
+		return undefined;
 	}
 
 	const targetPath = decodedPath.length === 0
@@ -343,10 +383,10 @@ async function validateDestination(sourcePath, source, link) {
 	const repositoryRelative = relative(REPOSITORY_ROOT, targetPath);
 	if (repositoryRelative.startsWith(`..${sep}`) || repositoryRelative === ".." || isAbsolute(repositoryRelative)) {
 		addError(`${displayPath(sourcePath)}:${String(line)} links outside the repository: ${rawDestination}.`);
-		return;
+		return undefined;
 	}
 	if (targetUsesExcludedDirectory(targetPath)) {
-		return;
+		return undefined;
 	}
 
 	let targetStat;
@@ -355,18 +395,17 @@ async function validateDestination(sourcePath, source, link) {
 	} catch (error) {
 		if (error instanceof Error && "code" in error && error.code === "ENOENT") {
 			addError(`${displayPath(sourcePath)}:${String(line)} links to missing path ${rawDestination}.`);
-			return;
+			return undefined;
 		}
 		throw error;
 	}
-	if (fragment === undefined || fragment.length === 0) {
-		return;
-	}
-
 	const markdownPath = targetStat.isDirectory() ? join(targetPath, "README.md") : targetPath;
+	if (fragment === undefined || fragment.length === 0) {
+		return extname(markdownPath).toLowerCase() === ".md" ? markdownPath : undefined;
+	}
 	if (extname(markdownPath).toLowerCase() !== ".md") {
 		addError(`${displayPath(sourcePath)}:${String(line)} links to anchor #${fragment} in a non-Markdown file.`);
-		return;
+		return undefined;
 	}
 	try {
 		const anchors = await markdownAnchors(markdownPath);
@@ -376,16 +415,18 @@ async function validateDestination(sourcePath, source, link) {
 	} catch (error) {
 		if (error instanceof Error && "code" in error && error.code === "ENOENT") {
 			addError(`${displayPath(sourcePath)}:${String(line)} links to missing path ${displayPath(markdownPath)}.`);
-			return;
+			return undefined;
 		}
 		throw error;
 	}
+	return markdownPath;
 }
 
 async function validateMarkdownFile(path) {
 	const source = await readFile(path, "utf8");
 	const prose = maskNonProse(source);
 	const links = [...extractInlineLinks(prose), ...extractReferenceLinks(prose)];
+	const localMarkdownTargets = new Set();
 	for (const link of links) {
 		const line = lineNumberAt(source, link.index);
 		if (link.missingReference !== undefined) {
@@ -396,7 +437,45 @@ async function validateMarkdownFile(path) {
 		if (!link.image && isVagueLinkLabel(link.label)) {
 			addError(`${displayPath(path)}:${String(line)} uses vague link label ${JSON.stringify(link.label)}.`);
 		}
-		await validateDestination(path, source, link);
+		const target = await validateDestination(path, source, link);
+		if (target !== undefined) {
+			localMarkdownTargets.add(target);
+		}
+	}
+	markdownLinkGraph.set(path, localMarkdownTargets);
+}
+
+async function validateDeprecatedWebMcpUsage(paths) {
+	for (const path of paths) {
+		const source = await readFile(path, "utf8");
+		for (const match of source.matchAll(DEPRECATED_WEB_MCP_PATTERN)) {
+			addError(
+				`${displayPath(path)}:${String(lineNumberAt(source, match.index ?? 0))} uses the deprecated navigator-scoped WebMCP API; use document.modelContext.`
+			);
+		}
+	}
+}
+
+function validateMarkdownReachability(markdownFiles) {
+	const knownFiles = new Set(markdownFiles);
+	const reachable = new Set();
+	const pending = [DOCUMENTATION_ENTRY_PATH];
+	while (pending.length > 0) {
+		const path = pending.pop();
+		if (path === undefined || reachable.has(path) || !knownFiles.has(path)) {
+			continue;
+		}
+		reachable.add(path);
+		for (const target of markdownLinkGraph.get(path) ?? []) {
+			pending.push(target);
+		}
+	}
+
+	for (const path of markdownFiles) {
+		const repositoryPath = displayPath(path);
+		if (!repositoryPath.startsWith(".github/") && !reachable.has(path)) {
+			addError(`${repositoryPath} is not reachable from docs/README.md through repository-local Markdown links.`);
+		}
 	}
 }
 
@@ -442,6 +521,28 @@ function parseNamedRootExports(source) {
 	return exports.filter(({ name }) => name.length > 0);
 }
 
+function parseDocumentedSymbolCell(cell, kind, description) {
+	const names = [...cell.matchAll(/`([^`]+)`/gu)].map((match) => match[1] ?? "");
+	const remainder = cell.replace(/`[^`]+`/gu, "").replaceAll(",", "").trim();
+	if ((names.length === 0 && remainder !== "—") || (names.length > 0 && remainder !== "")) {
+		addError(
+			`${displayPath(API_DOCUMENT_PATH)} ${description} has an invalid ${kind} cell: ${cell}.`
+		);
+		return [];
+	}
+
+	return names.filter((name) => {
+		if (/^[$A-Z_a-z][$\w]*$/u.test(name)) {
+			return true;
+		}
+
+		addError(
+			`${displayPath(API_DOCUMENT_PATH)} ${description} contains invalid symbol ${name}.`
+		);
+		return false;
+	});
+}
+
 function parseDocumentedRootExports(apiDocument) {
 	const heading = "## Find a public export";
 	const headingIndex = apiDocument.indexOf(heading);
@@ -479,25 +580,79 @@ function parseDocumentedRootExports(apiDocument) {
 		}
 		for (const [cellIndex, kind] of [[1, "runtime"], [2, "type"]]) {
 			const cell = cells[cellIndex] ?? "";
-			const names = [...cell.matchAll(/`([^`]+)`/gu)].map((match) => match[1] ?? "");
-			const remainder = cell.replace(/`[^`]+`/gu, "").replaceAll(",", "").trim();
-			if ((names.length === 0 && remainder !== "—") || (names.length > 0 && remainder !== "")) {
-				addError(
-					`${displayPath(API_DOCUMENT_PATH)} public export table has an invalid ${kind} cell: ${cell}.`
-				);
-				continue;
-			}
-			for (const name of names) {
-				if (!/^[$A-Z_a-z][$\w]*$/u.test(name)) {
-					addError(
-						`${displayPath(API_DOCUMENT_PATH)} public export table contains invalid symbol ${name}.`
-					);
-					continue;
-				}
+			for (const name of parseDocumentedSymbolCell(
+				cell,
+				kind,
+				"public export table"
+			)) {
 				documented.push({ kind, name });
 			}
 		}
 	}
+	return documented;
+}
+
+function parseDocumentedExtensionExports(apiDocument) {
+	const heading = "## Find a first-party extension export";
+	const headingIndex = apiDocument.indexOf(heading);
+	if (headingIndex === -1) {
+		addError(`${displayPath(API_DOCUMENT_PATH)} is missing the ${heading} section.`);
+		return [];
+	}
+	const nextHeadingIndex = apiDocument.indexOf("\n## ", headingIndex + heading.length);
+	const section = apiDocument.slice(
+		headingIndex + heading.length,
+		nextHeadingIndex === -1 ? apiDocument.length : nextHeadingIndex
+	);
+	const tableLines = section.split(/\r?\n/u).filter((line) => /^\|/u.test(line.trim()));
+	if (tableLines.length < 3) {
+		addError(`${displayPath(API_DOCUMENT_PATH)} must contain the first-party extension export table.`);
+		return [];
+	}
+
+	const parseCells = (line) => line.trim().split("|").slice(1, -1).map((cell) => cell.trim());
+	const headerCells = parseCells(tableLines[0] ?? "");
+	if (headerCells.join("|") !== "Module|Runtime values|Types") {
+		addError(
+			`${displayPath(API_DOCUMENT_PATH)} extension export table must use Module, Runtime values, and Types columns.`
+		);
+	}
+
+	const documented = [];
+	for (const [rowIndex, line] of tableLines.slice(2).entries()) {
+		const cells = parseCells(line);
+		if (cells.length !== 3) {
+			addError(
+				`${displayPath(API_DOCUMENT_PATH)} extension export table row ${String(rowIndex + 1)} must contain three columns.`
+			);
+			continue;
+		}
+
+		const moduleCell = cells[0] ?? "";
+		const moduleMatch = /^`([^`]+)`$/u.exec(moduleCell);
+		if (moduleMatch === null) {
+			addError(
+				`${displayPath(API_DOCUMENT_PATH)} extension export table has an invalid module cell: ${moduleCell}.`
+			);
+			continue;
+		}
+
+		const importPath = moduleMatch[1] ?? "";
+		const symbols = [];
+		for (const [cellIndex, kind] of [[1, "runtime"], [2, "type"]]) {
+			const cell = cells[cellIndex] ?? "";
+			for (const name of parseDocumentedSymbolCell(
+				cell,
+				kind,
+				`extension export table row for ${importPath}`
+			)) {
+				symbols.push({ kind, name });
+			}
+		}
+
+		documented.push({ importPath, symbols });
+	}
+
 	return documented;
 }
 
@@ -544,11 +699,128 @@ async function validateRootExportDocumentation() {
 	return sourceByName.size;
 }
 
+function isJavaScriptExportTarget(target) {
+	if (typeof target === "string") {
+		return target.endsWith(".js");
+	}
+
+	return target !== null && typeof target === "object" && !Array.isArray(target) &&
+		["import", "default"].some((condition) =>
+			typeof target[condition] === "string" && target[condition].endsWith(".js")
+		);
+}
+
+async function validateExtensionExportDocumentation() {
+	const [packageJson, apiDocument] = await Promise.all([
+		readPackageManifest(),
+		readFile(API_DOCUMENT_PATH, "utf8")
+	]);
+
+	let extensionEntries;
+	try {
+		extensionEntries = extractExtensionEntries(packageJson);
+	} catch (error) {
+		addError(
+			error instanceof Error
+				? error.message
+				: "Package extension exports could not be inspected."
+		);
+		return { entryCount: 0, exportCount: 0 };
+	}
+
+	const supportedJavaScriptExports = new Set([
+		".",
+		...extensionEntries.map((entry) => entry.exportPath)
+	]);
+	for (const [exportPath, target] of Object.entries(packageJson.exports ?? {})) {
+		if (isJavaScriptExportTarget(target) && !supportedJavaScriptExports.has(exportPath)) {
+			addError(
+				`package.json JavaScript export ${exportPath} has no source or documentation convention.`
+			);
+		}
+	}
+
+	const documentedRows = parseDocumentedExtensionExports(apiDocument);
+	const documentedByPath = new Map();
+	for (const row of documentedRows) {
+		if (documentedByPath.has(row.importPath)) {
+			addError(
+				`${displayPath(API_DOCUMENT_PATH)} lists extension module ${row.importPath} more than once.`
+			);
+			continue;
+		}
+		documentedByPath.set(row.importPath, row.symbols);
+	}
+
+	let exportCount = 0;
+	const expectedImportPaths = new Set();
+	for (const entry of extensionEntries) {
+		const importPath = `${packageJson.name}${entry.exportPath.slice(1)}`;
+		expectedImportPaths.add(importPath);
+		const sourcePath = join(REPOSITORY_ROOT, entry.sourceEntry);
+		const sourceExports = parseNamedRootExports(await readFile(sourcePath, "utf8"));
+		exportCount += sourceExports.length;
+
+		const sourceByName = new Map();
+		for (const sourceExport of sourceExports) {
+			if (sourceByName.has(sourceExport.name)) {
+				addError(`${displayPath(sourcePath)} exports ${sourceExport.name} more than once.`);
+				continue;
+			}
+			sourceByName.set(sourceExport.name, sourceExport.kind);
+		}
+
+		const documentedSymbols = documentedByPath.get(importPath);
+		if (documentedSymbols === undefined) {
+			addError(`${displayPath(API_DOCUMENT_PATH)} extension export table is missing ${importPath}.`);
+			continue;
+		}
+
+		const documentedByName = new Map();
+		for (const documentedExport of documentedSymbols) {
+			if (documentedByName.has(documentedExport.name)) {
+				addError(
+					`${displayPath(API_DOCUMENT_PATH)} lists ${importPath} export ${documentedExport.name} more than once.`
+				);
+				continue;
+			}
+			documentedByName.set(documentedExport.name, documentedExport.kind);
+		}
+
+		for (const [name, kind] of sourceByName) {
+			const documentedKind = documentedByName.get(name);
+			if (documentedKind === undefined) {
+				addError(`${displayPath(API_DOCUMENT_PATH)} ${importPath} export row is missing ${name}.`);
+			} else if (documentedKind !== kind) {
+				addError(
+					`${displayPath(API_DOCUMENT_PATH)} classifies ${importPath} export ${name} as ${documentedKind}; expected ${kind}.`
+				);
+			}
+		}
+		for (const name of documentedByName.keys()) {
+			if (!sourceByName.has(name)) {
+				addError(`${displayPath(API_DOCUMENT_PATH)} lists stale ${importPath} export ${name}.`);
+			}
+		}
+	}
+
+	for (const importPath of documentedByPath.keys()) {
+		if (!expectedImportPaths.has(importPath)) {
+			addError(`${displayPath(API_DOCUMENT_PATH)} lists stale extension module ${importPath}.`);
+		}
+	}
+
+	return { entryCount: extensionEntries.length, exportCount };
+}
+
 const markdownFiles = await collectMarkdownFiles(REPOSITORY_ROOT);
 for (const path of markdownFiles) {
 	await validateMarkdownFile(path);
 }
+validateMarkdownReachability(markdownFiles);
+await validateDeprecatedWebMcpUsage(await collectGuardedTextFiles(REPOSITORY_ROOT));
 const rootExportCount = await validateRootExportDocumentation();
+const extensionDocumentation = await validateExtensionExportDocumentation();
 
 if (errors.length > 0) {
 	for (const error of errors.sort()) {
@@ -558,6 +830,9 @@ if (errors.length > 0) {
 	process.exitCode = 1;
 } else {
 	console.log(
-		`Documentation check passed: ${String(markdownFiles.length)} Markdown files and ${String(rootExportCount)} exact root exports.`
+		`Documentation check passed: ${String(markdownFiles.length)} Markdown files, ` +
+		`${String(rootExportCount)} exact root exports, and ` +
+		`${String(extensionDocumentation.exportCount)} exact exports across ` +
+		`${String(extensionDocumentation.entryCount)} first-party extension entrypoint(s).`
 	);
 }

@@ -12,16 +12,16 @@
 <body>
 	<main class="example-shell">
 		<header class="example-intro">
-			<h1>Progressively enhanced project calendar</h1>
-			<p>The schedule below is useful before JavaScript loads. A successful calendar render replaces its presentation without removing the server-owned markup.</p>
+			<h1>Enhance a server-rendered schedule</h1>
+			<p>This page starts with an ordinary HTML schedule. JavaScript adds the interactive calendar and hides the fallback only after usable event data arrives.</p>
 		</header>
 
-		<section class="example-panel" data-example-fallback aria-labelledby="progressive-fallback-title">
+		<section class="example-panel" id="server-schedule" data-example-fallback aria-labelledby="progressive-fallback-title">
 			<h2 id="progressive-fallback-title">Schedule for August 4, 2026</h2>
 			<ol>
 				<li>
 					<time datetime="2026-08-04T09:30">9:30 AM</time>
-					<a href="/events/design-review?from=fallback&amp;view=summary#details">Calendar design review</a>
+					<a href="./?event=design-review&amp;from=fallback#server-schedule">Calendar design review</a>
 				</li>
 				<li>
 					<time datetime="2026-08-04">All day</time>
@@ -32,14 +32,18 @@
 
 		<div class="example-calendar" data-example-calendar></div>
 
-		<section class="example-panel" aria-labelledby="progressive-controls-title">
-			<h2 id="progressive-controls-title">Fallback lifecycle</h2>
-			<p data-example-result role="status">Loading the enhanced calendar. The fallback remains available.</p>
+		<section class="example-panel" data-example-controls aria-labelledby="progressive-controls-title" hidden>
+			<h2 id="progressive-controls-title">Test initial-load outcomes</h2>
+			<p>Each rebuild destroys the current calendar first, restoring the fallback before the next source request starts.</p>
+			<p class="example-result" data-example-result></p>
 			<div class="example-control-row">
 				<button class="example-button" type="button" data-example-rebuild="failure">Rebuild with an unavailable source</button>
 				<button class="example-button" type="button" data-example-rebuild="success">Rebuild with a usable source</button>
 			</div>
 		</section>
+
+		<div class="example-visually-hidden" data-example-announcer-polite role="status" aria-live="polite" aria-atomic="true"></div>
+		<div class="example-visually-hidden" data-example-announcer-assertive role="alert" aria-live="assertive" aria-atomic="true"></div>
 	</main>
 
 	<script type="module" src="./main.js"></script>

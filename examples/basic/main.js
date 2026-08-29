@@ -7,6 +7,7 @@ if (!(host instanceof HTMLElement) || !(result instanceof HTMLElement)) {
 	throw new Error("The example markup is incomplete.");
 }
 
+//Use local noon so adding civil days stays stable across daylight-saving transitions.
 const exampleDate = new Date();
 exampleDate.setHours(12, 0, 0, 0);
 
@@ -52,6 +53,7 @@ const calendar = createCalendar(host, {
 	events: EVENTS,
 	onEventActivate: ({ element, event, nativeEvent, surface }) => {
 		if (element instanceof HTMLAnchorElement) {
+			//Keep the standalone demo on this page; production event links can navigate normally.
 			nativeEvent.preventDefault();
 		}
 		result.textContent = `Opened ${event.title} from the ${surface} surface.`;
@@ -60,6 +62,8 @@ const calendar = createCalendar(host, {
 
 calendar.render();
 
-window.addEventListener("pagehide", () => {
-	calendar.destroy();
-}, { once: true });
+window.addEventListener("pagehide", (event) => {
+	if (!event.persisted) {
+		calendar.destroy();
+	}
+});

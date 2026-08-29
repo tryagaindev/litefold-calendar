@@ -1,21 +1,33 @@
 # Classic-script loader example
 
-This example uses an external classic script:
+Use this pattern when an existing page has a classic JavaScript entry point but can still load the litefold-calendar ESM package.
+
+## Run it
+
+From the repository root, run `npm run demo`, then choose **Load ESM from a classic script** from the examples landing page. Select August 4, 2026 and activate an event to confirm that the dynamically loaded calendar behaves like the module-script examples.
+
+## How it works
+
+The page loads one deferred classic script:
 
 ```html
 <script defer src="./main.js"></script>
 ```
 
-The script uses standard `import()` to load the local litefold-calendar ESM build. It contains no static `import`, `export`, module-script tag, global package object, CDN, or runtime dependency. Import failures receive a persistent visible error because package-owned error handling cannot run before the package loads.
+`main.js` has no static `import` or `export`. Instead, it uses the standard `import()` expression available to classic scripts:
 
-One event has a relative URL, so both grid and agenda representations are native links. The activation callback prevents navigation synchronously only to keep this standalone fixture on the page, and reports which surface was activated.
+```js
+void import("../../dist/index.js")
+	.then(({ createCalendar }) => {
+		//Create and render the calendar here.
+	})
+	.catch(reportStartupFailure);
+```
 
-This is a classic-script entry point, not a legacy or non-ESM package build. It requires the same modern evergreen browser baseline as litefold-calendar. Do not add `nomodule`; serve the repository over HTTP with JavaScript MIME types and a Content Security Policy that permits the same-origin scripts. The language behavior is defined by the [ECMA-262 `import()` contract](https://tc39.es/ecma262/multipage/ecmascript-language-expressions.html#sec-import-calls).
+`import()` resolves to the package module namespace; it does not create a global package object. The persistent alert in the page reports failures that occur before package-owned error handling is available.
 
-Run `npm run demo` from the repository root, then choose **Classic-script loader** from the examples landing page.
+This is an entry-point interoperability pattern, not a legacy or non-ESM build. It requires the same browsers as litefold-calendar and must be served over HTTP with correct JavaScript MIME types. A Content Security Policy must permit the same-origin entry and module scripts; `nomodule` is not applicable.
 
-The example's unprefixed `data-*` attributes are application-owned fixture selectors. They are not package output or public API.
+The fixture event URL renders as a native link. Its callback prevents navigation only so this standalone demo can show which calendar surface activated the event. Unprefixed `data-*` attributes are application-owned selectors, not package output.
 
-Browse the source: [JavaScript loader](main.js), [HTML](index.html), and [shared example CSS](../example.css).
-
-Next: read the [browser support policy](../../docs/browser-support.md) and [classic-script integration guidance](../../docs/integration-guide.md#classic-script-entry-point).
+Browse the [JavaScript loader](main.js), [HTML](index.html), [browser support policy](../../docs/browser-support.md), and [classic-script integration guidance](../../docs/integration-guide.md#classic-script-entry-point).

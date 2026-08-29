@@ -4,10 +4,38 @@ import test from "node:test";
 import {
 	createExampleMetadata,
 	parseExampleMetadata,
+	resolveExampleSourceCommit,
 	serializeExampleMetadata
 } from "../lib/example-metadata.mjs";
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
+
+void test("local source provenance does not claim an exact commit for a dirty build", () => {
+	assert.equal(resolveExampleSourceCommit({
+		channel: "local",
+		explicitCommit: undefined,
+		headCommit: COMMIT,
+		workingTreeDirty: true
+	}), null);
+	assert.equal(resolveExampleSourceCommit({
+		channel: "local",
+		explicitCommit: undefined,
+		headCommit: COMMIT,
+		workingTreeDirty: false
+	}), COMMIT);
+	assert.equal(resolveExampleSourceCommit({
+		channel: "main",
+		explicitCommit: undefined,
+		headCommit: COMMIT,
+		workingTreeDirty: true
+	}), COMMIT);
+	assert.equal(resolveExampleSourceCommit({
+		channel: "local",
+		explicitCommit: COMMIT,
+		headCommit: null,
+		workingTreeDirty: true
+	}), COMMIT);
+});
 
 void test("example metadata accepts local and deployment identities", () => {
 	assert.deepEqual(

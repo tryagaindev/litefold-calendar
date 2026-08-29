@@ -67,6 +67,15 @@ export class CalendarBounds {
 		return isCalendarDateWithinBounds(date, this.minDate, this.maxDate);
 	}
 
+	public getDateNavigationFailure(date: CalendarDate): "out-of-bounds" | "unrenderable" | null {
+		if (!this.isDateAllowed(date)) {
+			return "out-of-bounds";
+		}
+		return this.isMonthAllowed({ day: 1, month: date.month, year: date.year })
+			? null
+			: "unrenderable";
+	}
+
 	public isMonthAllowed(month: CalendarDate): boolean {
 		return doesCalendarMonthIntersectBounds(month, this.minDate, this.maxDate) &&
 			isRenderableMonth({ day: 1, month: month.month, year: month.year }, this.firstDay);

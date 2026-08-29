@@ -120,8 +120,13 @@ async function verifyBasicExample() {
 		findButtonByText(agenda, "Calendar design review", dom.window).click();
 		assert.match(result.textContent ?? "", /agenda surface/u);
 
+		const cachedPagehide = new dom.window.Event("pagehide");
+		Object.defineProperty(cachedPagehide, "persisted", { value: true });
+		dom.window.dispatchEvent(cachedPagehide);
+		assert.ok(host.childElementCount > 0, "A back/forward-cache pagehide must preserve the calendar.");
+
 		dom.window.dispatchEvent(new dom.window.Event("pagehide"));
-		assert.equal(host.childElementCount, 0, "The basic example must destroy its calendar on pagehide.");
+		assert.equal(host.childElementCount, 0, "A non-cached pagehide must destroy the calendar.");
 	} finally {
 		environment.dispose();
 	}
@@ -138,13 +143,13 @@ async function verifyAsyncErrorsExample() {
 			dom.window.HTMLInputElement
 		);
 		const failAction = requireElement(document, "[data-fail-action]", dom.window.HTMLInputElement);
-		const failExtension = requireElement(document, "[data-fail-extension]", dom.window.HTMLInputElement);
+		const failRenderHooks = requireElement(document, "[data-fail-render-hooks]", dom.window.HTMLInputElement);
 		const failNext = requireElement(document, "[data-fail-next]", dom.window.HTMLButtonElement);
 		const applicationError = requireElement(document, "[data-host-error]", dom.window.HTMLElement);
 		const applicationRetry = requireElement(document, "[data-host-retry]", dom.window.HTMLButtonElement);
 
 		await waitFor(
-			() => host.textContent?.includes("Extension active") === true &&
+			() => host.textContent?.includes("Render hooks active") === true &&
 				host.getAttribute("aria-busy") !== "true",
 			"the async-errors example's first usable snapshot",
 			1_000
@@ -190,23 +195,23 @@ async function verifyAsyncErrorsExample() {
 			"the rejected async event action"
 		);
 
-		failExtension.click();
-		assert.equal(failExtension.checked, true);
+		failRenderHooks.click();
+		assert.equal(failRenderHooks.checked, true);
 		await waitFor(
 			() => host.textContent?.includes("Some details are unavailable") === true &&
 				host.textContent?.includes("Open async details") === true,
-			"the quarantined failing extension",
+			"the quarantined failing render hooks",
 			1_000
 		);
-		failExtension.click();
-		assert.equal(failExtension.checked, false);
+		failRenderHooks.click();
+		assert.equal(failRenderHooks.checked, false);
 		await waitFor(
-			() => host.textContent?.includes("Extension active") === true &&
+			() => host.textContent?.includes("Render hooks active") === true &&
 				host.textContent?.includes("Some details are unavailable") !== true,
-			"the rebuilt healthy extension",
+			"the rebuilt healthy render hooks",
 			1_000
 		);
-		assert.ok(observedWarnings.length >= 3, "Expected source, action, and extension diagnostics.");
+		assert.ok(observedWarnings.length >= 3, "Expected source, action, and render-hook diagnostics.");
 
 		dom.window.dispatchEvent(new dom.window.Event("pagehide"));
 		assert.equal(host.childElementCount, 0, "The async-errors example must destroy on pagehide.");
@@ -269,6 +274,11 @@ async function verifyMigrationRecipe() {
 		agendaLink.dispatchEvent(agendaClick);
 		assert.equal(agendaClick.defaultPrevented, true);
 		assert.match(activation.textContent ?? "", /from agenda/u);
+		assert.equal(
+			requireElement(document, "[data-example-status]", dom.window.HTMLElement).textContent,
+			activation.textContent,
+			"Canceled native navigation must also produce live completion feedback."
+		);
 
 		const adaptSnapshot = module["adaptFullCalendarSnapshot"];
 		assert.equal(typeof adaptSnapshot, "function", "Expected the exported migration adapter.");
@@ -279,12 +289,36 @@ async function verifyMigrationRecipe() {
 		assert.equal(adapted[0]?.accentColor, "#805FC0");
 		assert.equal(adaptSnapshot([createMigrationRecord({ id: 42 })])[0]?.id, "42");
 		assert.equal(
+			adaptSnapshot([createMigrationRecord({ allDay: false })])[0]?.start,
+			"2026-08-04T09:30"
+		);
+		assert.equal(
+			adaptSnapshot([createMigrationRecord({
+				allDay: true,
+				end: "2026-08-05",
+				start: "2026-08-04"
+			})])[0]?.start,
+			"2026-08-04"
+		);
+		assert.equal(
 			adaptSnapshot([createMigrationRecord({ backgroundColor: undefined, borderColor: "#008577" })])[0]
 				?.accentColor,
 			"#008577"
 		);
 		assert.throws(() => adaptSnapshot({ events: [] }), TypeError);
 		assert.throws(() => adaptSnapshot([createMigrationRecord({ id: null })]), TypeError);
+		assert.throws(() => adaptSnapshot([createMigrationRecord({ allDay: true })]), TypeError);
+		assert.throws(() => adaptSnapshot([createMigrationRecord({ allDay: false, start: "2026-08-04" })]), TypeError);
+		assert.throws(() => adaptSnapshot([createMigrationRecord({ end: "2026-08-05" })]), TypeError);
+
+		const previousCivilDate = module["previousCivilDate"];
+		assert.equal(typeof previousCivilDate, "function", "Expected the exported boundary adapter.");
+		assert.equal(previousCivilDate("2026-03-01"), "2026-02-28");
+		assert.equal(previousCivilDate("2024-03-01"), "2024-02-29");
+		for (const invalidDate of ["2026-02-30", "2026-2-03", "2026-02-03T00:00", "0000-01-01"]) {
+			assert.throws(() => previousCivilDate(invalidDate), TypeError);
+		}
+		assert.throws(() => previousCivilDate("0001-01-01"), RangeError);
 
 		const previousReturnedRequest = host.dataset["exampleReturnedRequest"];
 		const refetch = requireElement(
@@ -314,7 +348,7 @@ async function verifyProgressiveRecipe() {
 		assert.ok(fallback.querySelector("ol > li time[datetime]") instanceof dom.window.HTMLTimeElement);
 		assert.equal(
 			findLinkByText(fallback, "Calendar design review", dom.window).getAttribute("href"),
-			"/events/design-review?from=fallback&view=summary#details"
+			"./?event=design-review&from=fallback#server-schedule"
 		);
 
 		await waitFor(
@@ -326,9 +360,9 @@ async function verifyProgressiveRecipe() {
 		assert.ok(agenda.querySelector("li") !== null);
 		assert.ok(agenda.querySelector("time[datetime]") instanceof dom.window.HTMLTimeElement);
 		const agendaLink = findLinkByText(agenda, "Calendar design review", dom.window);
-		assert.equal(agendaLink.pathname, "/events/design-review");
-		assert.equal(agendaLink.search, "?from=calendar&view=summary");
-		assert.equal(agendaLink.hash, "#details");
+		assert.equal(agendaLink.pathname, "/examples/progressive-enhancement/");
+		assert.equal(agendaLink.search, "?event=design-review&from=calendar");
+		assert.equal(agendaLink.hash, "#server-schedule");
 		const staticEvent = [...agenda.querySelectorAll("li")]
 			.find((item) => item.textContent?.includes("Release window") === true);
 		assert.ok(staticEvent !== undefined);
@@ -346,6 +380,15 @@ async function verifyProgressiveRecipe() {
 			"the progressive recipe's unavailable first load"
 		);
 		assert.equal(fallback.hidden, false, "An unavailable first load must preserve the fallback.");
+		const assertiveAnnouncer = requireElement(
+			document,
+			"[data-example-announcer-assertive]",
+			dom.window.HTMLElement
+		);
+		await waitFor(
+			() => (assertiveAnnouncer.textContent?.length ?? 0) > 0,
+			"the progressive recipe's assertive source-error announcement"
+		);
 
 		const success = requireElement(
 			document,

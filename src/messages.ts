@@ -24,10 +24,10 @@ export interface CalendarMessages {
 	readonly event: string;
 	/** Plural event noun. */
 	readonly events: string;
-	/** Body text for a quarantined rendering extension. */
-	readonly extensionErrorMessage: string;
-	/** Heading for a quarantined rendering extension. */
-	readonly extensionErrorTitle: string;
+	/** Body text for quarantined consumer render hooks. */
+	readonly renderHookErrorMessage: string;
+	/** Heading for quarantined consumer render hooks. */
+	readonly renderHookErrorTitle: string;
 	/** Grid overflow template. Supports `{count}`. */
 	readonly gridMore: string;
 	/** Instructions for entering and leaving visible event actions in the managed grid. */
@@ -93,8 +93,8 @@ export const DEFAULT_CALENDAR_MESSAGES: Readonly<CalendarMessages> = Object.free
 	dayLabel: "{date}, {count} {eventLabel}",
 	event: "event",
 	events: "events",
-	extensionErrorMessage: "Some calendar details could not be displayed.",
-	extensionErrorTitle: "Some details are unavailable",
+	renderHookErrorMessage: "Some calendar details could not be displayed.",
+	renderHookErrorTitle: "Some details are unavailable",
 	gridMore: "{count} more",
 	gridEventInstructions: "Use arrow keys to move between dates and Enter or Space to select. Press F2 on a date to move to its visible event actions; use Up and Down Arrow between actions, and Escape or F2 to return.",
 	gridMoreLabel: "View {count} more {eventLabel} for {date}",

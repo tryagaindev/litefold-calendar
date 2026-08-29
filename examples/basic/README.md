@@ -1,20 +1,27 @@
-# Basic example
+# Basic JavaScript example
 
-Run `npm run demo` from the repository root, then choose **Basic JavaScript** from the examples landing page.
+This is the smallest complete integration: a calendar host, the package stylesheet, a static event array, and an activation callback.
 
-The example demonstrates:
+## Run it
 
-- A CSS-container-responsive month view and selected-day agenda, using the default visible time treatment on both surfaces.
-- An omitted `initialDate`, which opens and selects the current date from the default clock.
-- All-day, timed, and multi-day events generated around the current date from a static `events` array.
-- Today, the native month/year jump popover, Previous, Next, default touch/pen/horizontal precision-scroll month paging, day selection, and event activation from the grid or agenda.
-- Native link rendering for an event URL, with a synchronous callback that prevents navigation only for this self-contained demo.
-- Validated per-event accent markers and a small `--lfc-*` token override.
+From the repository root, run `npm run demo`, then choose **Render static events** from the examples landing page.
 
-It intentionally uses no metadata, custom type, generic argument, date bounds, extension, cache, or framework. It imports only the local `dist` output, so the title jump and one-current-range native pager demonstrate package defaults without application code. Pager momentum and snap feel vary with the browser, operating system, and input device.
+Try the following:
 
-The example's `data-calendar` and `data-result` attributes are application-owned fixture selectors. They are not package output or public API.
+1. Select today to open its agenda.
+2. Activate **Calendar design review** from the month grid or agenda.
+3. Activate **Documentation walkthrough** to see a native event link. The demo prevents navigation so its status message remains visible.
+4. Use Today, Previous, Next, or the month title to navigate with the package defaults.
 
-Browse the source: [JavaScript](main.js), [HTML](index.html), and [shared example CSS](../example.css).
+## What the code demonstrates
 
-Next: use the [API reference](../../docs/api.md) for exact contracts or continue to the [advanced TypeScript example](../advanced/) for application integration patterns.
+- Static all-day, timed, and multi-day events generated around the current date.
+- An omitted `initialDate`, so the calendar opens on the date supplied by its default clock.
+- `onEventActivate` receiving the normalized event, native event, rendered element, and the activating `surface`.
+- Optional `url` and `accentColor` event fields.
+- A small documented `--lfc-*` CSS-token override in the shared example stylesheet.
+- Explicit cleanup with `destroy()` on a non-cached page exit while preserving the instance in the browser's back/forward cache.
+
+The example intentionally avoids providers, metadata, bounds, render hooks, extensions, and framework code. Its unprefixed `data-*` attributes are application-owned selectors, not litefold-calendar output.
+
+Browse the [JavaScript](main.js), [HTML](index.html), and [shared example CSS](../example.css). For exact contracts, continue to the [API reference](../../docs/api.md); for a larger application integration, see [Advanced TypeScript](../advanced/).

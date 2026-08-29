@@ -4,7 +4,17 @@ import {
 	readConfigurationValue,
 	snapshotConfigurationArray
 } from "./configuration.js";
-import { isLitefoldCalendarError } from "./safety.js";
+import { isLitefoldCalendarError, isRecord } from "./safety.js";
+
+const EVENT_INPUT_KEYS = Object.freeze([
+	"accentColor",
+	"end",
+	"id",
+	"metadata",
+	"start",
+	"title",
+	"url"
+] as const satisfies readonly (keyof CalendarEventInput)[]);
 
 /** Resolves a static source snapshot or provider from validated calendar options. */
 export function resolveCalendarEvents<TMetadata>(
@@ -26,15 +36,37 @@ export function resolveCalendarEvents<TMetadata>(
 	}
 
 	try {
-		return snapshotConfigurationArray(
+		const events = snapshotConfigurationArray(
 			value as readonly CalendarEventInput<TMetadata>[],
 			"events",
 			true
-		) as readonly CalendarEventInput<TMetadata>[];
+		);
+		return Object.freeze(events.map((event, index) =>
+			snapshotStaticEvent<TMetadata>(event, `events[${index.toString()}]`)
+		));
 	} catch (cause: unknown) {
 		if (isLitefoldCalendarError(cause)) {
 			throw cause;
 		}
 		throw createConfigurationError("events array could not be snapshotted.", cause);
 	}
+}
+
+/** Snapshots supported event fields while preserving opaque metadata by reference. */
+function snapshotStaticEvent<TMetadata>(
+	value: unknown,
+	path: string
+): CalendarEventInput<TMetadata> {
+	if (!isRecord(value)) {
+		return value as CalendarEventInput<TMetadata>;
+	}
+
+	const snapshot: Partial<Record<keyof CalendarEventInput<TMetadata>, unknown>> = {};
+	for (const key of EVENT_INPUT_KEYS) {
+		const field = readConfigurationValue(value, key, `${path}.${key}`);
+		if (field !== undefined) {
+			snapshot[key] = field;
+		}
+	}
+	return Object.freeze(snapshot) as CalendarEventInput<TMetadata>;
 }

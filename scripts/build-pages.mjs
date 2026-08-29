@@ -14,13 +14,14 @@ import { fileURLToPath } from "node:url";
 
 import { parseExampleMetadata } from "./lib/example-metadata.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
+import { parseSemVer } from "./lib/semver.mjs";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const DEFAULT_SHELL_DIRECTORY = join(REPOSITORY_ROOT, "scripts", "pages-site");
+const SHELL_MARK_FILENAME = "litefold-calendar-mark.svg";
 const EXAMPLE_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js", ".json"]);
 const PACKAGE_RUNTIME_EXTENSIONS = new Set([".css", ".js"]);
 const SHELL_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js"]);
-const VERSION_PATTERN = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
 const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'";
 
 function displayPath(path, root) {
@@ -40,6 +41,39 @@ function deploymentChannelLabel(channel) {
 	return channel === "main" ? "Rolling main preview" : "Immutable release";
 }
 
+function repositoryWebUrl(repository) {
+	const value = typeof repository === "string" ? repository : repository?.url;
+	if (typeof value !== "string") {
+		throw new Error("Package repository metadata must identify a GitHub repository.");
+	}
+	let parsed;
+	try {
+		parsed = new URL(value.startsWith("git+") ? value.slice(4) : value);
+	} catch {
+		throw new Error("Package repository metadata must identify a GitHub repository.");
+	}
+	const segments = parsed.pathname.replace(/\.git$/u, "").split("/").filter(Boolean);
+	if (parsed.protocol !== "https:" || parsed.hostname !== "github.com" ||
+		parsed.username !== "" || parsed.password !== "" || parsed.search !== "" ||
+		parsed.hash !== "" || segments.length !== 2) {
+		throw new Error("Package repository metadata must identify a GitHub repository.");
+	}
+	return `https://github.com/${segments.map(encodeURIComponent).join("/")}`;
+}
+
+function repositoryPathUrl(repositoryUrl, kind, commit, path) {
+	const encodedPath = path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
+	return `${repositoryUrl}/${kind}/${commit}/${encodedPath}${kind === "tree" ? "/" : ""}`;
+}
+
+function relativeDirectoryHref(fromDirectory, toDirectory) {
+	let href = relative(fromDirectory, toDirectory).replaceAll(sep, "/");
+	if (!href.startsWith(".")) {
+		href = `./${href}`;
+	}
+	return `${href.replace(/\/$/u, "")}/`;
+}
+
 function parseArguments(arguments_) {
 	if (arguments_.length !== 2 || arguments_[0] !== "--output" || arguments_[1]?.length === 0) {
 		throw new Error("Usage: node scripts/build-pages.mjs --output <directory>");
@@ -53,7 +87,12 @@ export function validateDeploymentMetadata(metadata, packageVersion) {
 	if (parsed.channel !== "main" && parsed.channel !== "release") {
 		throw new Error("A Pages artifact must use the main or release deployment channel.");
 	}
-	if (!VERSION_PATTERN.test(parsed.version) || parsed.version !== packageVersion) {
+	try {
+		parseSemVer(parsed.version);
+	} catch {
+		throw new Error("Deployment metadata version must match the package version.");
+	}
+	if (parsed.version !== packageVersion) {
 		throw new Error("Deployment metadata version must match the package version.");
 	}
 
@@ -103,6 +142,22 @@ function assertNoRemoteJavaScriptRequests(source, path) {
 	}
 }
 
+function assertSelfContainedSvgAsset(source, path) {
+	const disallowedMarkup = /<(?:foreignObject|image|script)\b|<\?xml-stylesheet\b|\bon[a-z]+\s*=/iu;
+	const remoteReference = /\b(?:href|xlink:href)\s*=\s*(?:"[^"]*(?:https?:)?\/\/|'[^']*(?:https?:)?\/\/|[^\s"'=<>`]*(?:https?:)?\/\/)/iu;
+	if (disallowedMarkup.test(source) || remoteReference.test(source)) {
+		throw new Error(`${path} must be a self-contained, script-free SVG runtime asset.`);
+	}
+	for (const use of source.matchAll(/<use\b[^>]*>/giu)) {
+		const reference = /\b(?:href|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/iu.exec(use[0]);
+		const value = reference?.[1] ?? reference?.[2] ?? reference?.[3];
+		if (value === undefined || !value.startsWith("#")) {
+			throw new Error(`${path} must be a self-contained, script-free SVG runtime asset.`);
+		}
+	}
+	assertNoRemoteCssAssets(source, path);
+}
+
 async function injectContentSecurityPolicy(htmlPath, root) {
 	const source = await readFile(htmlPath, "utf8");
 	if (!source.includes("<head>") || !source.includes("</head>")) {
@@ -129,6 +184,9 @@ export function assertNoRemoteRuntimeAssets(source, path) {
 			break;
 		case ".js":
 			assertNoRemoteJavaScriptRequests(source, path);
+			break;
+		case ".svg":
+			assertSelfContainedSvgAsset(source, path);
 			break;
 		default:
 			break;
@@ -179,30 +237,51 @@ async function copyRuntimeTree(sourceDirectory, destinationDirectory, extensions
 	return copiedFiles;
 }
 
-function deploymentDetails(metadata, stylesheetHref) {
+async function copyRegularFile(sourcePath, destinationPath, repositoryRoot) {
+	const source = await lstat(sourcePath);
+	if (source.isSymbolicLink()) {
+		throw new Error(`${displayPath(sourcePath, repositoryRoot)} must not be a symbolic link.`);
+	}
+	if (!source.isFile()) {
+		throw new Error(`${displayPath(sourcePath, repositoryRoot)} must be a regular file.`);
+	}
+
+	await mkdir(dirname(destinationPath), { recursive: true });
+	await copyFile(sourcePath, destinationPath);
+	return destinationPath;
+}
+
+function developerFooter(metadata, stylesheetHref, navigation) {
 	const channel = escapeHtml(deploymentChannelLabel(metadata.channel));
 	const commit = escapeHtml(metadata.commit);
 	const version = escapeHtml(metadata.version);
 	return [
 		`\t<link rel="stylesheet" href="${escapeHtml(stylesheetHref)}">`,
-		`\t<aside class="lfc-deployment-details" aria-label="Deployment details" data-deployment-channel="${escapeHtml(metadata.channel)}">`,
-		`\t\t<p><strong>${channel}</strong></p>`,
+		`\t<footer class="lfc-developer-footer" data-deployment-channel="${escapeHtml(metadata.channel)}">`,
+		'\t\t<nav aria-label="Developer resources">',
+		'\t\t\t<ul class="lfc-developer-footer-links">',
+		`\t\t\t\t<li><a href="${escapeHtml(navigation.examplesHref)}">All examples</a></li>`,
+		`\t\t\t\t<li><a href="${escapeHtml(navigation.sourceHref)}">Recipe source</a></li>`,
+		`\t\t\t\t<li><a href="${escapeHtml(navigation.apiHref)}">API reference</a></li>`,
+		`\t\t\t\t<li><a href="${escapeHtml(navigation.integrationHref)}">Integration guide</a></li>`,
+		"\t\t\t</ul>",
+		"\t\t</nav>",
 		"\t\t<dl>",
 		"\t\t\t<dt>Package version</dt>",
 		`\t\t\t<dd><code>${version}</code></dd>`,
-		"\t\t\t<dt>Source commit</dt>",
-		`\t\t\t<dd><code>${commit}</code></dd>`,
 		"\t\t\t<dt>Deployment channel</dt>",
 		`\t\t\t<dd>${channel}</dd>`,
+		"\t\t\t<dt>Source commit</dt>",
+		`\t\t\t<dd><a href="${escapeHtml(navigation.commitHref)}"><code>${commit}</code></a></dd>`,
 		"\t\t</dl>",
-		"\t</aside>"
+		"\t</footer>"
 	].join("\n");
 }
 
-async function injectDeploymentDetails(htmlPath, contentDirectory, metadata) {
+async function injectDeveloperFooter(htmlPath, contentDirectory, exampleDirectory, metadata, repositoryUrl) {
 	const source = await readFile(htmlPath, "utf8");
-	if (source.includes("class=\"lfc-deployment-details\"")) {
-		throw new Error(`${displayPath(htmlPath, contentDirectory)} already contains deployment details.`);
+	if (source.includes("class=\"lfc-developer-footer\"")) {
+		throw new Error(`${displayPath(htmlPath, contentDirectory)} already contains a developer footer.`);
 	}
 	if (!source.includes("</head>") || !source.includes("</body>")) {
 		throw new Error(`${displayPath(htmlPath, contentDirectory)} is not a complete HTML document.`);
@@ -213,10 +292,32 @@ async function injectDeploymentDetails(htmlPath, contentDirectory, metadata) {
 	if (!stylesheetHref.startsWith(".")) {
 		stylesheetHref = `./${stylesheetHref}`;
 	}
-	const link = deploymentDetails(metadata, stylesheetHref).split("\n")[0];
-	const aside = deploymentDetails(metadata, stylesheetHref).split("\n").slice(1).join("\n");
+	const exampleRelativeDirectory = displayPath(dirname(htmlPath), exampleDirectory);
+	if (exampleRelativeDirectory === "" || exampleRelativeDirectory.startsWith("../")) {
+		throw new Error(`${displayPath(htmlPath, contentDirectory)} must be a nested example document.`);
+	}
+	const navigation = {
+		apiHref: repositoryPathUrl(repositoryUrl, "blob", metadata.commit, "docs/api.md"),
+		commitHref: `${repositoryUrl}/commit/${metadata.commit}`,
+		examplesHref: relativeDirectoryHref(dirname(htmlPath), exampleDirectory),
+		integrationHref: repositoryPathUrl(
+			repositoryUrl,
+			"blob",
+			metadata.commit,
+			"docs/integration-guide.md"
+		),
+		sourceHref: repositoryPathUrl(
+			repositoryUrl,
+			"tree",
+			metadata.commit,
+			`examples/${exampleRelativeDirectory}`
+		)
+	};
+	const footer = developerFooter(metadata, stylesheetHref, navigation);
+	const link = footer.split("\n")[0];
+	const markup = footer.split("\n").slice(1).join("\n");
 	const withStylesheet = source.replace("</head>", `${link}\n</head>`);
-	await writeFile(htmlPath, withStylesheet.replace("</body>", `${aside}\n</body>`), "utf8");
+	await writeFile(htmlPath, withStylesheet.replace("</body>", `${markup}\n</body>`), "utf8");
 }
 
 async function validateRuntimeFiles(files, root) {
@@ -251,6 +352,7 @@ export async function buildPagesArtifact(options) {
 		JSON.parse(await readFile(metadataPath, "utf8")),
 		packageManifest.version
 	);
+	const repositoryUrl = repositoryWebUrl(packageManifest.repository);
 
 	await mkdir(dirname(resolvedOutput), { recursive: true });
 	const stagingDirectory = await mkdtemp(join(dirname(resolvedOutput), ".lfc-pages-staging-"));
@@ -275,6 +377,11 @@ export async function buildPagesArtifact(options) {
 			SHELL_RUNTIME_EXTENSIONS,
 			repositoryRoot
 		);
+		shellFiles.push(await copyRegularFile(
+			join(repositoryRoot, "docs", "assets", SHELL_MARK_FILENAME),
+			join(stagingDirectory, "shell", SHELL_MARK_FILENAME),
+			repositoryRoot
+		));
 
 		await requireFiles(stagingDirectory, [
 			"content/dist/index.js",
@@ -283,6 +390,7 @@ export async function buildPagesArtifact(options) {
 			"content/examples/metadata.json",
 			"shell/deployment-details.css",
 			"shell/index.html",
+			`shell/${SHELL_MARK_FILENAME}`,
 			"shell/site.css",
 			"shell/site.js"
 		]);
@@ -292,7 +400,13 @@ export async function buildPagesArtifact(options) {
 			displayPath(path, exampleDirectory) !== "index.html"
 		);
 		for (const htmlPath of nestedExampleHtml) {
-			await injectDeploymentDetails(htmlPath, contentDirectory, metadata);
+			await injectDeveloperFooter(
+				htmlPath,
+				contentDirectory,
+				exampleDirectory,
+				metadata,
+				repositoryUrl
+			);
 		}
 		const allHtmlFiles = [...exampleFiles, ...shellFiles]
 			.filter((path) => extname(path).toLowerCase() === ".html");

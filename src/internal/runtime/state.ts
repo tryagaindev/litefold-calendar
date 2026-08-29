@@ -28,6 +28,7 @@ export interface InternalErrorOptions {
 	readonly code: CalendarErrorCode;
 	readonly eventIndex?: number | undefined;
 	readonly extensionId?: string | undefined;
+	readonly renderHookId?: string | undefined;
 	readonly hook?: string | undefined;
 	readonly message?: string | undefined;
 	readonly phase?: CalendarErrorPhase | undefined;
@@ -57,8 +58,8 @@ export function createState(
 	});
 }
 
-/** Identifies a supported extension/rendering surface. */
-export function isExtensionSurface(value: unknown): value is CalendarSurface {
+/** Identifies a supported render-hook surface. */
+export function isRenderHookSurface(value: unknown): value is CalendarSurface {
 	return value === "day" || value === "grid-summary" || value === "agenda";
 }
 
@@ -78,7 +79,8 @@ export function phaseForCode(code: CalendarErrorCode): CalendarErrorPhase {
 		case "event-source-failed": return "source";
 		case "event-data-invalid":
 		case "event-limit-exceeded": return "validation";
-		case "extension-failed": return "extension";
+		case "extension-failed": return "integration";
+		case "render-hook-failed": return "render";
 		case "action-failed": return "action";
 		case "host-integration-failed": return "integration";
 		case "internal-error": return "render";

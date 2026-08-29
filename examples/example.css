@@ -91,6 +91,7 @@
 	.example-intro h1 {
 		font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.5rem);
 		line-height: 1.1;
+		overflow-wrap: anywhere;
 		text-wrap: balance;
 	}
 
@@ -106,7 +107,7 @@
 		gap: var(--example-gap);
 		min-inline-size: 0;
 		padding: clamp(0.875rem, 2vw, 1.125rem);
-		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
 		border: 1px solid var(--example-border-color);
 		border-radius: var(--example-radius);
 		background: var(--example-surface-background);
@@ -143,7 +144,7 @@
 		min-inline-size: 0;
 		padding-block: 0.5rem;
 		padding-inline: 0.75rem;
-		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
 		border: 1px solid var(--example-border-color);
 		border-radius: 0.5rem;
 		background: var(--example-surface-background);
@@ -211,7 +212,7 @@
 
 	.example-result:not(:empty) {
 		padding: 0.75rem;
-		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
 		border: 1px solid var(--example-border-color);
 		border-radius: var(--example-radius);
 		background: var(--example-surface-background);

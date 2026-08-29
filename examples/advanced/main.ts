@@ -5,11 +5,12 @@ import {
 	type CalendarAnnouncement,
 	type CalendarEventInput,
 	type CalendarEventSource,
-	type CalendarExtension,
 	type CalendarMessages,
 	type CalendarOptions,
+	type CalendarRenderHooks,
 	type CalendarState
 } from "../../dist/index.js";
+import { webMcp } from "../../dist/extensions/webmcp/index.js";
 
 type ScheduleItemType = "appointment" | "milestone" | "task";
 
@@ -31,12 +32,16 @@ interface ScheduleRecord {
 	readonly url?: string;
 }
 
+/**
+ * Repository coverage types: every public key stays required here so a new API surface
+ * cannot be added without updating this example.
+ */
 type CompleteCalendarOptions<TMetadata> = {
 	-readonly [TKey in keyof CalendarOptions<TMetadata>]-?: CalendarOptions<TMetadata>[TKey];
 };
 
-type CompleteCalendarExtension<TMetadata> = {
-	-readonly [TKey in keyof CalendarExtension<TMetadata>]-?: CalendarExtension<TMetadata>[TKey];
+type CompleteCalendarRenderHooks<TMetadata> = {
+	-readonly [TKey in keyof CalendarRenderHooks<TMetadata>]-?: CalendarRenderHooks<TMetadata>[TKey];
 };
 
 const OPAQUE_HEX_COLOR = /^#[0-9A-F]{6}$/u;
@@ -65,8 +70,8 @@ const ADVANCED_MESSAGES = Object.freeze({
 	dayLabel: "{date}, {count} {eventLabel}",
 	event: "item",
 	events: "items",
-	extensionErrorMessage: "Some schedule details could not be displayed.",
-	extensionErrorTitle: "Some schedule details are unavailable",
+	renderHookErrorMessage: "Some schedule details could not be displayed.",
+	renderHookErrorTitle: "Some schedule details are unavailable",
 	gridEventInstructions: "Use arrow keys to move between dates and Enter or Space to select. Press F2 on a date to move to its visible event actions; use Up and Down Arrow between actions, and Escape or F2 to return.",
 	gridMore: "{count} additional",
 	gridMoreLabel: "View {count} more {eventLabel} for {date}",
@@ -101,10 +106,11 @@ const REPLACEMENT_EVENTS = Object.freeze([
 		}),
 		start: "2026-08-06T13:00",
 		title: "Dynamically replaced schedule",
-		url: "/schedule/dynamic-replacement?view=calendar#details"
+		url: "./?event=dynamic-replacement&from=calendar#advanced-example-calendar-title"
 	})
 ] satisfies readonly CalendarEventInput<EventData>[]);
 
+//The first records demonstrate behavior; the generated records exercise overflow limits.
 const FEATURE_SCHEDULE: readonly ScheduleRecord[] = Object.freeze([
 	Object.freeze({
 		accentCandidate: "#008577",
@@ -132,7 +138,7 @@ const FEATURE_SCHEDULE: readonly ScheduleRecord[] = Object.freeze([
 		start: "2026-08-06T09:30",
 		statusLabel: "Confirmed",
 		title: "Design review",
-		url: "/schedule/design-review?view=calendar#details"
+		url: "./?event=design-review&from=calendar#advanced-example-calendar-title"
 	}),
 	Object.freeze({
 		accentCandidate: "#805FC0",
@@ -142,7 +148,7 @@ const FEATURE_SCHEDULE: readonly ScheduleRecord[] = Object.freeze([
 		start: "2026-08-06T10:00",
 		statusLabel: null,
 		title: "Launch checkpoint",
-		url: "/schedule/launch-checkpoint?view=calendar#details"
+		url: "./?event=launch-checkpoint&from=calendar#advanced-example-calendar-title"
 	}),
 	Object.freeze({
 		accentCandidate: "#008577",
@@ -217,6 +223,7 @@ const SCHEDULE: readonly ScheduleRecord[] = Object.freeze([
 	...createOverflowSchedule()
 ]);
 
+//Resolve integration elements once so markup drift fails during example startup.
 function requireElement<TElement extends Element>(
 	selector: string,
 	constructor: abstract new (...arguments_: never[]) => TElement
@@ -255,9 +262,11 @@ const eventDialogOccurrence = requireElement(
 );
 const eventDialogStart = requireElement("[data-example-event-dialog-start]", HTMLTimeElement);
 const eventDialogEnd = requireElement("[data-example-event-dialog-end]", HTMLTimeElement);
+const eventDialogNoEnd = requireElement("[data-example-event-dialog-no-end]", HTMLElement);
 const typeInputs = [...document.querySelectorAll<HTMLInputElement>("[data-example-type-filter]")];
 const commandButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-example-command]")];
 
+//This cache belongs to the application, not to litefold-calendar.
 const rawRangeCache = new Map<string, readonly CalendarEventInput<EventData>[]>();
 
 function toAccentColor(value: string | null): string | undefined {
@@ -269,6 +278,7 @@ function toAccentColor(value: string | null): string | undefined {
 	return OPAQUE_HEX_COLOR.test(normalized) ? normalized : undefined;
 }
 
+/** Maps an application record to the public event-input contract. */
 function adaptScheduleRecord(item: ScheduleRecord): CalendarEventInput<EventData> {
 	const accentColor = toAccentColor(item.accentCandidate);
 	const metadata: EventData = Object.freeze({
@@ -289,6 +299,7 @@ function adaptScheduleRecord(item: ScheduleRecord): CalendarEventInput<EventData
 	});
 }
 
+/** Loads and caches the unfiltered snapshot for one requested 42-day range. */
 function loadRawRange(
 	start: string,
 	end: string,
@@ -330,7 +341,7 @@ function formatStateDate(date: CalendarState["selectedDate"]): string {
 	].join("-");
 }
 
-function updateState(state: Readonly<CalendarState>): void {
+function updateState(state: Readonly<CalendarState>): undefined {
 	document.documentElement.dataset["examplePhase"] = state.phase;
 	document.documentElement.dataset["exampleReady"] =
 		state.phase === "ready" || state.phase === "degraded" ? "true" : "false";
@@ -343,7 +354,7 @@ function updateState(state: Readonly<CalendarState>): void {
 	stateIssues.textContent = String(state.issues.length);
 }
 
-function announceExternally(announcement: Readonly<CalendarAnnouncement>): void {
+function announceExternally(announcement: Readonly<CalendarAnnouncement>): undefined {
 	const target = announcement.politeness === "assertive" ? assertiveAnnouncer : politeAnnouncer;
 	const other = announcement.politeness === "assertive" ? politeAnnouncer : assertiveAnnouncer;
 	other.textContent = "";
@@ -391,6 +402,7 @@ function createNavigationIcon(ownerDocument: Document, text: string): Node {
 	return icon;
 }
 
+/** Applies current application filters each time the calendar requests or refetches a range. */
 const loadEvents: CalendarEventSource<EventData> = ({ end, signal, start }) => {
 	host.dataset["exampleSourceRange"] = `${start} to ${end} (exclusive)`;
 	const raw = loadRawRange(start, end, signal);
@@ -399,7 +411,8 @@ const loadEvents: CalendarEventSource<EventData> = ({ end, signal, start }) => {
 		event.metadata !== undefined && enabled.has(event.metadata.itemType));
 };
 
-const advancedExtension = Object.freeze({
+//Hook output is application-owned DOM; lifecycle hooks undo every mutation they make.
+const advancedRenderHooks = Object.freeze({
 	id: "advanced-example",
 	dayDidMount: ({ dateString, elements, isCurrentMonth, isSelected, isToday }) => {
 		elements.cell.toggleAttribute(
@@ -440,8 +453,9 @@ const advancedExtension = Object.freeze({
 			);
 		}
 
+		//Cleanup may run from the returned callback or the hook-scoped abort signal.
 		let cleaned = false;
-		const cleanup = (): void => {
+		const cleanup = (): undefined => {
 			if (cleaned) {
 				return;
 			}
@@ -504,16 +518,35 @@ const advancedExtension = Object.freeze({
 		actionHint.className = "advanced-example-action-hint";
 		actionHint.textContent = "View details";
 		return actionHint;
-	}
-} satisfies CompleteCalendarExtension<EventData>);
+	},
+	renderGridOverflowContent: ({
+		dateString,
+		document: ownerDocument,
+		eventCount,
+		hiddenEventCount,
+		surface,
+		text
+	}) => {
+		const content = ownerDocument.createElement("span");
+		content.className = "advanced-example-grid-overflow-content";
+		content.dataset["exampleDate"] = dateString;
+		content.dataset["exampleEventCount"] = String(eventCount);
+		content.dataset["exampleHiddenEventCount"] = String(hiddenEventCount);
+		content.dataset["exampleSurface"] = surface;
+		content.textContent = text;
+		return content;
+	},
+	//Returning undefined keeps the built-in multiple-event indicator.
+	renderMultipleEventIndicator: () => undefined
+} satisfies CompleteCalendarRenderHooks<EventData>);
 
-//EventData is inferred from the typed source and extension.
+//EventData is inferred from the typed source and render hooks; `satisfies` keeps every option checked.
 const calendarOptions = {
 	agendaDomLimit: 50,
 	agendaPageSize: 10,
 	events: loadEvents,
 	eventTimeDisplay: "agenda",
-	extensions: [advancedExtension],
+	extensions: [webMcp({ toolNamePrefix: "litefold-advanced" })],
 	fallbackElement,
 	firstDay: 1,
 	headingLevel: 3,
@@ -569,10 +602,14 @@ const calendarOptions = {
 
 		if (event.end === null) {
 			eventDialogEnd.removeAttribute("datetime");
-			eventDialogEnd.textContent = "No end time";
+			eventDialogEnd.textContent = "";
+			eventDialogEnd.hidden = true;
+			eventDialogNoEnd.hidden = false;
 		} else {
 			eventDialogEnd.dateTime = event.end;
 			eventDialogEnd.textContent = formatCivilValue(event.end, event.isAllDay);
+			eventDialogEnd.hidden = false;
+			eventDialogNoEnd.hidden = true;
 		}
 
 		result.textContent = `Opened ${event.title} from ${surface} with ${nativeEvent.type} on ${element.localName}.`;
@@ -586,6 +623,7 @@ const calendarOptions = {
 		);
 	},
 	onStateChange: updateState,
+	renderHooks: [advancedRenderHooks],
 	sourceEventLimit: 100,
 	swipe: true,
 	timeZone: "America/Los_Angeles",
@@ -594,11 +632,13 @@ const calendarOptions = {
 
 const calendar = createCalendar(host, calendarOptions);
 
+//This exhaustive map doubles as the UI command dispatcher and public-method coverage check.
 const calendarMethods = {
 	destroy: () => { calendar.destroy(); },
 	focusDate: () => { calendar.focusDate(targetDate.value); },
 	focusToday: () => { calendar.focusToday(); },
 	getState: () => calendar.getState(),
+	//Use an instant here to demonstrate projection through the configured time zone.
 	gotoDate: () => { calendar.gotoDate(new Date(`${targetDate.value}T19:00:00.000Z`)); },
 	next: () => { calendar.next(); },
 	prev: () => { calendar.prev(); },
@@ -644,6 +684,7 @@ function runCommand(command: string): boolean {
 	return true;
 }
 
+//Connect application controls only after the calendar and its immutable options exist.
 for (const button of commandButtons) {
 	const command = button.dataset["exampleCommand"];
 	if (command === undefined) {
@@ -684,12 +725,15 @@ themeControl.addEventListener("change", () => {
 	reportAction(`Changed example theme to ${theme}.`);
 });
 
+//Rendering is explicit; non-cached page exit owns teardown for this standalone page.
 calendarMethods.render();
 updateState(calendarMethods.getState());
 
-window.addEventListener("pagehide", () => {
-	if (eventDialog.open) {
-		eventDialog.close();
+window.addEventListener("pagehide", (event) => {
+	if (!event.persisted) {
+		if (eventDialog.open) {
+			eventDialog.close();
+		}
+		calendarMethods.destroy();
 	}
-	calendarMethods.destroy();
-}, { once: true });
+});

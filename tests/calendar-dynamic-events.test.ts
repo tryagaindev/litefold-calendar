@@ -187,24 +187,79 @@ void test("setEvents aborts stale sources and refetches the latest accepted prov
 
 void test("setEvents snapshots a static array before accepting it", async (context) => {
 	const { host } = setupDom(context);
+	const initialRecord = {
+		id: "initial-snapshot",
+		start: "2026-08-06",
+		title: "Initial snapshotted event"
+	};
 	const calendar = createCalendar(host, {
-		events: [],
+		events: [initialRecord],
 		initialDate: "2026-08-06"
 	});
+	initialRecord.start = "invalid-after-construction";
+	initialRecord.title = "Initial caller mutation";
 	calendar.render();
 	await waitForReady(calendar);
+	assert.match(host.textContent ?? "", /Initial snapshotted event/u);
+	assert.doesNotMatch(host.textContent ?? "", /Initial caller mutation/u);
 
-	const mutableEvents: CalendarEventInput[] = [event("snapshot", "Snapshotted event")];
+	const mutableRecord = {
+		id: "snapshot",
+		start: "2026-08-06",
+		title: "Snapshotted event"
+	};
+	const mutableEvents: CalendarEventInput[] = [mutableRecord];
 	calendar.setEvents(mutableEvents);
 	mutableEvents.splice(0, 1, event("mutated", "Caller mutation"));
+	mutableRecord.start = "invalid-after-replacement";
+	mutableRecord.title = "Caller record mutation";
 	await waitForReady(calendar);
 	assert.match(host.textContent ?? "", /Snapshotted event/u);
 	assert.doesNotMatch(host.textContent ?? "", /Caller mutation/u);
+	assert.doesNotMatch(host.textContent ?? "", /Caller record mutation/u);
 
 	calendar.refetchEvents();
 	await waitForReady(calendar);
 	assert.match(host.textContent ?? "", /Snapshotted event/u);
 	assert.doesNotMatch(host.textContent ?? "", /Caller mutation/u);
+	assert.doesNotMatch(host.textContent ?? "", /Caller record mutation/u);
+});
+
+void test("same-range date navigation does not refetch or collapse an unchanged agenda", async (context) => {
+	const { dom, host } = setupDom(context);
+	let providerCalls = 0;
+	const calendar = createCalendar(host, {
+		agendaPageSize: 10,
+		events: () => {
+			providerCalls += 1;
+			return agendaEvents(12);
+		},
+		initialDate: "2026-08-06",
+		now: () => new Date("2026-08-07T12:00:00Z"),
+		timeZone: "UTC"
+	});
+	calendar.render();
+	await waitForReady(calendar);
+	assert.equal(providerCalls, 1);
+
+	const more = requireElement(host, ".lfc-calendar-agenda-more", dom.window.HTMLButtonElement);
+	dispatchClick(dom, more);
+	assert.equal(renderedAgendaEvents(host).length, 12);
+
+	calendar.gotoDate("2026-08-06");
+	assert.equal(providerCalls, 1);
+	assert.equal(renderedAgendaEvents(host).length, 12, "An idempotent gotoDate must preserve disclosure.");
+
+	calendar.gotoDate("2026-08-07");
+	assert.equal(providerCalls, 1);
+	assert.deepEqual(calendar.getState().selectedDate, { day: 7, month: 8, year: 2026 });
+	calendar.today();
+	assert.equal(providerCalls, 1);
+	assert.deepEqual(calendar.getState().selectedDate, { day: 7, month: 8, year: 2026 });
+
+	calendar.gotoDate("2026-09-07");
+	await waitForReady(calendar);
+	assert.equal(providerCalls, 2, "A visible-range transition must request its new snapshot.");
 });
 
 void test("reentrant validation and callbacks keep the last accepted replacement", async (context) => {

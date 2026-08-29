@@ -2,6 +2,18 @@ const CHANNELS = new Set(["local", "main", "release"]);
 const FULL_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z.+-]{0,126}[0-9A-Za-z])?$/u;
 
+export function resolveExampleSourceCommit({
+	channel,
+	explicitCommit,
+	headCommit,
+	workingTreeDirty
+}) {
+	if (explicitCommit !== undefined) {
+		return explicitCommit;
+	}
+	return channel === "local" && workingTreeDirty ? null : headCommit;
+}
+
 function requireMetadataRecord(value) {
 	if (typeof value !== "object" || value === null || Array.isArray(value)) {
 		throw new Error("Example metadata must be a JSON object.");

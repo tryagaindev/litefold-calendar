@@ -7,6 +7,7 @@ import {
 	type CalendarEventInput,
 	LitefoldCalendarError
 } from "../src/index.js";
+import { webMcp } from "../src/extensions/webmcp/index.js";
 import {
 	createDom,
 	deferred,
@@ -253,7 +254,7 @@ void test("synchronous reentrant actions preserve only the newest action outcome
 	assert.equal(calendar.getState().issues.some((issue) => issue.code === "action-failed"), false);
 });
 
-void test("extension nodes must be detached, noninteractive, and remain application-owned if moved", async (context) => {
+void test("render-hook nodes must be detached, noninteractive, and remain application-owned if moved", async (context) => {
 	const { dom, host } = setupDom(context, '<div id="outside"><span id="connected">Connected</span></div><div id="calendar"></div>');
 	const outside = dom.window.document.querySelector<HTMLElement>("#outside");
 	const connected = dom.window.document.querySelector<HTMLElement>("#connected");
@@ -263,7 +264,7 @@ void test("extension nodes must be detached, noninteractive, and remain applicat
 	const errors: LitefoldCalendarError[] = [];
 	const calendar = createCalendar(host, {
 		events: async () => [event("lease", "2026-07-14", "Lease")],
-		extensions: [
+		renderHooks: [
 			{ id: "connected", renderEventDetails: () => connected },
 			{ id: "interactive", renderEventTrailing: () => dom.window.document.createElement("button") },
 			{
@@ -285,7 +286,9 @@ void test("extension nodes must be detached, noninteractive, and remain applicat
 	calendar.render();
 	await waitForPhase(calendar, "degraded");
 	assert.equal(connected.parentElement, outside);
-	assert.equal(errors.filter((error) => error.code === "extension-failed").length, 2);
+	const renderHookErrors = errors.filter((error) => error.code === "render-hook-failed");
+	assert.equal(renderHookErrors.length, 2);
+	assert.ok(renderHookErrors.every((error) => error.phase === "render"));
 	const leasedNode = leasedNodes[0];
 	assert.ok(leasedNode);
 	outside.append(leasedNode);
@@ -299,16 +302,16 @@ void test("async returns from synchronous host and cleanup callbacks are observe
 	let cleanupSawAbort = false;
 	const options = {
 		events: async () => [event("callbacks", "2026-07-14", "Callbacks")],
-		extensions: [{
+		initialDate: "2026-07-14",
+		onError: (error: LitefoldCalendarError) => { errors.push(error); return undefined; }
+	};
+	Reflect.set(options, "renderHooks", [{
 			eventDidMount: ({ signal }: { readonly signal: AbortSignal }) => () => {
 				cleanupSawAbort = signal.aborted;
 				return Promise.reject(new Error("async cleanup rejection"));
 			},
 			id: "async-cleanup"
-		}],
-		initialDate: "2026-07-14",
-		onError: (error: LitefoldCalendarError) => { errors.push(error); }
-	};
+		}]);
 	Reflect.set(options, "onAnnounce", async () => undefined);
 	Reflect.set(options, "onStateChange", async () => undefined);
 	const calendar = createCalendar(host, options);
@@ -316,10 +319,10 @@ void test("async returns from synchronous host and cleanup callbacks are observe
 	await waitFor(() => errors.some((error) => error.hook === "onStateChange"), "async state callback error");
 	await waitFor(() => getAgenda(host).textContent?.includes("Callbacks") === true, "mounted callback event");
 	calendar.focusDate("2026-07-14");
-	await waitFor(() => errors.some((error) => error.extensionId === "async-cleanup"), "async cleanup error");
+	await waitFor(() => errors.some((error) => error.renderHookId === "async-cleanup"), "async cleanup error");
 	assert.equal(cleanupSawAbort, true);
 	assert.ok(errors.some((error) => error.code === "host-integration-failed"));
-	assert.ok(errors.some((error) => error.code === "extension-failed"));
+	assert.ok(errors.some((error) => error.code === "render-hook-failed"));
 });
 
 void test("a fatal render failure creates an unavailable fallback and restores removed owned focus", (context) => {
@@ -435,14 +438,14 @@ void test("callback reentrancy cannot invoke a source or overwrite destroyed sta
 	assert.equal(host.childElementCount, 0);
 });
 
-void test("extension hooks stop and clean up after reentrant destroy", (context) => {
+void test("render hooks stop and clean up after reentrant destroy", (context) => {
 	const { host } = setupDom(context);
 	let renderCalls = 0;
 	let returnedNode: HTMLElement | undefined;
 	let renderingCalendar: Calendar | null = null;
 	const first = createCalendar(host, {
 		events: [],
-		extensions: [{
+		renderHooks: [{
 			id: "destroying-render-hook",
 			renderDayBadge: ({ document: ownerDocument }) => {
 				renderCalls += 1;
@@ -466,7 +469,7 @@ void test("extension hooks stop and clean up after reentrant destroy", (context)
 	let mountingCalendar: Calendar | null = null;
 	const second = createCalendar(host, {
 		events: [],
-		extensions: [{
+		renderHooks: [{
 			dayDidMount: () => {
 				mountCalls += 1;
 				mountingCalendar?.destroy();
@@ -483,6 +486,67 @@ void test("extension hooks stop and clean up after reentrant destroy", (context)
 	assert.equal(cleanups, 1);
 	assert.equal(second.getState().phase, "destroyed");
 	assert.equal(host.childElementCount, 0);
+});
+
+void test("render-hook node leases survive connected-callback teardown without blocking reuse", async (context) => {
+	const { dom, host } = setupDom(context);
+	let activeCalendar: Calendar | null = null;
+	let connections = 0;
+	class DestroyingRenderHookElement extends dom.window.HTMLElement {
+		public connectedCallback(): void {
+			connections += 1;
+			activeCalendar?.destroy();
+		}
+	}
+	dom.window.customElements.define("lfc-destroying-render-hook", DestroyingRenderHookElement);
+	const renderHookNode = dom.window.document.createElement("lfc-destroying-render-hook");
+	let firstReturned = false;
+	const first = createCalendar(host, {
+		events: [],
+		renderHooks: [{
+			id: "connected-destroy",
+			renderDayBadge: () => {
+				if (firstReturned) {
+					return null;
+				}
+				firstReturned = true;
+				return renderHookNode;
+			}
+		}],
+		initialDate: "2026-07-14"
+	});
+	activeCalendar = first;
+	first.render();
+
+	assert.equal(first.getState().phase, "destroyed");
+	assert.equal(renderHookNode.parentNode, null);
+	assert.equal(connections, 1);
+	const connectionsBeforeReuse = connections;
+
+	activeCalendar = null;
+	const errors: LitefoldCalendarError[] = [];
+	const second = createCalendar(host, {
+		events: [],
+			renderHooks: [{
+			id: "connected-reuse",
+			renderDayBadge: () => {
+				if (renderHookNode.parentNode === null) {
+					return renderHookNode;
+				}
+				return null;
+			}
+		}],
+		initialDate: "2026-07-14",
+		onError: (error) => { errors.push(error); }
+	});
+	second.render();
+	await waitForPhase(second, "ready");
+
+	assert.ok(connections > connectionsBeforeReuse);
+	assert.equal(host.contains(renderHookNode), true);
+	assert.equal(errors.some((error) => error.code === "render-hook-failed"), false);
+	second.destroy();
+	assert.equal(renderHookNode.parentNode, null);
 });
 
 void test("Page navigation always changes month while arrows remain focus-only at the grid boundary", async (context) => {
@@ -524,10 +588,10 @@ void test("destroy detaches toolbar content for reuse and duplicate cleanup regi
 	assert.ok(toolbarEnd);
 	let registrations = 0;
 	let cleanups = 0;
-	const cleanup = (): void => { cleanups += 1; };
+	const cleanup = (): undefined => { cleanups += 1; };
 	const calendar = createCalendar(host, {
 		events: async () => [event("cleanup", "2026-07-14", "Cleanup")],
-		extensions: [{
+		renderHooks: [{
 			eventDidMount: () => {
 				registrations += 1;
 				return cleanup;
@@ -634,7 +698,18 @@ void test("configuration is snapshotted once and rejects unknown keys, bad callb
 	Object.defineProperty(staticEvents, Symbol.iterator, {
 		value: () => { throw new Error("The custom iterator must not run."); }
 	});
-	const options = { initialDate: "2026-07-14" } as Record<PropertyKey, unknown>;
+	const configurationTag = Symbol("application-configuration-tag");
+	const options = {
+		[configurationTag]: true,
+		icons: { [configurationTag]: true },
+		initialDate: "2026-07-14",
+		messages: { [configurationTag]: true },
+		renderHooks: [{ [configurationTag]: true, id: "symbol-tagged" }]
+	} as Record<PropertyKey, unknown>;
+	assert.doesNotThrow(() => webMcp({
+		[configurationTag]: true,
+		toolNamePrefix: "symbol-tagged"
+	} as never));
 	Object.defineProperty(options, "events", {
 		enumerable: true,
 		get: () => {
@@ -658,7 +733,7 @@ void test("configuration is snapshotted once and rejects unknown keys, bad callb
 		{ events: [], swipe: null },
 		{ events: [], onDaySelect: "not a function" },
 		{ events: [], icons: { nxt: () => host.ownerDocument.createTextNode("next") } },
-		{ events: [], extensions: [{ id: "typo", renderDayBadg: () => null }] },
+		{ events: [], renderHooks: [{ id: "typo", renderDayBadg: () => null }] },
 		{ events: [], messages: { agendaEmpty: "None", emtpy: "Typo" } },
 		{ events: [], messages: { agendaTitle: "Events for {dayte}" } }
 	];
@@ -676,7 +751,7 @@ void test("context-menu-only agenda events have a primary action and native acce
 	let nativeEvent: Event | undefined;
 	const calendar = createCalendar(host, {
 		events: [event("context-only", "2026-07-14T09:00", "Context only")],
-		extensions: [{
+		renderHooks: [{
 			id: "visible-details",
 			renderEventDetails: ({ document }) => document.createTextNode("Visible details")
 		}],
@@ -878,8 +953,8 @@ function findRetryButton(host: HTMLElement): HTMLButtonElement | undefined {
 			button.hasAttribute("hidden") === false && button.closest("[hidden]") === null);
 }
 
-async function waitForPhase(
-	calendar: Calendar,
+async function waitForPhase<TMetadata>(
+	calendar: Calendar<TMetadata>,
 	phase: ReturnType<Calendar["getState"]>["phase"]
 ): Promise<void> {
 	await waitFor(() => calendar.getState().phase === phase, `${phase} calendar state`);

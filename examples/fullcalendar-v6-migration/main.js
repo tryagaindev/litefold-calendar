@@ -7,11 +7,14 @@ import { createCalendar } from "../../dist/index.js";
  * @property {string} [ownerLabel]
  */
 /**
- * @typedef FullCalendarEventInput
- * @property {string | number} id
+ * Narrow FullCalendar-style input accepted by this migration adapter.
+ * Transport validation should happen before values reach this type.
+ * @typedef MigratableFullCalendarEvent
+ * @property {string | number} [id]
  * @property {string} title
  * @property {string} start
  * @property {string} [end]
+ * @property {boolean} [allDay]
  * @property {string} [url]
  * @property {string} [backgroundColor]
  * @property {string} [borderColor]
@@ -21,6 +24,13 @@ import { createCalendar } from "../../dist/index.js";
 /** @typedef {import("../../dist/index.js").CalendarRange} CalendarRange */
 
 const MILLISECONDS_PER_DAY = 86_400_000;
+const OPAQUE_HEX_COLOR = /^#[0-9A-F]{6}$/iu;
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+
+const FULLCALENDAR_VALID_RANGE = Object.freeze({
+	end: "2027-09-16",
+	start: "2026-07-15"
+});
 
 /**
  * @param {string} selector
@@ -44,7 +54,7 @@ if (!(refetchButton instanceof HTMLButtonElement)) {
 	throw new Error("The migration refetch control must be a button.");
 }
 
-/** @type {readonly Readonly<FullCalendarEventInput>[]} */
+/** @type {readonly Readonly<MigratableFullCalendarEvent>[]} */
 const FULLCALENDAR_STYLE_RESPONSE = Object.freeze([
 	Object.freeze({
 		backgroundColor: "#008577",
@@ -73,9 +83,24 @@ const FULLCALENDAR_STYLE_RESPONSE = Object.freeze([
 ]);
 
 /**
+ * Returns the first FullCalendar color that Litefold can use as a marker accent.
+ * @param {Readonly<MigratableFullCalendarEvent>} event
+ * @returns {string | undefined}
+ */
+function getMarkerAccent(event) {
+	for (const candidate of [event.backgroundColor, event.borderColor]) {
+		if (typeof candidate === "string" && OPAQUE_HEX_COLOR.test(candidate)) {
+			return candidate.toUpperCase();
+		}
+	}
+
+	return undefined;
+}
+
+/**
  * Converts the common FullCalendar event fields used by a basic `dayGridMonth` view.
  * Litefold performs the authoritative public-event validation when the provider resolves.
- * @param {readonly Readonly<FullCalendarEventInput>[]} events
+ * @param {readonly Readonly<MigratableFullCalendarEvent>[]} events
  * @returns {readonly Readonly<MigratedEvent>[]}
  */
 export function adaptFullCalendarSnapshot(events) {
@@ -87,7 +112,15 @@ export function adaptFullCalendarSnapshot(events) {
 		if (typeof event.id !== "string" && typeof event.id !== "number") {
 			throw new TypeError("Every migrated event needs a stable string or numeric id.");
 		}
-		const accentColor = event.backgroundColor ?? event.borderColor;
+		if (event.allDay !== undefined && typeof event.allDay !== "boolean") {
+			throw new TypeError("FullCalendar allDay must be a boolean when supplied.");
+		}
+		const inferredAllDay = DATE_ONLY_PATTERN.test(event.start);
+		if ((event.end !== undefined && DATE_ONLY_PATTERN.test(event.end) !== inferredAllDay) ||
+			(event.allDay !== undefined && event.allDay !== inferredAllDay)) {
+			throw new TypeError("FullCalendar allDay must match the date-only or date-time start and end values.");
+		}
+		const accentColor = getMarkerAccent(event);
 		return {
 			id: String(event.id),
 			title: event.title,
@@ -98,6 +131,29 @@ export function adaptFullCalendarSnapshot(events) {
 			...(event.extendedProps === undefined ? {} : { metadata: event.extendedProps })
 		};
 	});
+}
+
+/**
+ * Converts FullCalendar's exclusive date-only upper bound to Litefold's inclusive bound.
+ * @param {string} value
+ * @returns {string}
+ */
+export function previousCivilDate(value) {
+	if (typeof value !== "string" || !DATE_ONLY_PATTERN.test(value) || value.startsWith("0000-")) {
+		throw new TypeError("validRange.end must be a valid date-only ISO string in years 0001-9999.");
+	}
+
+	const date = new Date(`${value}T00:00:00Z`);
+	if (Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== value) {
+		throw new TypeError("validRange.end must be a valid date-only ISO string in years 0001-9999.");
+	}
+
+	date.setUTCDate(date.getUTCDate() - 1);
+	const previous = date.toISOString().slice(0, 10);
+	if (previous.startsWith("0000-")) {
+		throw new RangeError("validRange.end has no preceding date supported by Litefold.");
+	}
+	return previous;
 }
 
 /**
@@ -169,14 +225,21 @@ async function loadMigratedEvents({ end, signal, start }) {
 const calendar = createCalendar(host, {
 	events: loadMigratedEvents,
 	initialDate: "2026-08-04",
+	maxDate: previousCivilDate(FULLCALENDAR_VALID_RANGE.end),
+	minDate: FULLCALENDAR_VALID_RANGE.start,
 	onDaySelect: ({ dateString }) => {
 		selectionResult.textContent = dateString;
 	},
 	onEventActivate: ({ element, event, nativeEvent, surface }) => {
+		let destination = "";
 		if (element instanceof HTMLAnchorElement) {
+			//Keep this demo open while showing the native link target that would be followed.
 			nativeEvent.preventDefault();
+			destination = `; link target: ${element.pathname}${element.search}${element.hash}`;
 		}
-		activationResult.textContent = `${event.title} from ${surface}; metadata kind: ${event.metadata?.kind ?? "unknown"}.`;
+		const message = `${event.title} from ${surface}; metadata kind: ${event.metadata?.kind ?? "unknown"}${destination}.`;
+		activationResult.textContent = message;
+		statusResult.textContent = message;
 	},
 	onStateChange: (state) => {
 		document.documentElement.dataset["examplePhase"] = state.phase;
@@ -188,12 +251,15 @@ const calendar = createCalendar(host, {
 });
 
 refetchButton.addEventListener("click", () => {
+	statusResult.textContent = "Started two overlapping requests; waiting for the latest response.";
 	calendar.refetchEvents();
 	calendar.refetchEvents();
 });
 
 calendar.render();
 
-window.addEventListener("pagehide", () => {
-	calendar.destroy();
-}, { once: true });
+window.addEventListener("pagehide", (event) => {
+	if (!event.persisted) {
+		calendar.destroy();
+	}
+});

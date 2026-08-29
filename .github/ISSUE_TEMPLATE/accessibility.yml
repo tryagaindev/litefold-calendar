@@ -13,14 +13,14 @@ body:
     attributes:
       label: Package version or commit
       description: Use the exact npm version or source commit and include the tarball SHA-256 when relevant.
-      placeholder: 0.1.0-alpha.0; source commit or tarball SHA-256
+      placeholder: 0.x.y-alpha.N; source commit or tarball SHA-256
     validations:
       required: true
   - type: input
     id: environment
     attributes:
       label: Browser, operating system, and device
-      placeholder: Safari on iOS 20, iPhone portrait
+      placeholder: Current Safari on iOS, iPhone portrait
     validations:
       required: true
   - type: input
@@ -37,6 +37,7 @@ body:
       label: Primary interaction
       options:
         - Keyboard
+        - Browser-agent or WebMCP navigation
         - Grid event action or overflow
         - Screen reader
         - Touch or pointer
@@ -79,5 +80,5 @@ body:
       options:
         - label: I searched for existing issues and removed private data.
           required: true
-        - label: I agree to follow the Code of Conduct.
+        - label: I agree to follow the [Code of Conduct](https://github.com/tryagaindev/litefold-calendar/blob/main/CODE_OF_CONDUCT.md).
           required: true

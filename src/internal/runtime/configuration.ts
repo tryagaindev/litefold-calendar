@@ -18,6 +18,7 @@ const CALENDAR_OPTION_SCHEMA = Object.freeze({
 	eventTimeDisplay: "value",
 	events: "value",
 	extensions: "value",
+	renderHooks: "value",
 	fallbackElement: "value",
 	firstDay: "value",
 	headingLevel: "value",
@@ -261,7 +262,7 @@ export function resolveFallbackElement(
 	}
 	if (!isValid) {
 		throw createConfigurationError(
-			"fallbackElement must be a same-document HTML element outside the calendar host."
+			"fallbackElement must be a same-document HTML element that neither contains nor is contained by the calendar host."
 		);
 	}
 	return fallbackElement;

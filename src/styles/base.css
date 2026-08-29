@@ -32,8 +32,7 @@
     align-items: safe center;
     appearance: none;
     background: var(--lfc-surface-background);
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border: 1px solid var(--lfc-border-color);
+    border: var(--lfc-internal-hairline) solid var(--lfc-border-color);
     border-radius: var(--lfc-border-radius);
     cursor: pointer;
     display: inline-flex;
@@ -46,8 +45,8 @@
     padding-inline: 0.625rem;
     touch-action: manipulation;
     transition-duration: var(--lfc-internal-motion-duration);
-    transition-property: background-color, border-color, color;
-    transition-timing-function: ease-out;
+    transition-property: background-color, border-color, box-shadow, color;
+    transition-timing-function: var(--lfc-internal-motion-easing);
     white-space: normal;
   }
 
@@ -80,6 +79,6 @@
       .lfc-calendar-month-picker-cancel
     ):where([disabled], [aria-disabled="true"]) {
     cursor: not-allowed;
-    opacity: 0.65;
+    opacity: var(--lfc-internal-disabled-opacity);
   }
 }

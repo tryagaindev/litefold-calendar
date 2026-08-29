@@ -19,8 +19,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-grid {
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border: 1px solid var(--lfc-internal-grid-border-color);
+    border: var(--lfc-internal-hairline) solid var(--lfc-internal-grid-border-color);
     border-radius: var(--lfc-border-radius);
     flex: 0 0 100%;
     max-inline-size: 100%;
@@ -93,7 +92,7 @@
 
   :where(.litefold-calendar) .lfc-calendar-swipe-lane-icon {
     font-size: 1.5rem;
-    font-weight: 700;
+    font-weight: var(--lfc-internal-font-weight-bold);
     line-height: 1;
   }
 
@@ -104,7 +103,7 @@
   :where(.litefold-calendar) .lfc-calendar-swipe-lane-label {
     display: block;
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: var(--lfc-internal-font-weight-bold);
     max-inline-size: 100%;
     overflow-wrap: anywhere;
     text-wrap: balance;

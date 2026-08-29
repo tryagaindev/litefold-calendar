@@ -18,6 +18,10 @@ import {
 	SUPPORTED_NODE_RANGE
 } from "./lib/node-version.mjs";
 import { normalizeNpmPackResult } from "./lib/npm-pack-result.mjs";
+import {
+	createPackedExtensionTypeFixture,
+	verifyPackedExtensions
+} from "./lib/packed-extension-verification.mjs";
 import { REPOSITORY_ROOT, run, runNpm, runTsc } from "./lib/process.mjs";
 import { verifyPackedBrowserInteraction } from "./lib/packed-browser-verification.mjs";
 import {
@@ -197,6 +201,19 @@ async function repositoryState() {
 	if (!FULL_GIT_SHA_PATTERN.test(commit)) {
 		throw new Error(`Git HEAD must resolve to a full 40-character commit SHA; found ${commit}.`);
 	}
+	const epochResult = await run(
+		"git",
+		["show", "-s", "--format=%ct", "HEAD^{commit}"],
+		{ capture: true }
+	);
+	const sourceDateEpochText = epochResult.stdout.trim();
+	if (!/^(?:0|[1-9][0-9]*)$/u.test(sourceDateEpochText)) {
+		throw new Error(`Git HEAD must have a nonnegative integer committer epoch; found ${sourceDateEpochText}.`);
+	}
+	const sourceDateEpoch = Number(sourceDateEpochText);
+	if (!Number.isSafeInteger(sourceDateEpoch)) {
+		throw new Error("Git HEAD committer epoch is outside the safe integer range.");
+	}
 
 	const statusResult = await run(
 		"git",
@@ -209,7 +226,7 @@ async function repositoryState() {
 		throw new Error(`Release packaging requires a clean tracked and untracked source tree:\n${preview}`);
 	}
 
-	return { commit, root: expectedRoot };
+	return { commit, root: expectedRoot, sourceDateEpoch };
 }
 
 function repositoryUrl(packageJson) {
@@ -309,7 +326,14 @@ async function produceReleaseBundle(artifactDirectory) {
 	await run(process.execPath, [POLICY_SCRIPT, "--built", "--pack"]);
 
 	await copyFile(join(REPOSITORY_ROOT, LICENSE_FILENAME), join(artifactDirectory, LICENSE_FILENAME));
-	const sbomResult = await run(process.execPath, [SBOM_SCRIPT, "--json"], { capture: true });
+	const sbomResult = await run(process.execPath, [
+		SBOM_SCRIPT,
+		"--json",
+		"--source-commit",
+		initialRepository.commit,
+		"--source-date-epoch",
+		String(initialRepository.sourceDateEpoch)
+	], { capture: true });
 	const sbomBytes = `${JSON.stringify(JSON.parse(sbomResult.stdout), null, 2)}\n`;
 	if (sbomResult.stdout !== sbomBytes) {
 		throw new Error("SBOM generator did not return canonical JSON bytes.");
@@ -424,6 +448,11 @@ async function produceReleaseBundle(artifactDirectory) {
 		if (JSON.stringify(installedManifest) !== JSON.stringify(packageJson)) {
 			throw new Error("The packed manifest differs from the policy-checked source manifest.");
 		}
+		const extensionFactories = await verifyPackedExtensions(
+			fixtureDirectory,
+			installedPackage,
+			installedManifest
+		);
 		try {
 			const nestedEntries = await readdir(join(installedPackage, "node_modules"));
 			if (nestedEntries.length > 0) {
@@ -439,29 +468,7 @@ async function produceReleaseBundle(artifactDirectory) {
 			join(fixtureDirectory, "consumer.ts"),
 			[
 				`import ${JSON.stringify(`${packageJson.name}/styles.css`)};`,
-				"import {",
-				"\tcreateCalendar,",
-				"\ttype Calendar,",
-				"\ttype CalendarEventInput,",
-				"\ttype CalendarOptions",
-				`} from ${JSON.stringify(packageJson.name)};`,
-				"",
-				"interface Metadata {",
-				"\treadonly sourceId: string;",
-				"}",
-				"",
-				"const events: readonly CalendarEventInput<Metadata>[] = [{",
-				"\tid: \"typed-replacement\",",
-				"\tmetadata: { sourceId: \"packed-consumer\" },",
-				"\tstart: \"2026-07-14\",",
-				"\ttitle: \"Typed replacement\"",
-				"}];",
-				"const options: CalendarOptions<Metadata> = { events };",
-				"declare const host: HTMLElement;",
-				"const calendar: Calendar<Metadata> = createCalendar(host, options);",
-				"calendar.setEvents(events);",
-				"void calendar.getState();",
-				""
+				createPackedExtensionTypeFixture(installedManifest, extensionFactories)
 			].join("\n"),
 			"utf8"
 		);
@@ -488,6 +495,9 @@ async function produceReleaseBundle(artifactDirectory) {
 
 		const verification = [
 			`await import(${JSON.stringify(packageJson.name)});`,
+			...extensionFactories.map((factory) =>
+				`await import(${JSON.stringify(`${packageJson.name}${factory.exportPath.slice(1)}`)});`
+			),
 			`const style = import.meta.resolve(${JSON.stringify(`${packageJson.name}/styles.css`)});`,
 			"if (!style.endsWith('/dist/styles.css')) throw new Error(`Unexpected style export: ${style}`);"
 		].join("\n");
@@ -522,7 +532,7 @@ try {
 	}
 	console.log(
 		`Verified ${result.tarballName} (${result.tarballSha256}) from ${initialRepository.commit} ` +
-		"with a dependency-free install and packed-byte browser interaction."
+		"with a dependency-free install, extension tree shaking, and packed-byte browser interaction."
 	);
 	if (releaseArguments.verifyOnly) {
 		console.log("Transient artifact bundle verified and removed; .artifacts was not changed.");

@@ -97,6 +97,14 @@ export interface CalendarState {
 	readonly selectedDate: Readonly<CalendarDate>;
 }
 
+declare const CALENDAR_EXTENSION_BRAND: unique symbol;
+
+/** An opaque, immutable configured extension issued by an official extension factory. */
+export interface CalendarExtension {
+	/** Compile-time opacity; runtime discovery uses a private symbol-keyed interface. */
+	readonly [CALENDAR_EXTENSION_BRAND]: never;
+}
+
 /** A request to announce calendar state through an application-owned live region. */
 export interface CalendarAnnouncement {
 	/** Localized user-safe text to announce. */
@@ -105,20 +113,20 @@ export interface CalendarAnnouncement {
 	readonly politeness: "polite" | "assertive";
 }
 
-/** Common values supplied to every extension render and mount hook. */
-export interface CalendarExtensionContext<
+/** Common values supplied to every consumer-owned render hook. */
+export interface CalendarRenderContext<
 	TSurface extends CalendarSurface = CalendarSurface
 > {
-	/** The calendar host's document; use it to create extension nodes. */
+	/** The calendar host's document; use it to create render-hook nodes. */
 	readonly document: Document;
-	/** Aborts before extension cleanup when the extension is replaced, quarantined, or destroyed. */
+	/** Aborts before cleanup when the render hook is replaced, quarantined, or destroyed. */
 	readonly signal: AbortSignal;
 	/** Rendered location receiving this hook call. */
 	readonly surface: TSurface;
 }
 
-/** Values supplied to extensions that decorate a rendered day. */
-export interface CalendarDayExtensionContext extends CalendarExtensionContext<"day"> {
+/** Values supplied to consumer-owned hooks that decorate a rendered day. */
+export interface CalendarDayRenderContext extends CalendarRenderContext<"day"> {
 	/** Structured Gregorian date for the rendered day. */
 	readonly date: CalendarDate;
 	/** Strict `YYYY-MM-DD` form of `date`. */
@@ -133,9 +141,19 @@ export interface CalendarDayExtensionContext extends CalendarExtensionContext<"d
 	readonly isToday: boolean;
 }
 
-/** Stable element references supplied to day extensions without exposing private selectors. */
+/** Values supplied when rendering the compact cue for a day with multiple events. */
+export interface CalendarMultipleEventIndicatorContext extends CalendarRenderContext<"day"> {
+	/** Structured Gregorian date for the rendered day. */
+	readonly date: CalendarDate;
+	/** Strict `YYYY-MM-DD` form of `date`. */
+	readonly dateString: string;
+	/** Authoritative total number of event occurrences for the day. */
+	readonly eventCount: number;
+}
+
+/** Stable element references supplied to day render hooks without exposing private selectors. */
 export interface CalendarDayElements {
-	/** Visual-only extension slot for a day badge. */
+	/** Visual-only render-hook slot for a day badge. */
 	readonly badge: HTMLElement;
 	/** Native day-selection button. */
 	readonly button: HTMLButtonElement;
@@ -156,15 +174,30 @@ export type CalendarEventSurface = "grid-summary" | "agenda";
 /** Calendar surfaces on which event times remain visually displayed. */
 export type CalendarEventTimeDisplay = "all" | "grid" | "agenda" | "none";
 
-/** Stable element references supplied to event extensions without exposing private selectors. */
+/** Values supplied when rendering visual content for the native grid-overflow action. */
+export interface CalendarGridOverflowContentContext
+	extends CalendarRenderContext<"grid-summary"> {
+	/** Structured Gregorian date for the rendered day. */
+	readonly date: CalendarDate;
+	/** Strict `YYYY-MM-DD` form of `date`. */
+	readonly dateString: string;
+	/** Authoritative total number of event occurrences for the day. */
+	readonly eventCount: number;
+	/** Number of event occurrences omitted from the grid cell. */
+	readonly hiddenEventCount: number;
+	/** Localized built-in overflow text retained by the native action. */
+	readonly text: string;
+}
+
+/** Stable element references supplied to event render hooks without exposing private selectors. */
 export interface CalendarEventElements {
 	/** Native link or button for an actionable occurrence, or `null` for a static representation. */
 	readonly action: CalendarEventActionElement | null;
-	/** Extension slot after the built-in title. */
+	/** Render-hook slot after the built-in title. */
 	readonly details: HTMLElement;
-	/** Extension slot before the built-in time and title. */
+	/** Render-hook slot before the built-in time and title. */
 	readonly leading: HTMLElement;
-	/** Container for the built-in or extension-provided event marker. */
+	/** Container for the built-in or render-hook-provided event marker. */
 	readonly marker: HTMLElement;
 	/** Root event element for this rendering surface. */
 	readonly root: HTMLElement;
@@ -172,13 +205,13 @@ export interface CalendarEventElements {
 	readonly time: HTMLTimeElement;
 	/** Element containing the event title. */
 	readonly title: HTMLElement;
-	/** Extension slot after all other event content. */
+	/** Render-hook slot after all other event content. */
 	readonly trailing: HTMLElement;
 }
 
-/** Values supplied to extensions that decorate a rendered event. */
-export interface CalendarEventExtensionContext<TMetadata = unknown>
-	extends CalendarExtensionContext<CalendarEventSurface> {
+/** Values supplied to consumer-owned hooks that decorate a rendered event. */
+export interface CalendarEventRenderContext<TMetadata = unknown>
+	extends CalendarRenderContext<CalendarEventSurface> {
 	/** Day on which this event representation is rendered. */
 	readonly date: CalendarDate;
 	/** Strict `YYYY-MM-DD` form of `date`. */
@@ -187,51 +220,65 @@ export interface CalendarEventExtensionContext<TMetadata = unknown>
 	readonly elements: CalendarEventElements;
 	/** Immutable normalized event. */
 	readonly event: CalendarEvent<TMetadata>;
-	/** Localized time label, or an empty string when no time is displayed. */
+	/**
+	 * Localized time label, or an empty string when this occurrence has no time label
+	 * (for example, a later day of a timed multi-day event). `eventTimeDisplay`
+	 * affects visual exposure only and does not clear this value.
+	 */
 	readonly timeText: string;
 }
 
-/** Cleanup returned by an extension mount hook. */
-export type CalendarExtensionCleanup = (this: void) => void;
+/** Cleanup returned by a consumer-owned mount hook. */
+export type CalendarRenderCleanup = (this: void) => undefined;
 
-/** A same-realm rendering extension isolated from other extensions on failure. */
-export interface CalendarExtension<TMetadata = unknown> {
+/** Consumer-owned, same-realm rendering callbacks isolated from other render hooks on failure. */
+export interface CalendarRenderHooks<TMetadata = unknown> {
 	/** Stable identifier unique within one calendar instance. */
 	readonly id: string;
 	/** Observes a rendered day and may return synchronous cleanup. */
 	readonly dayDidMount?: (
 		this: void,
-		context: Readonly<CalendarDayExtensionContext>
-	) => void | CalendarExtensionCleanup;
+		context: Readonly<CalendarDayRenderContext>
+	) => CalendarRenderCleanup | undefined;
 	/** Observes a rendered event and may return synchronous cleanup. */
 	readonly eventDidMount?: (
 		this: void,
-		context: Readonly<CalendarEventExtensionContext<TMetadata>>
-	) => void | CalendarExtensionCleanup;
+		context: Readonly<CalendarEventRenderContext<TMetadata>>
+	) => CalendarRenderCleanup | undefined;
 	/** Returns detached, noninteractive content for a day's visual badge slot. */
 	readonly renderDayBadge?: (
 		this: void,
-		context: Readonly<CalendarDayExtensionContext>
+		context: Readonly<CalendarDayRenderContext>
 	) => Node | null | undefined;
 	/** Returns detached, noninteractive content after an event title. */
 	readonly renderEventDetails?: (
 		this: void,
-		context: Readonly<CalendarEventExtensionContext<TMetadata>>
+		context: Readonly<CalendarEventRenderContext<TMetadata>>
 	) => Node | null | undefined;
 	/** Returns detached, noninteractive content before an event time and title. */
 	readonly renderEventLeading?: (
 		this: void,
-		context: Readonly<CalendarEventExtensionContext<TMetadata>>
+		context: Readonly<CalendarEventRenderContext<TMetadata>>
 	) => Node | null | undefined;
 	/** Replaces the built-in marker with detached content, or suppresses it with `null`. */
 	readonly renderEventMarker?: (
 		this: void,
-		context: Readonly<CalendarEventExtensionContext<TMetadata>>
+		context: Readonly<CalendarEventRenderContext<TMetadata>>
 	) => Node | null;
 	/** Returns detached, noninteractive content after all other event content. */
 	readonly renderEventTrailing?: (
 		this: void,
-		context: Readonly<CalendarEventExtensionContext<TMetadata>>
+		context: Readonly<CalendarEventRenderContext<TMetadata>>
+	) => Node | null | undefined;
+	/** Returns detached, noninteractive wide content for the native grid-overflow action. */
+	readonly renderGridOverflowContent?: (
+		this: void,
+		context: Readonly<CalendarGridOverflowContentContext>
+	) => Node | null | undefined;
+	/** Replaces the built-in compact three-layer event-slip fan, or suppresses it with `null`. */
+	readonly renderMultipleEventIndicator?: (
+		this: void,
+		context: Readonly<CalendarMultipleEventIndicatorContext>
 	) => Node | null | undefined;
 }
 
@@ -254,6 +301,10 @@ export interface CalendarEventActivation<TMetadata = unknown> {
 /** Information supplied for an application context action on an event occurrence. */
 export interface CalendarEventContextMenu<TMetadata = unknown>
 	extends Omit<CalendarEventActivation<TMetadata>, "nativeEvent"> {
+	/** Structured occurrence date represented by the context gesture. */
+	readonly date: CalendarDate;
+	/** Current native link or button that received the context gesture; no selection rerender occurs first. */
+	readonly element: CalendarEventActionElement;
 	/** Viewport-relative horizontal coordinate; keyboard-synthesized primary clicks may report zero. */
 	readonly clientX: number;
 	/** Viewport-relative vertical coordinate; keyboard-synthesized primary clicks may report zero. */
@@ -288,6 +339,10 @@ export interface CalendarDaySelection {
 
 /** Information supplied for a pointer or keyboard context gesture on a calendar day. */
 export interface CalendarDayContextMenu extends Omit<CalendarDaySelection, "nativeEvent"> {
+	/** Structured Gregorian date represented by the context gesture. */
+	readonly date: CalendarDate;
+	/** Current live day button that received the context gesture; the gesture does not select or rerender the day. */
+	readonly element: HTMLButtonElement;
 	/** Viewport-relative horizontal coordinate for a context surface. */
 	readonly clientX: number;
 	/** Viewport-relative vertical coordinate for a context surface. */
@@ -317,7 +372,7 @@ export interface CalendarOptions<TMetadata = unknown> {
 	/** Surfaces on which event times remain visually displayed; defaults to `"all"`. */
 	readonly eventTimeDisplay?: CalendarEventTimeDisplay;
 	/** Synchronous bridge to an application-owned live announcer. */
-	readonly onAnnounce?: (this: void, announcement: Readonly<CalendarAnnouncement>) => void;
+	readonly onAnnounce?: (this: void, announcement: Readonly<CalendarAnnouncement>) => undefined;
 	/** Handles pointer or keyboard context gestures on a day. */
 	readonly onDayContextMenu?: CalendarAction<CalendarDayContextMenu>;
 	/** Observes a committed user selection; presentation-only feedback never delays the callback. */
@@ -328,9 +383,11 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly onEventContextMenu?: CalendarAction<CalendarEventContextMenu<TMetadata>>;
 	/** Static events or an abort-aware provider for the one current fixed 42-day grid. */
 	readonly events: CalendarEvents<TMetadata>;
-	/** Ordered, isolated node-based rendering extensions. */
-	readonly extensions?: readonly Readonly<CalendarExtension<TMetadata>>[];
-	/** Same-document fallback content outside the host, shown until a usable event snapshot is available. */
+	/** Complete configured components registered in deterministic lifecycle order. */
+	readonly extensions?: readonly CalendarExtension[];
+	/** Ordered, isolated consumer-owned rendering hooks. */
+	readonly renderHooks?: readonly Readonly<CalendarRenderHooks<TMetadata>>[];
+	/** Same-document content DOM-disjoint from the host; its original visibility is preserved until a usable snapshot hides it. */
 	readonly fallbackElement?: HTMLElement;
 	/** Locale-derived or explicit week start; defaults to `"locale"`. */
 	readonly firstDay?: CalendarFirstDay;
@@ -361,9 +418,9 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly onError?: (
 		this: void,
 		error: LitefoldCalendarError
-	) => void | CalendarErrorDisposition;
+	) => CalendarErrorDisposition | undefined;
 	/** Synchronously observes immutable, presentation-safe state snapshots. */
-	readonly onStateChange?: (this: void, state: Readonly<CalendarState>) => void;
+	readonly onStateChange?: (this: void, state: Readonly<CalendarState>) => undefined;
 	/** Maximum events accepted from one source result; defaults to `10,000`. */
 	readonly sourceEventLimit?: number;
 	/**
@@ -379,27 +436,27 @@ export interface CalendarOptions<TMetadata = unknown> {
 }
 
 /** The intentionally small calendar lifecycle, event-data, state, and navigation API. */
-export interface Calendar<TMetadata = unknown> {
+export interface Calendar<in out TMetadata = unknown> {
 	/** Adds the calendar to its host and starts loading the visible month; throws when the instance cannot claim the host. */
-	render(): void;
+	render(this: Calendar<TMetadata>): void;
 	/** Aborts pending work, removes listeners, and clears the host. */
-	destroy(): void;
+	destroy(this: Calendar<TMetadata>): void;
 	/** Replaces the complete static snapshot or provider and loads the current visible range; throws for invalid input or lifecycle state. */
-	setEvents(events: CalendarEvents<TMetadata>): void;
+	setEvents(this: Calendar<TMetadata>, events: CalendarEvents<TMetadata>): void;
 	/** Forces the current visible range to be loaded again; throws unless the instance is rendered and live. */
-	refetchEvents(): void;
+	refetchEvents(this: Calendar<TMetadata>): void;
 	/** Displays and selects a supported date without moving focus; throws for an invalid argument or lifecycle state. */
-	gotoDate(date: CalendarDateInput): void;
+	gotoDate(this: Calendar<TMetadata>, date: CalendarDateInput): void;
 	/** Selects and focuses a supported date; throws for an invalid argument or lifecycle state. */
-	focusDate(date: CalendarDateInput): void;
+	focusDate(this: Calendar<TMetadata>, date: CalendarDateInput): void;
 	/** Selects and focuses the configured current date when its month is renderable; throws unless the instance is rendered and live. */
-	focusToday(): void;
+	focusToday(this: Calendar<TMetadata>): void;
 	/** Moves to the previous month when one is renderable; throws unless the instance is rendered and live. */
-	prev(): void;
+	prev(this: Calendar<TMetadata>): void;
 	/** Moves to the next month when one is renderable; throws unless the instance is rendered and live. */
-	next(): void;
+	next(this: Calendar<TMetadata>): void;
 	/** Displays the configured current date when its month is renderable; throws unless the instance is rendered and live. */
-	today(): void;
+	today(this: Calendar<TMetadata>): void;
 	/** Returns the latest immutable, presentation-safe state snapshot. */
-	getState(): Readonly<CalendarState>;
+	getState(this: Calendar<TMetadata>): Readonly<CalendarState>;
 }

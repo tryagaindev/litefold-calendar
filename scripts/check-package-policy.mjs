@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { dirname, extname, join, relative } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 
 import ts from "typescript";
 
@@ -10,7 +10,17 @@ import {
     SUPPORTED_NODE_SELECTOR
 } from "./lib/node-version.mjs";
 import { normalizeNpmPackResult } from "./lib/npm-pack-result.mjs";
+import {
+    expectedExtensionExport,
+    extractExtensionEntries,
+    ROOT_PACKAGE_EXPORT,
+    STYLE_PACKAGE_EXPORT
+} from "./lib/package-entries.mjs";
 import { REPOSITORY_ROOT, runNpm } from "./lib/process.mjs";
+import {
+    findForbiddenRuntimeLiterals,
+    formatForbiddenRuntimeLiteral
+} from "./lib/runtime-literals.mjs";
 import { composeStyles } from "./lib/styles.mjs";
 
 const FORBIDDEN_DEPENDENCY_FIELDS = [
@@ -44,17 +54,6 @@ const FORBIDDEN_LIFECYCLE_SCRIPTS = [
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 const EXPECTED_PACKAGE_NAME = "@tryagaindev/litefold-calendar";
 const EXPECTED_REPOSITORY = "git+https://github.com/tryagaindev/litefold-calendar.git";
-const EXPECTED_EXPORTS = Object.freeze({
-    ".": Object.freeze({
-        default: "./dist/index.js",
-        import: "./dist/index.js",
-        types: "./dist/index.d.ts"
-    }),
-    "./styles.css": Object.freeze({
-        default: "./dist/styles.css",
-        types: "./dist/styles.css.d.ts"
-    })
-});
 const EXPECTED_PUBLISH_CONFIG = Object.freeze({
     access: "public",
     provenance: true,
@@ -163,6 +162,47 @@ const ALLOWED_PACKED_FILES = new Set([
     ])
 ]);
 
+function inspectExtensionCatalog(extensionEntries) {
+    const exportedIds = new Set(extensionEntries.map((entry) => entry.id));
+    const sourceIds = new Set();
+
+    for (const moduleName of PACKED_MODULES) {
+        if (!moduleName.startsWith("extensions/")) {
+            continue;
+        }
+
+        const segments = moduleName.split("/");
+        const id = segments[1];
+        if (id === undefined || segments.length < 3) {
+            addError(
+                `Optional extension source must live below src/extensions/<id>/: src/${moduleName}.ts.`
+            );
+            continue;
+        }
+
+        sourceIds.add(id);
+        if (!exportedIds.has(id)) {
+            addError(
+                `Extension source directory ${JSON.stringify(id)} has no matching ./extensions/${id} package export.`
+            );
+        }
+    }
+
+    for (const entry of extensionEntries) {
+        if (!PACKED_MODULE_SET.has(entry.sourceModule)) {
+            addError(
+                `Extension export ${entry.exportPath} requires ${entry.sourceEntry}.`
+            );
+        }
+
+        if (!sourceIds.has(entry.id)) {
+            addError(
+                `Extension export ${entry.exportPath} has no matching source directory.`
+            );
+        }
+    }
+}
+
 function isRelativeSpecifier(specifier) {
     return specifier.startsWith("./") || specifier.startsWith("../");
 }
@@ -179,6 +219,17 @@ function getNodeLocation(path, sourceFile, nodeOrPosition) {
 
 function addNodeError(path, sourceFile, nodeOrPosition, message) {
     addError(`${getNodeLocation(path, sourceFile, nodeOrPosition)} ${message}`);
+}
+
+function inspectRuntimeLiterals(path, source) {
+    const packagePath = relative(REPOSITORY_ROOT, path)
+        .replaceAll("\\", "/");
+
+    for (const finding of findForbiddenRuntimeLiterals(source)) {
+        addError(
+            formatForbiddenRuntimeLiteral(packagePath, finding)
+        );
+    }
 }
 
 function getAccessName(expression) {
@@ -224,7 +275,52 @@ function isInlineStyleMutationTarget(expression) {
         getAccessName(expression.expression) === "style";
 }
 
+function extensionLocation(path) {
+    const packagePath = relative(REPOSITORY_ROOT, path)
+        .replaceAll("\\", "/");
+    const match = /^(?:dist|src)\/extensions\/([^/]+)(?:\/|$)/u.exec(packagePath);
+
+    return match === null
+        ? undefined
+        : Object.freeze({ id: match[1], packagePath });
+}
+
+function inspectExtensionImportBoundary(path, sourceFile, node, specifier) {
+    if (!isRelativeSpecifier(specifier)) {
+        return;
+    }
+
+    const importedLocation = extensionLocation(
+        resolve(dirname(path), specifier)
+    );
+    if (importedLocation === undefined) {
+        return;
+    }
+
+    const importerLocation = extensionLocation(path);
+    if (importerLocation === undefined) {
+        addNodeError(
+            path,
+            sourceFile,
+            node,
+            `imports optional extension ${JSON.stringify(importedLocation.id)} from the core module graph.`
+        );
+        return;
+    }
+
+    if (importerLocation.id !== importedLocation.id) {
+        addNodeError(
+            path,
+            sourceFile,
+            node,
+            `extension ${JSON.stringify(importerLocation.id)} imports sibling extension ${JSON.stringify(importedLocation.id)}.`
+        );
+    }
+}
+
 function inspectModuleSpecifier(path, sourceFile, node, specifier, kind) {
+    inspectExtensionImportBoundary(path, sourceFile, node, specifier);
+
     if (!isRelativeSpecifier(specifier)) {
         addNodeError(
             path,
@@ -917,10 +1013,6 @@ function hasPullRequestTargetTrigger(source) {
     return false;
 }
 
-function countOccurrences(source, value) {
-    return source.split(value).length - 1;
-}
-
 function normalizeSimpleYamlScalar(value) {
     const trimmed = value.trim();
 
@@ -953,111 +1045,12 @@ function inspectCiWorkflow(source) {
             ".github/workflows/ci.yml must install the lockfile with lifecycle scripts disabled."
         );
     }
-}
 
-function inspectPublishWorkflow(source) {
-    const required = [
-        "release:",
-        "prerelease == true",
-        "git merge-base --is-ancestor HEAD origin/main",
-        "npm ci --ignore-scripts",
-        "npm run check",
-        "npm run package",
-        "environment: npm",
-        "actions/download-artifact@",
-        "sha256sum --check --strict",
-        "npm publish",
-        "--registry https://registry.npmjs.org/",
-        "--access public",
-        "--tag alpha",
-        "--provenance",
-        "--ignore-scripts"
-    ];
-
-    for (const value of required) {
-        if (!source.includes(value)) {
-            addError(
-                `.github/workflows/publish-alpha.yml must include ${JSON.stringify(value)}.`
-            );
-        }
-    }
-
-    if (countOccurrences(
-        source,
-        "id-token: write"
-    ) !== 1) {
+    if (!source.includes(
+        "group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'push' && github.sha || github.ref }}"
+    ) || !source.includes("cancel-in-progress: true")) {
         addError(
-            ".github/workflows/publish-alpha.yml must grant id-token: write to exactly one job."
-        );
-    }
-
-    if (countOccurrences(
-        source,
-        "npm publish"
-    ) !== 1) {
-        addError(
-            ".github/workflows/publish-alpha.yml must contain exactly one npm publish command."
-        );
-    }
-
-    if (/NPM_TOKEN|NODE_AUTH_TOKEN|secrets\.[A-Za-z0-9_]*npm/iu.test(source)) {
-        addError(
-            ".github/workflows/publish-alpha.yml must use trusted publishing without an npm token secret."
-        );
-    }
-
-    const publishJobIndex =
-        source.indexOf("\n  publish:\n");
-
-    if (publishJobIndex < 0) {
-        addError(
-            ".github/workflows/publish-alpha.yml must separate verify and publish jobs."
-        );
-        return;
-    }
-
-    const verifyJob =
-        source.slice(0, publishJobIndex);
-
-    const publishJob =
-        source.slice(publishJobIndex);
-
-    if (verifyJob.includes("id-token: write")) {
-        addError(
-            "The release verification job must not receive npm OIDC authority."
-        );
-    }
-
-    if (!publishJob.includes("needs: verify") ||
-        !publishJob.includes("actions: read") ||
-        !publishJob.includes("contents: read") ||
-        !publishJob.includes("id-token: write")) {
-        addError(
-            "The publish job must depend on verification and use explicit least-privilege permissions."
-        );
-    }
-
-    if (publishJob.includes("actions/checkout@") ||
-        publishJob.includes("npm ci") ||
-        publishJob.includes("npm run ") ||
-        publishJob.includes("node scripts/")) {
-        addError(
-            "The npm OIDC publish job must not check out or execute project source or install project dependencies."
-        );
-    }
-
-    if (/^\s*registry-url\s*:/mu.test(publishJob) ||
-        /^\s*scope\s*:/mu.test(publishJob)) {
-        addError(
-            "The npm OIDC publish job must not configure setup-node registry authentication; npm publish must select npmjs explicitly with --registry."
-        );
-    }
-
-    if (!publishJob.includes(
-        "Download the verified bundle without checking out source"
-    )) {
-        addError(
-            "The publish job must consume only the verified Actions artifact."
+            ".github/workflows/ci.yml must isolate push runs by SHA and cancel superseded ref-scoped pull request runs."
         );
     }
 }
@@ -1120,10 +1113,14 @@ async function inspectSourceTree() {
     }
 
     for (const path of files) {
+        const source = await readFile(path, "utf8");
+
+        inspectRuntimeLiterals(path, source);
+
         if (path.endsWith(".ts")) {
             inspectScript(
                 path,
-                await readFile(path, "utf8"),
+                source,
                 {
                     declaration: path.endsWith(".d.ts")
                 }
@@ -1173,9 +1170,6 @@ async function inspectWorkflowTree(
             if (workflowPath ===
                 ".github/workflows/ci.yml") {
                 inspectCiWorkflow(source);
-            } else if (workflowPath ===
-                ".github/workflows/publish-alpha.yml") {
-                inspectPublishWorkflow(source);
             }
 
             const expectedEnvironment =
@@ -1359,6 +1353,20 @@ const packageJson =
         )
     );
 
+let extensionEntries = Object.freeze([]);
+
+try {
+    extensionEntries = extractExtensionEntries(packageJson);
+} catch (error) {
+    addError(
+        error instanceof Error
+            ? error.message
+            : "Package extension exports are invalid."
+    );
+}
+
+inspectExtensionCatalog(extensionEntries);
+
 const developmentNodeRange =
     packageJson.devEngines?.runtime?.version;
 
@@ -1477,13 +1485,41 @@ for (const [name, version] of
     }
 }
 
-if (!isExactValue(
-    packageJson.exports,
-    EXPECTED_EXPORTS
-)) {
+if (!isExactValue(packageJson.exports?.["."], ROOT_PACKAGE_EXPORT)) {
     addError(
-        "Package exports must be the exact root ESM/types API and ./styles.css contract."
+        "Package root export must be the exact ESM/types API contract."
     );
+}
+
+if (!isExactValue(packageJson.exports?.["./styles.css"], STYLE_PACKAGE_EXPORT)) {
+    addError(
+        "Package stylesheet export must be the exact CSS/types contract."
+    );
+}
+
+const allowedExportPaths = new Set([
+    ".",
+    "./styles.css",
+    ...extensionEntries.map((entry) => entry.exportPath)
+]);
+
+for (const exportPath of Object.keys(packageJson.exports ?? {})) {
+    if (!allowedExportPaths.has(exportPath)) {
+        addError(
+            `Unexpected package export: ${exportPath}. JavaScript subpaths must use ./extensions/<id>.`
+        );
+    }
+}
+
+for (const entry of extensionEntries) {
+    if (!isExactValue(
+        packageJson.exports?.[entry.exportPath],
+        expectedExtensionExport(entry.id)
+    )) {
+        addError(
+            `Extension export ${entry.exportPath} must resolve to ${entry.distJavaScript} and ${entry.distDeclaration}.`
+        );
+    }
 }
 
 if (packageJson.types !==
@@ -1680,6 +1716,18 @@ await inspectWorkflowTree({
         LFC_NPM_VERSION:
             String(referenceNpmVersion)
     },
+    ".github/workflows/deploy-examples.yml": {
+        LFC_NODE_VERSION:
+        WORKFLOW_NODE_VERSION,
+        LFC_NPM_VERSION:
+            String(referenceNpmVersion)
+    },
+    ".github/workflows/prepare-alpha.yml": {
+        LFC_NODE_VERSION:
+        WORKFLOW_NODE_VERSION,
+        LFC_NPM_VERSION:
+            String(referenceNpmVersion)
+    },
     ".github/workflows/publish-alpha.yml": {
         LFC_NODE_VERSION:
         WORKFLOW_NODE_VERSION,
@@ -1743,6 +1791,11 @@ if (process.argv.includes("--built")) {
                 path,
                 "utf8"
             );
+
+        inspectRuntimeLiterals(
+            path,
+            source
+        );
 
         if (extension === ".js") {
             inspectScript(
@@ -1818,5 +1871,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-    "Package policy passed: Node/toolchain policy, exact npm/development dependencies, and zero runtime dependencies."
+    "Package policy passed: Node/toolchain policy, exact npm/development dependencies, zero runtime dependencies, and no prohibited runtime literals."
 );

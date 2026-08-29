@@ -13,12 +13,31 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
+import { JSDOM } from "jsdom";
+
 import { parseExampleMetadata, serializeExampleMetadata } from "./lib/example-metadata.mjs";
+import { compareSemVer, parseSemVer } from "./lib/semver.mjs";
+import { renderDeploymentManifest } from "./pages-site/site.js";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
-const VERSION_PATTERN = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
-const SHELL_FILES = Object.freeze(["index.html", "site.css", "site.js"]);
+const SHELL_MARK_FILENAME = "litefold-calendar-mark.svg";
+const PREVIOUS_REQUIRED_SHELL_FILES = Object.freeze(["index.html", "site.css", "site.js"]);
+const SHELL_FILES = Object.freeze([
+	"index.html",
+	SHELL_MARK_FILENAME,
+	"site.css",
+	"site.js"
+]);
 const STAGED_SHELL_FILES = Object.freeze(["deployment-details.css", ...SHELL_FILES]);
+
+function isSemanticVersion(value) {
+	try {
+		parseSemVer(value);
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 function displayPath(path, root) {
 	return relative(root, path).replaceAll(sep, "/");
@@ -91,7 +110,7 @@ async function readMetadata(path, expectedChannel, expectedVersion) {
 	if (metadata.channel !== expectedChannel) {
 		throw new Error(`${path} must use the ${expectedChannel} channel.`);
 	}
-	if (!VERSION_PATTERN.test(metadata.version)) {
+	if (!isSemanticVersion(metadata.version)) {
 		throw new Error(`${path} must use a path-safe semantic version.`);
 	}
 	if (expectedVersion !== undefined && metadata.version !== expectedVersion) {
@@ -129,7 +148,7 @@ async function validateIncomingArtifact(channelDirectory) {
 		throw new Error("Staged channel and example metadata must identify the same deployment.");
 	}
 	if ((metadata.channel !== "main" && metadata.channel !== "release") ||
-		!VERSION_PATTERN.test(metadata.version)) {
+		!isSemanticVersion(metadata.version)) {
 		throw new Error("A staged Pages channel must use a deployable channel and semantic version.");
 	}
 	return metadata;
@@ -138,26 +157,29 @@ async function validateIncomingArtifact(channelDirectory) {
 async function validatePreviousSnapshot(siteDirectory) {
 	const files = await listTree(siteDirectory);
 	if (files.length === 0) {
-		return;
+		return { main: null, releases: [], schemaVersion: 1 };
 	}
 	const entries = await readdir(siteDirectory, { withFileTypes: true });
 	const expectedNames = new Set([
-		"index.html",
 		"main",
 		"releases",
 		"site-manifest.json",
-		"site.css",
-		"site.js"
+		...SHELL_FILES
 	]);
 	for (const entry of entries) {
 		if (!expectedNames.has(entry.name)) {
 			throw new Error(`Unexpected previous Pages snapshot entry ${entry.name}.`);
 		}
 	}
-	for (const shellFile of SHELL_FILES) {
+	for (const shellFile of PREVIOUS_REQUIRED_SHELL_FILES) {
 		if (!await pathExists(join(siteDirectory, shellFile))) {
 			throw new Error(`The previous Pages snapshot is missing ${shellFile}.`);
 		}
+	}
+	const previousIndex = await readFile(join(siteDirectory, "index.html"), "utf8");
+	if (previousIndex.includes(`src="./${SHELL_MARK_FILENAME}"`) &&
+		!await pathExists(join(siteDirectory, SHELL_MARK_FILENAME))) {
+		throw new Error(`The previous Pages snapshot references missing ${SHELL_MARK_FILENAME}.`);
 	}
 	if (!await pathExists(join(siteDirectory, "site-manifest.json"))) {
 		throw new Error("The previous Pages snapshot is missing site-manifest.json.");
@@ -169,7 +191,7 @@ async function validatePreviousSnapshot(siteDirectory) {
 	if (await pathExists(releasesDirectory)) {
 		const releases = await readdir(releasesDirectory, { withFileTypes: true });
 		for (const release of releases) {
-			if (!release.isDirectory() || !VERSION_PATTERN.test(release.name)) {
+			if (!release.isDirectory() || !isSemanticVersion(release.name)) {
 				throw new Error(`Unexpected immutable release entry ${release.name}.`);
 			}
 			await readMetadata(
@@ -184,6 +206,7 @@ async function validatePreviousSnapshot(siteDirectory) {
 	if (!isDeepStrictEqual(actualManifest, expectedManifest)) {
 		throw new Error("The previous Pages manifest does not match its retained channel trees.");
 	}
+	return actualManifest;
 }
 
 async function collectSiteManifest(siteDirectory) {
@@ -200,7 +223,7 @@ async function collectSiteManifest(siteDirectory) {
 	if (await pathExists(releasesDirectory)) {
 		const entries = await readdir(releasesDirectory, { withFileTypes: true });
 		for (const entry of entries) {
-			if (!entry.isDirectory() || !VERSION_PATTERN.test(entry.name)) {
+			if (!entry.isDirectory() || !isSemanticVersion(entry.name)) {
 				throw new Error(`Unexpected immutable release entry ${entry.name}.`);
 			}
 			releases.push({
@@ -213,17 +236,52 @@ async function collectSiteManifest(siteDirectory) {
 			});
 		}
 	}
-	releases.sort((left, right) => right.version.localeCompare(left.version, "en", { numeric: true }));
+	releases.sort((left, right) => compareSemVer(right.version, left.version));
 
 	return { schemaVersion: 1, main, releases };
 }
 
-async function createSiteManifest(siteDirectory) {
+async function writeSiteManifest(siteDirectory, manifest) {
 	await writeFile(
 		join(siteDirectory, "site-manifest.json"),
-		`${JSON.stringify(await collectSiteManifest(siteDirectory), null, "\t")}\n`,
+		`${JSON.stringify(manifest, null, "\t")}\n`,
 		"utf8"
 	);
+}
+
+async function stampSiteIndex(siteDirectory, manifest) {
+	const indexPath = join(siteDirectory, "index.html");
+	const dom = new JSDOM(await readFile(indexPath, "utf8"), {
+		url: "https://tryagaindev.github.io/litefold-calendar/"
+	});
+	try {
+		renderDeploymentManifest(dom.window.document, manifest);
+		await writeFile(indexPath, dom.serialize(), "utf8");
+	} finally {
+		dom.window.close();
+	}
+}
+
+async function retainedShellSupportsCurrentRenderer(siteDirectory) {
+	const indexPath = join(siteDirectory, "index.html");
+	if (!await pathExists(indexPath)) {
+		return false;
+	}
+	const dom = new JSDOM(await readFile(indexPath, "utf8"), {
+		url: "https://tryagaindev.github.io/litefold-calendar/"
+	});
+	try {
+		renderDeploymentManifest(dom.window.document, {
+			main: null,
+			releases: [],
+			schemaVersion: 1
+		});
+		return true;
+	} catch {
+		return false;
+	} finally {
+		dom.window.close();
+	}
 }
 
 function parseArguments(arguments_) {
@@ -265,7 +323,7 @@ export async function assemblePagesSnapshot(options) {
 	}
 
 	const metadata = await validateIncomingArtifact(resolve(channelDirectory));
-	await validatePreviousSnapshot(resolve(previousDirectory));
+	const previousManifest = await validatePreviousSnapshot(resolve(previousDirectory));
 	await mkdir(dirname(resolvedOutput), { recursive: true });
 	const stagingDirectory = await mkdtemp(join(dirname(resolvedOutput), ".lfc-pages-snapshot-"));
 	try {
@@ -273,6 +331,7 @@ export async function assemblePagesSnapshot(options) {
 		await mkdir(siteDirectory);
 		await copyTree(resolve(previousDirectory), siteDirectory);
 
+		let exactReleaseRerun = false;
 		if (metadata.channel === "main") {
 			await rm(join(siteDirectory, "main"), { force: true, recursive: true });
 			await copyTree(join(resolve(channelDirectory), "content"), join(siteDirectory, "main"));
@@ -282,20 +341,35 @@ export async function assemblePagesSnapshot(options) {
 				if (!await treesEqual(destination, join(resolve(channelDirectory), "content"))) {
 					throw new Error(`Immutable release ${metadata.version} cannot be overwritten.`);
 				}
+				exactReleaseRerun = true;
 			} else {
 				await copyTree(join(resolve(channelDirectory), "content"), destination);
 			}
 		}
 
-		if (metadata.channel === "main" || !await pathExists(join(siteDirectory, "index.html"))) {
-			for (const shellFile of SHELL_FILES) {
-				await copyFile(
-					join(resolve(channelDirectory), "shell", shellFile),
-					join(siteDirectory, shellFile)
+		if (!exactReleaseRerun) {
+			const retainedShellIsCompatible = await retainedShellSupportsCurrentRenderer(siteDirectory);
+			const incomingReleaseIsNewer = metadata.channel === "release" &&
+				previousManifest.releases.every((release) =>
+					compareSemVer(metadata.version, release.version) > 0) &&
+				(previousManifest.main === null ||
+					compareSemVer(metadata.version, previousManifest.main.version) >= 0);
+			if (metadata.channel === "main" || (!retainedShellIsCompatible && incomingReleaseIsNewer)) {
+				for (const shellFile of SHELL_FILES) {
+					await copyFile(
+						join(resolve(channelDirectory), "shell", shellFile),
+						join(siteDirectory, shellFile)
+					);
+				}
+			} else if (!retainedShellIsCompatible) {
+				throw new Error(
+					`Immutable release ${metadata.version} cannot safely replace a newer retained Pages shell.`
 				);
 			}
+			const manifest = await collectSiteManifest(siteDirectory);
+			await stampSiteIndex(siteDirectory, manifest);
+			await writeSiteManifest(siteDirectory, manifest);
 		}
-		await createSiteManifest(siteDirectory);
 		await writeFile(
 			join(stagingDirectory, "receipt.json"),
 			serializeExampleMetadata(metadata),

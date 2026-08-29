@@ -52,9 +52,21 @@ test("progressive enhancement keeps useful semantic content without JavaScript",
 		const fallback = page.locator("[data-example-fallback]");
 		await expect(fallback).toBeVisible();
 		await expect(fallback.locator("ol > li")).not.toHaveCount(0);
-		await expect(fallback.locator("a[href]").first()).toBeVisible();
+		const eventLink = fallback.getByRole("link", { name: "Calendar design review" });
+		await expect(eventLink).toBeVisible();
 		await expect(fallback.locator("time[datetime]").first()).toBeVisible();
 		await expect(page.locator("[data-example-calendar]")).toBeEmpty();
+
+		const [eventResponse] = await Promise.all([
+			page.waitForNavigation(),
+			eventLink.click()
+		]);
+		expect(eventResponse?.ok()).toBe(true);
+		const eventUrl = new URL(page.url());
+		expect(eventUrl.searchParams.get("event")).toBe("design-review");
+		expect(eventUrl.searchParams.get("from")).toBe("fallback");
+		expect(eventUrl.hash).toBe("#server-schedule");
+		await expect(page.locator("#server-schedule")).toBeVisible();
 	} finally {
 		await context.close();
 	}
@@ -74,6 +86,7 @@ test("progressive enhancement coordinates fallback with usable and unavailable s
 	await page.clock.runFor(80);
 	await expect(page.locator('html[data-example-phase="unavailable"]')).toHaveCount(1);
 	await expect(fallback).toBeVisible();
+	await expect(page.locator("[data-example-announcer-assertive]")).not.toBeEmpty();
 
 	await page.locator('[data-example-rebuild="success"]').click();
 	await expect(page.locator('html[data-example-phase="loading"]')).toHaveCount(1);
@@ -82,6 +95,7 @@ test("progressive enhancement coordinates fallback with usable and unavailable s
 	await page.clock.runFor(80);
 	await expect(page.locator('html[data-example-ready="true"]')).toHaveCount(1);
 	await expect(fallback).toBeHidden();
+	await expect(page.locator("[data-example-announcer-assertive]")).toBeEmpty();
 	await page.clock.resume();
 	await expectNoAutomatedAccessibilityViolations(page, testInfo);
 });

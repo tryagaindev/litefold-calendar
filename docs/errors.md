@@ -1,60 +1,110 @@
 # Error handling
 
-litefold-calendar owns presentation for current operational errors by default while an instance owns a rendered host. Invalid configuration, public arguments, and lifecycle ordering are programmer errors that throw synchronously instead. Applications can observe current and diagnostic-only late or stale runtime failures without accidentally hiding active errors and can explicitly opt into full presentation ownership when needed.
+litefold-calendar separates failures into two paths:
 
-## Default behavior
+- **Programmer errors** are invalid configuration, arguments, or lifecycle calls. They throw synchronously and must be caught at the application boundary that supplied the uncertain input.
+- **Operational failures** happen after a rendered calendar starts work. The package presents current failures by default and sends them to `onError` when configured. Late or stale failures are diagnostic only and never change the current UI or state.
+
+## Choose an integration path
+
+| Goal | Use | Who presents the error? |
+|---|---|---|
+| Use the built-in error panel and announcements | Omit `onError`, or return `undefined` / `"default"` | litefold-calendar |
+| Add telemetry while keeping the built-in UI | Log in `onError`, then return `"default"` | litefold-calendar |
+| Replace the built-in error UI | Synchronously render equivalent UI in `onError`, then return the exact string `"handled"` | Application |
+| Route all package announcements through a shared announcer | `onAnnounce` | Unchanged for visible UI; application owns announcements |
+| Observe presentation-safe state | `getState()` or `onStateChange` | Unchanged |
+
+`onError` does not receive programmer errors thrown by construction or public method calls. Catch those separately.
+
+## Package-owned presentation
 
 Persistent status/error UI appears after the toolbar and before the grid. It does not auto-dismiss, steal focus, reveal raw failure details, or depend on color alone.
 
 | Failure | Visible behavior | Announcement |
 |---|---|---|
-| Initial/current-range source, validation, or limit failure | Error title, safe message, Retry | Assertive |
+| Initial load or range-change source, validation, or limit failure | Error title, safe message, Retry | Assertive |
 | Failed same-range refresh with retained events | Stale-data warning and Retry; prior events remain | Polite |
 | Rejected current event/day action | Persistent action error | Assertive |
-| Failed extension hook | Partial-details warning; built-in UI remains | Polite |
-| Failed or invalid context-availability predicate | Context action fails closed; one recoverable integration issue | Polite |
+| Failed render hook | Partial-details warning; built-in UI remains | Polite |
+| Context-availability predicate throws or returns an invalid value | Context action fails closed; one recoverable integration issue | Polite |
+| Failed registered extension | The affected extension is quarantined; ordinary calendar state and UI remain unchanged; diagnostic `extension-failed` only | Silent |
 | Fatal internal failure | Generic unavailable fallback | Assertive |
 | Successful user-initiated Retry | Resolved issue is removed | Polite recovery message |
 | Superseded request aborted by the package | No error | Silent |
 | Late failure that can no longer enter active presentation | Diagnostic only; current state and UI remain unchanged | Silent |
 
-Retry remains in the document while retrying, exposes `aria-disabled="true"`, guards repeated activation, and updates in place. Focus stays on the initiating control. After recovery, focus moves only if that control was removed; the selected day or calendar heading is the fallback.
+While a Retry is pending, its button remains mounted and focused, updates in place, exposes `aria-disabled="true"`, and guards repeated activation. After a successful Retry hides that control, focus moves to the selected day button or, if that button is unavailable, the calendar heading.
 
 The package creates empty live regions before they are needed and uses one announcement route for each message. Loading is represented by `aria-busy`; routine loading transitions are not repeatedly announced.
 
-“No events” is rendered only after a successful empty source result. It is never used as a substitute for loading, failure, invalid data, or an over-limit response.
+"No events" appears only after a successful empty source result. Loading, failed, invalid, and over-limit results never use the empty state.
 
 ## Handle programmer errors
 
-Invalid host/options throw `invalid-configuration` before generated DOM is committed. Invalid or reversed `minDate` / `maxDate` values, a range with no renderable month, an explicitly supplied `initialDate` that is out of range or unrenderable, an unsupported `eventTimeDisplay` value, or a structurally invalid/cross-document/host-descendant `fallbackElement` are configuration errors; an omitted `initialDate` instead resolves the date produced by `now` to the nearest in-range date in a renderable month. Invalid date arguments and out-of-range `gotoDate()` / `focusDate()` targets throw `invalid-argument`; `setEvents()` also uses `invalid-argument` when its top-level value cannot be inspected and snapshotted as an array or function. Navigation, refetch, and event-replacement methods that require a live rendered instance throw `invalid-state` before `render()`, after `destroy()`, or after a fatal unavailable transition; `render()` also throws `invalid-state` when called after destroy, against an already-owned host, or when it cannot claim an already leased/unavailable integration node. `getState()` remains safe throughout the lifecycle, repeated live `render()` and repeated `destroy()` calls are idempotent, and `destroy()` before render is allowed. These synchronous `LitefoldCalendarError` instances do not invoke `onError`, update `CalendarState.issues`, or render package error UI. Construction failure and a failed host claim leave the fallback unchanged.
+| Code | Thrown when | Common examples |
+|---|---|---|
+| `invalid-configuration` | `createCalendar()` cannot validate and snapshot the host or options | Invalid/reversed date bounds, no renderable month, an explicit out-of-range `initialDate`, unsupported `eventTimeDisplay`, or an invalid `fallbackElement` |
+| `invalid-argument` | A live public method receives invalid input | Invalid or out-of-range `gotoDate()` / `focusDate()` input, or a `setEvents()` value that cannot be read and snapshotted as an array or function |
+| `invalid-state` | A method is called in an unsupported lifecycle state or cannot claim required DOM ownership | Live-only methods before `render()`, after `destroy()`, or after a fatal transition; `render()` after destroy, on a host owned by another instance, or with an unavailable integration node |
 
-Catch construction at the application bootstrap boundary. Catch method calls when their arguments or lifecycle ordering come from uncertain application state. Package-owned Previous, Next, Today, swipe, keyboard, day-button, and month-and-year picker interaction never turns a configured boundary into an error: it quietly stops or clamps. Boundary navigation controls remain focusable with `aria-disabled="true"` and guarded no-op activation; out-of-range day buttons are natively disabled. Partial boundary months remain usable. These inclusive selection bounds do not clip an event provider's or `CalendarState.range`'s complete 42-day inclusive-start/exclusive-end range.
+These `LitefoldCalendarError` instances do not invoke `onError`, update `CalendarState.issues`, or render package error UI. Construction failure and a failed render-time host or integration-node claim leave `fallbackElement` unchanged.
+
+An omitted `initialDate` is intentionally different from an invalid explicit value: the date returned by `now` is moved to the nearest in-range date in a renderable month. `getState()` is safe throughout the lifecycle, repeated live `render()` and repeated `destroy()` calls are idempotent, and `destroy()` before render is allowed and terminal.
+
+Catch construction at application startup. Catch method calls when arguments or lifecycle ordering come from uncertain application state. `prev()`, `next()`, `today()`, `focusToday()`, and equivalent package-owned interactions stop or clamp at configured boundaries; only invalid or out-of-range `gotoDate()` / `focusDate()` targets throw. Boundary navigation controls remain focusable with `aria-disabled="true"`, while out-of-range day buttons are natively disabled. Selection bounds do not shrink the event provider's or `CalendarState.range`'s complete 42-day inclusive-start/exclusive-end range. See [date bounds and public method contracts](api.md#control-the-calendar-calendar) for the full behavior.
 
 ```ts
-try {
-	calendar.gotoDate(applicationDate);
-} catch (error: unknown) {
-	if (!(error instanceof LitefoldCalendarError)) {
-		throw error;
-	}
+import {
+	LitefoldCalendarError,
+	type Calendar,
+	type CalendarDateInput
+} from "@tryagaindev/litefold-calendar";
 
-	showApplicationError(error.userTitle, error.userMessage);
+function gotoApplicationDate(
+	calendar: Calendar,
+	date: CalendarDateInput,
+	showApplicationError: (title: string, message: string) => void
+): void {
+	try {
+		calendar.gotoDate(date);
+	} catch (error: unknown) {
+		if (!(error instanceof LitefoldCalendarError)) {
+			throw error;
+		}
+
+		showApplicationError(error.userTitle, error.userMessage);
+	}
 }
 ```
 
 Use the safe localized `userTitle` and `userMessage`, or application-authored text appropriate to the invalid control. Do not display the diagnostic `message`, `cause`, or stack.
 
-Developer diagnostics identify the exact option or event field and the expected correction—for example, a synchronous availability predicate or an HTTP(S)/relative URL—without echoing event values. Event validation may expose a bounded `eventIndex` for trusted diagnostics, but never copies the title, URL, metadata, payload, or raw cause into package DOM or sanitized state.
+Developer diagnostics identify the relevant option, callback, or event index where possible and describe the expected correction. For example, URL validation requires an HTTP(S) or relative URL, and the context-availability predicate must return a boolean synchronously. Diagnostics do not echo rejected event values. Event validation may expose a bounded `eventIndex`, but the resulting error and `CalendarIssue` never include the rejected event's title, URL, metadata, payload, or raw cause.
 
 ## Observe operational failures without taking over
 
-Use `onError` for telemetry, logging, or application diagnostics. For a current error accepted into state, returning nothing—or returning `"default"`—keeps the package UI and live announcement. A stale diagnostic is still delivered to this callback, but it has no package presentation to preserve or suppress.
+Use `onError` for telemetry, logging, or application diagnostics. Its return value affects presentation only:
+
+| Callback result | Current error accepted into state | Late or stale diagnostic |
+|---|---|---|
+| `undefined` or `"default"` | Keep package UI and announcement | No presentation exists to change |
+| Exact string `"handled"` | Suppress package UI and announcement | No presentation exists to change |
+| Any other value, including other truthy values | Keep package UI and announcement | No presentation exists to change |
+
+Once `onError` is configured, it is the diagnostic sink for callbacks that return normally; returning `"default"` does not also call the global error channel. Log or forward the error before returning.
+
+A consumer render-hook failure uses code `render-hook-failed`, phase `render`, and includes its `renderHookId`, hook, and applicable surface. It can enter the partial-render warning flow described above.
+
+A registered extension failure follows the diagnostic-only route even when it occurs during render. The error uses code `extension-failed`, phase `integration`, and includes its `extensionId` and lifecycle `hook`; it does not enter `CalendarState.issues` or disable or degrade the ordinary calendar. For WebMCP registration, `extensionId` is `webmcp` and `hook` is `register`. Correct a name collision or host capability issue, then recreate the calendar if that extension is still required.
 
 ```ts
+import { createCalendar } from "@tryagaindev/litefold-calendar";
+
 const calendar = createCalendar(host, {
 	events: loadEvents,
 	onError(error) {
-		telemetry.capture({
+		console.error("Calendar operation failed", {
 			code: error.code,
 			phase: error.phase,
 			recoverable: error.recoverable,
@@ -64,15 +114,26 @@ const calendar = createCalendar(host, {
 		return "default";
 	}
 });
+
+calendar.render();
 ```
 
-The callback is synchronous so ownership is decided before presentation. A returned promise/thenable is unsupported, cannot suppress package UI, and is observed so a later rejection does not become unhandled. The original error and integration failure are reported together through one `AggregateError` on the global error channel.
+`cause` can contain private network or application data; send it only to trusted diagnostics.
+
+The callback is synchronous so ownership is decided before presentation. A returned promise/thenable cannot suppress package UI. It is observed to prevent an unhandled rejection; when it settles, one `AggregateError` containing the original error plus the unsupported callback result or rejection is sent to the global error channel.
 
 ## Explicit application ownership
 
-For a current error accepted into state, return the exact string `"handled"` only after synchronously committing persistent visible UI and scheduling an announcement through a live region that existed before the update. No other truthy value suppresses package UI. Returning a disposition for a stale diagnostic has no presentation effect because stale work never enters the issue-presentation pipeline.
+For a current error accepted into state, return the exact string `"handled"` only after synchronously committing persistent visible UI and scheduling an announcement through a live region that existed before the update. No other truthy value suppresses package UI.
+
+`onError` also receives diagnostic-only failures. Do not show application UI just because the callback ran: ignore `stale` errors and explicitly select the error categories your application owns. The example below assumes the existing calendar setup already defines `host` and `loadEvents`. It owns current action failures and leaves source errors with the package because source ownership also requires a custom Retry and recovery flow.
 
 ```ts
+import {
+	createCalendar,
+	type LitefoldCalendarError
+} from "@tryagaindev/litefold-calendar";
+
 const applicationAlert = document.querySelector<HTMLElement>("#application-alert");
 const politeRegion = document.querySelector<HTMLElement>("#application-status");
 const assertiveRegion = document.querySelector<HTMLElement>("#application-assertive");
@@ -96,7 +157,8 @@ function announceApplicationError(error: LitefoldCalendarError): boolean {
 const calendar = createCalendar(host, {
 	events: loadEvents,
 	onError(error) {
-		if (applicationAlert === null || !announceApplicationError(error)) {
+		if (error.stale || error.code !== "action-failed" ||
+			applicationAlert === null || !announceApplicationError(error)) {
 			return "default";
 		}
 
@@ -109,11 +171,21 @@ const calendar = createCalendar(host, {
 		applicationAlert.hidden = false;
 
 		return "handled";
+	},
+	onStateChange(state) {
+		const hasCurrentActionError = state.phase !== "unavailable" &&
+			state.issues.some((issue) => issue.code === "action-failed");
+		if (applicationAlert !== null && !hasCurrentActionError) {
+			applicationAlert.hidden = true;
+			applicationAlert.replaceChildren();
+		}
 	}
 });
+
+calendar.render();
 ```
 
-The page must create the empty `#application-status` (`role="status"`) and `#application-assertive` (`role="alert"`) regions before the calendar runs. The visible `#application-alert` panel itself should not duplicate that announcement route. A handled warning uses the polite region; a blocking or action failure uses the assertive region.
+The page must create the empty `#application-status` (`role="status"`, `aria-live="polite"`) and `#application-assertive` (`role="alert"`, `aria-live="assertive"`) regions before the calendar runs, with `aria-atomic="true"` on both. The helper clears both routes synchronously, then schedules the selected region's text update before returning `"handled"`. The visible `#application-alert` panel itself should not duplicate that announcement route. A handled warning uses the polite region; a blocking or action failure uses the assertive region. See the [runnable async-errors example](../examples/async-errors/) for source-error ownership with Retry and recovery.
 
 When the application returns `"handled"` for a current error, the package still updates state and diagnostics, but it suppresses its visible panel and live announcement for that error. The application also owns retry/recovery presentation for the handed-off error.
 
@@ -132,15 +204,17 @@ const calendar = createCalendar(host, {
 });
 ```
 
-`onAnnounce` is synchronous and must complete its handoff before returning. A thrown error or returned promise/thenable is a `host-integration-failed` error. The package observes that failure through `onError` or the global error channel and sends the original message through its internal live region instead. It also observes a returned promise's rejection so the application does not create an unhandled rejection.
+`onAnnounce` must complete synchronously. If it throws or returns a promise/thenable, the package reports `host-integration-failed` through `onError` or the global error channel and sends the original message through its internal live region instead.
 
 The callback replaces only internal live announcements. Visible package UI remains unless `onError` separately returns `"handled"`.
 
 Avoid echoing the same message from both callbacks. `onError` is for diagnostics/ownership; `onAnnounce` is the single alternative announcement route.
 
-## State observation failures
+## Synchronous callback failures
 
-`onStateChange` is also synchronous. If it throws or returns a promise/thenable, the package records and presents a `host-integration-failed` issue through the normal error path without recursively invoking the failed observer. The current immutable snapshot remains available through `getState()`. A returned promise is observed to prevent an unhandled rejection, but its eventual fulfillment does not make the asynchronous observer supported.
+`onError`, `onAnnounce`, `onStateChange`, and `isEventContextMenuAvailable` are synchronous integration points. Returning a promise does not defer the decision. Every returned thenable is observed so a later rejection does not become unhandled.
+
+If `onStateChange` throws or returns a promise/thenable, the package records and presents `host-integration-failed` without recursively invoking the failed observer. The current immutable snapshot remains available through `getState()`.
 
 `isEventContextMenuAvailable` is synchronous and must return a boolean. If it throws, returns a non-boolean, or returns a thenable, the affected occurrence fails closed and cannot invoke the application context action. The package observes a thenable rejection and reports one recoverable `host-integration-failed` issue rather than repeating a failure for every render. A linked event that is ineligible retains its native browser context menu.
 
@@ -157,12 +231,13 @@ type CalendarErrorCode =
 	| "event-data-invalid"
 	| "event-limit-exceeded"
 	| "extension-failed"
+	| "render-hook-failed"
 	| "action-failed"
 	| "host-integration-failed"
 	| "internal-error";
 ```
 
-`LitefoldCalendarError` extends `Error` and provides immutable structured context:
+The [API reference contains the complete error declarations](api.md#handle-failures-litefoldcalendarerror). `LitefoldCalendarError` extends `Error` and provides immutable structured context:
 
 - `code`, `phase`, and `severity`
 - `recoverable` and `stale`
@@ -170,12 +245,14 @@ type CalendarErrorCode =
 - applicable request `range`
 - diagnostic `message`
 - optional event `eventIndex`
-- optional extension `extensionId`, `hook`, and `surface`
+- optional method, callback, action, or lifecycle `hook`
+- optional render-hook `renderHookId` and `surface`
+- optional registered-extension `extensionId`
 - original unknown `cause`
 
 `recoverable` means the instance may remain usable or recover after a later valid operation. It does not promise that the failure has built-in Retry UI.
 
-`cause` is for developer diagnostics and can contain sensitive application or network details. Do not display it. The package never copies the cause, stack, URL, response payload, metadata, or extension ID into user-facing DOM or sanitized `CalendarState`.
+`cause` is for developer diagnostics and can contain sensitive application or network details. Do not display it. Package error presentation and sanitized `CalendarState` never include the raw cause or stack, rejected response/event data, application metadata, `extensionId`, or `renderHookId`.
 
 ## Global reporting
 
@@ -188,12 +265,13 @@ Attach a global `error` listener only if your telemetry stack requires it. Do no
 ## Recovery guidance
 
 - Source errors: keep source policy idempotent and make Retry safe to call repeatedly.
-- Authentication/authorization failures: return or throw a safe application error; keep private response details in telemetry.
+- Authentication/authorization failures: throw a diagnostic error, keep tokens and response bodies out of user text, and localize the generic load message through `messages` or application-owned presentation.
 - Validation failures: fix the entire source snapshot. The package never displays the valid subset of an invalid response.
-- Extension failures: recreate the calendar after replacing or removing the extension. Quarantine is terminal for that extension instance.
+- Render-hook failures: recreate the calendar after replacing or removing the failed render-hook set. Quarantine is terminal for that render-hook set on the instance.
+- Registered-extension failures: recreate the calendar after replacing or removing the extension. Quarantine is terminal for that extension instance.
 - Fatal/internal failures: destroy and recreate after recording diagnostics. Do not manipulate private package DOM to force recovery.
 - Application actions: return their promise. A fire-and-forget async action cannot be observed by the calendar.
-- Progressive fallback: keep it independent of package error DOM. Initial loading leaves it unchanged; usable data hides it; retained-data degradation keeps it hidden; unavailable/fatal state with no usable snapshot and destroy restore its original hidden state while the package still manages the current value; retry success hides it again. Package writes are skipped while an application `hidden` mutation differs from the package's last value, and destroy preserves that differing value.
+- Progressive fallback: keep it independent of package error DOM and follow the [canonical lease and visibility lifecycle](api.md#application-integration-options); do not reimplement that lifecycle in application error presentation.
 
 ## Accessibility requirements for application ownership
 

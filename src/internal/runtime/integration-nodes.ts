@@ -1,4 +1,3 @@
-import { reportCalendarError } from "../../errors.js";
 import type { LitefoldCalendarError } from "../../errors.js";
 import { isAppendableNode, isSameDocumentNode } from "./safety.js";
 import {
@@ -15,6 +14,7 @@ interface IntegrationNodeControllerOptions {
 	readonly fallbackElement: HTMLElement | null;
 	readonly host: HTMLElement;
 	readonly iconNodes: Readonly<Record<"next" | "previous", Node>>;
+	readonly reportDetachError: (error: LitefoldCalendarError) => void;
 	readonly toolbarEnd: HTMLElement | null;
 }
 
@@ -83,7 +83,7 @@ export class IntegrationNodeController {
 			try {
 				expectedParent.removeChild(node);
 			} catch (cause: unknown) {
-				reportCalendarError(this.options.createDetachError(cause));
+				this.options.reportDetachError(this.options.createDetachError(cause));
 			}
 		}
 	}

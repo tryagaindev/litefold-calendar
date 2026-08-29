@@ -19,6 +19,10 @@ const PUBLIC_ROOT_MODULES = Object.freeze({
 const PUBLIC_INTERNAL_DEPENDENCIES = Object.freeze({
 	"calendar.ts": new Set(["internal/runtime/coordinator.ts"])
 });
+const EXTENSION_INTERNAL_DEPENDENCIES = new Set([
+	"internal/domain/civil-date.ts",
+	"internal/runtime/registered-extension-contract.ts"
+]);
 
 function normalizeSourcePath(filePath) {
 	return path.relative(SOURCE_ROOT, filePath).replaceAll(path.sep, "/");
@@ -94,7 +98,9 @@ function createArchitectureRule() {
 					if (!target.startsWith("internal/")) {
 						return;
 					}
-					const allowedTargets = PUBLIC_INTERNAL_DEPENDENCIES[source] ?? new Set();
+					const allowedTargets = source.startsWith("extensions/")
+						? EXTENSION_INTERNAL_DEPENDENCIES
+						: PUBLIC_INTERNAL_DEPENDENCIES[source] ?? new Set();
 					if (!allowedTargets.has(target)) {
 						context.report({
 							node: sourceNode,

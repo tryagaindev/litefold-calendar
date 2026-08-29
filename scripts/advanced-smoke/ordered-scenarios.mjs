@@ -352,15 +352,89 @@ export async function runAdvancedSmokeScenarios(environment) {
 		2,
 		"Expected maxGridEventsPerDay to cap visual summaries."
 	);
+	const multipleEventIndicator = requireElement(
+		selectedCell,
+		":scope .lfc-calendar-day-summaries > .lfc-calendar-multiple-event-indicator",
+		dom.window.HTMLSpanElement
+	);
 	assert.equal(
-		selectedCell.querySelector(":scope .lfc-calendar-day-summaries > .lfc-calendar-more")?.textContent,
+		multipleEventIndicator.getAttribute("aria-hidden"),
+		"true",
+		"The decorative multiple-event cue must remain outside the accessibility tree."
+	);
+	const defaultMultipleEventIcon = requireElement(
+		multipleEventIndicator,
+		".lfc-calendar-multiple-event-indicator-icon",
+		dom.window.SVGSVGElement
+	);
+	assert.equal(
+		defaultMultipleEventIcon.querySelectorAll(".lfc-calendar-multiple-event-indicator-card").length,
+		3,
+		"Returning undefined from the compact hook must retain the built-in three-layer event-slip fan."
+	);
+	assert.ok(
+		selectedCell.querySelector(
+			'[data-example-event-surface="grid-summary"] .advanced-example-event-marker'
+		) instanceof dom.window.HTMLSpanElement,
+		"The built-in multiple-event cue must coexist with a custom event marker."
+	);
+	const selectedOverflowAction = requireElement(
+		selectedCell,
+		":scope .lfc-calendar-grid-more",
+		dom.window.HTMLButtonElement
+	);
+	const defaultOverflowContent = requireElement(
+		selectedOverflowAction,
+		":scope > .lfc-calendar-grid-more-default-content",
+		dom.window.HTMLSpanElement
+	);
+	const customOverflowSlot = requireElement(
+		selectedOverflowAction,
+		":scope > .lfc-calendar-grid-more-custom-content",
+		dom.window.HTMLSpanElement
+	);
+	const customOverflowContent = requireElement(
+		customOverflowSlot,
+		":scope > .advanced-example-grid-overflow-content",
+		dom.window.HTMLSpanElement
+	);
+	assert.equal(
+		defaultOverflowContent.textContent,
 		"51 additional",
-		"Expected the overflow count in its dedicated grid summary row."
+		"Expected the canonical localized overflow text to remain in the native action."
+	);
+	assert.equal(customOverflowSlot.getAttribute("aria-hidden"), "true");
+	assert.equal(customOverflowContent.ownerDocument, document);
+	assert.equal(customOverflowContent.textContent, "51 additional");
+	assert.deepEqual(
+		{
+			date: customOverflowContent.dataset["exampleDate"],
+			eventCount: customOverflowContent.dataset["exampleEventCount"],
+			hiddenEventCount: customOverflowContent.dataset["exampleHiddenEventCount"],
+			surface: customOverflowContent.dataset["exampleSurface"]
+		},
+		{
+			date: "2026-08-06",
+			eventCount: "53",
+			hiddenEventCount: "51",
+			surface: "grid-summary"
+		},
+		"Expected the custom wide overflow content to receive authoritative context."
+	);
+	assert.equal(
+		customOverflowContent.querySelector("a, button, input, select, textarea, [tabindex]"),
+		null,
+		"Custom overflow content must remain noninteractive."
+	);
+	assert.equal(
+		selectedOverflowAction.classList.contains("lfc-has-custom-grid-overflow-content"),
+		true,
+		"Expected the native overflow action to expose its custom wide-content state."
 	);
 	assert.match(
-		selectedCell.querySelector(":scope .lfc-calendar-grid-more")?.getAttribute("aria-label") ?? "",
+		selectedOverflowAction.getAttribute("aria-label") ?? "",
 		/^View 51 more items for /u,
-		"Expected the localized date/count name on the native overflow action."
+		"Custom visual content must not replace the native overflow action's localized name."
 	);
 
 	selectedDay.dispatchEvent(new dom.window.KeyboardEvent("keydown", {
@@ -410,10 +484,18 @@ export async function runAdvancedSmokeScenarios(environment) {
 	);
 	overflowAction.click();
 	await waitFor(() => selectedDate.textContent === "2026-08-06", "the native grid overflow action");
-	assert.equal(actionResult.textContent, actionBeforeOverflow, "Grid overflow must not call onDaySelect.");
+	assert.equal(
+		actionResult.textContent,
+		actionBeforeOverflow,
+		"Custom overflow content must not change the native action or call onDaySelect."
+	);
 	const agendaHeadingId = agenda.getAttribute("aria-labelledby");
 	assert.notEqual(agendaHeadingId, null);
-	assert.equal(document.activeElement, document.getElementById(agendaHeadingId));
+	assert.equal(
+		document.activeElement,
+		document.getElementById(agendaHeadingId),
+		"The native overflow action must still transfer focus to the agenda heading."
+	);
 
 	const initialAgendaActions = getAgendaActions(host);
 	assert.equal(initialAgendaActions.length, 10, "Expected the configured initial agenda page size.");
@@ -433,9 +515,14 @@ export async function runAdvancedSmokeScenarios(environment) {
 
 	const initialAppointment = requireAgendaAction(host, APPOINTMENT_ID);
 	assert.ok(initialAppointment instanceof dom.window.HTMLAnchorElement, "A URL event must render as an anchor.");
-	assert.equal(initialAppointment.pathname, "/schedule/design-review");
-	assert.equal(initialAppointment.search, "?view=calendar");
-	assert.equal(initialAppointment.hash, "#details");
+	assert.equal(initialAppointment.pathname, "/examples/advanced/");
+	assert.equal(initialAppointment.search, "?event=design-review&from=calendar");
+	assert.equal(initialAppointment.hash, "#advanced-example-calendar-title");
+	const fallbackAppointment = document.querySelector("[data-example-fallback] a");
+	assert.ok(fallbackAppointment instanceof dom.window.HTMLAnchorElement);
+	assert.equal(fallbackAppointment.pathname, "/examples/advanced/");
+	assert.equal(fallbackAppointment.search, "?event=design-review&from=fallback");
+	assert.equal(fallbackAppointment.hash, "#advanced-example-fallback-title");
 	assert.ok(
 		initialAppointment.querySelector("time[datetime=\"2026-08-06T09:30\"]") instanceof
 			dom.window.HTMLTimeElement,
@@ -541,11 +628,34 @@ export async function runAdvancedSmokeScenarios(environment) {
 		eventDialog.querySelector("[data-example-event-dialog-end]")?.textContent,
 		"2026-08-06 at 10:15"
 	);
+	const dialogEndTime = requireElement(
+		eventDialog,
+		"[data-example-event-dialog-end]",
+		dom.window.HTMLTimeElement
+	);
+	const dialogNoEnd = requireElement(
+		eventDialog,
+		"[data-example-event-dialog-no-end]",
+		dom.window.HTMLElement
+	);
+	assert.equal(dialogEndTime.hidden, false);
+	assert.equal(dialogEndTime.dateTime, "2026-08-06T10:15");
+	assert.equal(dialogNoEnd.hidden, true);
 	assert.equal(
 		document.activeElement,
 		eventDialog.querySelector("[autofocus]"),
 		"The dialog close action should receive initial focus."
 	);
+	eventDialog.close();
+
+	const pointAppointment = requireAgendaAction(host, POINT_APPOINTMENT_ID);
+	pointAppointment.click();
+	await waitFor(() => eventDialog.open, "the point-event details dialog");
+	assert.equal(dialogEndTime.hidden, true);
+	assert.equal(dialogEndTime.hasAttribute("datetime"), false);
+	assert.equal(dialogEndTime.textContent, "");
+	assert.equal(dialogNoEnd.hidden, false);
+	assert.equal(dialogNoEnd.textContent, "No end time");
 	eventDialog.close();
 
 	const selectedBeforeGridActivation = selectedDate.textContent;
@@ -752,6 +862,11 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"the setEvents() replacement"
 	);
 	assert.doesNotMatch(host.textContent ?? "", /Design review/u);
+	const replacementAction = requireAgendaAction(host, "dynamic-replacement");
+	assert.ok(replacementAction instanceof dom.window.HTMLAnchorElement, "A replacement URL event must render as an anchor.");
+	assert.equal(replacementAction.pathname, "/examples/advanced/");
+	assert.equal(replacementAction.search, "?event=dynamic-replacement&from=calendar");
+	assert.equal(replacementAction.hash, "#advanced-example-calendar-title");
 	clickCommand(document, "refetchEvents");
 	await waitFor(
 		() => (host.textContent ?? "").includes("Dynamically replaced schedule") &&

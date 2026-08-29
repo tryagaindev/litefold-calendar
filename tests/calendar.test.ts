@@ -11,7 +11,7 @@ import {
 	type CalendarEventActivation,
 	type CalendarEventContextMenu,
 	type CalendarEventInput,
-	type CalendarExtension
+	type CalendarRenderHooks
 } from "../src/index.js";
 import {
 	createDom,
@@ -43,27 +43,31 @@ void test("construction rejects invalid configuration before committing generate
 	assert.throws(
 		() => createCalendar(host, {
 			events: async () => [],
-			extensions: [{ id: "duplicate" }, { id: "duplicate" }]
+			renderHooks: [{ id: "duplicate" }, { id: "duplicate" }]
 		}),
 		(error: unknown) => isCalendarError(error, "invalid-configuration")
 	);
 	assert.throws(
 		() => createCalendar(host, {
 			events: async () => [],
-			extensions: [{ id: "invalid-day-badge", renderDayBadge: "invalid" } as never]
+			renderHooks: [{ id: "invalid-day-badge", renderDayBadge: "invalid" } as never]
 		}),
 		(error: unknown) => isCalendarError(error, "invalid-configuration")
 	);
-	assert.throws(
-		() => createCalendar(host, {
-			events: [],
-			extensions: [
-				{ id: "first-marker", renderEventMarker: () => null },
-				{ id: "second-marker", renderEventMarker: () => null }
-			]
-		}),
-		(error: unknown) => isCalendarError(error, "invalid-configuration")
-	);
+	for (const hook of [
+		"renderEventMarker",
+		"renderGridOverflowContent",
+		"renderMultipleEventIndicator"
+	] as const) {
+		const renderHooks = [
+			{ id: `first-${hook}`, [hook]: () => null },
+			{ id: `second-${hook}`, [hook]: () => null }
+		] satisfies CalendarRenderHooks[];
+		assert.throws(
+			() => createCalendar(host, { events: [], renderHooks }),
+			(error: unknown) => isCalendarError(error, "invalid-configuration")
+		);
+	}
 	const staticEventsFailure = new Error("static events getter failure");
 	const hostileStaticEvents: CalendarEventInput[] = [];
 	Object.defineProperty(hostileStaticEvents, "0", {
@@ -234,23 +238,24 @@ void test("structured dates round-trip through state and same-month selection em
 
 void test("construction snapshots mutable option containers and emits frozen state", async (context) => {
 	const { host } = setupDom(context);
-	const extensions: CalendarExtension[] = [];
+	const renderHooks: CalendarRenderHooks[] = [];
 	const messages = { agendaEmpty: "Original empty state" };
 	const states: ReturnType<Calendar["getState"]>[] = [];
 	const options = {
 		events: async () => [],
-		extensions,
+		renderHooks,
 		initialDate: "2026-07-14",
 		messages,
 		onStateChange: (state: ReturnType<Calendar["getState"]>) => {
 			states.push(state);
+			return undefined;
 		}
 	};
 	const calendar = createCalendar(host, options);
 	options.initialDate = "2026-08-20";
 	messages.agendaEmpty = "Mutated empty state";
-	extensions.push({
-		id: "late-extension",
+	renderHooks.push({
+		id: "late-render-hook",
 		renderDayBadge: () => host.ownerDocument.createTextNode("MUTATED EXTENSION")
 	});
 
@@ -950,8 +955,8 @@ function findRetryButton(host: HTMLElement): HTMLButtonElement | undefined {
 			button.hasAttribute("hidden") === false && button.closest("[hidden]") === null);
 }
 
-async function waitForPhase(
-	calendar: Calendar,
+async function waitForPhase<TMetadata>(
+	calendar: Calendar<TMetadata>,
 	phase: ReturnType<Calendar["getState"]>["phase"]
 ): Promise<void> {
 	await waitFor(() => calendar.getState().phase === phase, `${phase} calendar state`);

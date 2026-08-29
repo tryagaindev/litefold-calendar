@@ -59,8 +59,13 @@ async function renderMetadata(dom, metadata) {
 		installGlobal("document", dom.window.document, descriptors);
 		installGlobal("HTMLElement", dom.window.HTMLElement, descriptors);
 		installGlobal("window", dom.window, descriptors);
-		installGlobal("fetch", async (input) => {
+		installGlobal("fetch", async (input, init) => {
 			assert.equal(input, "./metadata.json");
+			assert.deepEqual(init, {
+				cache: "no-store",
+				credentials: "same-origin",
+				headers: { Accept: "application/json" }
+			});
 			return {
 				json: async () => metadata,
 				ok: true,

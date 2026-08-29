@@ -9,7 +9,7 @@ import {
 } from "../src/index.js";
 import { createDom, installDom, waitFor } from "./helpers/dom.js";
 
-void test("cleanup reentrancy preserves the newest extension signal until destroy", async (context) => {
+void test("cleanup reentrancy preserves the newest render-hook signal through destroy", async (context) => {
 	const { dom, host } = setupDom(context);
 	const PROBE_EVENT = "lfc-cleanup-reentrancy-probe";
 	const signals: AbortSignal[] = [];
@@ -23,7 +23,7 @@ void test("cleanup reentrancy preserves the newest extension signal until destro
 			event("cleanup-first", "2026-07-14T09:00", "Cleanup first"),
 			event("cleanup-newest", "2026-07-15T09:00", "Cleanup newest")
 		],
-		extensions: [{
+		renderHooks: [{
 			eventDidMount: ({ document: ownerDocument, event: mountedEvent, signal, surface }) => {
 				if (surface !== "agenda") {
 					return;
@@ -75,7 +75,7 @@ void test("cleanup reentrancy drains the old batch once without cleaning the new
 			event("batch-second", "2026-07-14T10:00", "Batch second"),
 			event("batch-newest", "2026-07-15T09:00", "Batch newest")
 		],
-		extensions: [{
+		renderHooks: [{
 			eventDidMount: ({ event: mountedEvent, signal, surface }) => {
 				if (surface !== "agenda") {
 					return;
@@ -110,7 +110,7 @@ void test("cleanup reentrancy drains the old batch once without cleaning the new
 	assert.equal(host.childElementCount, 0);
 });
 
-void test("abort-listener reentrancy preserves the newest extension signal until destroy", async (context) => {
+void test("abort-listener reentrancy preserves the newest render-hook signal until destroy", async (context) => {
 	const { dom, host } = setupDom(context);
 	const PROBE_EVENT = "lfc-abort-reentrancy-probe";
 	const signals: AbortSignal[] = [];
@@ -124,7 +124,7 @@ void test("abort-listener reentrancy preserves the newest extension signal until
 			event("abort-first", "2026-07-14T09:00", "Abort first"),
 			event("abort-newest", "2026-07-15T09:00", "Abort newest")
 		],
-		extensions: [{
+		renderHooks: [{
 			eventDidMount: ({ document: ownerDocument, event: mountedEvent, signal, surface }) => {
 				if (surface !== "agenda") {
 					return;

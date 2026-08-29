@@ -2,33 +2,43 @@ import { createCalendar } from "../../dist/index.js";
 
 const host = document.querySelector("[data-example-calendar]");
 const fallbackElement = document.querySelector("[data-example-fallback]");
+const controls = document.querySelector("[data-example-controls]");
 const result = document.querySelector("[data-example-result]");
-const rebuildButtons = [...document.querySelectorAll("[data-example-rebuild]")];
+const politeAnnouncer = document.querySelector("[data-example-announcer-polite]");
+const assertiveAnnouncer = document.querySelector("[data-example-announcer-assertive]");
+const failureButton = document.querySelector('[data-example-rebuild="failure"]');
+const successButton = document.querySelector('[data-example-rebuild="success"]');
 
 if (!(host instanceof HTMLElement) ||
 	!(fallbackElement instanceof HTMLElement) ||
+	!(controls instanceof HTMLElement) ||
 	!(result instanceof HTMLElement) ||
-	!rebuildButtons.every((button) => button instanceof HTMLButtonElement)) {
+	!(politeAnnouncer instanceof HTMLElement) ||
+	!(assertiveAnnouncer instanceof HTMLElement) ||
+	!(failureButton instanceof HTMLButtonElement) ||
+	!(successButton instanceof HTMLButtonElement)) {
 	throw new Error("The progressive-enhancement example markup is incomplete.");
 }
 
-const EVENTS = Object.freeze([
-	Object.freeze({
+const SOURCE_DELAY_MS = 80;
+const EVENTS = [
+	{
 		id: "release-window",
 		title: "Release window",
 		start: "2026-08-04",
 		end: "2026-08-06",
 		accentColor: "#008577"
-	}),
-	Object.freeze({
+	},
+	{
 		id: "design-review",
 		title: "Calendar design review",
 		start: "2026-08-04T09:30",
 		end: "2026-08-04T10:15",
-		url: "/events/design-review?from=calendar&view=summary#details"
-	})
-]);
+		url: "./?event=design-review&from=calendar#server-schedule"
+	}
+];
 
+//Keep the loading state visible while modeling an abort-aware event provider.
 const waitForSource = (signal) => new Promise((resolve, reject) => {
 	if (signal.aborted) {
 		reject(signal.reason);
@@ -42,16 +52,37 @@ const waitForSource = (signal) => new Promise((resolve, reject) => {
 	const timeoutId = setTimeout(() => {
 		signal.removeEventListener("abort", handleAbort);
 		resolve();
-	}, 80);
+	}, SOURCE_DELAY_MS);
 	signal.addEventListener("abort", handleAbort, { once: true });
 });
 
-let calendar;
+const isSourceError = (error) => error.code === "event-source-failed" ||
+	error.code === "event-data-invalid" ||
+	error.code === "event-limit-exceeded";
 
-const buildCalendar = (mode) => {
+let calendar = null;
+let announcementRevision = 0;
+
+const reportResult = (message, politeness) => {
+	result.textContent = message;
+	const target = politeness === "assertive" ? assertiveAnnouncer : politeAnnouncer;
+	const revision = ++announcementRevision;
+	politeAnnouncer.textContent = "";
+	assertiveAnnouncer.textContent = "";
+
+	//A separate DOM update lets assistive technology announce repeated messages.
+	queueMicrotask(() => {
+		if (revision === announcementRevision) {
+			target.textContent = message;
+		}
+	});
+};
+
+const rebuildCalendar = (mode) => {
+	//Destroy restores the fallback before the replacement starts loading.
 	calendar?.destroy();
-	document.documentElement.dataset["exampleReady"] = "false";
-	result.textContent = "Loading the enhanced calendar. The fallback remains available.";
+	document.documentElement.dataset.exampleReady = "false";
+	reportResult("Loading the enhanced calendar. The fallback remains available.", "polite");
 
 	calendar = createCalendar(host, {
 		events: async ({ signal }) => {
@@ -65,33 +96,39 @@ const buildCalendar = (mode) => {
 		fallbackElement,
 		initialDate: "2026-08-04",
 		onError: (error) => {
-			if (error.code === "event-source-failed" || error.code === "event-data-invalid") {
-				result.textContent = `${error.userTitle}. ${error.userMessage} The fallback remains visible.`;
+			if (isSourceError(error)) {
+				reportResult(
+					`${error.userTitle}. ${error.userMessage} The server-rendered schedule remains available.`,
+					"assertive"
+				);
 				return "handled";
 			}
 			return "default";
 		},
 		onStateChange: (state) => {
-			document.documentElement.dataset["examplePhase"] = state.phase;
+			document.documentElement.dataset.examplePhase = state.phase;
 			if (state.phase === "ready") {
-				document.documentElement.dataset["exampleReady"] = "true";
-				result.textContent = "The usable calendar is ready, so the fallback is hidden.";
-			} else if (state.phase === "unavailable") {
-				result.textContent = "No usable calendar snapshot is available, so the fallback remains visible.";
+				document.documentElement.dataset.exampleReady = "true";
+				reportResult("The usable calendar is ready, so the fallback is hidden.", "polite");
 			}
 		}
 	});
 	calendar.render();
 };
 
-for (const button of rebuildButtons) {
-	button.addEventListener("click", () => {
-		buildCalendar(button.dataset["exampleRebuild"] === "failure" ? "failure" : "success");
-	});
-}
+failureButton.addEventListener("click", () => {
+	rebuildCalendar("failure");
+});
 
-buildCalendar("success");
+successButton.addEventListener("click", () => {
+	rebuildCalendar("success");
+});
 
-window.addEventListener("pagehide", () => {
-	calendar?.destroy();
-}, { once: true });
+controls.hidden = false;
+rebuildCalendar("success");
+
+window.addEventListener("pagehide", (event) => {
+	if (!event.persisted) {
+		calendar?.destroy();
+	}
+});

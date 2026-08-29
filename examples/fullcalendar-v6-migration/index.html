@@ -11,15 +11,16 @@
 <body>
 	<main class="example-shell">
 		<header class="example-intro">
-			<h1>Rewrite a basic dayGridMonth integration</h1>
-			<p>This standalone recipe adapts a JSON shape commonly used with FullCalendar v6. It is application code, not a compatibility layer.</p>
+			<h1>Rewrite a FullCalendar dayGridMonth view</h1>
+			<p>See a small adapter turn a common FullCalendar v6 event shape into a range-aware Litefold source with equivalent day and event callbacks.</p>
 		</header>
 
 		<section class="example-panel" aria-labelledby="migration-request-title">
 			<h2 id="migration-request-title">Range-aware source</h2>
+			<p>The button starts two refetches. The second aborts the first, so only the latest 42-day snapshot can render.</p>
 			<p data-example-range>Waiting for the first 42-day request.</p>
 			<div class="example-control-row">
-				<button class="example-button" type="button" data-example-refetch>Supersede a request</button>
+				<button class="example-button" type="button" data-example-refetch>Trigger overlapping refetches</button>
 			</div>
 		</section>
 
@@ -29,7 +30,7 @@
 			<h2 id="migration-result-title">Application callbacks</h2>
 			<p><strong>Day selection:</strong> <span data-example-selection>None</span></p>
 			<p><strong>Event activation:</strong> <span data-example-activation>None</span></p>
-			<p class="example-result" data-example-status role="status">Loading adapted events.</p>
+			<p class="example-result" data-example-status role="status" aria-atomic="true">Loading adapted events.</p>
 		</section>
 	</main>
 

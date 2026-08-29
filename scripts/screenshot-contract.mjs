@@ -26,16 +26,35 @@ const GENERATED_SOURCE_FILES = new Set([
 	"examples/advanced/main.js",
 	"examples/metadata.json"
 ]);
+const SCREENSHOT_SOURCE_DIRECTORIES = new Set(["src"]);
+const SCREENSHOT_PACKAGE_SCRIPTS = Object.freeze([
+	"prebuild:package",
+	"build:package",
+	"postbuild:package",
+	"prebuild:examples:advanced",
+	"build:examples:advanced",
+	"postbuild:examples:advanced",
+	"prescreenshots:update",
+	"screenshots:update",
+	"postscreenshots:update"
+]);
 export const SCREENSHOT_SOURCE_INPUTS = Object.freeze([
 	"package.json",
 	"package-lock.json",
-	"playwright.config.mjs",
+	"tsconfig.base.json",
+	"tsconfig.build.json",
 	"src",
-	"examples",
-	"scripts/build.mjs",
-	"scripts/build-examples.mjs",
+	"examples/example.css",
+	"examples/advanced/index.html",
+	"examples/advanced/main.ts",
+	"examples/advanced/theme.css",
+	"examples/advanced/tsconfig.json",
+	"scripts/build-advanced-example.mjs",
 	"scripts/build-package.mjs",
+	"scripts/lib/advanced-example-build.mjs",
 	"scripts/lib/node-version.mjs",
+	"scripts/lib/package-entries.mjs",
+	"scripts/lib/process.mjs",
 	"scripts/lib/styles.mjs",
 	"scripts/screenshot-contract.mjs",
 	"scripts/screenshot-scenes.mjs",
@@ -70,11 +89,51 @@ export function isScreenshotSourceFile(repositoryRelativePath) {
 		SOURCE_EXTENSIONS.has(extname(normalizedPath).toLowerCase());
 }
 
+export function isScreenshotSourceInput(repositoryRelativePath) {
+	const normalizedPath = repositoryRelativePath.replaceAll("\\", "/");
+	return isScreenshotSourceFile(normalizedPath) && (
+		SCREENSHOT_SOURCE_INPUTS.includes(normalizedPath) ||
+		[...SCREENSHOT_SOURCE_DIRECTORIES].some((directory) =>
+			normalizedPath.startsWith(`${directory}/`)
+		)
+	);
+}
+
+export function canonicalizeScreenshotSource(repositoryRelativePath, contents) {
+	const normalizedPath = repositoryRelativePath.replaceAll("\\", "/");
+	if (normalizedPath !== "package.json" && normalizedPath !== "package-lock.json") {
+		return Buffer.isBuffer(contents) ? contents : Buffer.from(contents);
+	}
+
+	const manifest = JSON.parse(Buffer.isBuffer(contents) ? contents.toString("utf8") : contents);
+	if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) {
+		throw new Error(`${normalizedPath} must contain a JSON object.`);
+	}
+	if (Object.hasOwn(manifest, "version")) {
+		manifest.version = "<root-version>";
+	}
+	if (normalizedPath === "package.json" &&
+		manifest.scripts !== null && typeof manifest.scripts === "object" &&
+		!Array.isArray(manifest.scripts)) {
+		manifest.scripts = Object.fromEntries(SCREENSHOT_PACKAGE_SCRIPTS
+			.filter((name) => Object.hasOwn(manifest.scripts, name))
+			.map((name) => [name, manifest.scripts[name]]));
+	}
+	if (normalizedPath === "package-lock.json" &&
+		manifest.packages?.[""] !== null &&
+		typeof manifest.packages?.[""] === "object" &&
+		!Array.isArray(manifest.packages[""]) &&
+		Object.hasOwn(manifest.packages[""], "version")) {
+		manifest.packages[""].version = "<root-version>";
+	}
+	return Buffer.from(JSON.stringify(manifest));
+}
+
 async function collectFiles(path) {
 	const metadata = await stat(path);
 	if (metadata.isFile()) {
 		const repositoryRelativePath = relative(REPOSITORY_ROOT, path).replaceAll("\\", "/");
-		return isScreenshotSourceFile(repositoryRelativePath) ? [path] : [];
+		return isScreenshotSourceInput(repositoryRelativePath) ? [path] : [];
 	}
 	if (!metadata.isDirectory()) {
 		return [];
@@ -97,7 +156,10 @@ export async function computeSourceFingerprint() {
 		}
 		hash.update(relative(REPOSITORY_ROOT, file).replaceAll("\\", "/"));
 		hash.update("\0");
-		hash.update(await readFile(file));
+		hash.update(canonicalizeScreenshotSource(
+			relative(REPOSITORY_ROOT, file).replaceAll("\\", "/"),
+			await readFile(file)
+		));
 		hash.update("\0");
 	}
 	return hash.digest("hex");
@@ -120,7 +182,7 @@ export function validateScreenshotManifest(manifest, { final = false } = {}) {
 	}
 	if (!isSupportedNodeVersion(manifest.toolchain?.node) ||
 		manifest.toolchain?.npm !== REQUIRED_NPM_VERSION ||
-		manifest.toolchain?.playwright !== "1.61.1" || manifest.toolchain?.browser !== "chromium") {
+		manifest.toolchain?.playwright !== "1.62.1" || manifest.toolchain?.browser !== "chromium") {
 		errors.push(
 			`Manifest toolchain must record an exact Node ${SUPPORTED_NODE_RANGE} runtime and the pinned ` +
 			"npm, Playwright, and Chromium inputs."

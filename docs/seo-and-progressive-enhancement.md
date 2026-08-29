@@ -2,6 +2,18 @@
 
 litefold-calendar renders meaningful native client-side markup and can coordinate an application-owned no-JavaScript fallback. It does not render HTML on the server, create canonical pages, inject metadata, or determine whether event data may be indexed.
 
+Optional [WebMCP site tools](webmcp.md) provide structured interaction to a compatible browser agent only after JavaScript runs. They do not make content server-rendered, crawlable, indexable, or available as a no-JavaScript fallback.
+
+## Choose the right level
+
+| Requirement | Use |
+| --- | --- |
+| Accessible semantics after JavaScript runs | Core calendar output |
+| Useful content while JavaScript or the first event request is unavailable | Application-authored HTML coordinated with `fallbackElement` |
+| Crawlable event content, canonical URLs, metadata, or structured data | Server-rendered application pages |
+
+These approaches can be combined. The calendar enhances application content; it does not replace the server's indexing or privacy policy.
+
 ## What core renders
 
 After a usable source snapshot commits, the calendar uses:
@@ -15,7 +27,7 @@ After a usable source snapshot commits, the calendar uses:
 
 This improves document semantics, link behavior, keyboard support, and machine readability after JavaScript runs. It is not equivalent to server-rendered, crawlable event detail content.
 
-`eventTimeDisplay` changes visual exposure, not this semantic output. A time suppressed from grid, agenda, or both remains a native `<time datetime>` value with visually hidden localized text and remains part of the event's accessible name. This improves consistency for assistive technology and client-side consumers, but it still does not make client-rendered content equivalent to canonical server markup.
+`eventTimeDisplay` changes visual exposure, not this semantic output. A time suppressed from grid, agenda, or both remains a native `<time datetime>` value with visually hidden localized text, so it stays exposed to assistive technology; for actionable occurrences, it also remains part of the event action's accessible name. This improves consistency for assistive technology and client-side consumers, but it still does not make client-rendered content equivalent to canonical server markup.
 
 ## Provide a no-JavaScript fallback
 
@@ -60,26 +72,29 @@ The fallback must belong to the host document and remain outside the calendar ho
 
 ## Fallback lifecycle
 
-The package records the fallback's original `hidden` state and changes only that property while its current value still matches the package's last observed or written value:
+The package changes only the fallback element's `hidden` property:
 
-- Construction and initial loading leave the fallback unchanged.
-- The first usable source snapshot hides it, including a successful empty snapshot.
-- A degraded refresh that retains usable data keeps it hidden.
-- An unavailable or fatal state with no usable snapshot restores its original `hidden` state while the package still manages the current value.
-- A successful retry hides it again.
-- If application code changes `hidden` during the lease, package writes are skipped while that value differs, and destruction preserves the differing application value. Restoring the package's last value allows normal management to resume.
-- `destroy()` always releases the lease and restores the original state only while the package still manages the current value.
-- Invalid construction or a failed host claim leaves it untouched.
+| Calendar state | Fallback behavior |
+| --- | --- |
+| Construction and initial loading | Keeps the application's original visibility |
+| First usable snapshot, including an empty result | Hides the fallback |
+| Later refresh failure with retained usable data | Keeps the fallback hidden |
+| Unavailable or fatal state with no usable data | Restores the original visibility |
+| `destroy()` | Restores the original visibility when the package still owns the current value |
+
+If application code changes `hidden`, Litefold preserves that value instead of overwriting it. The [API reference](api.md#application-integration-options) defines exact lease admission, Retry, application-mutation, and destruction behavior.
 
 Keep fallback content independently correct; the package does not reconcile or rewrite it. When fallback data changes, update it through the application's server or content workflow.
 
 ## Event URL policy
 
-`CalendarEventInput.url` is optional. The package resolves it against the host document and accepts relative references or HTTP(S) URLs up to 2,048 characters. Validation rejects empty or trim-altered input, control characters, embedded credentials, malformed URLs, and unsupported schemes. A bad URL rejects the entire source snapshot atomically.
+`CalendarEventInput.url` is optional. Litefold accepts validated relative references and HTTP(S) URLs, resolves them against the host document, and renders them as native anchors. An invalid URL rejects the complete source snapshot rather than silently dropping one event. See the [event URL contract](api.md#define-events-calendareventinput-and-calendarevent) for exact length, whitespace, credential, character, and scheme rules.
 
 Use same-origin relative links when possible. The application remains responsible for authorization, privacy, canonical routing, destination security, and deciding whether a link may expose an event's existence.
 
-For linked events, both grid and agenda representations are native anchors. `onEventActivate` may synchronously prevent navigation—for example, to open an application dialog—but should not do so unless a complete alternative is available. A context action that is unavailable for a link leaves the browser's native context menu intact. For an eligible non-link event with no activation callback, the context callback is the native button's only application action and therefore also runs on primary activation.
+For linked events, both grid and agenda representations are native anchors. `onEventActivate` may synchronously prevent navigation—for example, to open an application dialog—but should not do so unless a complete alternative is available. An unavailable context action leaves the browser's native context menu intact.
+
+For an eligible non-link event with no activation callback, the context callback is the native button's only application action and therefore also runs on primary activation.
 
 ## Server and metadata responsibilities
 
@@ -100,7 +115,7 @@ litefold-calendar deliberately does not emit JSON-LD. Rich-result schemas requir
 
 1. Load the page with JavaScript disabled and confirm the fallback is useful, ordered, linked where appropriate, and authorized.
 2. Load with a slow source and confirm the fallback stays available until usable calendar data commits.
-3. Exercise initial failure, retry success, retained-data refresh failure, fatal failure, and destroy.
+3. Exercise the fallback states required by the [canonical lifecycle](api.md#application-integration-options).
 4. Inspect the rendered agenda for native `ol`/`li`/`time`/`a` semantics; repeat with each visual time mode and confirm hidden times remain semantic and accessible.
 5. Confirm links work with ordinary navigation, new-tab commands, copy-link, and the native context menu.
 6. Test keyboard and assistive-technology reading order across the server content, calendar grid, agenda, and fallback transition.

@@ -361,13 +361,42 @@ void test("event destinations accept safe relative and HTTP(S) URLs and reject u
 		url: "../events/relative?from=calendar#details"
 	}, baseUrl);
 	assert.equal(relative?.url, "../events/relative?from=calendar#details");
+	const schemeRelative = normalizeCalendarEvent({
+		id: "scheme-relative",
+		start: "2026-07-14",
+		title: "Scheme-relative",
+		url: "//events.example.test/from-calendar"
+	}, baseUrl);
+	assert.equal(schemeRelative?.url, "//events.example.test/from-calendar");
 	const absolute = normalizeCalendarEvent({
 		id: "absolute",
 		start: "2026-07-14",
 		title: "Absolute",
 		url: "HTTP://Example.COM:80/a/../event"
-	}, baseUrl);
+	});
 	assert.equal(absolute?.url, "http://example.com/event");
+	const secureAbsolute = normalizeCalendarEvent({
+		id: "secure-absolute",
+		start: "2026-07-14",
+		title: "Secure absolute",
+		url: "https://example.test/event"
+	});
+	assert.equal(secureAbsolute?.url, "https://example.test/event");
+	const missing = normalizeCalendarEvent({
+		id: "missing",
+		start: "2026-07-14",
+		title: "Missing"
+	});
+	assert.equal(missing?.url, null);
+
+	for (const url of ["/events/no-base", "//events.example.test/no-base"]) {
+		assert.equal(normalizeCalendarEvent({
+			id: "missing-base",
+			start: "2026-07-14",
+			title: "Missing base",
+			url
+		}), null, url);
+	}
 
 	for (const url of [
 		"",

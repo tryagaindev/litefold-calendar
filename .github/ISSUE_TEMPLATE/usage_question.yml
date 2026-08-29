@@ -1,0 +1,49 @@
+name: Usage question
+description: Ask for help integrating or using litefold-calendar.
+title: "[Question]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start with the documentation and search existing issues before asking a public usage question. Support is provided on a best-effort basis.
+
+        **Do not disclose security vulnerabilities here.** Use [private vulnerability reporting](https://github.com/tryagaindev/litefold-calendar/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: Package version or commit
+      description: Provide the exact npm version or source commit.
+      placeholder: 0.x.y-alpha.N or source commit
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Integration goal
+      description: Describe the application behavior you are trying to implement.
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+      description: Include a minimal dependency-free example, relevant configuration, and sanitized output when practical.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the browser, operating system, framework, relevant assistive technology, and browser-agent workspace/model context when applicable.
+      placeholder: Current Chrome on Windows; plain TypeScript
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched the documentation and existing issues.
+          required: true
+        - label: I removed credentials, private event data, and other sensitive information.
+          required: true
+        - label: I agree to follow the [Code of Conduct](https://github.com/tryagaindev/litefold-calendar/blob/main/CODE_OF_CONDUCT.md).
+          required: true

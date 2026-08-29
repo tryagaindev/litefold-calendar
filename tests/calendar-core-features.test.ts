@@ -147,7 +147,7 @@ void test("eventTimeDisplay changes only visual time presentation across both ev
 				}
 			],
 			...(testCase.value === null ? {} : { eventTimeDisplay: testCase.value }),
-			extensions: [{
+			renderHooks: [{
 				eventDidMount: ({ dateString, elements, event, surface, timeText }) => {
 					mounted.push({
 						dateString,
@@ -207,24 +207,24 @@ void test("eventTimeDisplay changes only visual time presentation across both ev
 				selectedDateMounts.find(({ eventId, surface: mountedSurface }) =>
 					eventId === "timed" && mountedSurface === surface)?.timeText,
 				"9:00 AM",
-				`${testCase.name}: timed extension text on ${surface}.`
+				`${testCase.name}: timed render-hook text on ${surface}.`
 			);
 			assert.equal(
 				selectedDateMounts.find(({ eventId, surface: mountedSurface }) =>
 					eventId === "all-day" && mountedSurface === surface)?.timeText,
 				"All day",
-				`${testCase.name}: all-day extension text on ${surface}.`
+				`${testCase.name}: all-day render-hook text on ${surface}.`
 			);
 			assert.equal(
 				selectedDateMounts.find(({ eventId, surface: mountedSurface }) =>
 					eventId === "continuation" && mountedSurface === surface)?.timeText,
 				"",
-				`${testCase.name}: continuation extension text on ${surface}.`
+				`${testCase.name}: continuation render-hook text on ${surface}.`
 			);
 		}
 		assert.ok(mounted.every(({ hidden, surface }) => hidden === (
 			surface === "grid-summary" ? testCase.gridHidden : testCase.agendaHidden
-		)), `${testCase.name}: extension time element visual state did not match its surface.`);
+		)), `${testCase.name}: render-hook time element visual state did not match its surface.`);
 
 		const window = host.ownerDocument.defaultView;
 		assert.ok(window);
@@ -517,6 +517,11 @@ void test("progressive fallback visibility and its exclusive lease are reversibl
 	assert.throws(
 		() => createCalendar(host, { events: [], fallbackElement: host }),
 		(error: unknown) => error instanceof LitefoldCalendarError && error.code === "invalid-configuration"
+	);
+	assert.throws(
+		() => createCalendar(host, { events: [], fallbackElement: dom.window.document.body }),
+		(error: unknown) => error instanceof LitefoldCalendarError && error.code === "invalid-configuration" &&
+			error.message.includes("neither contains nor is contained")
 	);
 	const otherDocumentFallback = createDom('<div id="calendar"></div>').window.document.body;
 	assert.throws(

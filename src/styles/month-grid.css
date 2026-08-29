@@ -9,15 +9,14 @@
 
   :where(.litefold-calendar) .lfc-calendar-weekdays {
     background: var(--lfc-internal-grid-border-color);
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border-block-end: 1px solid var(--lfc-internal-grid-border-color);
+    border-block-end: var(--lfc-internal-hairline) solid var(--lfc-internal-grid-border-color);
   }
 
   :where(.litefold-calendar) .lfc-calendar-weekday {
     background: var(--lfc-surface-background);
     color: var(--lfc-muted-color);
     font-size: 0.75em;
-    font-weight: 700;
+    font-weight: var(--lfc-internal-font-weight-bold);
     letter-spacing: 0.025em;
     min-inline-size: 0;
     overflow-wrap: anywhere;
@@ -105,7 +104,7 @@
     .lfc-calendar-day.lfc-is-out-of-range
     .lfc-calendar-day-button {
     cursor: not-allowed;
-    opacity: 0.55;
+    opacity: var(--lfc-internal-out-of-range-opacity);
   }
 
   :where(.litefold-calendar)
@@ -136,10 +135,10 @@
     align-items: center;
     background: transparent;
     border: 0.125rem solid transparent;
-    border-radius: 100vmax;
+    border-radius: var(--lfc-internal-full-radius);
     display: inline-flex;
     font-variant-numeric: tabular-nums;
-    font-weight: 500;
+    font-weight: var(--lfc-internal-font-weight-medium);
     justify-content: center;
     justify-self: end;
     line-height: 1;
@@ -149,7 +148,7 @@
     scale: 1;
     transition-duration: var(--lfc-internal-motion-duration);
     transition-property: background-color, border-color, color;
-    transition-timing-function: ease-out;
+    transition-timing-function: var(--lfc-internal-motion-easing);
   }
 
   :where(.litefold-calendar)
@@ -161,7 +160,7 @@
     background: var(--lfc-accent-color);
     border-color: var(--lfc-today-border-color);
     color: var(--lfc-accent-contrast-color);
-    font-weight: 700;
+    font-weight: var(--lfc-internal-font-weight-bold);
   }
 
   :where(.litefold-calendar)
@@ -192,13 +191,38 @@
     z-index: 1;
   }
 
+  :where(.litefold-calendar) .lfc-calendar-multiple-event-indicator {
+    block-size: 1.25rem;
+    color: var(--lfc-event-border-color);
+    display: none;
+    flex: none;
+    inline-size: 0.75rem;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-multiple-event-indicator > * {
+    max-block-size: 100%;
+    max-inline-size: 100%;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-multiple-event-indicator-icon {
+    block-size: auto;
+    fill: var(--lfc-event-background);
+    inline-size: 0.75rem;
+    overflow: visible;
+    shape-rendering: geometricprecision;
+    stroke: currentcolor;
+    stroke-linejoin: round;
+    stroke-width: 2;
+  }
+
   :where(.litefold-calendar) .lfc-calendar-event-summary {
     align-items: safe center;
     background: var(--lfc-event-background);
-    /* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
-    border: 1px solid var(--lfc-event-border-color);
+    border: var(--lfc-internal-hairline) solid var(--lfc-event-border-color);
     border-inline-start: var(--lfc-event-accent-width) solid var(--lfc-event-accent-color);
-    border-radius: var(--lfc-internal-event-border-radius);
+    border-radius: var(--lfc-border-radius);
     color: var(--lfc-event-color);
     display: flex;
     font: inherit;
@@ -217,6 +241,10 @@
   :where(.litefold-calendar) .lfc-calendar-event-summary.lfc-calendar-event-button,
   :where(.litefold-calendar) .lfc-calendar-grid-more {
     pointer-events: auto;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-grid-more-custom-content {
+    display: none;
   }
 
   :where(.litefold-calendar)

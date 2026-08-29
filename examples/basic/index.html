@@ -4,20 +4,20 @@
 	<meta charset="utf-8">
 	<meta name="color-scheme" content="light dark">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>litefold-calendar basic example</title>
+	<title>Basic JavaScript | litefold-calendar</title>
 	<link rel="stylesheet" href="../../dist/styles.css">
 	<link rel="stylesheet" href="../example.css">
 </head>
 <body>
 	<main class="example-shell">
 		<header class="example-intro">
-			<h1>Project calendar</h1>
-			<p>The calendar opens on today by default. Open an event directly in the grid or choose a date and use its progressively revealed agenda.</p>
+			<h1>Render static events with JavaScript</h1>
+			<p>Select today, then activate an event from the month grid or agenda. The status below identifies the event and the surface that opened it.</p>
 		</header>
 
 		<div class="example-calendar" data-calendar></div>
 
-		<p class="example-result" data-result role="status"></p>
+		<p class="example-result" data-result role="status" aria-atomic="true"></p>
 	</main>
 
 	<script type="module" src="./main.js"></script>

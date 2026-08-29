@@ -20,12 +20,17 @@ void test("the classic-script example starts and tears down through a regular sc
 	const entry = await loadClassicEntry();
 	context.after(() => { entry.dom.window.close(); });
 
-	executeEntry(entry, async () => publicApi as unknown as Module);
 	const host = requireElement(entry.dom, "[data-calendar]");
-	await waitFor(
-		() => host.hasAttribute("data-litefold-calendar") && host.getAttribute("aria-busy") !== "true",
-		"classic-script calendar startup"
-	);
+	const restoreHTMLElement = exposeHTMLElement(entry.dom);
+	try {
+		executeEntry(entry, async () => publicApi as unknown as Module);
+		await waitFor(
+			() => host.hasAttribute("data-litefold-calendar") && host.getAttribute("aria-busy") !== "true",
+			"classic-script calendar startup"
+		);
+	} finally {
+		restoreHTMLElement();
+	}
 
 	assert.match(host.textContent ?? "", /Alpha release window/u);
 	const eventLink = [...host.querySelectorAll<HTMLAnchorElement>("section[aria-labelledby] a")]
@@ -107,4 +112,20 @@ function requireElement(dom: JSDOM, selector: string): HTMLElement {
 	const element = dom.window.document.querySelector(selector);
 	assert.ok(element instanceof dom.window.HTMLElement, `Expected ${selector}.`);
 	return element;
+}
+
+function exposeHTMLElement(dom: JSDOM): () => void {
+	const original = Object.getOwnPropertyDescriptor(globalThis, "HTMLElement");
+	Object.defineProperty(globalThis, "HTMLElement", {
+		configurable: true,
+		value: dom.window.HTMLElement,
+		writable: true
+	});
+	return (): void => {
+		if (original === undefined) {
+			Reflect.deleteProperty(globalThis, "HTMLElement");
+		} else {
+			Object.defineProperty(globalThis, "HTMLElement", original);
+		}
+	};
 }
