@@ -16,8 +16,20 @@
 	<header class="example-landing-header">
 		<div class="example-landing-header-content">
 			<p class="example-landing-kicker">Dependency-free calendar recipes</p>
-			<h1>Explore Litefold Calendar</h1>
-			<p>Start with a static event array, then move into asynchronous sources, application-owned failure handling, progressive enhancement, or migration work.</p>
+			<h1>Build with Litefold Calendar</h1>
+			<p class="example-landing-summary">Run a focused recipe, inspect the source that produced it, and adapt the public API to your application.</p>
+			<nav class="example-developer-links" aria-label="Developer resources">
+				<a
+					href="https://github.com/tryagaindev/litefold-calendar/blob/main/docs/api.md"
+					data-example-repository-kind="blob"
+					data-example-repository-path="docs/api.md"
+				>API reference</a>
+				<a
+					href="https://github.com/tryagaindev/litefold-calendar/blob/main/docs/integration-guide.md"
+					data-example-repository-kind="blob"
+					data-example-repository-path="docs/integration-guide.md"
+				>Integration guide</a>
+			</nav>
 		</div>
 
 		<aside class="example-metadata" aria-labelledby="example-metadata-title" data-example-metadata-state="loading">
@@ -25,69 +37,139 @@
 			<dl>
 				<div>
 					<dt>Version</dt>
-					<dd><code data-example-version>Loading</code></dd>
+					<dd><code data-example-version>@alpha</code></dd>
 				</div>
 				<div>
 					<dt>Source commit</dt>
-					<dd><code data-example-commit>Loading</code></dd>
+					<dd>
+						<a href="https://github.com/tryagaindev/litefold-calendar/tree/main" data-example-commit-link>
+							<code data-example-commit>main branch</code>
+						</a>
+					</dd>
 				</div>
 				<div>
 					<dt>Channel</dt>
-					<dd data-example-channel>Loading</dd>
+					<dd data-example-channel>Local or unavailable</dd>
 				</div>
 			</dl>
-			<p data-example-metadata-status>Reading generated metadata.</p>
+			<p data-example-metadata-status>Source links target <code>main</code> until build metadata loads.</p>
 		</aside>
 	</header>
 
 	<main id="example-list" class="example-landing-main" tabindex="-1">
 		<section aria-labelledby="example-list-title">
 			<div class="example-landing-section-heading">
-				<h2 id="example-list-title">Choose an example</h2>
-				<p>Every recipe imports the locally built package and uses public APIs only.</p>
+				<h2 id="example-list-title">Choose a task</h2>
+				<p>Every example runs against the package built for this deployment and stays within its public API.</p>
 			</div>
 
 			<ul class="example-card-list" role="list">
 				<li>
 					<article class="example-card">
 						<p class="example-card-tag">Start here</p>
-						<h3><a href="./basic/">Basic JavaScript</a></h3>
-						<p>Render static events, select a date, and activate an event with the smallest useful setup.</p>
+						<h3>
+							<a class="example-card-run" href="./basic/">
+								<span>Render static events</span>
+								<span class="example-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Select today, reveal its agenda, and activate an event from either surface.</p>
+						<a
+							class="example-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/basic"
+							data-example-repository-kind="tree"
+							data-example-repository-path="examples/basic"
+						>View source<span class="example-visually-hidden"> for Render static events</span></a>
 					</article>
 				</li>
 				<li>
 					<article class="example-card">
 						<p class="example-card-tag">Complete surface</p>
-						<h3><a href="./advanced/">Advanced TypeScript</a></h3>
-						<p>Exercise providers, bounds, extensions, custom toolbar content, actions, themes, direction, and state observation.</p>
+						<h3>
+							<a class="example-card-run" href="./advanced/">
+								<span>Exercise the complete API</span>
+								<span class="example-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Call public methods, filter typed events, switch theme and direction, and inspect state.</p>
+						<a
+							class="example-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/advanced"
+							data-example-repository-kind="tree"
+							data-example-repository-path="examples/advanced"
+						>View source<span class="example-visually-hidden"> for Exercise the complete API</span></a>
 					</article>
 				</li>
 				<li>
 					<article class="example-card">
 						<p class="example-card-tag">Failure ownership</p>
-						<h3><a href="./async-errors/">Async errors</a></h3>
-						<p>Compare package-owned diagnostics with explicit application handling for source, extension, and action failures.</p>
+						<h3>
+							<a class="example-card-run" href="./async-errors/">
+								<span>Handle asynchronous failures</span>
+								<span class="example-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Fail a source request, transfer error UI to the application, and reject an action.</p>
+						<a
+							class="example-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/async-errors"
+							data-example-repository-kind="tree"
+							data-example-repository-path="examples/async-errors"
+						>View source<span class="example-visually-hidden"> for Handle asynchronous failures</span></a>
 					</article>
 				</li>
 				<li>
 					<article class="example-card">
 						<p class="example-card-tag">Server-first</p>
-						<h3><a href="./progressive-enhancement/">Progressive enhancement</a></h3>
-						<p>Keep a server-rendered schedule useful before JavaScript loads and across enhanced-calendar failures.</p>
+						<h3>
+							<a class="example-card-run" href="./progressive-enhancement/">
+								<span>Enhance server-rendered HTML</span>
+								<span class="example-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Rebuild with failing and successful sources while watching the fallback lifecycle.</p>
+						<a
+							class="example-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/progressive-enhancement"
+							data-example-repository-kind="tree"
+							data-example-repository-path="examples/progressive-enhancement"
+						>View source<span class="example-visually-hidden"> for Enhance server-rendered HTML</span></a>
 					</article>
 				</li>
 				<li>
 					<article class="example-card">
 						<p class="example-card-tag">Rewrite guide</p>
-						<h3><a href="./fullcalendar-v6-migration/">FullCalendar v6 migration</a></h3>
-						<p>Adapt a common dayGridMonth data shape into a range-aware Litefold integration without a compatibility layer.</p>
+						<h3>
+							<a class="example-card-run" href="./fullcalendar-v6-migration/">
+								<span>Rewrite a dayGridMonth view</span>
+								<span class="example-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Supersede a range request, select a day, and activate an adapted event.</p>
+						<a
+							class="example-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/fullcalendar-v6-migration"
+							data-example-repository-kind="tree"
+							data-example-repository-path="examples/fullcalendar-v6-migration"
+						>View source<span class="example-visually-hidden"> for Rewrite a dayGridMonth view</span></a>
 					</article>
 				</li>
 				<li>
 					<article class="example-card">
 						<p class="example-card-tag">Loader boundary</p>
-						<h3><a href="./classic-script/">Classic-script loader</a></h3>
-						<p>Use a classic entry script to load the ESM package while keeping the calendar implementation module-based.</p>
+						<h3>
+							<a class="example-card-run" href="./classic-script/">
+								<span>Load ESM from a classic script</span>
+								<span class="example-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Inspect the classic entry point, then select a date and activate an event.</p>
+						<a
+							class="example-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/classic-script"
+							data-example-repository-kind="tree"
+							data-example-repository-path="examples/classic-script"
+						>View source<span class="example-visually-hidden"> for Load ESM from a classic script</span></a>
 					</article>
 				</li>
 			</ul>
@@ -95,7 +177,7 @@
 	</main>
 
 	<footer class="example-landing-footer">
-		<p>These examples are executable integration recipes. Package installation guidance remains in the repository README.</p>
+		<p>Need the smallest installable setup? Start with the <a href="./basic/">basic example</a>, then compare its pinned source with the API reference.</p>
 	</footer>
 
 	<script type="module" src="./index.js"></script>

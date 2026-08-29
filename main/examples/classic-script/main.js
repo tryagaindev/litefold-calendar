@@ -26,6 +26,20 @@ const EVENTS = [
 	}
 ];
 
+function reportStartupFailure(error) {
+	startupError.textContent = "The calendar could not start. Check the browser console and try again.";
+	if (typeof globalThis.reportError === "function") {
+		try {
+			globalThis.reportError(error);
+		} catch (reportingError) {
+			console.error("The calendar example and its global reporter failed.", error, reportingError);
+		}
+	} else {
+		console.error("The calendar example could not start.", error);
+	}
+}
+
+//Dynamic import works in a classic script even though static imports do not.
 void import("../../dist/index.js")
 	.then(({ createCalendar }) => {
 		const calendar = createCalendar(host, {
@@ -33,6 +47,7 @@ void import("../../dist/index.js")
 			initialDate: "2026-08-04",
 			onEventActivate: ({ element, event, nativeEvent, surface }) => {
 				if (element instanceof HTMLAnchorElement) {
+					//Keep the standalone demo on this page; production event links can navigate normally.
 					nativeEvent.preventDefault();
 				}
 				result.textContent = `Opened ${event.title} from the ${surface} surface.`;
@@ -40,19 +55,10 @@ void import("../../dist/index.js")
 		});
 
 		calendar.render();
-		window.addEventListener("pagehide", () => {
-			calendar.destroy();
-		}, { once: true });
-	})
-	.catch((error) => {
-		startupError.textContent = "The calendar could not start. Check the browser console and try again.";
-		if (typeof globalThis.reportError === "function") {
-			try {
-				globalThis.reportError(error);
-			} catch (reportingError) {
-				console.error("The calendar example and its global reporter failed.", error, reportingError);
+		window.addEventListener("pagehide", (event) => {
+			if (!event.persisted) {
+				calendar.destroy();
 			}
-		} else {
-			console.error("The calendar example could not start.", error);
-		}
-	});
+		});
+	})
+	.catch(reportStartupFailure);

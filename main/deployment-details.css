@@ -1,4 +1,4 @@
-.lfc-deployment-details {
+.lfc-developer-footer {
 	background: Canvas;
 	border: 0.125rem solid currentColor;
 	color: CanvasText;
@@ -7,29 +7,44 @@
 	padding: 1rem;
 }
 
-.lfc-deployment-details p {
-	margin-block: 0 0.5rem;
+.lfc-developer-footer-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 1.5rem;
+	margin-block: 0 1rem;
+	padding-inline-start: 1.25rem;
 }
 
-.lfc-deployment-details dl {
+.lfc-developer-footer a {
+	color: LinkText;
+	overflow-wrap: anywhere;
+	text-underline-offset: 0.15em;
+}
+
+.lfc-developer-footer a:focus-visible {
+	outline: 0.1875rem solid Highlight;
+	outline-offset: 0.1875rem;
+}
+
+.lfc-developer-footer dl {
 	display: grid;
 	gap: 0.25rem 0.75rem;
 	grid-template-columns: max-content minmax(0, 1fr);
 	margin: 0;
 }
 
-.lfc-deployment-details dd {
+.lfc-developer-footer dd {
 	margin: 0;
 	min-inline-size: 0;
 	overflow-wrap: anywhere;
 }
 
 @media (max-width: 32rem) {
-	.lfc-deployment-details dl {
+	.lfc-developer-footer dl {
 		grid-template-columns: 1fr;
 	}
 
-	.lfc-deployment-details dd:not(:last-child) {
+	.lfc-developer-footer dd:not(:last-child) {
 		margin-block-end: 0.5rem;
 	}
 }

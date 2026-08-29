@@ -2,15 +2,17 @@
  * A typed calendar failure containing separate diagnostic and user-safe text.
  *
  * The original failure remains available through `cause` for trusted application diagnostics. Causes, stack traces,
- * extension identifiers, and hook names must never be copied into rendered output or calendar state.
+ * extension identifiers, render-hook identifiers, and hook names must never be copied into rendered output or calendar state.
  */
 export class LitefoldCalendarError extends Error {
     /** Stable machine-readable failure category. */
     code;
     /** Zero-based source-event index associated with validation, when known. */
     eventIndex;
-    /** Trusted extension identifier associated with the failure, when applicable. */
+    /** Trusted registered-extension identifier associated with the failure, when applicable. */
     extensionId;
+    /** Trusted render-hook identifier associated with the failure, when applicable. */
+    renderHookId;
     /** Trusted lifecycle or action hook name associated with the failure, when applicable. */
     hook;
     /** Operation in which the failure originated. */
@@ -36,6 +38,7 @@ export class LitefoldCalendarError extends Error {
         this.code = options.code;
         this.eventIndex = options.eventIndex;
         this.extensionId = options.extensionId;
+        this.renderHookId = options.renderHookId;
         this.hook = options.hook;
         this.phase = options.phase;
         this.range = options.range === undefined

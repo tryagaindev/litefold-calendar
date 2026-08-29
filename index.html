@@ -1,39 +1,140 @@
-<!doctype html>
-<html lang="en">
-<head>
+<!DOCTYPE html><html lang="en"><head>
 	<meta charset="utf-8">
 	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
+	<meta name="color-scheme" content="light dark">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta name="description" content="Version-identifiable static examples for Litefold Calendar.">
-	<title>Litefold Calendar examples</title>
+	<meta name="description" content="Install Litefold Calendar, run its examples, and inspect version-pinned source code.">
+	<title>Litefold Calendar developer examples</title>
 	<link rel="stylesheet" href="./site.css">
 </head>
 <body>
-	<header>
-		<p class="lfc-pages-eyebrow">@tryagaindev/litefold-calendar</p>
-		<h1>Static examples</h1>
-		<p>Choose the rolling preview for current development or an immutable release demo for version-specific behavior.</p>
+	<a class="lfc-pages-skip-link" href="#lfc-pages-content">Skip to main content</a>
+	<header class="lfc-pages-site-header">
+		<nav class="lfc-pages-project-nav" aria-label="Project">
+			<a class="lfc-pages-wordmark" href="https://github.com/tryagaindev/litefold-calendar">
+				<img class="lfc-pages-mark" src="./litefold-calendar-mark.svg" alt="" width="48" height="48">
+				<span>Litefold Calendar</span>
+			</a>
+			<ul role="list">
+				<li><a id="api-link" href="https://github.com/tryagaindev/litefold-calendar/blob/8250ac4da9ada72a2915b8f810be404667ab47da/docs/api.md">API</a></li>
+				<li><a id="integration-link" href="https://github.com/tryagaindev/litefold-calendar/blob/8250ac4da9ada72a2915b8f810be404667ab47da/docs/integration-guide.md">Integration guide</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar">GitHub</a></li>
+			</ul>
+		</nav>
+
+		<div class="lfc-pages-hero">
+			<p class="lfc-pages-eyebrow">@tryagaindev/litefold-calendar</p>
+			<h1>A focused month calendar for modern web apps</h1>
+			<p class="lfc-pages-lede">Dependency-free, framework-agnostic, and ready to explore through runnable integration recipes.</p>
+			<div class="lfc-pages-actions">
+				<a class="lfc-pages-action lfc-pages-action-primary" id="primary-run-link" href="./releases/0.2.0-alpha.0/examples/basic/">Run basic example</a>
+				<a class="lfc-pages-action" id="primary-browse-link" href="./releases/0.2.0-alpha.0/examples/">Browse all examples</a>
+			</div>
+			<p class="lfc-pages-deployment-summary" id="deployment-summary">Running immutable release 0.2.0-alpha.0. Source links are pinned to its commit.</p>
+		</div>
 	</header>
-	<main>
-		<section aria-labelledby="main-preview-title">
-			<h2 id="main-preview-title">Rolling main preview</h2>
-			<div id="main-preview">
-				<p>Deployment metadata is loading.</p>
+
+	<main id="lfc-pages-content" tabindex="-1">
+		<section class="lfc-pages-section">
+			<div class="lfc-pages-section-heading">
+				<p class="lfc-pages-kicker">Quick start</p>
+				<h2>Install and render</h2>
+				<p>Install the selected package build, then import the package and stylesheet from your application's bundler entry module.</p>
+			</div>
+
+			<div class="lfc-pages-code-stack">
+				<div class="lfc-pages-code-block">
+					<div class="lfc-pages-code-toolbar">
+						<span>Terminal</span>
+						<button type="button" data-copy-label="Install command" data-copy-target="install-command" aria-label="Copy install command">Copy</button>
+					</div>
+					<pre tabindex="0" aria-label="Install command"><code id="install-command">npm install @tryagaindev/litefold-calendar@0.2.0-alpha.0</code></pre>
+				</div>
+
+				<div class="lfc-pages-code-block">
+					<div class="lfc-pages-code-toolbar">
+						<span>Host HTML</span>
+						<button type="button" data-copy-label="Host HTML" data-copy-target="setup-html" aria-label="Copy host HTML">Copy</button>
+					</div>
+					<pre tabindex="0" aria-label="Host HTML"><code id="setup-html">&lt;div data-calendar&gt;&lt;/div&gt;
+&lt;script type="module" src="/src/main.js"&gt;&lt;/script&gt;</code></pre>
+				</div>
+
+				<div class="lfc-pages-code-block">
+					<div class="lfc-pages-code-toolbar">
+						<span>Bundler entry module</span>
+						<button type="button" data-copy-label="Bundler entry module" data-copy-target="setup-code" aria-label="Copy bundler entry module">Copy</button>
+					</div>
+					<pre tabindex="0" aria-label="Bundler entry module"><code id="setup-code">import { createCalendar } from "@tryagaindev/litefold-calendar";
+import "@tryagaindev/litefold-calendar/styles.css";
+
+const host = document.querySelector("[data-calendar]");
+if (!(host instanceof HTMLElement)) {
+	throw new Error("Calendar host was not found.");
+}
+
+const calendar = createCalendar(host, {
+	initialDate: "2026-08-26",
+	events: [{ id: "launch", title: "Launch", start: "2026-08-26" }]
+});
+
+calendar.render();</code></pre>
+				</div>
+			</div>
+
+			<ul class="lfc-pages-resource-links" role="list">
+				<li><a id="primary-source-link" href="https://github.com/tryagaindev/litefold-calendar/tree/8250ac4da9ada72a2915b8f810be404667ab47da/examples/basic">Inspect the basic example source</a></li>
+				<li><a id="quick-start-link" href="https://github.com/tryagaindev/litefold-calendar/blob/8250ac4da9ada72a2915b8f810be404667ab47da/README.md#quick-start">Read the complete quick start</a></li>
+			</ul>
+		</section>
+
+		<section class="lfc-pages-section">
+			<div class="lfc-pages-section-heading">
+				<p class="lfc-pages-kicker">Choose a build</p>
+				<h2>Release demos and main preview</h2>
+				<p>Use an immutable release to reproduce published behavior. Use main to inspect the next change before release.</p>
+			</div>
+
+			<div class="lfc-pages-deployment-grid">
+				<div>
+					<h3>Release history</h3>
+					<div id="release-history"><ol class="lfc-pages-deployment-list" role="list"><li class="lfc-pages-deployment-card"><h3>0.2.0-alpha.0</h3><dl><dt>Channel</dt><dd><code>Immutable release</code></dd><dt>Source</dt><dd><code>8250ac4da9ada72a2915b8f810be404667ab47da</code></dd></dl><p class="lfc-pages-inline-links"><a href="./releases/0.2.0-alpha.0/examples/basic/">Run 0.2.0-alpha.0 basic example</a><a href="./releases/0.2.0-alpha.0/examples/">Browse 0.2.0-alpha.0 examples</a><a href="https://github.com/tryagaindev/litefold-calendar/tree/8250ac4da9ada72a2915b8f810be404667ab47da/examples">View 0.2.0-alpha.0 source</a></p></li></ol></div>
+				</div>
+				<div>
+					<h3>Rolling main preview</h3>
+					<div class="lfc-pages-preview-card" id="main-preview"><p>Version 0.2.0-alpha.0 from commit fdbbedd695ddee55d33a2c02545271bd72a4d8d2.</p><p class="lfc-pages-inline-links"><a href="./main/examples/" id="main-preview-link">Browse main examples</a><a href="https://github.com/tryagaindev/litefold-calendar/tree/fdbbedd695ddee55d33a2c02545271bd72a4d8d2/examples" id="main-preview-source-link">View source</a></p></div>
+				</div>
 			</div>
 		</section>
-		<section aria-labelledby="release-demos-title">
-			<h2 id="release-demos-title">Immutable release demos</h2>
-			<div id="release-demos">
-				<p>Deployment metadata is loading.</p>
-			</div>
-		</section>
+
 		<noscript>
-			<p>JavaScript is required only for this deployment index. The calendar examples themselves document their own progressive-enhancement behavior.</p>
+			<p class="lfc-pages-notice">The statically selected deployment, documentation, examples, and repository links remain available without JavaScript.</p>
 		</noscript>
 	</main>
-	<footer>
-		<p>This site loads no analytics, trackers, CDNs, or third-party runtime assets.</p>
+
+	<footer class="lfc-pages-footer">
+		<div>
+			<p class="lfc-pages-kicker">Provenance</p>
+			<h2>Currently selected build</h2>
+		</div>
+		<dl>
+			<div>
+				<dt>Version</dt>
+				<dd><code id="selected-version">0.2.0-alpha.0</code></dd>
+			</div>
+			<div>
+				<dt>Channel</dt>
+				<dd id="selected-channel">Immutable release</dd>
+			</div>
+			<div>
+				<dt>Source</dt>
+				<dd><a id="selected-commit" href="https://github.com/tryagaindev/litefold-calendar/commit/8250ac4da9ada72a2915b8f810be404667ab47da"><code>8250ac4da9ada72a2915b8f810be404667ab47da</code></a></dd>
+			</div>
+		</dl>
 	</footer>
+
+	<p class="lfc-pages-visually-hidden" id="copy-status" aria-live="polite" aria-atomic="true"></p>
 	<script type="module" src="./site.js"></script>
-</body>
-</html>
+
+
+</body></html>

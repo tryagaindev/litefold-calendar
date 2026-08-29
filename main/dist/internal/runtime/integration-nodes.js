@@ -1,4 +1,3 @@
-import { reportCalendarError } from "../../errors.js";
 import { isAppendableNode, isSameDocumentNode } from "./safety.js";
 import { hasNodeLease, ownsNodeLease, releaseNodeLease, setNodeLease } from "./node-leases.js";
 /** Owns reversible leases for application nodes integrated with one calendar instance. */
@@ -64,7 +63,7 @@ export class IntegrationNodeController {
                 expectedParent.removeChild(node);
             }
             catch (cause) {
-                reportCalendarError(this.options.createDetachError(cause));
+                this.options.reportDetachError(this.options.createDetachError(cause));
             }
         }
     }

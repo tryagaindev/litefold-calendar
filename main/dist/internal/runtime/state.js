@@ -8,8 +8,8 @@ export function createState(phase, range, issues, displayedMonth, selectedDate) 
         selectedDate: Object.freeze({ ...selectedDate })
     });
 }
-/** Identifies a supported extension/rendering surface. */
-export function isExtensionSurface(value) {
+/** Identifies a supported render-hook surface. */
+export function isRenderHookSurface(value) {
     return value === "day" || value === "grid-summary" || value === "agenda";
 }
 /** Returns whether an issue originated from the event-source pipeline. */
@@ -27,7 +27,8 @@ export function phaseForCode(code) {
         case "event-source-failed": return "source";
         case "event-data-invalid":
         case "event-limit-exceeded": return "validation";
-        case "extension-failed": return "extension";
+        case "extension-failed": return "integration";
+        case "render-hook-failed": return "render";
         case "action-failed": return "action";
         case "host-integration-failed": return "integration";
         case "internal-error": return "render";

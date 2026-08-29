@@ -88,7 +88,7 @@
 		min-inline-size: 0;
 		margin: 0;
 		padding: 0.375rem 0.5rem;
-		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
 		border: 1px solid var(--example-border-color);
 		border-radius: 0.5rem;
 		background: var(--example-surface-background);
@@ -162,7 +162,7 @@
 		min-block-size: 1.25rem;
 		min-inline-size: 1.25rem;
 		place-items: center;
-		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
 		border: 1px solid currentcolor;
 		border-radius: 50%;
 		font-size: 0.625rem;
@@ -212,7 +212,7 @@
 	.advanced-example-state > div {
 		min-inline-size: 0;
 		padding: 0.75rem;
-		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
 		border: 1px solid var(--example-border-color);
 		border-radius: 0.5rem;
 		background: var(--example-subtle-background);
@@ -251,7 +251,7 @@
 		margin: auto;
 		padding: 0;
 		overflow: hidden;
-		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
 		border: 1px solid var(--example-border-color);
 		border-radius: var(--example-radius);
 		background: var(--example-surface-background);
@@ -295,7 +295,7 @@
 		display: grid;
 		gap: 0;
 		margin: 0;
-		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
 		border-block: 1px solid var(--example-border-color);
 	}
 
@@ -307,7 +307,7 @@
 	}
 
 	.advanced-example-event-details > div + div {
-		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-device-pixel hairline. */
+		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
 		border-block-start: 1px solid var(--example-border-color);
 	}
 

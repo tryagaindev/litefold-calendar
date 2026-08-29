@@ -186,9 +186,12 @@ function normalizeEventUrl(value, baseUrl) {
     }
     try {
         const isAbsolute = URL_SCHEME_PATTERN.test(value);
+        if (!isAbsolute && baseUrl === undefined) {
+            return undefined;
+        }
         const resolved = isAbsolute
             ? new URL(value)
-            : new URL(value, baseUrl ?? "https://litefold.invalid/");
+            : new URL(value, baseUrl);
         if ((isAbsolute && resolved.protocol !== "http:" && resolved.protocol !== "https:") ||
             resolved.username.length > 0 || resolved.password.length > 0 ||
             resolved.href.length > MAX_EVENT_URL_CODE_UNITS) {

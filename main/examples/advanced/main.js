@@ -1,4 +1,5 @@
 import { createCalendar, LitefoldCalendarError } from "../../dist/index.js";
+import { webMcp } from "../../dist/extensions/webmcp/index.js";
 const OPAQUE_HEX_COLOR = /^#[0-9A-F]{6}$/u;
 const DAY_BADGE_RENDERED_DATES = new Set();
 const TARGET_DATE_ERROR_MESSAGE = "Choose a date from July 15, 2026 through September 15, 2027.";
@@ -24,8 +25,8 @@ const ADVANCED_MESSAGES = Object.freeze({
     dayLabel: "{date}, {count} {eventLabel}",
     event: "item",
     events: "items",
-    extensionErrorMessage: "Some schedule details could not be displayed.",
-    extensionErrorTitle: "Some schedule details are unavailable",
+    renderHookErrorMessage: "Some schedule details could not be displayed.",
+    renderHookErrorTitle: "Some schedule details are unavailable",
     gridEventInstructions: "Use arrow keys to move between dates and Enter or Space to select. Press F2 on a date to move to its visible event actions; use Up and Down Arrow between actions, and Escape or F2 to return.",
     gridMore: "{count} additional",
     gridMoreLabel: "View {count} more {eventLabel} for {date}",
@@ -59,9 +60,10 @@ const REPLACEMENT_EVENTS = Object.freeze([
         }),
         start: "2026-08-06T13:00",
         title: "Dynamically replaced schedule",
-        url: "/schedule/dynamic-replacement?view=calendar#details"
+        url: "./?event=dynamic-replacement&from=calendar#advanced-example-calendar-title"
     })
 ]);
+//The first records demonstrate behavior; the generated records exercise overflow limits.
 const FEATURE_SCHEDULE = Object.freeze([
     Object.freeze({
         accentCandidate: "#008577",
@@ -89,7 +91,7 @@ const FEATURE_SCHEDULE = Object.freeze([
         start: "2026-08-06T09:30",
         statusLabel: "Confirmed",
         title: "Design review",
-        url: "/schedule/design-review?view=calendar#details"
+        url: "./?event=design-review&from=calendar#advanced-example-calendar-title"
     }),
     Object.freeze({
         accentCandidate: "#805FC0",
@@ -99,7 +101,7 @@ const FEATURE_SCHEDULE = Object.freeze([
         start: "2026-08-06T10:00",
         statusLabel: null,
         title: "Launch checkpoint",
-        url: "/schedule/launch-checkpoint?view=calendar#details"
+        url: "./?event=launch-checkpoint&from=calendar#advanced-example-calendar-title"
     }),
     Object.freeze({
         accentCandidate: "#008577",
@@ -171,6 +173,7 @@ const SCHEDULE = Object.freeze([
     ...FEATURE_SCHEDULE,
     ...createOverflowSchedule()
 ]);
+//Resolve integration elements once so markup drift fails during example startup.
 function requireElement(selector, constructor) {
     const element = document.querySelector(selector);
     if (!(element instanceof constructor)) {
@@ -201,8 +204,10 @@ const eventDialogStatus = requireElement("[data-example-event-dialog-status]", H
 const eventDialogOccurrence = requireElement("[data-example-event-dialog-occurrence]", HTMLTimeElement);
 const eventDialogStart = requireElement("[data-example-event-dialog-start]", HTMLTimeElement);
 const eventDialogEnd = requireElement("[data-example-event-dialog-end]", HTMLTimeElement);
+const eventDialogNoEnd = requireElement("[data-example-event-dialog-no-end]", HTMLElement);
 const typeInputs = [...document.querySelectorAll("[data-example-type-filter]")];
 const commandButtons = [...document.querySelectorAll("[data-example-command]")];
+//This cache belongs to the application, not to litefold-calendar.
 const rawRangeCache = new Map();
 function toAccentColor(value) {
     if (value === null) {
@@ -211,6 +216,7 @@ function toAccentColor(value) {
     const normalized = value.toUpperCase();
     return OPAQUE_HEX_COLOR.test(normalized) ? normalized : undefined;
 }
+/** Maps an application record to the public event-input contract. */
 function adaptScheduleRecord(item) {
     const accentColor = toAccentColor(item.accentCandidate);
     const metadata = Object.freeze({
@@ -229,6 +235,7 @@ function adaptScheduleRecord(item) {
         metadata
     });
 }
+/** Loads and caches the unfiltered snapshot for one requested 42-day range. */
 function loadRawRange(start, end, signal) {
     signal.throwIfAborted();
     const key = `${start}/${end}`;
@@ -313,13 +320,15 @@ function createNavigationIcon(ownerDocument, text) {
     icon.textContent = text;
     return icon;
 }
+/** Applies current application filters each time the calendar requests or refetches a range. */
 const loadEvents = ({ end, signal, start }) => {
     host.dataset["exampleSourceRange"] = `${start} to ${end} (exclusive)`;
     const raw = loadRawRange(start, end, signal);
     const enabled = getEnabledTypes();
     return raw.filter((event) => event.metadata !== undefined && enabled.has(event.metadata.itemType));
 };
-const advancedExtension = Object.freeze({
+//Hook output is application-owned DOM; lifecycle hooks undo every mutation they make.
+const advancedRenderHooks = Object.freeze({
     id: "advanced-example",
     dayDidMount: ({ dateString, elements, isCurrentMonth, isSelected, isToday }) => {
         elements.cell.toggleAttribute("data-example-day-badge-rendered", DAY_BADGE_RENDERED_DATES.delete(dateString));
@@ -348,6 +357,7 @@ const advancedExtension = Object.freeze({
             const accessibleTime = timeText === "" ? "" : `${timeText}, `;
             elements.action.setAttribute("aria-label", `${accessibleTime}${metadata.accessibleLabel}. View details.`);
         }
+        //Cleanup may run from the returned callback or the hook-scoped abort signal.
         let cleaned = false;
         const cleanup = () => {
             if (cleaned) {
@@ -409,15 +419,27 @@ const advancedExtension = Object.freeze({
         actionHint.className = "advanced-example-action-hint";
         actionHint.textContent = "View details";
         return actionHint;
-    }
+    },
+    renderGridOverflowContent: ({ dateString, document: ownerDocument, eventCount, hiddenEventCount, surface, text }) => {
+        const content = ownerDocument.createElement("span");
+        content.className = "advanced-example-grid-overflow-content";
+        content.dataset["exampleDate"] = dateString;
+        content.dataset["exampleEventCount"] = String(eventCount);
+        content.dataset["exampleHiddenEventCount"] = String(hiddenEventCount);
+        content.dataset["exampleSurface"] = surface;
+        content.textContent = text;
+        return content;
+    },
+    //Returning undefined keeps the built-in multiple-event indicator.
+    renderMultipleEventIndicator: () => undefined
 });
-//EventData is inferred from the typed source and extension.
+//EventData is inferred from the typed source and render hooks; `satisfies` keeps every option checked.
 const calendarOptions = {
     agendaDomLimit: 50,
     agendaPageSize: 10,
     events: loadEvents,
     eventTimeDisplay: "agenda",
-    extensions: [advancedExtension],
+    extensions: [webMcp({ toolNamePrefix: "litefold-advanced" })],
     fallbackElement,
     firstDay: 1,
     headingLevel: 3,
@@ -466,11 +488,15 @@ const calendarOptions = {
         eventDialogStart.textContent = formatCivilValue(event.start, event.isAllDay);
         if (event.end === null) {
             eventDialogEnd.removeAttribute("datetime");
-            eventDialogEnd.textContent = "No end time";
+            eventDialogEnd.textContent = "";
+            eventDialogEnd.hidden = true;
+            eventDialogNoEnd.hidden = false;
         }
         else {
             eventDialogEnd.dateTime = event.end;
             eventDialogEnd.textContent = formatCivilValue(event.end, event.isAllDay);
+            eventDialogEnd.hidden = false;
+            eventDialogNoEnd.hidden = true;
         }
         result.textContent = `Opened ${event.title} from ${surface} with ${nativeEvent.type} on ${element.localName}.`;
         if (!eventDialog.open) {
@@ -481,17 +507,20 @@ const calendarOptions = {
         reportAction(`Event menu for ${event.title} on ${dateString} from ${surface} with ${nativeEvent.type} on ${element.localName} at ${clientX}, ${clientY}.`);
     },
     onStateChange: updateState,
+    renderHooks: [advancedRenderHooks],
     sourceEventLimit: 100,
     swipe: true,
     timeZone: "America/Los_Angeles",
     toolbarEnd
 };
 const calendar = createCalendar(host, calendarOptions);
+//This exhaustive map doubles as the UI command dispatcher and public-method coverage check.
 const calendarMethods = {
     destroy: () => { calendar.destroy(); },
     focusDate: () => { calendar.focusDate(targetDate.value); },
     focusToday: () => { calendar.focusToday(); },
     getState: () => calendar.getState(),
+    //Use an instant here to demonstrate projection through the configured time zone.
     gotoDate: () => { calendar.gotoDate(new Date(`${targetDate.value}T19:00:00.000Z`)); },
     next: () => { calendar.next(); },
     prev: () => { calendar.prev(); },
@@ -534,6 +563,7 @@ function runCommand(command) {
     }
     return true;
 }
+//Connect application controls only after the calendar and its immutable options exist.
 for (const button of commandButtons) {
     const command = button.dataset["exampleCommand"];
     if (command === undefined) {
@@ -570,11 +600,14 @@ themeControl.addEventListener("change", () => {
     }
     reportAction(`Changed example theme to ${theme}.`);
 });
+//Rendering is explicit; non-cached page exit owns teardown for this standalone page.
 calendarMethods.render();
 updateState(calendarMethods.getState());
-window.addEventListener("pagehide", () => {
-    if (eventDialog.open) {
-        eventDialog.close();
+window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) {
+        if (eventDialog.open) {
+            eventDialog.close();
+        }
+        calendarMethods.destroy();
     }
-    calendarMethods.destroy();
-}, { once: true });
+});

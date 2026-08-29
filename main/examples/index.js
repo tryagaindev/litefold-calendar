@@ -4,6 +4,8 @@ const CHANNEL_LABELS = Object.freeze({
 	release: "Immutable release"
 });
 const FULL_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
+const REPOSITORY_PATH_PATTERN = /^(?:[0-9A-Za-z._-]+\/)*[0-9A-Za-z._-]+$/u;
+const REPOSITORY_URL = "https://github.com/tryagaindev/litefold-calendar";
 
 function requireElement(selector) {
 	const element = document.querySelector(selector);
@@ -33,14 +35,32 @@ function parseMetadata(value) {
 	return { channel, commit, version };
 }
 
+function pinRepositoryLinks(commit) {
+	for (const element of document.querySelectorAll("[data-example-repository-path]")) {
+		if (!(element instanceof HTMLElement) || element.localName !== "a") {
+			throw new Error("Example repository links must be anchors.");
+		}
+		const kind = element.dataset["exampleRepositoryKind"];
+		const path = element.dataset["exampleRepositoryPath"];
+		if ((kind !== "blob" && kind !== "tree") ||
+			typeof path !== "string" || !REPOSITORY_PATH_PATTERN.test(path)) {
+			throw new Error("Example repository link metadata is invalid.");
+		}
+		element.setAttribute("href", `${REPOSITORY_URL}/${kind}/${commit}/${path}`);
+	}
+}
+
 const metadataRoot = requireElement("[data-example-metadata-state]");
 const versionElement = requireElement("[data-example-version]");
 const commitElement = requireElement("[data-example-commit]");
+const commitLink = requireElement("[data-example-commit-link]");
 const channelElement = requireElement("[data-example-channel]");
 const statusElement = requireElement("[data-example-metadata-status]");
 
 try {
 	const response = await fetch("./metadata.json", {
+		cache: "no-store",
+		credentials: "same-origin",
 		headers: { Accept: "application/json" }
 	});
 	if (!response.ok) {
@@ -50,12 +70,20 @@ try {
 	versionElement.textContent = metadata.version;
 	commitElement.textContent = metadata.commit ?? "Not available";
 	channelElement.textContent = CHANNEL_LABELS[metadata.channel];
-	statusElement.textContent = "Generated build metadata loaded.";
+	if (metadata.commit === null) {
+		commitLink.setAttribute("href", `${REPOSITORY_URL}/tree/main`);
+		statusElement.textContent = "Local metadata loaded. Source links target the main branch.";
+	} else {
+		commitLink.setAttribute("href", `${REPOSITORY_URL}/commit/${metadata.commit}`);
+		pinRepositoryLinks(metadata.commit);
+		statusElement.textContent = "Source and documentation links are pinned to this build.";
+	}
 	metadataRoot.dataset["exampleMetadataState"] = "ready";
 } catch {
-	versionElement.textContent = "Unavailable";
-	commitElement.textContent = "Unavailable";
-	channelElement.textContent = "Unavailable";
-	statusElement.textContent = "Build identity is unavailable. Run npm run build before serving the examples.";
+	versionElement.textContent = "@alpha";
+	commitElement.textContent = "main branch";
+	commitLink.setAttribute("href", `${REPOSITORY_URL}/tree/main`);
+	channelElement.textContent = "Metadata unavailable";
+	statusElement.textContent = "Run npm run build for exact provenance. Source links still target the main branch.";
 	metadataRoot.dataset["exampleMetadataState"] = "error";
 }

@@ -19,11 +19,47 @@ export function containsInteractiveContent(root) {
         if (node.nodeType === 1 && hasInteractiveSemantics(node)) {
             return true;
         }
+        if (node.nodeType === 1) {
+            const shadowRoot = node.shadowRoot;
+            if (shadowRoot !== null) {
+                pending.push(shadowRoot);
+            }
+        }
         for (const child of node.childNodes) {
             pending.push(child);
         }
     }
     return false;
+}
+/** Returns whether extension output can contribute visible content. */
+export function containsPresentationalContent(root) {
+    const pending = [root];
+    while (pending.length > 0) {
+        const node = pending.pop();
+        if (node === undefined) {
+            continue;
+        }
+        if (isHtmlTemplateElement(node)) {
+            continue;
+        }
+        if (node.nodeType === 1 || (node.nodeType === 3 && (node.nodeValue ?? "").trim().length > 0)) {
+            return true;
+        }
+        for (const child of node.childNodes) {
+            pending.push(child);
+        }
+    }
+    return false;
+}
+function isHtmlTemplateElement(node) {
+    if (node.nodeType !== 1) {
+        return false;
+    }
+    const element = node;
+    if (element.localName.toLowerCase() !== "template") {
+        return false;
+    }
+    return element.namespaceURI === element.ownerDocument.createElement("template").namespaceURI;
 }
 /** Returns whether an unknown value is a non-null object or function-property carrier. */
 export function isRecord(value) {
@@ -41,24 +77,23 @@ export function isDateInstance(value) {
         return false;
     }
 }
-/** Identifies an HTML element-like integration value without assuming the host realm. */
+/** Identifies a genuine HTMLElement through its standard Web IDL attribute brand check. */
 export function isHTMLElementLike(value) {
     if (!isRecord(value)) {
         return false;
     }
     try {
-        const ownerDocument = Reflect.get(value, "ownerDocument");
-        if (Reflect.get(value, "nodeType") !== 1 ||
-            Reflect.get(value, "namespaceURI") !== "http://www.w3.org/1999/xhtml" ||
-            typeof Reflect.get(value, "tagName") !== "string" || !isRecord(ownerDocument) ||
-            typeof Reflect.get(ownerDocument, "createElement") !== "function") {
+        const HTMLElementConstructor = Reflect.get(globalThis, "HTMLElement");
+        if (typeof HTMLElementConstructor !== "function") {
             return false;
         }
-        const defaultView = Reflect.get(ownerDocument, "defaultView");
-        const HTMLElementConstructor = isRecord(defaultView)
-            ? Reflect.get(defaultView, "HTMLElement")
-            : undefined;
-        return typeof HTMLElementConstructor !== "function" || value instanceof HTMLElementConstructor;
+        const prototype = Reflect.get(HTMLElementConstructor, "prototype");
+        if (!isRecord(prototype)) {
+            return false;
+        }
+        const titleGetter = Reflect.getOwnPropertyDescriptor(prototype, "title")?.get;
+        return typeof titleGetter === "function" &&
+            typeof Reflect.apply(titleGetter, value, []) === "string";
     }
     catch {
         return false;

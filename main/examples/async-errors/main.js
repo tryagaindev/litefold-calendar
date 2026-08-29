@@ -10,20 +10,21 @@ const getElement = (selector, constructor) => {
 };
 
 const host = getElement("[data-calendar]", HTMLElement);
-const applicationOwnership = getElement("[data-host-ownership]", HTMLInputElement);
-const failExtension = getElement("[data-fail-extension]", HTMLInputElement);
-const failAction = getElement("[data-fail-action]", HTMLInputElement);
+const applicationOwnsSourceErrors = getElement("[data-host-ownership]", HTMLInputElement);
+const failRenderHooks = getElement("[data-fail-render-hooks]", HTMLInputElement);
+const failEventActions = getElement("[data-fail-action]", HTMLInputElement);
 const failNextButton = getElement("[data-fail-next]", HTMLButtonElement);
 const refetchButton = getElement("[data-refetch]", HTMLButtonElement);
-const applicationError = getElement("[data-host-error]", HTMLElement);
+const applicationErrorRegion = getElement("[data-host-error]", HTMLElement);
 const applicationErrorTitle = getElement("[data-host-error-title]", HTMLElement);
 const applicationErrorMessage = getElement("[data-host-error-message]", HTMLElement);
-const applicationRetry = getElement("[data-host-retry]", HTMLButtonElement);
+const applicationRetryButton = getElement("[data-host-retry]", HTMLButtonElement);
 const politeAnnouncer = getElement("[data-announcer-polite]", HTMLElement);
 const assertiveAnnouncer = getElement("[data-announcer-assertive]", HTMLElement);
 
 let failNextSourceRequest = false;
 let applicationErrorActive = false;
+let announcementRevision = 0;
 
 const wait = (milliseconds, signal) => new Promise((resolve, reject) => {
 	if (signal.aborted) {
@@ -43,43 +44,53 @@ const wait = (milliseconds, signal) => new Promise((resolve, reject) => {
 	signal.addEventListener("abort", handleAbort, { once: true });
 });
 
-const EVENTS = Object.freeze([
-	Object.freeze({
+const EVENTS = [
+	{
 		id: "async-demo",
 		title: "Open async details",
 		start: "2026-08-04T14:00",
 		end: "2026-08-04T14:30",
 		accentColor: "#008577"
-	})
-]);
+	}
+];
 
-const eventDetailsExtension = Object.freeze({
+const EVENT_DETAILS_RENDER_HOOKS = {
 	id: "async-errors-event-details",
 	renderEventDetails: ({ document: ownerDocument }) => {
-		if (failExtension.checked) {
-			throw new Error("Demonstration extension failure with developer-only detail.");
+		if (failRenderHooks.checked) {
+			throw new Error("Demonstration render-hook failure with developer-only detail.");
 		}
 
 		const detail = ownerDocument.createElement("span");
-		detail.textContent = "Extension active";
+		detail.textContent = "Render hooks active";
 		return detail;
 	}
-});
+};
+
+const SOURCE_ERROR_CODES = new Set([
+	"event-source-failed",
+	"event-data-invalid",
+	"event-limit-exceeded"
+]);
 
 const hideApplicationError = () => {
 	applicationErrorActive = false;
-	applicationError.hidden = true;
+	applicationErrorRegion.hidden = true;
 	applicationErrorTitle.textContent = "";
 	applicationErrorMessage.textContent = "";
 };
 
 const announceExternally = ({ message, politeness }) => {
 	const target = politeness === "assertive" ? assertiveAnnouncer : politeAnnouncer;
-	const other = politeness === "assertive" ? politeAnnouncer : assertiveAnnouncer;
-	other.textContent = "";
-	target.textContent = "";
+	const revision = ++announcementRevision;
+	politeAnnouncer.textContent = "";
+	assertiveAnnouncer.textContent = "";
+
+	//A separate DOM update lets assistive technology announce repeated messages.
 	queueMicrotask(() => {
-		target.textContent = message;
+		if (revision === announcementRevision) {
+			target.textContent = message;
+		}
 	});
 };
 
@@ -96,25 +107,22 @@ const createExampleCalendar = () => createCalendar(host, {
 
 		return EVENTS;
 	},
-	extensions: [eventDetailsExtension],
+	renderHooks: [EVENT_DETAILS_RENDER_HOOKS],
 	onEventActivate: async () => {
 		await Promise.resolve();
-		if (failAction.checked) {
+		if (failEventActions.checked) {
 			throw new Error("Demonstration action failure with developer-only detail.");
 		}
 	},
 	onError: (error) => {
 		console.warn("Observed calendar error", error);
-		const isSourceError = error.code === "event-source-failed" ||
-			error.code === "event-data-invalid" ||
-			error.code === "event-limit-exceeded";
-		if (!applicationOwnership.checked || !isSourceError) {
+		if (!applicationOwnsSourceErrors.checked || !SOURCE_ERROR_CODES.has(error.code)) {
 			return "default";
 		}
 
 		applicationErrorTitle.textContent = error.userTitle;
 		applicationErrorMessage.textContent = error.userMessage;
-		applicationError.hidden = false;
+		applicationErrorRegion.hidden = false;
 		applicationErrorActive = true;
 		announceExternally({
 			message: `${error.userTitle}. ${error.userMessage}`,
@@ -145,11 +153,11 @@ refetchButton.addEventListener("click", () => {
 	calendar.refetchEvents();
 });
 
-applicationRetry.addEventListener("click", () => {
+applicationRetryButton.addEventListener("click", () => {
 	calendar.refetchEvents();
 });
 
-failExtension.addEventListener("change", () => {
+failRenderHooks.addEventListener("change", () => {
 	calendar.destroy();
 	failNextSourceRequest = false;
 	hideApplicationError();
@@ -159,6 +167,8 @@ failExtension.addEventListener("change", () => {
 
 calendar.render();
 
-window.addEventListener("pagehide", () => {
-	calendar.destroy();
-}, { once: true });
+window.addEventListener("pagehide", (event) => {
+	if (!event.persisted) {
+		calendar.destroy();
+	}
+});

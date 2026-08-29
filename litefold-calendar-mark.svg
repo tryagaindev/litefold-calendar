@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="litefold-calendar-mark-title">
+	<title id="litefold-calendar-mark-title">Litefold Calendar mark</title>
+
+	<!--Each calendar week continues beyond the page as a full-strength light bar.-->
+	<g stroke="#102A36" stroke-width="6" stroke-linejoin="round">
+		<rect x="132" y="169" width="282" height="18" rx="9" fill="#62E3A8"/>
+		<rect x="132" y="197" width="310" height="18" rx="9" fill="#D4F4E5"/>
+		<rect x="132" y="225" width="294" height="18" rx="9" fill="#A39AFF"/>
+		<rect x="132" y="253" width="316" height="18" rx="9" fill="#62E3A8"/>
+		<rect x="132" y="281" width="298" height="18" rx="9" fill="#D4F4E5"/>
+		<rect x="132" y="309" width="274" height="18" rx="9" fill="#A39AFF"/>
+	</g>
+
+	<!--Calendar page with a cut lower-right corner.-->
+	<path d="M128 84H346Q370 84 370 108V338L292 416H128Q104 416 104 392V108Q104 84 128 84Z" fill="#E9F4F5"/>
+	<path d="M128 84H346Q370 84 370 108V338L292 416H128Q104 416 104 392V108Q104 84 128 84Z" fill="none" stroke="#56737B" stroke-width="8" stroke-linejoin="round"/>
+
+	<!--Binding tabs and header rule.-->
+	<rect x="144" y="58" width="24" height="52" rx="12" fill="#62E3A8" stroke="#061A23" stroke-width="8"/>
+	<rect x="306" y="58" width="24" height="52" rx="12" fill="#62E3A8" stroke="#061A23" stroke-width="8"/>
+	<path d="M108 144H366" fill="none" stroke="#56737B" stroke-width="8"/>
+
+	<!--Simplified ledger grid.-->
+	<rect x="132" y="164" width="210" height="168" rx="12" fill="#F7FCFC" stroke="#56737B" stroke-width="6"/>
+	<path d="M162 167V329M192 167V329M222 167V329M252 167V329M282 167V329M312 167V329M135 192H339M135 220H339M135 248H339M135 276H339M135 304H339" fill="none" stroke="#56737B" stroke-width="5"/>
+
+	<!--Selected date and a representative cluster of rendered event pills.-->
+	<rect x="194.5" y="222.5" width="25" height="23" rx="5" fill="#D4F4E5" stroke="#047857" stroke-width="3"/>
+	<g fill="#EFEEFF" stroke="#665CC3" stroke-width="2.5">
+		<rect x="166" y="201" width="22" height="10" rx="5"/>
+		<rect x="226" y="201" width="22" height="10" rx="5"/>
+		<rect x="286" y="201" width="22" height="10" rx="5"/>
+		<rect x="196" y="229" width="22" height="10" rx="5"/>
+	</g>
+	<g fill="#A52A78">
+		<circle cx="171" cy="206" r="2.5"/>
+		<circle cx="231" cy="206" r="2.5"/>
+		<circle cx="291" cy="206" r="2.5"/>
+		<rect x="198.5" y="231.5" width="3" height="5" rx="1.5"/>
+	</g>
+	<g fill="none" stroke="#665CC3" stroke-width="2.5" stroke-linecap="round">
+		<path d="M176 206H184M236 206H244M296 206H304M204 234H214"/>
+	</g>
+	<rect x="256" y="257" width="22" height="10" rx="5" fill="#D4F4E5" stroke="#047857" stroke-width="2.5"/>
+	<circle cx="261" cy="262" r="2.5" fill="#62E3A8" stroke="#047857" stroke-width="1.5"/>
+	<path d="M266 262H274" fill="none" stroke="#047857" stroke-width="2.5" stroke-linecap="round"/>
+
+	<!--Folded flap.-->
+	<path d="M292 416V370Q292 338 324 338H370Z" fill="#D4F4E5" stroke="#56737B" stroke-width="8" stroke-linejoin="round"/>
+</svg>
