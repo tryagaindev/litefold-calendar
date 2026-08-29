@@ -6,10 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-<!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
-
-## [0.3.0-alpha.0] - 2026-08-29
-
 ### Added
 
 - Added a specification-compliant `DESIGN.md` as the canonical source for the package visual identity, exact light/dark defaults, responsive composition, component states, and public CSS token mapping.
@@ -37,6 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Corrected example teardown for the browser back/forward cache, static-demo links, no-end-time semantics, live activation feedback, and dirty-build provenance.
 - Hardened changelog-comment, documentation-anchor, and Pages-metadata validation against hidden release state, GFM parser differences, and pathological version input; removed invalid null fixtures from compile-only public API checks.
 - Bound retained Pages assembly tooling to the exact approved upstream commit and confined the loopback repository server to its selected public directory, including encoded Windows path separators.
+- Corrected release-bundle digest normalization, upgraded artifact downloads to the official Node 24 action, and isolated automatic Pages deployment from manual rollback so their distinct trigger trust contexts cannot be combined.
+- Reconstructed rollback snapshots inside the retained-state writer from authenticated Git objects, enforced the root runtime policy during every assembly, serialized Pages writers through deployment with GitHub's maximum queue, and bound forward-repair pushes to the exact reviewed `HEAD`.
 
 ## [0.2.0-alpha.0] - 2026-08-25
 

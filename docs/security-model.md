@@ -40,7 +40,8 @@ The model assumes:
 | Exact release commit → retained artifacts | Reviewed source and build tooling | Complete gate, clean-source package build, checksums, integrity, receipt, SBOM, license, attempt-scoped artifacts |
 | Verified artifact → npm | Exact tarball and OIDC identity | Protected `npm` environment, source-free publisher, hash/receipt/manifest validation, trusted publishing, provenance, post-publish verification |
 | Verified release state → Git tag and GitHub prerelease | Tag and release-write authority | Protected exact-SHA tag, draft-first assets, matching-byte reuse only, immutable release setting, public prerelease last |
-| Verified static snapshot → GitHub Pages | Built examples, rolling preview, immutable release paths | Self-contained asset scan, visible identity, retained history, byte-different overwrite rejection, protected Pages authority |
+| Verified Pages input → retained-state writer | Built automatic channel or authenticated retained rollback state | Exact-source or retained-commit identity, credential-stripped unprivileged assembly, exact root CSP, remote-runtime rejection, immutable release preservation |
+| Exact retained snapshot → GitHub Pages | `pages-content` commit and attempt-scoped Pages artifact | One queued workflow-level lock across writers and deployers, retained-head confirmation, protected Pages authority |
 
 ```mermaid
 flowchart LR
@@ -58,7 +59,11 @@ flowchart LR
   B --> N[Protected source-free npm publish]
   N --> G[Immutable GitHub prerelease]
   G --> Q[Native successful-workflow trigger]
-  Q --> H[Separately authorized Pages release]
+  V --> X[Queued retained-state writer]
+  Q --> X
+  O[Authorized rollback operator] --> T[Authenticated retained snapshot]
+  T --> X
+  X --> H[Separately authorized Pages deployment]
 ```
 
 ## Assets and objectives
@@ -96,7 +101,7 @@ The scenarios below describe what each control must prevent. A scenario becomes 
 | TM-008 | Duplicate, partial, or stale registrations target the wrong calendar | Stable unique prefix, document-wide collision failure, one shared abort signal, rollback after an observed failure, unregister on destroy, pre-wait and pending-wait lifecycle checks | WebMCP has no atomic batch or timeout, so a never-settling registration cannot be made atomic; application code can separately register conflicting names |
 | TM-009 | Pull-request code gains npm, tag, release, or Pages authority | Read-only PR defaults, pinned actions, no `pull_request_target`, separate protected environments/jobs, immutable release checks | Hosted rulesets, approval, and environment configuration remain external controls |
 | TM-010 | Release publishes bytes or identity other than the reviewed commit | Exact `push` SHA, deterministic release-state diff, checksums/integrity/receipt/SBOM, source-free OIDC publisher, registry verification, exact tag and immutable release | npm publication is irreversible; defective versions are deprecated and replaced |
-| TM-011 | Retried publication or Pages deployment creates conflicting public state | Matching-byte/identity recovery, no version/tag reuse, retained Pages history, immutable release directories, public identity verification | Ambiguous external state must fail closed and require maintainer review |
+| TM-011 | Retried publication, rollback, or Pages deployment creates conflicting public state | Matching-byte/identity recovery, no version/tag reuse, retained Pages history, writer-side rollback reconstruction, immutable release directories, one maximum queued workflow-level lock across Pages writers and deployers, public identity verification | Ambiguous external state or a retained-shell policy failure must fail closed and require maintainer review |
 | TM-012 | A forged, duplicated, or over-privileged extension value gains unintended authority | Package-issued opaque values, synchronous whole-array validation and duplicate-ID rejection, least-privilege capability contexts, per-extension lifecycle guards | Future third-party authoring would create a wider trusted-code boundary and requires a separate lower-stability contract and threat review |
 
 ## Severity calibration
@@ -122,11 +127,12 @@ Release-authority paths remain the highest supply-chain priority. Executable ren
 | `scripts/check-package-policy.mjs` | Manifest, import, sink, dependency, built-output, and workflow policy |
 | Release preparation and verification scripts | Atomic version/changelog transition, exact source state, collision and resume decisions |
 | `scripts/pack-release.mjs` | Clean-source tarball, integrity, receipt, SBOM, license, consumer verification |
-| Pages build and assembly scripts | Self-contained assets, visible identity, retained releases, rolling preview, immutable paths |
+| Pages build and assembly scripts | Self-contained assets, exact root CSP, visible identity, retained releases, rolling preview, immutable paths |
 | `.github/workflows/ci.yml` | Pull-request and main verification without publication authority |
 | `.github/workflows/prepare-alpha.yml` | Default-branch preparation and generated release-state branch without publication authority |
 | `.github/workflows/publish-alpha.yml` | Exact-`push` release classification, artifact handoff, isolated trusted publishing, tag and prerelease creation |
-| `.github/workflows/deploy-examples.yml` | Canonical workflow name-and-path and same-repository identity, rolling previews, separate release deployment, retained history, rollback, and isolated Pages authority |
+| `.github/workflows/deploy-examples.yml` | `workflow_run`-only canonical workflow identity, rolling previews, release deployment, retained history, isolated Pages authority, and the shared whole-run deployment queue |
+| `.github/workflows/rollback-examples.yml` | `workflow_dispatch`-only retained-main rollback reconstructed in the writer from authenticated Git objects, current retained shell, trusted default-branch tooling, and immutable releases; shares the whole-run deployment queue |
 
 ## Validation expectations
 
@@ -139,7 +145,7 @@ Match the change to the relevant verification groups; security-sensitive changes
 | Render hooks or registered extensions | Quarantine and cleanup; opaque admission; least-privilege capabilities; failure isolation |
 | WebMCP | Exact schemas and annotations; disclosure bounds; collision and cleanup; cross-instance and cross-snapshot cursor rejection; unavailable-browser fallback |
 | Package or example output | Root-graph exclusion; package policy; clean-consumer import; self-contained static deployment |
-| Release, npm, GitHub, or Pages workflows | Exact-source and artifact identity; authority separation; retry/recovery behavior; workflow-policy assertions |
+| Release, npm, GitHub, or Pages workflows | Exact-source and artifact identity; authority separation; writer-side rollback reconstruction; CSP/runtime-policy enforcement; cross-workflow writer-to-deployer serialization; retry/recovery behavior; workflow-policy assertions |
 
 External GitHub, Pages, npm, browser origin-trial, and ChatGPT workspace settings must be verified in their owning systems rather than inferred from repository tests. The historical `v0.1.0-alpha.0` tag predates the automated protected-tag and immutable-release policy and is not evidence that later tags may be moved or recreated.
 

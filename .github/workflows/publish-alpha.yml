@@ -353,13 +353,13 @@ jobs:
 
     steps:
       - name: Download the verified bundle without checking out source
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.verify.outputs.bundle-artifact }}
           path: ${{ runner.temp }}/release-bundle
 
       - name: Download normalized release notes
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.verify.outputs.notes-artifact }}
           path: ${{ runner.temp }}/release-notes
@@ -383,7 +383,7 @@ jobs:
               while IFS= read -r name; do
                 printf '%s\t%s\n' "${name}" "$(sha256sum "${LFC_BUNDLE_DIRECTORY}/${name}" | cut -d ' ' -f 1)"
               done |
-              jq --raw-input --slurp 'split("\n") | map(select(length > 0) | split("\t")) | from_entries'
+              jq --raw-input --slurp 'split("\n") | map(select(length > 0) | split("\t") | {key: .[0], value: .[1]}) | from_entries'
           )"
           jq --exit-status --argjson expected "${LFC_ASSET_DIGESTS}" \
             '. == $expected' <<< "${LFC_LOCAL_DIGESTS}" > /dev/null
@@ -606,7 +606,7 @@ jobs:
           ' <<< "${comparison}" > /dev/null
 
       - name: Download the verified bundle without checking out source
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.verify.outputs.bundle-artifact }}
           path: ${{ runner.temp }}/release-bundle
@@ -634,7 +634,7 @@ jobs:
               while IFS= read -r name; do
                 printf '%s\t%s\n' "${name}" "$(sha256sum "${name}" | cut -d ' ' -f 1)"
               done |
-              jq --raw-input --slurp 'split("\n") | map(select(length > 0) | split("\t")) | from_entries'
+              jq --raw-input --slurp 'split("\n") | map(select(length > 0) | split("\t") | {key: .[0], value: .[1]}) | from_entries'
           )"
           jq --exit-status --argjson expected "${LFC_ASSET_DIGESTS}" \
             '. == $expected' <<< "${local_digests}" > /dev/null
@@ -797,7 +797,7 @@ jobs:
         run: npm install --global "npm@${LFC_NPM_VERSION}" --ignore-scripts
 
       - name: Download the retained bundle for provenance verification
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.verify.outputs.bundle-artifact }}
           path: ${{ runner.temp }}/release-bundle

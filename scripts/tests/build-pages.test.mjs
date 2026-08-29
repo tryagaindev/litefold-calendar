@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -9,6 +9,7 @@ import { assemblePagesSnapshot } from "../assemble-pages.mjs";
 import {
 	assertNoRemoteRuntimeAssets,
 	buildPagesArtifact,
+	CONTENT_SECURITY_POLICY,
 	validateDeploymentMetadata
 } from "../build-pages.mjs";
 import { serializeExampleMetadata } from "../lib/example-metadata.mjs";
@@ -384,6 +385,217 @@ void test("Pages staging rejects ambiguous identity and remote runtime assets", 
 		}),
 		/self-contained, script-free SVG/u
 	);
+});
+
+void test("retained snapshot assembly enforces the exact shell runtime policy", async (context) => {
+	const empty = await emptyPreviousDirectory(context);
+	const missingPolicyArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: FIRST_COMMIT,
+		version: "1.0.0"
+	});
+	const missingPolicyIndex = join(missingPolicyArtifact, "shell", "index.html");
+	await writeFile(
+		missingPolicyIndex,
+		(await readFile(missingPolicyIndex, "utf8"))
+			.replace(/\s*<meta http-equiv="Content-Security-Policy"[^>]*>/u, ""),
+		"utf8"
+	);
+	await assert.rejects(
+		assemblePagesSnapshot({
+			channelDirectory: missingPolicyArtifact,
+			outputDirectory: await snapshotOutput(context),
+			previousDirectory: empty
+		}),
+		/exact Content Security Policy once in head/u
+	);
+
+	const duplicatePolicyArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: SECOND_COMMIT,
+		version: "1.0.1"
+	});
+	const duplicatePolicyIndex = join(duplicatePolicyArtifact, "shell", "index.html");
+	const policyPattern = /\s*<meta http-equiv="Content-Security-Policy"[^>]*>/u;
+	const duplicatePolicySource = await readFile(duplicatePolicyIndex, "utf8");
+	const policyMarkup = duplicatePolicySource.match(policyPattern)?.[0];
+	assert.ok(policyMarkup);
+	await writeFile(
+		duplicatePolicyIndex,
+		duplicatePolicySource.replace(policyPattern, `${policyMarkup}${policyMarkup}`),
+		"utf8"
+	);
+	await assert.rejects(
+		assemblePagesSnapshot({
+			channelDirectory: duplicatePolicyArtifact,
+			outputDirectory: await snapshotOutput(context),
+			previousDirectory: empty
+		}),
+		/exact Content Security Policy once in head/u
+	);
+
+	const bodyPolicyArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: FIRST_COMMIT,
+		version: "1.0.2"
+	});
+	const bodyPolicyIndex = join(bodyPolicyArtifact, "shell", "index.html");
+	const bodyPolicySource = await readFile(bodyPolicyIndex, "utf8");
+	const bodyPolicyMarkup = bodyPolicySource.match(policyPattern)?.[0];
+	assert.ok(bodyPolicyMarkup);
+	await writeFile(
+		bodyPolicyIndex,
+		bodyPolicySource
+			.replace(policyPattern, "")
+			.replace("<body>", `<body>${bodyPolicyMarkup}`),
+		"utf8"
+	);
+	await assert.rejects(
+		assemblePagesSnapshot({
+			channelDirectory: bodyPolicyArtifact,
+			outputDirectory: await snapshotOutput(context),
+			previousDirectory: empty
+		}),
+		/exact Content Security Policy once in head/u
+	);
+
+	const latePolicyArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: SECOND_COMMIT,
+		version: "1.0.3"
+	});
+	const latePolicyIndex = join(latePolicyArtifact, "shell", "index.html");
+	const latePolicySource = await readFile(latePolicyIndex, "utf8");
+	const latePolicyMarkup = latePolicySource.match(policyPattern)?.[0];
+	assert.ok(latePolicyMarkup);
+	await writeFile(
+		latePolicyIndex,
+		latePolicySource
+			.replace(policyPattern, "")
+			.replace(/(<link rel="stylesheet"[^>]*>)/u, `$1${latePolicyMarkup}`),
+		"utf8"
+	);
+	await assert.rejects(
+		assemblePagesSnapshot({
+			channelDirectory: latePolicyArtifact,
+			outputDirectory: await snapshotOutput(context),
+			previousDirectory: empty
+		}),
+		/Content Security Policy must precede runtime resources/u
+	);
+
+	const remoteRuntimeArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: SECOND_COMMIT,
+		version: "1.1.0"
+	});
+	await writeFile(
+		join(remoteRuntimeArtifact, "shell", "site.js"),
+		'fetch("https://cdn.invalid/rollback.js");\n',
+		"utf8"
+	);
+	await assert.rejects(
+		assemblePagesSnapshot({
+			channelDirectory: remoteRuntimeArtifact,
+			outputDirectory: await snapshotOutput(context),
+			previousDirectory: empty
+		}),
+		/requests a remote runtime resource/u
+	);
+});
+
+void test("retained rollback inputs restore main while preserving the current shell and releases", async (context) => {
+	const empty = await emptyPreviousDirectory(context);
+	const releaseArtifact = await buildFixtureArtifact(context, {
+		channel: "release",
+		commit: FIRST_COMMIT,
+		marker: "retained-release",
+		version: "1.0.0"
+	});
+	const releaseSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: releaseArtifact,
+		outputDirectory: releaseSnapshot,
+		previousDirectory: empty
+	});
+
+	const historicalMainArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: FIRST_COMMIT,
+		marker: "historical-main",
+		version: "1.1.0"
+	});
+	const historicalSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: historicalMainArtifact,
+		outputDirectory: historicalSnapshot,
+		previousDirectory: join(releaseSnapshot, "site")
+	});
+
+	const currentMainArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: SECOND_COMMIT,
+		marker: "current-main",
+		version: "1.2.0"
+	});
+	const currentSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: currentMainArtifact,
+		outputDirectory: currentSnapshot,
+		previousDirectory: join(historicalSnapshot, "site")
+	});
+
+	const rollbackChannel = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: FIRST_COMMIT,
+		marker: "historical-main",
+		version: "1.1.0"
+	});
+	for (const shellFile of ["index.html", SHELL_MARK_FILENAME, "site.css", "site.js"]) {
+		await copyFile(
+			join(currentSnapshot, "site", shellFile),
+			join(rollbackChannel, "shell", shellFile)
+		);
+	}
+	const rollbackSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: rollbackChannel,
+		outputDirectory: rollbackSnapshot,
+		previousDirectory: join(currentSnapshot, "site")
+	});
+
+	assert.equal(
+		await readFile(join(rollbackSnapshot, "site", "main", "examples", "basic", "main.js"), "utf8"),
+		'export const marker = "historical-main";\n'
+	);
+	assert.equal(
+		await readFile(join(rollbackSnapshot, "site", "releases", "1.0.0", "examples", "basic", "main.js"), "utf8"),
+		'export const marker = "retained-release";\n'
+	);
+	for (const shellFile of [SHELL_MARK_FILENAME, "site.css", "site.js"]) {
+		assert.equal(
+			await readFile(join(rollbackSnapshot, "site", shellFile), "utf8"),
+			await readFile(join(currentSnapshot, "site", shellFile), "utf8")
+		);
+	}
+	const rollbackDom = new JSDOM(
+		await readFile(join(rollbackSnapshot, "site", "index.html"), "utf8")
+	);
+	try {
+		const policies = rollbackDom.window.document.querySelectorAll(
+			'meta[http-equiv="Content-Security-Policy"]'
+		);
+		assert.equal(policies.length, 1);
+		assert.equal(policies[0]?.getAttribute("content"), CONTENT_SECURITY_POLICY);
+	} finally {
+		rollbackDom.window.close();
+	}
+	const manifest = JSON.parse(
+		await readFile(join(rollbackSnapshot, "site", "site-manifest.json"), "utf8")
+	);
+	assert.equal(manifest.main.commit, FIRST_COMMIT);
+	assert.equal(manifest.main.version, "1.1.0");
+	assert.deepEqual(manifest.releases.map((entry) => entry.version), ["1.0.0"]);
 });
 
 void test("retained snapshots preserve releases, replace main, and reject release overwrites", async (context) => {

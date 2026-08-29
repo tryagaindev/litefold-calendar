@@ -2,12 +2,13 @@
 
 Follow this runbook to publish `@tryagaindev/litefold-calendar` versions shaped like `0.x.y-alpha.N`. It assumes the operator is new to this repository but can follow exact instructions. The first stable release needs a separate procedure because npm's temporary alpha-as-`latest` rule must end first.
 
-The four GitHub Actions workflows used here are:
+The five GitHub Actions workflows used here are:
 
 - **Prepare alpha release** (`prepare-alpha.yml`)
 - **CI** (`ci.yml`)
 - **Publish npm alpha** (`publish-alpha.yml`)
 - **Deploy static examples** (`deploy-examples.yml`)
+- **Roll back static examples** (`rollback-examples.yml`; recovery only)
 
 Read the [release policy](releasing.md) and confirm the [hosted prerequisites](release-administration.md#one-time-hosted-prerequisites) before operating a release.
 
@@ -58,12 +59,13 @@ Complete every checkbox before running the preparation workflow.
 Normal release preparation and publication do not require a local commit. If an exceptional repair does require a human-authored local commit, set and verify the protected identity first. The commands below are exact when the operator is Basi:
 
 ```sh
-git config --local user.name "Basi"
+git config --local user.name "Basi Angulo"
 git config --local user.email "6586019+redbasi@users.noreply.github.com"
+git config --local --get user.name
 git config --local --get user.email
 ```
 
-For Basi, the last command must print exactly `6586019+redbasi@users.noreply.github.com`. Any other operator must substitute their own GitHub name and protected GitHub no-reply address from their GitHub email settings, then verify that exact address. Never reuse another operator's identity or configure a public personal address.
+For Basi, the last two commands must print exactly `Basi Angulo` and `6586019+redbasi@users.noreply.github.com`. Any other operator must substitute their own GitHub name and protected GitHub no-reply address from their GitHub email settings, then verify both exact values. Never reuse another operator's identity or configure a public personal address.
 
 Run these read-only npm checks in the npm owner's shell:
 
@@ -176,12 +178,14 @@ Do not edit the tag, release, notes, or assets after publication.
 
 A successful **Publish npm alpha** completion automatically triggers **Deploy static examples** through GitHub's native `workflow_run` event. Do not manually dispatch a release deployment and do not supply a release ref.
 
+Automatic and rollback Pages runs share one non-canceling workflow-level queue so retained-state writes cannot race deployment. A publisher-linked run may legitimately remain queued behind earlier Pages work. Do not cancel it, rerun around it, or weaken the queue; wait for that exact run to start and finish.
+
 Two **Deploy static examples** runs can exist for the same `RELEASE_SHA`:
 
 - the run linked to **CI** updates the rolling `main` channel;
 - the run linked to **Publish npm alpha** adds the immutable `release` channel.
 
-Open the publisher-linked run and confirm its upstream head SHA is `RELEASE_SHA`. **Stage a verified Pages channel**, **Preserve deployment snapshot**, **Package retained Pages snapshot**, and **Deploy retained static examples** must succeed. **Prepare an exact retained main rollback** and **Restore the validated retained main snapshot** must be skipped. Then check:
+Open the publisher-linked run and confirm its upstream head SHA is `RELEASE_SHA`. **Stage a verified Pages channel**, **Preserve deployment snapshot**, **Package retained Pages snapshot**, and **Deploy retained static examples** must succeed. The separately dispatched **Roll back static examples** workflow must not run as part of a release. Then check:
 
 ```text
 https://tryagaindev.github.io/litefold-calendar/releases/EXACT_VERSION/examples/metadata.json
@@ -206,7 +210,7 @@ A rerun of an existing GitHub Actions run keeps that run's original commit SHA, 
 | The publisher-linked Pages run failed | Rerun that original **Deploy static examples** run only for a transient or hosted-state failure. If repository or workflow files must change, stop and use administration recovery; an already-published package requires a greater alpha. |
 | No publisher-linked Pages run was created | Confirm the original publisher succeeded, review the current default-branch `deploy-examples.yml`, then select **Re-run all jobs** on that original publisher. Its successful completion emits a new native event. Confirm the new Pages run uses `RELEASE_SHA` and validate it independently. |
 | Published package or immutable prerelease is defective | Leave immutable state intact, deprecate the package version when appropriate, and publish a corrected greater alpha. |
-| Rolling `main` preview must move backward | Follow the [rollback procedure](example-deployment.md#roll-back-the-rolling-preview). Manual **Deploy static examples** is rollback-only and accepts only **Snapshot ref**. |
+| Rolling `main` preview must move backward | Follow the [rollback procedure](example-deployment.md#roll-back-the-rolling-preview). **Roll back static examples** is manual, recovery-only, and accepts only **Snapshot ref**. |
 
 For details on exceptional registry or hosted state, use the [release recovery matrix](release-administration.md#recovery-matrix). Never turn the rollback dispatch into a release-deployment shortcut.
 

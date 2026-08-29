@@ -1733,6 +1733,12 @@ await inspectWorkflowTree({
         WORKFLOW_NODE_VERSION,
         LFC_NPM_VERSION:
             String(referenceNpmVersion)
+    },
+    ".github/workflows/rollback-examples.yml": {
+        LFC_NODE_VERSION:
+        WORKFLOW_NODE_VERSION,
+        LFC_NPM_VERSION:
+            String(referenceNpmVersion)
     }
 });
 

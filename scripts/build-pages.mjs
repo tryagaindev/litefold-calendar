@@ -22,7 +22,7 @@ const SHELL_MARK_FILENAME = "litefold-calendar-mark.svg";
 const EXAMPLE_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js", ".json"]);
 const PACKAGE_RUNTIME_EXTENSIONS = new Set([".css", ".js"]);
 const SHELL_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js"]);
-const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'";
+export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'";
 
 function displayPath(path, root) {
 	return relative(root, path).replaceAll(sep, "/");

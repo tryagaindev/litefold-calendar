@@ -15,6 +15,10 @@ import { isDeepStrictEqual } from "node:util";
 
 import { JSDOM } from "jsdom";
 
+import {
+	assertNoRemoteRuntimeAssets,
+	CONTENT_SECURITY_POLICY
+} from "./build-pages.mjs";
 import { parseExampleMetadata, serializeExampleMetadata } from "./lib/example-metadata.mjs";
 import { compareSemVer, parseSemVer } from "./lib/semver.mjs";
 import { renderDeploymentManifest } from "./pages-site/site.js";
@@ -262,6 +266,39 @@ async function stampSiteIndex(siteDirectory, manifest) {
 	}
 }
 
+async function validateSiteRuntimePolicy(siteDirectory) {
+	for (const shellFile of SHELL_FILES) {
+		const shellPath = join(siteDirectory, shellFile);
+		assertNoRemoteRuntimeAssets(
+			await readFile(shellPath, "utf8"),
+			displayPath(shellPath, siteDirectory)
+		);
+	}
+
+	const indexPath = join(siteDirectory, "index.html");
+	const dom = new JSDOM(await readFile(indexPath, "utf8"));
+	try {
+		const policies = [...dom.window.document.querySelectorAll("meta[http-equiv]")]
+			.filter((meta) =>
+				meta.getAttribute("http-equiv")?.toLowerCase() === "content-security-policy");
+		if (policies.length !== 1 ||
+			policies[0].parentElement !== dom.window.document.head ||
+			policies[0].getAttribute("content") !== CONTENT_SECURITY_POLICY) {
+			throw new Error("The retained Pages shell must declare the exact Content Security Policy once in head.");
+		}
+		const firstRuntimeResource = dom.window.document.head?.querySelector(
+			"base[href], embed[src], iframe[src], img[src], link[href], object[data], script[src], source[src], style"
+		);
+		if (firstRuntimeResource !== null &&
+			(policies[0].compareDocumentPosition(firstRuntimeResource) &
+				dom.window.Node.DOCUMENT_POSITION_FOLLOWING) === 0) {
+			throw new Error("The retained Pages Content Security Policy must precede runtime resources.");
+		}
+	} finally {
+		dom.window.close();
+	}
+}
+
 async function retainedShellSupportsCurrentRenderer(siteDirectory) {
 	const indexPath = join(siteDirectory, "index.html");
 	if (!await pathExists(indexPath)) {
@@ -370,6 +407,7 @@ export async function assemblePagesSnapshot(options) {
 			await stampSiteIndex(siteDirectory, manifest);
 			await writeSiteManifest(siteDirectory, manifest);
 		}
+		await validateSiteRuntimePolicy(siteDirectory);
 		await writeFile(
 			join(stagingDirectory, "receipt.json"),
 			serializeExampleMetadata(metadata),

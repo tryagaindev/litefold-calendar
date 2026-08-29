@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -232,6 +232,21 @@ void test("publisher authorization is bound to one verified registry snapshot", 
 	assert.match(publish, /registry state changed immediately before publication/u);
 });
 
+void test("release bundle digest lines become explicit jq entries", async () => {
+	const source = await workflow("publish-alpha.yml");
+	const stage = job(source, "stage-release");
+	const publish = job(source, "publish");
+	const corrected =
+		/jq --raw-input --slurp 'split\("\\n"\) \| map\(select\(length > 0\) \| split\("\\t"\) \| \{key: \.\[0\], value: \.\[1\]\}\) \| from_entries'/u;
+	const broken =
+		/map\(select\(length > 0\) \| split\("\\t"\)\) \| from_entries/u;
+
+	assert.match(stage, corrected);
+	assert.match(publish, corrected);
+	assert.equal(occurrences(source, new RegExp(corrected.source, "gu")), 2);
+	assert.doesNotMatch(source, broken);
+});
+
 void test("draft assets and final release publication are digest-bound and source-free", async () => {
 	const source = await workflow("publish-alpha.yml");
 	const stage = job(source, "stage-release");
@@ -286,20 +301,22 @@ void test("the publisher relies on the native downstream workflow handoff", asyn
 	);
 });
 
-void test("Pages independently handles rolling main, immutable releases, and rollback", async () => {
+void test("automatic Pages deployment is workflow-run-only and exact-source", async () => {
 	const source = await workflow("deploy-examples.yml");
 	const event = trigger(source);
 	const build = job(source, "build");
 	const update = job(source, "update-snapshot");
-	const prepareRollback = job(source, "prepare-rollback");
-	const rollback = job(source, "rollback-snapshot");
 	const packageSite = job(source, "package-site");
 	const deploy = job(source, "deploy");
-	assert.match(event, /workflow_run:[\s\S]*?- CI[\s\S]*?- Publish npm alpha[\s\S]*?workflow_dispatch:[\s\S]*?snapshot_ref:/u);
-	assert.match(event, /workflow_run:[\s\S]*?branches:\s*\n\s+- main/u);
-	assert.doesNotMatch(event, /operation:|release_ref:/u);
+	assert.match(event, /workflow_run:[\s\S]*?- CI[\s\S]*?- Publish npm alpha[\s\S]*?branches:\s*\n\s+- main/u);
+	assert.doesNotMatch(event, /workflow_dispatch:|snapshot_ref:/u);
+	assert.doesNotMatch(source, /^ {2}(?:prepare-rollback|rollback-snapshot):/mu);
 	assert.doesNotMatch(source, /^ {2}classify:/mu);
-	assert.match(source, /group: static-examples-\$\{\{ github\.repository \}\}-\$\{\{[\s\S]*?format\('rollback-\{0\}', inputs\.snapshot_ref\)[\s\S]*?format\('workflow-run-\{0\}', github\.event\.workflow_run\.id\) \}\}/u);
+	assert.match(
+		source,
+		/^concurrency:\s*\n\s*group: static-examples-deploy-\$\{\{ github\.repository \}\}\s*\n\s*queue: max\s*\n\s*cancel-in-progress: false/mu
+	);
+	assert.equal(occurrences(source, /group: static-examples-deploy-\$\{\{ github\.repository \}\}/gu), 1);
 	assert.match(
 		build,
 		/github\.event_name == 'workflow_run'[\s\S]*?conclusion == 'success'[\s\S]*?event == 'push'[\s\S]*?head_branch == 'main'[\s\S]*?head_repository\.full_name == github\.repository/u
@@ -321,7 +338,7 @@ void test("Pages independently handles rolling main, immutable releases, and rol
 	assert.match(build, /releases\/tags\/\$\{release_ref\}/u);
 	assert.match(build, /\.draft == false and \.prerelease == true and \.immutable == true and[\s\S]*?\.tag_name == \$tag and \.target_commitish == \$commit/u);
 	assert.match(build, /printf 'eligible=%s[\s\S]*?printf 'channel=%s[\s\S]*?printf 'source-commit=%s[\s\S]*?printf 'version=%s/u);
-	assert.doesNotMatch(source, /inputs\.operation|inputs\.release_ref|gh workflow run/u);
+	assert.doesNotMatch(source, /inputs\.|gh workflow run/u);
 	assert.match(build, /name=pages-channel-%s-%s[\s\S]*?path: \$\{\{ runner\.temp \}\}\/pages-channel/u);
 	assert.doesNotMatch(build, /assemble-pages\.mjs|pages-content|previous-pages-site/u);
 	assert.match(update, /needs\.build\.outputs\.eligible == 'true'/u);
@@ -341,43 +358,123 @@ void test("Pages independently handles rolling main, immutable releases, and rol
 	assert.match(update, /test ! -e "\$\{state_worktree\}\/node_modules"[\s\S]*?--exclude=\.git/u);
 	assert.match(update, /diff --cached --quiet[\s\S]*?observed_pages_commit[\s\S]*?current_pages_commit/u);
 	assert.doesNotMatch(update, /^\s+git add --all$/mu);
-	assert.match(prepareRollback, /github\.event_name == 'workflow_dispatch'[\s\S]*?github\.ref == 'refs\/heads\/main'/u);
-	assert.doesNotMatch(prepareRollback, /inputs\.operation/u);
-	assert.match(prepareRollback, /git merge-base --is-ancestor "\$\{LFC_SNAPSHOT_REF\}"/u);
-	assert.match(rollback, /changed or removed immutable/u);
-	assert.match(rollback, /ref: \$\{\{ github\.sha \}\}[\s\S]*?trusted_shell="\$\(mktemp -d\)"/u);
-	assert.match(rollback, /diff --cached --quiet[\s\S]*?observed_pages_commit[\s\S]*?LFC_PAGES_BASE_COMMIT/u);
-	assert.match(packageSite, /needs\.update-snapshot\.outputs\.snapshot-commit \|\| needs\.rollback-snapshot\.outputs\.snapshot-commit/u);
-	assert.match(
-		deploy,
-		/concurrency:[\s\S]*?group: static-examples-deploy-\$\{\{ github\.repository \}\}\s*\n\s+cancel-in-progress: false/u
-	);
-	assert.doesNotMatch(source, /^\s*queue:/mu);
+	assert.match(packageSite, /needs: update-snapshot[\s\S]*?needs\.update-snapshot\.outputs\.snapshot-commit/u);
+	assert.doesNotMatch(packageSite, /rollback-snapshot/u);
+	assert.doesNotMatch(deploy, /^\s*concurrency:/mu);
 	assert.match(deploy, /current_snapshot[\s\S]*?LFC_SNAPSHOT_COMMIT[\s\S]*?actions\/deploy-pages@/u);
 	assert.doesNotMatch(source, /npm publish|NPM_TOKEN|NODE_AUTH_TOKEN/u);
+});
 
-	const repositoryAssets = new Map([
-		["docs/assets/litefold-calendar-mark.svg", 2],
-		["scripts/pages-site/deployment-details.css", 1],
-		["scripts/pages-site/index.html", 1],
-		["scripts/pages-site/site.css", 2],
-		["scripts/pages-site/site.js", 2]
-	]);
-	for (const [path, expectedReferences] of repositoryAssets) {
-		assert.equal(
-			source.split(path).length - 1,
-			expectedReferences,
-			`${path} must be copied by every intended rollback stage.`
+void test("manual Pages rollback is workflow-dispatch-only and preserves releases", async () => {
+	const source = await workflow("rollback-examples.yml");
+	const event = trigger(source);
+	const rollback = job(source, "rollback-snapshot");
+	const packageSite = job(source, "package-site");
+	const deploy = job(source, "deploy");
+	assert.match(source, /^name: Roll back static examples$/mu);
+	assert.match(event, /workflow_dispatch:[\s\S]*?snapshot_ref:[\s\S]*?required: true/u);
+	assert.doesNotMatch(event, /workflow_run:/u);
+	assert.doesNotMatch(source, /github\.event\.workflow_run|^ {2}(?:build|prepare-rollback|update-snapshot):/mu);
+	assert.match(
+		source,
+		/^concurrency:\s*\n\s*group: static-examples-deploy-\$\{\{ github\.repository \}\}\s*\n\s*queue: max\s*\n\s*cancel-in-progress: false/mu
+	);
+	assert.equal(occurrences(source, /group: static-examples-deploy-\$\{\{ github\.repository \}\}/gu), 1);
+	assert.match(rollback, /github\.event_name == 'workflow_dispatch'[\s\S]*?github\.ref == 'refs\/heads\/main'/u);
+	assert.doesNotMatch(rollback, /inputs\.operation/u);
+	assert.match(rollback, /ref: \$\{\{ github\.sha \}\}[\s\S]*?git rev-parse --verify HEAD\^\{commit\}[\s\S]*?LFC_DISPATCH_COMMIT/u);
+	assert.doesNotMatch(source, /ref: \$\{\{ inputs\.snapshot_ref \}\}/u);
+	assert.match(rollback, /! "\$\{LFC_SNAPSHOT_REF\}" =~ \^\[0-9a-f\]\{40\}\$/u);
+	assert.match(rollback, /git merge-base --is-ancestor "\$\{LFC_SNAPSHOT_REF\}" "\$\{pages_base_commit\}"/u);
+	assert.match(rollback, /git archive --format=tar "\$\{pages_base_commit\}"[\s\S]*?previous_site[\s\S]*?git archive --format=tar "\$\{LFC_SNAPSHOT_REF\}" main[\s\S]*?rollback_channel/u);
+	assert.match(rollback, /previous_site\}\/index\.html[\s\S]*?previous_site\}\/litefold-calendar-mark\.svg[\s\S]*?previous_site\}\/site\.css[\s\S]*?previous_site\}\/site\.js/u);
+	assert.match(rollback, /rollback_channel\}\/content\/deployment-details\.css[\s\S]*?rollback_channel\}\/shell\/deployment-details\.css/u);
+	assert.match(rollback, /assembly_tooling="\$\(mktemp -d\)"[\s\S]*?cp -a -- scripts node_modules[\s\S]*?chmod --recursive go-w,a\+rX/u);
+	assert.match(rollback, /chmod --recursive go-w,a\+rX "\$\{rollback_inputs\}"[\s\S]*?sudo --user=nobody env --ignore-environment[\s\S]*?scripts\/assemble-pages\.mjs/u);
+	assert.match(rollback, /candidate_snapshot[\s\S]*?must not contain symbolic links|Canonical rollback assembly produced a symbolic link/u);
+	assert.match(rollback, /rollback_channel\}\/content" "\$\{candidate_site\}\/main[\s\S]*?changed or removed immutable releases/u);
+	assert.match(rollback, /state_worktree="\$\{state_parent\}\/state"[\s\S]*?git worktree add --detach[\s\S]*?test ! -e "\$\{state_worktree\}\/node_modules"/u);
+	assert.match(rollback, /observed_pages_commit[\s\S]*?pages_base_commit[\s\S]*?HEAD:refs\/heads\/pages-content/u);
+	assert.doesNotMatch(source, /actions\/(?:upload|download)-artifact@|snapshot-artifact|scripts\/pages-site\/(?:index\.html|site\.css|site\.js)/u);
+	assert.match(packageSite, /needs: rollback-snapshot[\s\S]*?needs\.rollback-snapshot\.outputs\.snapshot-commit/u);
+	assert.doesNotMatch(packageSite, /update-snapshot/u);
+	assert.doesNotMatch(deploy, /^\s*concurrency:/mu);
+	assert.match(deploy, /current_snapshot[\s\S]*?LFC_SNAPSHOT_COMMIT[\s\S]*?actions\/deploy-pages@/u);
+	assert.doesNotMatch(source, /npm publish|NPM_TOKEN|NODE_AUTH_TOKEN/u);
+});
+
+void test("automatic deployment and rollback triggers remain physically isolated", async () => {
+	for (const name of ["deploy-examples.yml", "rollback-examples.yml"]) {
+		const event = trigger(await workflow(name));
+		assert.ok(
+			!(event.includes("workflow_run:") && event.includes("workflow_dispatch:")),
+			`${name} must not mix automatic and manual trust contexts.`
 		);
-		await access(join(REPOSITORY_ROOT, path));
 	}
 });
 
+void test("forward repair pushes the exact reviewed HEAD", async () => {
+	const guide = await readFile(
+		join(REPOSITORY_ROOT, "docs", "release-administration.md"),
+		"utf8"
+	);
+	assert.match(guide, /git rev-parse HEAD~2[\s\S]*?git rev-parse origin\/main/u);
+	assert.match(guide, /git rev-list --count origin\/main\.\.HEAD[\s\S]*?-eq 2/u);
+	assert.match(guide, /git log -2 --format='%ae%n%ce'[\s\S]*?6586019\+redbasi@users\.noreply\.github\.com/u);
+	assert.match(guide, /git push --atomic origin HEAD:refs\/heads\/main/u);
+	assert.match(guide, /git ls-remote --heads origin refs\/heads\/main/u);
+	assert.doesNotMatch(guide, /git push --atomic origin main/u);
+});
+
 void test("all third-party workflow actions are pinned to full commits", async () => {
-	for (const name of ["ci.yml", "deploy-examples.yml", "prepare-alpha.yml", "publish-alpha.yml"]) {
+	for (const name of [
+		"ci.yml",
+		"deploy-examples.yml",
+		"prepare-alpha.yml",
+		"publish-alpha.yml",
+		"rollback-examples.yml"
+	]) {
 		const source = await workflow(name);
 		for (const match of source.matchAll(/^\s*uses:\s*([^\s#]+)(?:\s+#.*)?$/gmu)) {
 			assert.match(match[1], /^[^@\s]+@[0-9a-f]{40}$/u, `${name}: ${match[1]}`);
 		}
+	}
+});
+
+void test("artifact downloads use the official Node 24 action", async () => {
+	const workflows = [
+		"deploy-examples.yml",
+		"prepare-alpha.yml",
+		"publish-alpha.yml",
+		"rollback-examples.yml"
+	];
+	const expected =
+		"actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1";
+	let downloads = 0;
+	for (const name of workflows) {
+		const source = await workflow(name);
+		for (const match of source.matchAll(/^\s*uses:\s*(actions\/download-artifact@[^\r\n]+)$/gmu)) {
+			downloads += 1;
+			assert.equal(match[1], expected, name);
+		}
+	}
+	assert.equal(downloads, 6);
+});
+
+void test("workflow dependency caches stay disabled", async () => {
+	for (const name of [
+		"ci.yml",
+		"deploy-examples.yml",
+		"prepare-alpha.yml",
+		"publish-alpha.yml",
+		"rollback-examples.yml"
+	]) {
+		const source = await workflow(name);
+		assert.doesNotMatch(source, /actions\/cache@|^\s+cache:\s*/mu, name);
+		assert.equal(
+			occurrences(source, /uses: actions\/setup-node@/gu),
+			occurrences(source, /package-manager-cache: false/gu),
+			`${name} must explicitly disable setup-node package-manager caching.`
+		);
 	}
 });

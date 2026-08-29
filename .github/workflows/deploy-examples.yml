@@ -9,18 +9,13 @@ on:
       - completed
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      snapshot_ref:
-        description: Full pages-content commit whose main preview should be restored
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: static-examples-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && format('rollback-{0}', inputs.snapshot_ref) || format('workflow-run-{0}', github.event.workflow_run.id) }}
+  group: static-examples-deploy-${{ github.repository }}
+  queue: max
   cancel-in-progress: false
 
 env:
@@ -199,7 +194,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Download the raw verified channel
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.build.outputs.channel-artifact }}
           path: ${{ runner.temp }}/pages-channel
@@ -380,336 +375,10 @@ jobs:
             "${assembly_tooling}" "${channel_input}" "${state_parent}"
           printf 'commit=%s\n' "${snapshot_commit}" >> "${GITHUB_OUTPUT}"
 
-  prepare-rollback:
-    name: Prepare an exact retained main rollback
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' &&
-        github.ref == 'refs/heads/main'
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    permissions:
-      contents: read
-
-    outputs:
-      pages-base-commit: ${{ steps.rollback.outputs.pages-base-commit }}
-      snapshot-artifact: ${{ steps.rollback.outputs.snapshot-artifact }}
-      target-main-commit: ${{ steps.rollback.outputs.target-main-commit }}
-
-    steps:
-      - name: Check out trusted main to assemble the rollback candidate
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-          ref: ${{ github.sha }}
-
-      - name: Set up exact Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: ${{ env.LFC_NODE_VERSION }}
-          package-manager-cache: false
-
-      - name: Set up exact npm
-        working-directory: ${{ runner.temp }}
-        run: npm install --global "npm@${LFC_NPM_VERSION}" --ignore-scripts
-
-      - name: Install locked deployment tooling
-        run: npm ci --ignore-scripts
-
-      - name: Assemble and restamp the rollback candidate
-        id: rollback
-        env:
-          LFC_DISPATCH_COMMIT: ${{ github.sha }}
-          LFC_PAGES_SNAPSHOT: ${{ runner.temp }}/rollback-pages-snapshot
-          LFC_PREVIOUS_SITE: ${{ runner.temp }}/previous-pages-site
-          LFC_ROLLBACK_CHANNEL: ${{ runner.temp }}/rollback-pages-channel
-          LFC_SNAPSHOT_REF: ${{ inputs.snapshot_ref }}
-        run: |
-          set -euo pipefail
-
-          test "$(git rev-parse --verify HEAD^{commit})" = "${LFC_DISPATCH_COMMIT}"
-
-          if [[ ! "${LFC_SNAPSHOT_REF}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Rollback requires a full lowercase pages-content commit." >&2
-            exit 1
-          fi
-          git fetch origin \
-            refs/heads/pages-content:refs/remotes/origin/pages-content
-          git cat-file -e "${LFC_SNAPSHOT_REF}^{commit}"
-          git merge-base --is-ancestor "${LFC_SNAPSHOT_REF}" refs/remotes/origin/pages-content
-          git cat-file -e "${LFC_SNAPSHOT_REF}:main/examples/metadata.json"
-
-          pages_base_commit="$(git rev-parse --verify refs/remotes/origin/pages-content^{commit})"
-          target_main_commit="$(
-            git show "${LFC_SNAPSHOT_REF}:main/examples/metadata.json" |
-              jq --exit-status --raw-output '
-                if type == "object" and
-                  (keys | sort) == ["channel", "commit", "version"] and
-                  .channel == "main" and
-                  (.commit | type == "string" and test("^[0-9a-f]{40}$")) and
-                  (.version | type == "string" and test("^[0-9A-Za-z](?:[0-9A-Za-z.+-]{0,126}[0-9A-Za-z])?$"))
-                then .commit
-                else error("Rollback main metadata is malformed.")
-                end
-              '
-          )"
-          git cat-file -e "${target_main_commit}^{commit}"
-
-          mkdir -- \
-            "${LFC_PREVIOUS_SITE}" \
-            "${LFC_ROLLBACK_CHANNEL}" \
-            "${LFC_ROLLBACK_CHANNEL}/content" \
-            "${LFC_ROLLBACK_CHANNEL}/shell"
-          git archive --format=tar refs/remotes/origin/pages-content |
-            tar --extract --file=- --directory="${LFC_PREVIOUS_SITE}"
-          git archive --format=tar "${LFC_SNAPSHOT_REF}" main |
-            tar --extract --file=- --strip-components=1 \
-              --directory="${LFC_ROLLBACK_CHANNEL}/content"
-          cp -- \
-            scripts/pages-site/index.html \
-            scripts/pages-site/site.css \
-            scripts/pages-site/site.js \
-            "${LFC_ROLLBACK_CHANNEL}/shell"
-          cp -- \
-            docs/assets/litefold-calendar-mark.svg \
-            "${LFC_ROLLBACK_CHANNEL}/shell/litefold-calendar-mark.svg"
-          cp -- \
-            scripts/pages-site/deployment-details.css \
-            "${LFC_ROLLBACK_CHANNEL}/shell/deployment-details.css"
-          cp -- \
-            "${LFC_ROLLBACK_CHANNEL}/content/examples/metadata.json" \
-            "${LFC_ROLLBACK_CHANNEL}/channel.json"
-
-          node scripts/assemble-pages.mjs \
-            --previous "${LFC_PREVIOUS_SITE}" \
-            --channel "${LFC_ROLLBACK_CHANNEL}" \
-            --output "${LFC_PAGES_SNAPSHOT}"
-          printf 'pages-base-commit=%s\n' "${pages_base_commit}" >> "${GITHUB_OUTPUT}"
-          printf 'snapshot-artifact=rollback-pages-snapshot-%s-%s\n' \
-            "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
-          printf 'target-main-commit=%s\n' "${target_main_commit}" >> "${GITHUB_OUTPUT}"
-
-      - name: Upload the restamped rollback candidate without write authority
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ steps.rollback.outputs.snapshot-artifact }}
-          if-no-files-found: error
-          overwrite: false
-          path: ${{ runner.temp }}/rollback-pages-snapshot
-          retention-days: 30
-
-  rollback-snapshot:
-    name: Restore the validated retained main snapshot
-    needs: prepare-rollback
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' &&
-        github.ref == 'refs/heads/main'
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    permissions:
-      actions: read
-      contents: write
-
-    outputs:
-      snapshot-commit: ${{ steps.rollback.outputs.commit }}
-
-    steps:
-      - name: Check out deployment history without executing project code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          fetch-depth: 0
-          path: pages-site
-          persist-credentials: false
-          ref: ${{ github.sha }}
-
-      - name: Download the restamped rollback candidate
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: ${{ needs.prepare-rollback.outputs.snapshot-artifact }}
-          path: ${{ runner.temp }}/rollback-pages
-
-      - name: Validate and restore the exact retained main snapshot
-        id: rollback
-        env:
-          GH_TOKEN: ${{ github.token }}
-          LFC_PAGES_BASE_COMMIT: ${{ needs.prepare-rollback.outputs.pages-base-commit }}
-          LFC_PAGES_SNAPSHOT: ${{ runner.temp }}/rollback-pages
-          LFC_SNAPSHOT_REF: ${{ inputs.snapshot_ref }}
-          LFC_TARGET_MAIN_COMMIT: ${{ needs.prepare-rollback.outputs.target-main-commit }}
-        working-directory: pages-site
-        run: |
-          set -euo pipefail
-
-          if [[ ! "${LFC_PAGES_BASE_COMMIT}" =~ ^[0-9a-f]{40}$ ||
-            ! "${LFC_SNAPSHOT_REF}" =~ ^[0-9a-f]{40}$ ||
-            ! "${LFC_TARGET_MAIN_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Rollback requires exact lowercase Pages and source commits." >&2
-            exit 1
-          fi
-          expected_entries=(receipt.json site)
-          mapfile -t actual_entries < <(
-            find "${LFC_PAGES_SNAPSHOT}" -mindepth 1 -maxdepth 1 -printf '%f\n' |
-              LC_ALL=C sort
-          )
-          diff -u \
-            <(printf '%s\n' "${expected_entries[@]}") \
-            <(printf '%s\n' "${actual_entries[@]}")
-          if find "${LFC_PAGES_SNAPSHOT}" -type l -print -quit | grep -q .; then
-            echo "The rollback Pages snapshot must not contain symbolic links." >&2
-            exit 1
-          fi
-          jq --exit-status \
-            --arg commit "${LFC_TARGET_MAIN_COMMIT}" '
-              type == "object" and
-              (keys | sort) == ["channel", "commit", "version"] and
-              .channel == "main" and .commit == $commit and
-              (.version | type == "string" and test("^[0-9A-Za-z](?:[0-9A-Za-z.+-]{0,126}[0-9A-Za-z])?$"))
-            ' "${LFC_PAGES_SNAPSHOT}/receipt.json" > /dev/null
-
-          trusted_shell="$(mktemp -d)"
-          cp -- \
-            docs/assets/litefold-calendar-mark.svg \
-            scripts/pages-site/site.css \
-            scripts/pages-site/site.js \
-            "${trusted_shell}"
-
-          git fetch origin \
-            refs/heads/pages-content:refs/remotes/origin/pages-content
-          current_pages_commit="$(git rev-parse --verify refs/remotes/origin/pages-content^{commit})"
-          if [[ "${current_pages_commit}" != "${LFC_PAGES_BASE_COMMIT}" ]]; then
-            echo "The retained Pages state advanced after this rollback was prepared; rerun all jobs." >&2
-            exit 1
-          fi
-          git cat-file -e "${LFC_SNAPSHOT_REF}^{commit}"
-          git merge-base --is-ancestor "${LFC_SNAPSHOT_REF}" "${current_pages_commit}"
-          git cat-file -e "${LFC_TARGET_MAIN_COMMIT}^{commit}"
-          git switch --force-create pages-content refs/remotes/origin/pages-content
-
-          candidate_site="${LFC_PAGES_SNAPSHOT}/site"
-          candidate_main_metadata="${candidate_site}/main/examples/metadata.json"
-          if [[ ! -f "${candidate_main_metadata}" || -L "${candidate_main_metadata}" ]]; then
-            echo "The rollback candidate is missing regular main metadata." >&2
-            exit 1
-          fi
-          cmp --silent "${LFC_PAGES_SNAPSHOT}/receipt.json" "${candidate_main_metadata}"
-          expected_site_entries=(
-            index.html
-            litefold-calendar-mark.svg
-            main
-            site-manifest.json
-            site.css
-            site.js
-          )
-          [[ -d releases ]] && expected_site_entries+=(releases)
-          mapfile -t expected_site_entries < <(
-            printf '%s\n' "${expected_site_entries[@]}" | LC_ALL=C sort
-          )
-          mapfile -t actual_site_entries < <(
-            find "${candidate_site}" -mindepth 1 -maxdepth 1 -printf '%f\n' |
-              LC_ALL=C sort
-          )
-          diff -u \
-            <(printf '%s\n' "${expected_site_entries[@]}") \
-            <(printf '%s\n' "${actual_site_entries[@]}")
-
-          expected_main="$(mktemp -d)"
-          git archive --format=tar "${LFC_SNAPSHOT_REF}" main |
-            tar --extract --file=- --strip-components=1 \
-              --directory="${expected_main}"
-          if ! diff --brief --recursive --no-dereference \
-            "${expected_main}" "${candidate_site}/main"; then
-            echo "The rollback candidate does not contain the requested retained main bytes." >&2
-            exit 1
-          fi
-          for shell_file in litefold-calendar-mark.svg site.css site.js; do
-            if [[ ! -f "${candidate_site}/${shell_file}" ||
-              -L "${candidate_site}/${shell_file}" ]] ||
-              ! cmp --silent "${trusted_shell}/${shell_file}" "${candidate_site}/${shell_file}"; then
-              echo "The rollback candidate does not match trusted shell/${shell_file}." >&2
-              exit 1
-            fi
-          done
-          for required_file in index.html site-manifest.json; do
-            if [[ ! -f "${candidate_site}/${required_file}" ||
-              -L "${candidate_site}/${required_file}" ]]; then
-              echo "The rollback candidate is missing regular ${required_file}." >&2
-              exit 1
-            fi
-          done
-          jq --exit-status \
-            --slurpfile main "${candidate_main_metadata}" \
-            --slurpfile retained site-manifest.json \
-            '. == ($retained[0] | .main = ($main[0] + {path: "main/examples/"}))' \
-            "${candidate_site}/site-manifest.json" > /dev/null
-
-          if [[ -d releases ]]; then
-            while IFS= read -r retained_release; do
-              candidate_release="${candidate_site}/${retained_release}"
-              if [[ ! -d "${candidate_release}" ]] ||
-                ! diff --brief --recursive --no-dereference \
-                  "${retained_release}" "${candidate_release}"; then
-                echo "Rollback candidate changed or removed immutable ${retained_release}." >&2
-                exit 1
-              fi
-            done < <(
-              find releases -mindepth 1 -maxdepth 1 -type d -printf '%p\n' |
-                LC_ALL=C sort
-            )
-          fi
-          retained_releases=()
-          candidate_releases=()
-          if [[ -d releases ]]; then
-            mapfile -t retained_releases < <(
-              find releases -mindepth 1 -maxdepth 1 -type d -printf '%p\n' |
-                LC_ALL=C sort
-            )
-          fi
-          if [[ -d "${candidate_site}/releases" ]]; then
-            mapfile -t candidate_releases < <(
-              find "${candidate_site}/releases" \
-                -mindepth 1 -maxdepth 1 -type d -printf 'releases/%f\n' |
-                LC_ALL=C sort
-            )
-          fi
-          diff -u \
-            <(printf '%s\n' "${retained_releases[@]}") \
-            <(printf '%s\n' "${candidate_releases[@]}")
-
-          git rm --force -r --ignore-unmatch .
-          cp -a -- "${candidate_site}/." .
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add --all
-          if git diff --cached --quiet; then
-            observed_pages_commit="$(
-              git -c credential.helper= ls-remote --heads origin refs/heads/pages-content |
-                awk 'NR == 1 { print $1 }'
-            )"
-            if [[ "${observed_pages_commit}" != "${LFC_PAGES_BASE_COMMIT}" ]]; then
-              echo "The retained Pages state advanced during a no-op rollback; rerun all jobs." >&2
-              exit 1
-            fi
-          else
-            git commit -m "Restore main preview from ${LFC_SNAPSHOT_REF}"
-            gh auth setup-git
-            git push origin HEAD:refs/heads/pages-content
-          fi
-
-          printf 'commit=%s\n' "$(git rev-parse --verify HEAD^{commit})" >> "${GITHUB_OUTPUT}"
-
   package-site:
     name: Package retained Pages snapshot
-    needs:
-      - rollback-snapshot
-      - update-snapshot
-    if: ${{ always() && !cancelled() && (needs.update-snapshot.result == 'success' || needs.rollback-snapshot.result == 'success') }}
+    needs: update-snapshot
+    if: ${{ needs.update-snapshot.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -722,7 +391,7 @@ jobs:
       snapshot-commit: ${{ steps.artifact.outputs.snapshot-commit }}
 
     env:
-      LFC_SNAPSHOT_COMMIT: ${{ needs.update-snapshot.outputs.snapshot-commit || needs.rollback-snapshot.outputs.snapshot-commit }}
+      LFC_SNAPSHOT_COMMIT: ${{ needs.update-snapshot.outputs.snapshot-commit }}
 
     steps:
       - name: Resolve the exact Pages deployment artifact
@@ -766,10 +435,6 @@ jobs:
     needs: package-site
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
-    concurrency:
-      group: static-examples-deploy-${{ github.repository }}
-      cancel-in-progress: false
 
     environment:
       name: github-pages
