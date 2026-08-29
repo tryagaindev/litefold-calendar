@@ -123,14 +123,14 @@ If the original run is no longer rerunnable, or any public identity cannot be pr
 
 This temporary path fixes the publisher workflow without changing the candidate package. It is not a historical-commit dispatcher and is not a template for normal releases. Use it only for the already staged but still unpublished `0.3.0-alpha.0` attempt.
 
-The reviewed recovery commit is valid only when all of these invariants hold:
+The reviewed recovery head is valid only when all of these invariants hold:
 
 - npm has no `@tryagaindev/litefold-calendar@0.3.0-alpha.0` version;
 - the existing GitHub object is unpublished draft release `379092928` for `v0.3.0-alpha.0`, its tag targets failed release commit `84fc9288bf6e8ab9678c6f0e4ade9add5846c72d`, and all five retained assets and release notes match the recorded evidence;
 - `CHANGELOG.md`, `package.json`, and `package-lock.json` are byte-for-byte unchanged from the failed release commit;
-- the recovery commit changes only the workflow, workflow-policy tests, and release guides named in the workflow's operational allowlist;
+- the two operational recovery commits together change only the workflows, workflow-policy tests, release guides, and deterministic wheel-burst test harness named in the workflow's operational allowlist;
 - the rebuilt package tarball SHA-256 equals the retained failed-attempt digest `f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894` committed in `publish-alpha.yml`; and
-- the recovery commit is the freshly fetched head of `main`, its parent is the exact failed release commit pinned in the workflow, and there is no intervening source or package change.
+- the recovery head is the freshly fetched head of `main`, its parent is the exact audited recovery predecessor `4d97e280156c24b06d93cfe4167595df749d7b9d` pinned in both publisher and Pages workflows, that predecessor's parent is the failed release commit, and neither operational commit changes source or package state.
 
 The operational allowlist is exactly:
 
@@ -141,14 +141,17 @@ The operational allowlist is exactly:
 - `docs/releasing.md`
 - `scripts/tests/publish-alpha-policy.test.mjs`
 - `scripts/tests/workflow-contracts.test.mjs`
+- `tests/e2e/swipe-gestures.spec.js`
 
-No source, build output, package manifest, lockfile, changelog, or other repository file may change in the recovery commit.
+The wheel-burst change controls trusted CDP event timestamps so parallel test load cannot turn one intended rapid burst into multiple gestures; it does not alter runtime behavior. No source, build output, package manifest, lockfile, changelog, or other repository file may change across either recovery commit.
+
+The verifier checks out immutable platform `github.sha` directly. The operator input is confirmation-only and must equal that SHA; it is never forwarded as a checkout ref. The earlier audited recovery predecessor remains pinned because the hosted CodeQL result required this direct trust-boundary expression after the predecessor was already on `main`.
 
 Before deleting anything, independently record the draft release ID, tag target, release-note digest, asset names, and asset SHA-256 values. Query npm's exact version and require a definite not-found result; an authentication failure, network error, or malformed response is not proof of absence. Confirm that no published GitHub release or Pages release directory exists for the candidate.
 
 Only after every check passes may an administrator delete the exact unpublished `v0.3.0-alpha.0` draft and its exact candidate tag so the corrected workflow can recreate them from the retained bytes. Do not delete either historical tag, any published release, or any unrelated draft. If a tag ruleset blocks deletion, the draft or tag identity differs, npm contains the version, Pages already contains the release, or any retained byte cannot be proved, stop and publish a greater alpha instead.
 
-After the reviewed recovery commit is the live `main` head:
+After the reviewed recovery head is the live `main` head:
 
 1. Open **Actions** → **Publish npm alpha** → **Run workflow**.
 2. Leave **Use workflow from** set to `main`.

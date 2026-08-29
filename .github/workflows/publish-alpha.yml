@@ -28,7 +28,7 @@ env:
   LFC_GH_MIN_VERSION: "2.96.0"
   LFC_NODE_VERSION: "24.19.0"
   LFC_NPM_VERSION: "12.0.2"
-  LFC_RECOVERY_PARENT_COMMIT: "84fc9288bf6e8ab9678c6f0e4ade9add5846c72d"
+  LFC_RECOVERY_PARENT_COMMIT: "4d97e280156c24b06d93cfe4167595df749d7b9d"
   LFC_RECOVERY_TARBALL_SHA256: "f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894"
   LFC_RECOVERY_VERSION: "0.3.0-alpha.0"
   LFC_NORMALIZE_NPM_VIEW_JSON: >-
@@ -52,7 +52,6 @@ jobs:
       eligible: ${{ steps.candidate.outputs.eligible }}
       parent-version: ${{ steps.candidate.outputs.parent-version }}
       recovery: ${{ steps.candidate.outputs.recovery }}
-      source-commit: ${{ steps.candidate.outputs.source-commit }}
 
     steps:
       - name: Check out the exact pushed commit or live recovery head
@@ -129,12 +128,24 @@ jobs:
           printf 'eligible=%s\n' "${eligible}" >> "${GITHUB_OUTPUT}"
           printf 'parent-version=%s\n' "${parent_version}" >> "${GITHUB_OUTPUT}"
           printf 'recovery=%s\n' "${recovery}" >> "${GITHUB_OUTPUT}"
-          printf 'source-commit=%s\n' "${LFC_SOURCE_COMMIT}" >> "${GITHUB_OUTPUT}"
 
   verify:
     name: Verify exact source and create release evidence
     needs: classify
-    if: ${{ needs.classify.outputs.eligible == 'true' }}
+    if: >-
+      ${{
+        needs.classify.outputs.eligible == 'true' &&
+        github.ref == 'refs/heads/main' &&
+        (
+          github.event_name == 'push' ||
+          (
+            github.event_name == 'workflow_dispatch' &&
+            inputs.current_main_commit == github.sha &&
+            github.workflow_sha == github.sha &&
+            needs.classify.outputs.recovery == 'true'
+          )
+        )
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 50
 
@@ -160,7 +171,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ needs.classify.outputs.source-commit }}
+          ref: ${{ github.sha }}
 
       - name: Set up exact Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -184,7 +195,7 @@ jobs:
           LFC_RECOVERY: ${{ needs.classify.outputs.recovery }}
           LFC_RECOVERY_PARENT_COMMIT: ${{ env.LFC_RECOVERY_PARENT_COMMIT }}
           LFC_RECOVERY_VERSION: ${{ env.LFC_RECOVERY_VERSION }}
-          LFC_SOURCE_COMMIT: ${{ needs.classify.outputs.source-commit }}
+          LFC_SOURCE_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -217,6 +228,7 @@ jobs:
               docs/releasing.md
               scripts/tests/publish-alpha-policy.test.mjs
               scripts/tests/workflow-contracts.test.mjs
+              tests/e2e/swipe-gestures.spec.js
             )
             mapfile -t unexpected_files < <(
               comm -23 \

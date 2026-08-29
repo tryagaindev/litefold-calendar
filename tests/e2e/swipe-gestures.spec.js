@@ -5,6 +5,7 @@ import { expectExampleReady } from "./helpers.js";
 const HOST_SELECTOR = "[data-example-calendar]";
 const MONTH_SELECTOR = "[data-example-state-month]";
 const VIEWPORT_SELECTOR = ".lfc-calendar-swipe-viewport";
+const WHEEL_BURST_EVENT_SPACING_SECONDS = 0.01;
 
 async function createInputClient(page, reducedMotion) {
 	const client = await page.context().newCDPSession(page);
@@ -370,11 +371,15 @@ test.describe("native month pager", () => {
 		const point = await gesturePoint(host.locator(
 			'.lfc-calendar-day-button[data-lfc-date="2026-08-13"]'
 		), 16);
+		const burstTimestamp = Date.now() / 1_000;
 		for (let eventIndex = 0; eventIndex < 3; eventIndex += 1) {
 			await client.send("Input.dispatchMouseEvent", {
 				deltaX: 90,
 				deltaY: 0,
 				pointerType: "mouse",
+				timestamp: burstTimestamp + (
+					eventIndex * WHEEL_BURST_EVENT_SPACING_SECONDS
+				),
 				type: "mouseWheel",
 				x: point.x,
 				y: point.y

@@ -211,8 +211,9 @@ Before opening Actions, have an administrator confirm all of the following:
 - [ ] npm definitely has no `@tryagaindev/litefold-calendar@0.3.0-alpha.0`; an error other than a definite not-found result is a stop condition.
 - [ ] Unpublished draft release `379092928`, its exact `v0.3.0-alpha.0` tag target `84fc9288bf6e8ab9678c6f0e4ade9add5846c72d`, its notes, five asset names, and asset digests match the retained failed-run evidence.
 - [ ] `CHANGELOG.md`, `package.json`, and `package-lock.json` are unchanged from the failed release commit.
-- [ ] The recovery commit changes only the workflow, workflow-policy tests, and release guides in the workflow's operational allowlist.
-- [ ] The workflow pins the failed release parent and retained tarball SHA-256 `f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894`, and the rebuilt tarball must match that digest.
+- [ ] The two operational recovery commits, taken together from the failed release commit through current `main`, change only the workflows, workflow-policy tests, release guides, and deterministic wheel-burst test harness in the workflow's operational allowlist; the test-only change sets explicit trusted CDP timestamps and does not alter runtime behavior.
+- [ ] Both publisher and Pages workflows pin the exact audited recovery predecessor `4d97e280156c24b06d93cfe4167595df749d7b9d`, whose parent is the failed release commit, plus retained tarball SHA-256 `f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894`; the rebuilt tarball must match that digest.
+- [ ] The publisher verifier checks out platform `github.sha` directly; the typed commit is confirmation-only and is never used as a checkout ref.
 - [ ] There is no published candidate release or candidate Pages directory.
 
 After recording the evidence, the administrator may delete only that exact unpublished draft and its exact `v0.3.0-alpha.0` tag. Stop and prepare a greater alpha if deletion is blocked by a ruleset, either identity differs, npm contains the version, any evidence is unavailable, or any public state conflicts. Never delete a published release or either historical lightweight tag.
