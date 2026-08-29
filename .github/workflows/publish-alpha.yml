@@ -197,6 +197,7 @@ jobs:
             exit "${registry_status}"
           fi
           export LFC_REGISTRY_METADATA="${metadata}"
+          # LFC_PRERELEASE_CHANNEL_POLICY_START
           node --input-type=module <<'NODE'
           import semver from "semver";
 
@@ -206,9 +207,13 @@ jobs:
             ? [metadata.versions]
             : metadata.versions;
           const tags = metadata["dist-tags"];
-          if (!Array.isArray(versions) || tags === null || typeof tags !== "object") {
+          if (!Array.isArray(versions) || tags === null || typeof tags !== "object" ||
+            Array.isArray(tags)) {
             throw new Error("npm returned malformed release metadata.");
           }
+          const supportedAlpha = (value) => typeof value === "string" &&
+            /^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$/u.test(value) &&
+            semver.valid(value) === value;
           for (const version of versions) {
             if (typeof version !== "string" || semver.valid(version) === null) {
               throw new Error("npm returned a malformed published version.");
@@ -217,20 +222,32 @@ jobs:
               throw new Error(`Published version ${version} is not older than ${candidate}.`);
             }
           }
-          if (tags.alpha !== undefined && typeof tags.alpha !== "string") {
-            throw new Error("npm returned a malformed alpha dist-tag.");
-          }
-          if (typeof tags.alpha === "string" && tags.alpha !== candidate &&
-            semver.gte(tags.alpha, candidate)) {
-            throw new Error(`npm alpha ${tags.alpha} cannot move to ${candidate}.`);
-          }
-          if (tags.latest !== undefined && typeof tags.latest !== "string") {
-            throw new Error("npm returned a malformed latest dist-tag.");
-          }
-          if (typeof tags.latest === "string" && semver.prerelease(tags.latest) !== null) {
-            throw new Error(`npm latest must be stable or absent; found ${tags.latest}.`);
+          if (versions.length === 0) {
+            if (Object.keys(tags).length !== 0) {
+              throw new Error("An absent npm package must not expose dist-tags.");
+            }
+          } else {
+            for (const name of ["alpha", "latest"]) {
+              const value = tags[name];
+              if (!supportedAlpha(value) || !versions.includes(value)) {
+                throw new Error(`npm ${name} must select a published supported alpha; found ${String(value)}.`);
+              }
+              if (value !== candidate && semver.gte(value, candidate)) {
+                throw new Error(`npm ${name} ${value} cannot move to ${candidate}.`);
+              }
+            }
+            const legacyDivergence = tags.alpha === "0.2.0-alpha.0" &&
+              tags.latest === "0.1.0-alpha.0";
+            const publicationInProgress = versions.includes(candidate) &&
+              tags.alpha === candidate && tags.latest !== candidate;
+            if (tags.alpha !== tags.latest && !legacyDivergence && !publicationInProgress) {
+              throw new Error(
+                `npm alpha and latest must match before a release; found alpha=${tags.alpha}, latest=${tags.latest}.`
+              );
+            }
           }
           NODE
+          # LFC_PRERELEASE_CHANNEL_POLICY_END
 
           registry_state_sha256="$(
             printf '%s' "${registry_state}" | sha256sum | cut -d ' ' -f 1
@@ -750,6 +767,7 @@ jobs:
 
           printf 'expected-integrity=%s\n' "${expected_integrity}" >> "${GITHUB_OUTPUT}"
           printf 'publication=%s\n' "${publication}" >> "${GITHUB_OUTPUT}"
+          echo "::notice::An authenticated npm owner must ensure latest selects this alpha: npm dist-tag add @tryagaindev/litefold-calendar@${LFC_VERSION} latest --registry https://registry.npmjs.org/"
 
   verify-registry:
     name: Verify registry integrity, imports, and provenance
@@ -757,7 +775,7 @@ jobs:
       - publish
       - verify
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     permissions:
       actions: read
@@ -797,7 +815,7 @@ jobs:
           tags_raw="${RUNNER_TEMP}/registry-tags.raw.json"
           tags_json="${RUNNER_TEMP}/registry-tags.json"
           verified=false
-          for attempt in $(seq 1 12); do
+          for attempt in $(seq 1 60); do
             if npm view "@tryagaindev/litefold-calendar@${LFC_VERSION}" dist.integrity \
               --registry https://registry.npmjs.org/ --json \
               > "${integrity_raw}" 2>/dev/null; then
@@ -817,15 +835,19 @@ jobs:
                 fi
                 if [[ "${integrity}" == "${LFC_EXPECTED_INTEGRITY}" &&
                   "${alpha}" == "${LFC_VERSION}" &&
-                  ( -z "${latest}" || ! "${latest}" =~ - ) ]]; then
+                  "${latest}" == "${LFC_VERSION}" ]]; then
                   verified=true
                   break
                 fi
               fi
             fi
-            [[ "${attempt}" -lt 12 ]] && sleep 10
+            [[ "${attempt}" -lt 60 ]] && sleep 10
           done
-          [[ "${verified}" == "true" ]]
+          if [[ "${verified}" != "true" ]]; then
+            echo "npm alpha and latest must both select ${LFC_VERSION}." >&2
+            echo "An authenticated npm owner must run: npm dist-tag add @tryagaindev/litefold-calendar@${LFC_VERSION} latest --registry https://registry.npmjs.org/" >&2
+            exit 1
+          fi
 
           consumer="$(mktemp -d)"
           printf '%s\n' '{"name":"litefold-release-verification","private":true,"type":"module"}' > "${consumer}/package.json"

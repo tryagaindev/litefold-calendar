@@ -123,6 +123,7 @@ async function writeFixtureFile(root, path, contents) {
 
 async function createSourceFixture(context, options = {}) {
 	const {
+		canonicalMetadata = true,
 		channel = "main",
 		commit = FIRST_COMMIT,
 		marker = "first",
@@ -167,11 +168,14 @@ async function createSourceFixture(context, options = {}) {
 	].join("\n"));
 	await writeFixtureFile(root, "examples/index.js", 'fetch("./metadata.json");\n');
 	await writeFixtureFile(root, "examples/index.css", "body { margin: 0; }\n");
-	await writeFixtureFile(root, "examples/metadata.json", serializeExampleMetadata({
-		channel,
-		commit,
-		version
-	}));
+	const metadata = { channel, commit, version };
+	await writeFixtureFile(
+		root,
+		"examples/metadata.json",
+		canonicalMetadata
+			? serializeExampleMetadata(metadata)
+			: `${JSON.stringify(metadata, null, 2)}\n`
+	);
 	await writeFixtureFile(root, "examples/README.md", "Authoring notes.\n");
 	await writeFixtureFile(root, "examples/basic/main.ts", "export {};\n");
 	await writeFixtureFile(root, "examples/basic/main.js", `export const marker = "${marker}";\n`);
@@ -218,7 +222,7 @@ async function snapshotOutput(context) {
 }
 
 void test("Pages staging includes self-contained assets and commit-pinned developer navigation", async (context) => {
-	const artifact = await buildFixtureArtifact(context);
+	const artifact = await buildFixtureArtifact(context, { canonicalMetadata: false });
 	const nestedHtml = await readFile(join(artifact, "content", "examples", "basic", "index.html"), "utf8");
 	assert.match(nestedHtml, /Rolling main preview/u);
 	assert.match(nestedHtml, new RegExp(FIRST_COMMIT, "u"));
@@ -285,6 +289,10 @@ void test("Pages staging includes self-contained assets and commit-pinned develo
 	assert.deepEqual(
 		JSON.parse(await readFile(join(artifact, "channel.json"), "utf8")),
 		{ channel: "main", commit: FIRST_COMMIT, version: "1.0.0" }
+	);
+	assert.equal(
+		await readFile(join(artifact, "channel.json"), "utf8"),
+		await readFile(join(artifact, "content", "examples", "metadata.json"), "utf8")
 	);
 });
 

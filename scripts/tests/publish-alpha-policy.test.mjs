@@ -92,6 +92,67 @@ void test("the workflow normalizer accepts only npm 12 single-result arrays", as
 	}
 });
 
+void test("the prerelease channel policy converges alpha and latest on the candidate", async () => {
+	const workflow = await readFile(WORKFLOW_PATH, "utf8");
+	const policy = inlineModule(workflow, "LFC_PRERELEASE_CHANNEL_POLICY");
+	const candidate = "0.3.0-alpha.0";
+	const runPolicy = (metadata) => runInlineModule(policy, {
+		cwd: REPOSITORY_ROOT,
+		env: {
+			...process.env,
+			LFC_REGISTRY_METADATA: JSON.stringify(metadata),
+			LFC_VERSION: candidate
+		}
+	});
+	const versions = ["0.1.0-alpha.0", "0.2.0-alpha.0"];
+
+	for (const metadata of [
+		{ "dist-tags": {}, versions: [] },
+		{
+			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.1.0-alpha.0" },
+			versions
+		},
+		{
+			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.2.0-alpha.0" },
+			versions
+		},
+		{
+			"dist-tags": { alpha: candidate, latest: "0.2.0-alpha.0" },
+			versions: [...versions, candidate]
+		},
+		{
+			"dist-tags": { alpha: candidate, latest: candidate },
+			versions: [...versions, candidate]
+		}
+	]) {
+		await runPolicy(metadata);
+	}
+
+	for (const metadata of [
+		{ "dist-tags": { alpha: "0.2.0-alpha.0" }, versions },
+		{
+			"dist-tags": { alpha: "0.2.0-alpha.1", latest: "0.1.0-alpha.0" },
+			versions: [...versions, "0.2.0-alpha.1"]
+		},
+		{
+			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.2.0" },
+			versions: [...versions, "0.2.0"]
+		},
+		{
+			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.2.1-alpha.0" },
+			versions
+		},
+		{
+			"dist-tags": { alpha: "0.4.0-alpha.0", latest: "0.4.0-alpha.0" },
+			versions: [...versions, "0.4.0-alpha.0"]
+		},
+		{ "dist-tags": [], versions: [] },
+		{ "dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.2.0-alpha.0" }, versions: [] }
+	]) {
+		await assert.rejects(runPolicy(metadata));
+	}
+});
+
 void test("the pinned npm CLI emits the captured npm 12 view shapes", async (context) => {
 	const workflow = await readFile(WORKFLOW_PATH, "utf8");
 	const pinnedVersion = /LFC_NPM_VERSION: "([^"]+)"/u.exec(workflow)?.[1];

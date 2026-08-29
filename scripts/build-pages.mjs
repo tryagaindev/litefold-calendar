@@ -12,7 +12,7 @@ import {
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseExampleMetadata } from "./lib/example-metadata.mjs";
+import { parseExampleMetadata, serializeExampleMetadata } from "./lib/example-metadata.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
 import { parseSemVer } from "./lib/semver.mjs";
 
@@ -352,6 +352,7 @@ export async function buildPagesArtifact(options) {
 		JSON.parse(await readFile(metadataPath, "utf8")),
 		packageManifest.version
 	);
+	const serializedMetadata = serializeExampleMetadata(metadata);
 	const repositoryUrl = repositoryWebUrl(packageManifest.repository);
 
 	await mkdir(dirname(resolvedOutput), { recursive: true });
@@ -416,8 +417,13 @@ export async function buildPagesArtifact(options) {
 		const deploymentStylesheetPath = join(contentDirectory, "deployment-details.css");
 		await copyFile(join(shellDirectory, "deployment-details.css"), deploymentStylesheetPath);
 		await writeFile(
+			join(exampleDirectory, "metadata.json"),
+			serializedMetadata,
+			"utf8"
+		);
+		await writeFile(
 			join(stagingDirectory, "channel.json"),
-			`${JSON.stringify(metadata, null, 2)}\n`,
+			serializedMetadata,
 			"utf8"
 		);
 

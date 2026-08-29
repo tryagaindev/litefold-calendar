@@ -90,9 +90,9 @@ Tree shaking and package contents answer different questions. The extension file
 
 ## Registry and release evidence
 
-The publisher retries npm's eventually consistent reads and verifies the exact version, `alpha` dist-tag, acceptable `latest` state, registry integrity, provenance/signatures, clean installation, root import, documented extension import, and stylesheet import before publishing the GitHub prerelease. The immutable Pages example is a separately queued deployment for the same exact tag and commit.
+The publisher retries npm's eventually consistent reads and verifies the exact version, matching `alpha` and `latest` dist-tags, registry integrity, provenance/signatures, clean installation, root import, documented extension import, and stylesheet import before publishing the GitHub prerelease. The immutable Pages example is a separately queued deployment for the same exact tag and commit.
 
-Inspect an exact published version rather than relying only on the movable `alpha` tag:
+Inspect an exact published version rather than relying only on movable dist-tags:
 
 ```sh
 npm view "@tryagaindev/litefold-calendar@EXACT_VERSION" name version dist.integrity repository --json --registry https://registry.npmjs.org/
@@ -103,7 +103,7 @@ Replace `EXACT_VERSION` with the release being checked. Confirm that:
 
 - The returned name and version are exact.
 - `dist.integrity` equals `npmIntegrity` in the GitHub prerelease's `package-verification.json`.
-- `alpha` points to that version immediately after release; `latest` is absent or points to a stable version.
+- Both `alpha` and `latest` point to that exact prerelease until the first stable release replaces the temporary channel policy.
 - The npm package page shows provenance for the expected repository and `publish-alpha.yml` workflow.
 
 The workflow installs the exact version into a clean consumer before running `npm audit signatures`. Running that command in the repository would verify the development dependency tree instead. If a registry read is unavailable, ambiguous, or inconsistent with the retained bundle, stop and use the [recovery matrix](release-administration.md#recovery-matrix).

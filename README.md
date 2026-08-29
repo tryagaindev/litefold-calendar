@@ -8,7 +8,7 @@ Litefold Calendar is a mobile-first, responsive month calendar for applications 
 
 Use Litefold when your product needs a polished month calendar without adopting a complete scheduling platform or maintaining separate mobile and desktop implementations.
 
-> **Alpha:** The current public prerelease is published under npm's `alpha` dist-tag.  Pin an exact version in production-like environments.  Public API changes remain possible before `1.0.0` and will be documented in the changelog.
+> **Alpha:** Until the first stable release, npm's `alpha` and `latest` dist-tags intentionally select the same public prerelease, so an unqualified install also receives alpha software. Pin an exact version in production-like environments. Public API changes remain possible before `1.0.0` and will be documented in the changelog.
 
 ## Install
 

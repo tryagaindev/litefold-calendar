@@ -100,6 +100,7 @@ void test("the OIDC publisher consumes only the verified five-file bundle", asyn
 	);
 	assert.equal(occurrences(publish, /^\s*npm publish\b/gmu), 1);
 	assert.match(publish, /--registry https:\/\/registry\.npmjs\.org\/[\s\S]*?--access public[\s\S]*?--tag alpha[\s\S]*?--provenance[\s\S]*?--ignore-scripts/u);
+	assert.match(publish, /manifest\.publishConfig\?\.tag !== "alpha"/u);
 	assert.doesNotMatch(publish, /actions\/checkout@|npm ci|npm run |node scripts\//u);
 	assert.doesNotMatch(publish, /LFC_PARENT_VERSION|releases\/tags\/v\$\{LFC_PARENT_VERSION\}/u);
 	assert.doesNotMatch(source, /NPM_TOKEN|NODE_AUTH_TOKEN|registry-release-state\.mjs|release-verification\.mjs|verify-release-state\.mjs/u);
@@ -147,7 +148,7 @@ void test("npm 12 view results pass through one fail-closed normalizer", async (
 	);
 	assert.doesNotMatch(source, /jq[^\n]*\.raw\.json|JSON\.parse\([^\n]*\.raw\.json/u);
 
-	const propagationLoop = /for attempt in \$\(seq 1 12\); do([\s\S]*?)\n\s*done/u.exec(
+	const propagationLoop = /for attempt in \$\(seq 1 60\); do([\s\S]*?)\n\s*done/u.exec(
 		verifyRegistry
 	)?.[1];
 	assert.equal(typeof propagationLoop, "string");
@@ -249,7 +250,7 @@ void test("draft assets and final release publication are digest-bound and sourc
 		verifyRegistry,
 		/LFC_PROVENANCE_POLICY_START[\s\S]*?sourceRepositoryVisibilityAtSigning === "public"/u
 	);
-	assert.match(verifyRegistry, /"\$\{alpha\}" == "\$\{LFC_VERSION\}"/u);
+	assert.match(verifyRegistry, /"\$\{alpha\}" == "\$\{LFC_VERSION\}"[\s\S]*?"\$\{latest\}" == "\$\{LFC_VERSION\}"/u);
 	assert.doesNotMatch(verifyRegistry, /actions\/checkout@|GH_TOKEN|contents: write|id-token: write|npm publish/u);
 	assert.match(publishRelease, /needs:[\s\S]*?- stage-release[\s\S]*?- verify-registry/u);
 	assert.match(publishRelease, /LFC_ASSET_DIGESTS: \$\{\{ needs\.verify\.outputs\.asset-digests \}\}/u);
