@@ -1,6 +1,7 @@
 const PACKAGE_NAME = "@tryagaindev/litefold-calendar";
 const REPOSITORY_URL = "https://github.com/tryagaindev/litefold-calendar";
-const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u;
+const MAX_VERSION_LENGTH = 128;
+const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
 
 function validateEntry(value, expectedChannel) {
@@ -10,6 +11,7 @@ function validateEntry(value, expectedChannel) {
 		Array.isArray(value) ||
 		value.channel !== expectedChannel ||
 		typeof value.version !== "string" ||
+		value.version.length > MAX_VERSION_LENGTH ||
 		!SEMVER_PATTERN.test(value.version) ||
 		typeof value.commit !== "string" ||
 		!COMMIT_PATTERN.test(value.commit) ||
