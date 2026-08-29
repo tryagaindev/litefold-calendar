@@ -2,8 +2,8 @@
 	"schemaVersion": 1,
 	"main": {
 		"channel": "main",
-		"commit": "fdbbedd695ddee55d33a2c02545271bd72a4d8d2",
-		"version": "0.2.0-alpha.0",
+		"commit": "a1c3dfa551b2ce5bcd589977bed54f0c712e58a7",
+		"version": "0.3.0-alpha.0",
 		"path": "main/examples/"
 	},
 	"releases": [
