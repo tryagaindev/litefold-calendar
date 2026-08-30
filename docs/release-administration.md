@@ -13,7 +13,7 @@ Verify these settings before enabling publication and after any owner, repositor
 - Organization owners use two-factor authentication, and the organization requires it for every member and outside collaborator. Keep at least two trusted owners when a second maintainer is available, but otherwise grant owner access sparingly.
 - Base repository permission is **None**. Repository access is explicit, and members cannot create or delete repositories, change repository visibility, create teams, or create Pages sites unless an owner deliberately changes that policy.
 - GitHub Actions permits GitHub-owned actions and reusable workflows only, requires full commit-SHA pinning, gives `GITHUB_TOKEN` read access by default, and does not let workflows create or approve pull requests.
-- Immutable releases and the organization security configuration apply to every repository and are the defaults for new public repositories.
+- Immutable releases apply to every repository. The enforced organization security configuration applies to every public repository and is the default for new public repositories.
 
 ### npm
 
@@ -26,7 +26,7 @@ Verify these settings before enabling publication and after any owner, repositor
 
 - The GitHub `npm` environment requires release-maintainer approval, prevents an initiator from approving their own deployment when more than one maintainer is available, blocks administrator bypass, and has a deployment-branch policy that allows `main` only. Keep self-review available while there is only one maintainer; otherwise every release deadlocks.
 - The default branch requires a pull request, successful up-to-date **Build, test, and verify package** status, resolved review conversations, CodeQL merge protection, and linear history. It blocks deletion and force pushes. With one maintainer, require zero independent approvals; require an independent approval and code-owner review after a second maintainer is available.
-- A `v*` tag ruleset blocks creation, updates, deletion, and force updates. Only the GitHub Actions integration may bypass creation so the source-pinned publisher can create an exact-SHA release tag.
+- A `v*` tag ruleset permits the source-pinned publisher to create a new exact-SHA release tag, then blocks updates, deletion, and force updates. It has no bypass actors.
 - Only squash merging is enabled, using the pull-request title and description. Automatic merging and deletion of merged head branches are enabled.
 - [GitHub immutable releases](https://docs.github.com/en/enterprise-cloud@latest/code-security/concepts/supply-chain-security/immutable-releases) are enabled.  Release artifacts must be attached while the prerelease is still a draft because published immutable tags and assets cannot be replaced.
 - The organization security configuration enables the dependency graph, Dependabot alerts and security updates, CodeQL default setup, secret scanning, push protection, validity checks, non-provider patterns, and private vulnerability reporting. Weekly npm and GitHub Actions version-update pull requests come from `.github/dependabot.yml`.
