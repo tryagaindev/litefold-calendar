@@ -54,7 +54,7 @@ Complete every checkbox before running the preparation workflow.
 - [ ] Open **Actions** → **CI** and confirm the newest run for `main` succeeded.
 - [ ] Confirm all intended source, documentation, tests, screenshots, design decisions, and risk-based accessibility evidence are already merged into `main`.
 - [ ] Open `CHANGELOG.md` on `main` and confirm `[Unreleased]` contains meaningful user-visible bullet notes rather than placeholders.
-- [ ] Open **Security** and review code-scanning, code-quality, Dependabot, secret-scanning, and malware results. Resolve or explicitly disposition every release-blocking result.
+- [ ] Open **Security** and review code-scanning, Dependabot, secret-scanning, and malware results. Resolve or explicitly disposition every release-blocking result.
 - [ ] Confirm GitHub's private-email setting is enabled for the account that will squash-merge the release pull request.
 - [ ] Confirm the `npm` and `github-pages` environments, required CI check, protected `main`, protected `v*` tags, immutable releases, and npm trusted publisher still match the [administration guide](release-administration.md#one-time-hosted-prerequisites).
 

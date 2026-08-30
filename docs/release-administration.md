@@ -31,7 +31,7 @@ Verify these settings before enabling publication and after any owner, repositor
 - A `v*` tag ruleset permits the source-pinned publisher to create a new exact-SHA release tag, then blocks updates, deletion, and force updates. It has no bypass actors.
 - Only squash merging is enabled, using the pull-request title and description. Automatic merging and deletion of merged head branches are enabled.
 - [GitHub immutable releases](https://docs.github.com/en/enterprise-cloud@latest/code-security/concepts/supply-chain-security/immutable-releases) are enabled.  Release artifacts must be attached while the prerelease is still a draft because published immutable tags and assets cannot be replaced.
-- The organization security configuration enables the dependency graph, Dependabot alerts and security updates, CodeQL default setup, secret scanning, push protection, validity checks, non-provider patterns, and private vulnerability reporting. Weekly npm and GitHub Actions version-update pull requests come from `.github/dependabot.yml`.
+- The enforced public-repository security configuration enables the dependency graph, Dependabot alerts and security updates, CodeQL default setup, provider-pattern secret scanning, push protection, and private vulnerability reporting. GitHub Code Quality and licensed secret-scanning extensions (validity checks, extended metadata, non-provider and generic patterns, and AI-detected secrets) remain disabled. Weekly npm and GitHub Actions version-update pull requests come from `.github/dependabot.yml`.
 
 ### GitHub Pages
 

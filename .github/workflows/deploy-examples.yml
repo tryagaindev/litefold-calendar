@@ -157,7 +157,7 @@ jobs:
           if-no-files-found: error
           overwrite: false
           path: ${{ runner.temp }}/pages-channel
-          retention-days: 30
+          retention-days: 1
 
   update-snapshot:
     name: Preserve deployment snapshot
@@ -431,7 +431,7 @@ jobs:
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: ${{ runner.temp }}/pages-site
-          retention-days: 30
+          retention-days: 1
 
   deploy:
     name: Deploy retained static examples

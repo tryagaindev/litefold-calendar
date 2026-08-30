@@ -319,7 +319,7 @@ jobs:
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: ${{ runner.temp }}/pages-site
-          retention-days: 30
+          retention-days: 1
 
   deploy:
     name: Deploy retained static examples
