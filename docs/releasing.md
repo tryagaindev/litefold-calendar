@@ -4,7 +4,7 @@ This is the day-to-day release path for `@tryagaindev/litefold-calendar`. Alpha 
 
 Operators should follow the checkbox-driven [alpha release operations runbook](release-operations.md). This guide defines the policy and workflow design behind those steps.
 
-The normal process is intentionally simple: prepare the release pull request, merge it, approve trusted publication, advance the temporary `latest` tag, and verify the automatic GitHub release and Pages deployment. A temporary current-main dispatch exists only to recover the still-unpublished `0.3.0-alpha.0` attempt and must be removed after that release succeeds.
+The process is intentionally simple: prepare the release pull request, merge it, approve trusted publication, advance the temporary `latest` tag, and verify the automatic GitHub release and Pages deployment. The merge push is the only publication trigger.
 
 Repository or npm administrators must complete the [hosted prerequisites](release-administration.md#one-time-hosted-prerequisites) first. A release operator needs permission to run Actions, open and merge the prepared release pull request, and coordinate approval for the protected `npm` environment. A separate authorized reviewer should be available when the environment prohibits self-approval.
 
@@ -50,7 +50,7 @@ Do not create or push a version tag, create a GitHub release, publish with npm l
 
 ### 4. Verify the published identities
 
-After approval, **Publish npm alpha** verifies npm and then makes the GitHub prerelease public. Its successful completion triggers **Deploy static examples** through GitHub's native `workflow_run` event, including the one-time guarded recovery event. A started Pages run is not proof of a completed deployment; open the publisher-linked run and wait for it to succeed.
+After approval, **Publish npm alpha** verifies npm and then makes the GitHub prerelease public. Its successful completion triggers **Deploy static examples** through GitHub's native `workflow_run` event. A started Pages run is not proof of a completed deployment; open the publisher-linked run and wait for it to succeed.
 
 Confirm all of these identify the same version and full commit:
 
@@ -76,15 +76,11 @@ Use `prepatch` or `preminor` instead of `prerelease` for the other two choices. 
 
 ## Historical release tags
 
-The lightweight tags `v0.1.0-alpha.0` at `17d8db664834d8e6e8ded8689df404827c11bfa3` and `v0.2.0-alpha.0` at `8250ac4da9ada72a2915b8f810be404667ab47da` are exact pre-policy exceptions. Never move, recreate, or annotate them. No other lightweight release tag is permitted.
+The lightweight tags `v0.1.0-alpha.0` at `53cf1fbb5f4176929c3105030a62e1d0c235b54f` and `v0.2.0-alpha.0` at `8250ac4da9ada72a2915b8f810be404667ab47da` are exact pre-policy exceptions. Never move, recreate, or annotate them. No other lightweight release tag is permitted.
 
 ## Failure handling
 
 Do not work around a failed workflow with a local publish, force push, unrelated tag movement, replaced asset, or reused package version. The one expected registry-administration action is advancing `latest` to the exact already-published candidate. A rerun of **Publish npm alpha** keeps that run's original commit SHA, ref, and publisher workflow definition, so use it only after resolving a transient infrastructure, authentication, or hosted-state configuration failure without changing repository source or the publisher workflow. Open the run for the original release merge commit and confirm its SHA and version before rerunning. If source or publisher workflow files must change, stop and use administration recovery; prepare a greater alpha when required. There is no arbitrary or historical-commit publication path.
-
-The sole temporary exception is the [one-time current-main recovery](release-administration.md#one-time-current-main-recovery-for-030-alpha0) for the still-unpublished `0.3.0-alpha.0`. Its dispatch input only confirms the exact live `main` workflow commit; the input, `github.sha`, workflow SHA, and freshly fetched `origin/main` must agree. The verifier checks out immutable platform `github.sha` directly and never uses the input as a ref. Release-state files stay unchanged, changed files are restricted to the operational allowlist, and the rebuilt tarball must equal the retained digest. That allowlist includes one deterministic wheel-burst test-harness correction but no runtime or package source. Provenance records the actual `workflow_dispatch` event while keeping the same current source and workflow commit.
-
-That recovery may delete and recreate only the exact verified unpublished `v0.3.0-alpha.0` draft and tag, and only after npm absence plus retained note/asset evidence are proved. Any published or conflicting state, unavailable evidence, or tag-protection failure is a stop condition: publish a greater alpha instead. After successful npm, immutable GitHub release, and Pages verification, remove the recovery trigger and recovery-only policy in a reviewed cleanup so the simple push-driven path is again the only publisher entry point.
 
 Only rerun when existing npm, tag, draft/release, assets, and Pages state are absent or match the retained bytes exactly. Conflicting or ambiguous state fails closed. Published npm versions are immutable: if bytes are defective, deprecate that version with upgrade guidance and prepare a greater alpha. Use the [recovery matrix](release-administration.md#recovery-matrix) for the exact failure stage.
 

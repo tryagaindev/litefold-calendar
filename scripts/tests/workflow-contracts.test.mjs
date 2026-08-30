@@ -55,48 +55,33 @@ void test("release preparation creates only the reviewed three-file branch", asy
 	assert.doesNotMatch(source, /--online|NPM_TOKEN|NODE_AUTH_TOKEN|secrets\.|git push[^\n]*--force/u);
 });
 
-void test("alpha publication allows only exact pushes or a guarded current-main recovery", async () => {
+void test("alpha publication is classified from the exact push to main", async () => {
 	const source = await workflow("publish-alpha.yml");
 	const event = trigger(source);
 	const classify = job(source, "classify");
 	const verify = job(source, "verify");
 	assert.match(event, /push:[\s\S]*?branches:[\s\S]*?- main[\s\S]*?paths:[\s\S]*?- \.github\/workflows\/publish-alpha\.yml[\s\S]*?- CHANGELOG\.md[\s\S]*?- package-lock\.json[\s\S]*?- package\.json/u);
-	assert.match(
-		event,
-		/workflow_dispatch:[\s\S]*?current_main_commit:[\s\S]*?required: true[\s\S]*?type: string/u
-	);
-	assert.doesNotMatch(event, /workflow_run:|release:/u);
-	assert.match(source, /^\s*LFC_RECOVERY_PARENT_COMMIT: "4d97e280156c24b06d93cfe4167595df749d7b9d"$/mu);
-	assert.match(source, /^\s*LFC_RECOVERY_TARBALL_SHA256: "f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894"$/mu);
-	assert.match(source, /^\s*LFC_RECOVERY_VERSION: "0\.3\.0-alpha\.0"$/mu);
-	assert.match(classify, /outputs:[\s\S]*?recovery:/u);
+	assert.doesNotMatch(event, /workflow_run:|workflow_dispatch:|release:/u);
+	assert.doesNotMatch(source, /LFC_RECOVERY_|current_main_commit|needs\.classify\.outputs\.recovery/u);
 	assert.doesNotMatch(classify, /source-commit:/u);
 	assert.match(classify, /fetch-depth: 2[\s\S]*?persist-credentials: false/u);
-	assert.match(
-		classify,
-		/ref: \$\{\{ github\.event_name == 'workflow_dispatch' && 'refs\/heads\/main' \|\| github\.sha \}\}/u
-	);
-	assert.match(classify, /LFC_RECOVERY_COMMIT: \$\{\{ inputs\.current_main_commit \}\}/u);
+	assert.match(classify, /ref: \$\{\{ github\.sha \}\}/u);
+	assert.match(classify, /LFC_EVENT_NAME: \$\{\{ github\.event_name \}\}/u);
 	assert.match(classify, /LFC_SOURCE_COMMIT: \$\{\{ github\.sha \}\}/u);
 	assert.match(classify, /LFC_WORKFLOW_COMMIT: \$\{\{ github\.workflow_sha \}\}/u);
+	assert.match(classify, /LFC_WORKFLOW_REF: \$\{\{ github\.ref \}\}/u);
+	assert.match(classify, /LFC_EVENT_NAME\}" != "push"[\s\S]*?LFC_WORKFLOW_REF\}" != "refs\/heads\/main"/u);
 	assert.match(classify, /! "\$\{LFC_SOURCE_COMMIT\}" =~ \^\[0-9a-f\]\{40\}\$/u);
+	assert.match(classify, /! "\$\{LFC_WORKFLOW_COMMIT\}" =~ \^\[0-9a-f\]\{40\}\$/u);
+	assert.match(classify, /LFC_WORKFLOW_COMMIT\}" != "\$\{LFC_SOURCE_COMMIT\}"/u);
 	assert.match(classify, /git rev-parse --verify HEAD\^\{commit\}[\s\S]*?LFC_SOURCE_COMMIT/u);
 	assert.match(classify, /git rev-parse --verify HEAD\^1/u);
 	assert.match(classify, /git show "\$\{parent_commit\}:package\.json"/u);
-	assert.match(classify, /LFC_EVENT_NAME\}" == "push"[\s\S]*?candidate_version[\s\S]*?parent_version[\s\S]*?eligible=true/u);
-	assert.match(classify, /LFC_EVENT_NAME\}" == "workflow_dispatch"/u);
-	assert.match(classify, /LFC_WORKFLOW_REF\}" != "refs\/heads\/main"/u);
-	assert.match(classify, /LFC_RECOVERY_COMMIT\}" != "\$\{LFC_SOURCE_COMMIT\}"/u);
-	assert.match(classify, /LFC_WORKFLOW_COMMIT\}" != "\$\{LFC_SOURCE_COMMIT\}"/u);
-	assert.match(classify, /refs\/remotes\/origin\/main\^\{commit\}[\s\S]*?!= "\$\{LFC_SOURCE_COMMIT\}"/u);
-	assert.match(classify, /parent_commit\}" != "\$\{LFC_RECOVERY_PARENT_COMMIT\}"/u);
-	assert.match(classify, /LFC_RECOVERY_TARBALL_SHA256\}" =~ \^\[0-9a-f\]\{64\}\$/u);
-	assert.match(classify, /candidate_version\}" != "\$\{parent_version\}"[\s\S]*?release-state version is unchanged/u);
-	assert.match(classify, /eligible=true[\s\S]*?recovery=true/u);
-	assert.doesNotMatch(classify, /GH_TOKEN|gh api/u);
+	assert.match(classify, /candidate_version[\s\S]*?parent_version[\s\S]*?eligible=true/u);
+	assert.doesNotMatch(classify, /GH_TOKEN|gh api|origin\/main/u);
 	assert.match(
 		verify,
-		/if: >-[\s\S]*?needs\.classify\.outputs\.eligible == 'true'[\s\S]*?github\.ref == 'refs\/heads\/main'[\s\S]*?github\.event_name == 'push'[\s\S]*?github\.event_name == 'workflow_dispatch'[\s\S]*?inputs\.current_main_commit == github\.sha[\s\S]*?github\.workflow_sha == github\.sha[\s\S]*?needs\.classify\.outputs\.recovery == 'true'/u
+		/if: >-[\s\S]*?needs\.classify\.outputs\.eligible == 'true'[\s\S]*?github\.event_name == 'push'[\s\S]*?github\.ref == 'refs\/heads\/main'[\s\S]*?github\.workflow_sha == github\.sha/u
 	);
 	assert.match(verify, /ref: \$\{\{ github\.sha \}\}/u);
 	assert.match(verify, /LFC_SOURCE_COMMIT: \$\{\{ github\.sha \}\}/u);
@@ -106,17 +91,10 @@ void test("alpha publication allows only exact pushes or a guarded current-main 
 		verify,
 		/git fetch --force --no-tags origin[\s\S]*?refs\/heads\/main:refs\/remotes\/origin\/main/u
 	);
+	assert.match(verify, /refs\/remotes\/origin\/main\^\{commit\}[\s\S]*?source_commit/u);
 	assert.match(verify, /git show HEAD\^1:package\.json/u);
 	assert.match(verify, /git diff --name-only HEAD\^1 HEAD/u);
-	assert.match(verify, /LFC_RECOVERY\}" == "true"[\s\S]*?LFC_EVENT_NAME\}" = "workflow_dispatch"/u);
-	assert.match(verify, /refs\/remotes\/origin\/main\^\{commit\}[\s\S]*?source_commit/u);
-	assert.match(verify, /git diff --quiet HEAD\^1 HEAD -- CHANGELOG\.md package-lock\.json package\.json/u);
-	assert.match(
-		verify,
-		/allowed_files=\([\s\S]*?\.github\/workflows\/deploy-examples\.yml[\s\S]*?\.github\/workflows\/publish-alpha\.yml[\s\S]*?docs\/release-administration\.md[\s\S]*?docs\/release-operations\.md[\s\S]*?docs\/releasing\.md[\s\S]*?scripts\/tests\/publish-alpha-policy\.test\.mjs[\s\S]*?scripts\/tests\/workflow-contracts\.test\.mjs[\s\S]*?tests\/e2e\/swipe-gestures\.spec\.js[\s\S]*?\)/u
-	);
-	assert.match(verify, /comm -23[\s\S]*?unexpected_files/u);
-	assert.match(verify, /else[\s\S]*?LFC_EVENT_NAME\}" = "push"[\s\S]*?expected_files=\(CHANGELOG\.md package-lock\.json package\.json\)/u);
+	assert.match(verify, /expected_files=\(CHANGELOG\.md package-lock\.json package\.json\)/u);
 	assert.match(verify, /npm run release:verify[\s\S]*?--commit "\$\{source_commit\}"[\s\S]*?--require-clean/u);
 	assert.match(verify, /registry_raw="\$\{RUNNER_TEMP\}\/registry\.raw\.json"/u);
 	assert.match(verify, /registry_json="\$\{RUNNER_TEMP\}\/registry\.json"/u);
@@ -131,10 +109,6 @@ void test("alpha publication allows only exact pushes or a guarded current-main 
 	assert.equal(occurrences(verify, /registry\.err/gu), 1);
 	assert.match(verify, /npm run check/u);
 	assert.match(verify, /npm run package/u);
-	assert.match(
-		verify,
-		/process\.env\.LFC_RECOVERY === "true"[\s\S]*?digests\[tarball\] !== process\.env\.LFC_RECOVERY_TARBALL_SHA256/u
-	);
 });
 
 void test("the OIDC publisher consumes only the verified five-file bundle", async () => {
@@ -270,7 +244,7 @@ void test("greater-alpha recovery follows the published alpha tag rather than th
 	assert.deepEqual(historicalIdentities, [
 		{
 			version: "0.1.0-alpha.0",
-			commit: "17d8db664834d8e6e8ded8689df404827c11bfa3"
+			commit: "53cf1fbb5f4176929c3105030a62e1d0c235b54f"
 		},
 		{
 			version: "0.2.0-alpha.0",
@@ -352,10 +326,8 @@ void test("draft assets and final release publication are digest-bound and sourc
 	)?.[1];
 	assert.equal(typeof provenancePolicy, "string");
 	assert.match(provenancePolicy, /const eventName = process\.env\.GITHUB_EVENT_NAME/u);
-	assert.match(
-		provenancePolicy,
-		/new Set\(\["push", "workflow_dispatch"\]\)\.has\(eventName\)/u
-	);
+	assert.match(provenancePolicy, /eventName === "push"/u);
+	assert.doesNotMatch(provenancePolicy, /workflow_dispatch/u);
 	assert.match(provenancePolicy, /process\.env\.GITHUB_SHA === sourceCommit/u);
 	assert.match(provenancePolicy, /process\.env\.GITHUB_WORKFLOW_SHA === sourceCommit/u);
 	assert.match(provenancePolicy, /internalGitHub\?\.event_name === eventName/u);
@@ -392,7 +364,7 @@ void test("automatic Pages deployment is workflow-run-only and exact-source", as
 	const update = job(source, "update-snapshot");
 	const packageSite = job(source, "package-site");
 	const deploy = job(source, "deploy");
-	assert.match(source, /^\s*LFC_RECOVERY_PARENT_COMMIT: "4d97e280156c24b06d93cfe4167595df749d7b9d"$/mu);
+	assert.doesNotMatch(source, /LFC_RECOVERY_/u);
 	assert.match(event, /workflow_run:[\s\S]*?- CI[\s\S]*?- Publish npm alpha[\s\S]*?branches:\s*\n\s+- main/u);
 	assert.doesNotMatch(event, /workflow_dispatch:|snapshot_ref:/u);
 	assert.doesNotMatch(source, /^ {2}(?:prepare-rollback|rollback-snapshot):/mu);
@@ -404,7 +376,7 @@ void test("automatic Pages deployment is workflow-run-only and exact-source", as
 	assert.equal(occurrences(source, /group: static-examples-deploy-\$\{\{ github\.repository \}\}/gu), 1);
 	assert.match(
 		build,
-		/github\.event_name == 'workflow_run'[\s\S]*?conclusion == 'success'[\s\S]*?event == 'push'[\s\S]*?event == 'workflow_dispatch'[\s\S]*?head_branch == 'main'[\s\S]*?head_repository\.full_name == github\.repository/u
+		/github\.event_name == 'workflow_run'[\s\S]*?conclusion == 'success'[\s\S]*?event == 'push'[\s\S]*?head_branch == 'main'[\s\S]*?head_repository\.full_name == github\.repository/u
 	);
 	assert.match(build, /outputs:[\s\S]*?eligible: \$\{\{ steps\.identity\.outputs\.eligible \}\}[\s\S]*?source-commit: \$\{\{ steps\.identity\.outputs\.source-commit \}\}/u);
 	assert.match(build, /ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/u);
@@ -429,12 +401,9 @@ void test("automatic Pages deployment is workflow-run-only and exact-source", as
 	assert.match(publisherRoute, /upstream_workflow_path\}" == "\.github\/workflows\/publish-alpha\.yml"/u);
 	assert.match(
 		publisherRoute,
-		/LFC_UPSTREAM_EVENT\}" == "push"[\s\S]*?version\}" == "\$\{parent_version\}"[\s\S]*?eligible=false/u
+		/LFC_UPSTREAM_EVENT\}" == "push"[\s\S]*?version\}" == "\$\{parent_version\}"[\s\S]*?eligible=false[\s\S]*?channel=""[\s\S]*?channel="release"/u
 	);
-	assert.match(
-		publisherRoute,
-		/LFC_UPSTREAM_EVENT\}" == "workflow_dispatch"[\s\S]*?version\}" != "\$\{parent_version\}"[\s\S]*?exit 1[\s\S]*?channel="release"/u
-	);
+	assert.doesNotMatch(publisherRoute, /workflow_dispatch/u);
 	assert.match(build, /Unexpected upstream workflow identity:[\s\S]*?LFC_UPSTREAM_WORKFLOW_PATH/u);
 	assert.match(build, /eligible.*channel.*release[\s\S]*?release_ref="v\$\{version\}"[\s\S]*?\^0\\\.\[0-9\]\+\\\.\[0-9\]\+-alpha\\\.\[0-9\]\+\$[\s\S]*?release_ref\}\^\{commit\}[\s\S]*?= "\$\{source_commit\}"/u);
 	assert.match(build, /Resolve the deployment identity[\s\S]*?Set up exact Node[\s\S]*?Set up exact npm[\s\S]*?npm ci --ignore-scripts[\s\S]*?npm run build/u);
@@ -520,19 +489,26 @@ void test("automatic deployment and rollback triggers remain physically isolated
 	}
 });
 
-void test("the one-time recovery guide keeps steady-state publishing simple", async () => {
-	const guide = await readFile(
-		join(REPOSITORY_ROOT, "docs", "release-administration.md"),
-		"utf8"
+void test("release documentation keeps publication push-only", async () => {
+	const [administration, operations, releasing] = await Promise.all([
+		readFile(join(REPOSITORY_ROOT, "docs", "release-administration.md"), "utf8"),
+		readFile(join(REPOSITORY_ROOT, "docs", "release-operations.md"), "utf8"),
+		readFile(join(REPOSITORY_ROOT, "docs", "releasing.md"), "utf8")
+	]);
+	assert.match(administration, /## Publication authority/u);
+	assert.match(
+		administration,
+		/`publish-alpha\.yml` starts only on pushes to `main`[\s\S]*?There is no manual, arbitrary-ref, or historical-commit publication path\./u
 	);
-	assert.match(guide, /steady-state process is deliberately short/u);
-	assert.match(guide, /exists only to recover the unpublished `0\.3\.0-alpha\.0` attempt[\s\S]*?removed after that release succeeds/u);
-	assert.match(guide, /`CHANGELOG\.md`, `package\.json`, and `package-lock\.json` are byte-for-byte unchanged/u);
-	assert.match(guide, /f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894/u);
-	assert.match(guide, /current `main` head[\s\S]*?cannot select another commit, branch, tag, or release/u);
-	assert.match(guide, /not a historical-commit dispatcher/u);
-	assert.match(guide, /remove the `workflow_dispatch` trigger, recovery constants and branches/u);
-	assert.doesNotMatch(guide, /git push[^\n]*--force/u);
+	assert.match(operations, /The merge push is the only publication trigger\./u);
+	assert.match(releasing, /The merge push is the only publication trigger\./u);
+	for (const guide of [administration, operations, releasing]) {
+		assert.doesNotMatch(
+			guide,
+			/current_main_commit|LFC_RECOVERY_|f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894/u
+		);
+		assert.doesNotMatch(guide, /git push[^\n]*--force/u);
+	}
 });
 
 void test("all third-party workflow actions are pinned to full commits", async () => {

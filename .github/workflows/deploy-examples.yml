@@ -21,8 +21,6 @@ concurrency:
 env:
   LFC_NODE_VERSION: "24.19.0"
   LFC_NPM_VERSION: "12.0.2"
-  LFC_RECOVERY_PARENT_COMMIT: "4d97e280156c24b06d93cfe4167595df749d7b9d"
-  LFC_RECOVERY_VERSION: "0.3.0-alpha.0"
 
 jobs:
   build:
@@ -31,8 +29,7 @@ jobs:
       ${{
         github.event_name == 'workflow_run' &&
         github.event.workflow_run.conclusion == 'success' &&
-        (github.event.workflow_run.event == 'push' ||
-          github.event.workflow_run.event == 'workflow_dispatch') &&
+        github.event.workflow_run.event == 'push' &&
         github.event.workflow_run.head_branch == 'main' &&
         github.event.workflow_run.head_repository.full_name == github.repository
       }}
@@ -81,26 +78,14 @@ jobs:
             "${LFC_UPSTREAM_EVENT}" == "push" ]]; then
             channel="main"
           elif [[ "${LFC_UPSTREAM_WORKFLOW}" == "Publish npm alpha" &&
-            "${upstream_workflow_path}" == ".github/workflows/publish-alpha.yml" ]]; then
+            "${upstream_workflow_path}" == ".github/workflows/publish-alpha.yml" &&
+            "${LFC_UPSTREAM_EVENT}" == "push" ]]; then
             parent_version="$(git show HEAD^1:package.json | jq --exit-status --raw-output '.version')"
-            if [[ "${LFC_UPSTREAM_EVENT}" == "push" ]]; then
-              if [[ "${version}" == "${parent_version}" ]]; then
-                eligible=false
-                channel=""
-              else
-                channel="release"
-              fi
-            elif [[ "${LFC_UPSTREAM_EVENT}" == "workflow_dispatch" ]]; then
-              if [[ "${version}" != "${parent_version}" ||
-                "${version}" != "${LFC_RECOVERY_VERSION}" ||
-                "$(git rev-parse --verify HEAD^1)" != "${LFC_RECOVERY_PARENT_COMMIT}" ]]; then
-                echo "Publisher dispatch is not the exact retained alpha recovery." >&2
-                exit 1
-              fi
-              channel="release"
+            if [[ "${version}" == "${parent_version}" ]]; then
+              eligible=false
+              channel=""
             else
-              echo "Unexpected publisher event ${LFC_UPSTREAM_EVENT}." >&2
-              exit 1
+              channel="release"
             fi
           else
             echo "Unexpected upstream workflow identity: ${LFC_UPSTREAM_WORKFLOW} (${LFC_UPSTREAM_WORKFLOW_PATH})" >&2

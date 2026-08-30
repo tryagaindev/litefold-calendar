@@ -9,12 +9,6 @@ on:
       - CHANGELOG.md
       - package-lock.json
       - package.json
-  workflow_dispatch:
-    inputs:
-      current_main_commit:
-        description: Exact current main commit (40 lowercase hexadecimal characters)
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -28,9 +22,6 @@ env:
   LFC_GH_MIN_VERSION: "2.96.0"
   LFC_NODE_VERSION: "24.19.0"
   LFC_NPM_VERSION: "12.0.2"
-  LFC_RECOVERY_PARENT_COMMIT: "4d97e280156c24b06d93cfe4167595df749d7b9d"
-  LFC_RECOVERY_TARBALL_SHA256: "f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894"
-  LFC_RECOVERY_VERSION: "0.3.0-alpha.0"
   LFC_NORMALIZE_NPM_VIEW_JSON: >-
     import { readFileSync, writeFileSync } from "node:fs";
     const [inputPath, outputPath] = process.argv.slice(1);
@@ -51,29 +42,31 @@ jobs:
       candidate-version: ${{ steps.candidate.outputs.candidate-version }}
       eligible: ${{ steps.candidate.outputs.eligible }}
       parent-version: ${{ steps.candidate.outputs.parent-version }}
-      recovery: ${{ steps.candidate.outputs.recovery }}
 
     steps:
-      - name: Check out the exact pushed commit or live recovery head
+      - name: Check out the exact pushed commit and its first parent
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 2
           persist-credentials: false
-          ref: ${{ github.event_name == 'workflow_dispatch' && 'refs/heads/main' || github.sha }}
+          ref: ${{ github.sha }}
 
-      - name: Classify the exact release source
+      - name: Classify the exact pushed commit
         id: candidate
         env:
           LFC_EVENT_NAME: ${{ github.event_name }}
-          LFC_RECOVERY_COMMIT: ${{ inputs.current_main_commit }}
           LFC_SOURCE_COMMIT: ${{ github.sha }}
           LFC_WORKFLOW_COMMIT: ${{ github.workflow_sha }}
           LFC_WORKFLOW_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
 
-          if [[ ! "${LFC_SOURCE_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "The release source must be one full lowercase commit." >&2
+          if [[ "${LFC_EVENT_NAME}" != "push" ||
+            "${LFC_WORKFLOW_REF}" != "refs/heads/main" ||
+            ! "${LFC_SOURCE_COMMIT}" =~ ^[0-9a-f]{40}$ ||
+            ! "${LFC_WORKFLOW_COMMIT}" =~ ^[0-9a-f]{40}$ ||
+            "${LFC_WORKFLOW_COMMIT}" != "${LFC_SOURCE_COMMIT}" ]]; then
+            echo "The release source must be the exact reviewed workflow commit pushed to main." >&2
             exit 1
           fi
           test "$(git rev-parse --verify HEAD^{commit})" = "${LFC_SOURCE_COMMIT}"
@@ -84,50 +77,16 @@ jobs:
           parent_version="$(jq -r '.version // empty' <<< "${parent_manifest}")"
 
           eligible=false
-          recovery=false
-          if [[ "${LFC_EVENT_NAME}" == "push" ]]; then
-            if [[ "${candidate_version}" != "${parent_version}" ]]; then
-              if [[ ! "${candidate_version}" =~ ^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
-                echo "A changed release version must be an exact supported alpha." >&2
-                exit 1
-              fi
-              eligible=true
-            fi
-          elif [[ "${LFC_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            git fetch --force --no-tags origin \
-              refs/heads/main:refs/remotes/origin/main
-            if [[ "${LFC_WORKFLOW_REF}" != "refs/heads/main" ||
-              ! "${LFC_RECOVERY_COMMIT}" =~ ^[0-9a-f]{40}$ ||
-              "${LFC_RECOVERY_COMMIT}" != "${LFC_SOURCE_COMMIT}" ||
-              "${LFC_WORKFLOW_COMMIT}" != "${LFC_SOURCE_COMMIT}" ||
-              "$(git rev-parse --verify refs/remotes/origin/main^{commit})" != "${LFC_SOURCE_COMMIT}" ]]; then
-              echo "Recovery must confirm the exact live main workflow commit." >&2
-              exit 1
-            fi
-            if [[ "${parent_commit}" != "${LFC_RECOVERY_PARENT_COMMIT}" ||
-              "${candidate_version}" != "${LFC_RECOVERY_VERSION}" ||
-              ! "${LFC_RECOVERY_TARBALL_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
-              echo "Recovery is not pinned to the retained failed-release evidence." >&2
-              exit 1
-            fi
-            if [[ "${candidate_version}" != "${parent_version}" ]]; then
-              echo "Recovery is only available when the release-state version is unchanged." >&2
-              exit 1
-            fi
+          if [[ "${candidate_version}" != "${parent_version}" ]]; then
             if [[ ! "${candidate_version}" =~ ^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
-              echo "Recovery requires an exact supported alpha." >&2
+              echo "A changed release version must be an exact supported alpha." >&2
               exit 1
             fi
             eligible=true
-            recovery=true
-          else
-            echo "Unexpected publisher event ${LFC_EVENT_NAME}." >&2
-            exit 1
           fi
           printf 'candidate-version=%s\n' "${candidate_version}" >> "${GITHUB_OUTPUT}"
           printf 'eligible=%s\n' "${eligible}" >> "${GITHUB_OUTPUT}"
           printf 'parent-version=%s\n' "${parent_version}" >> "${GITHUB_OUTPUT}"
-          printf 'recovery=%s\n' "${recovery}" >> "${GITHUB_OUTPUT}"
 
   verify:
     name: Verify exact source and create release evidence
@@ -135,16 +94,9 @@ jobs:
     if: >-
       ${{
         needs.classify.outputs.eligible == 'true' &&
+        github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        (
-          github.event_name == 'push' ||
-          (
-            github.event_name == 'workflow_dispatch' &&
-            inputs.current_main_commit == github.sha &&
-            github.workflow_sha == github.sha &&
-            needs.classify.outputs.recovery == 'true'
-          )
-        )
+        github.workflow_sha == github.sha
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 50
@@ -190,11 +142,7 @@ jobs:
         id: identity
         env:
           LFC_CLASSIFIED_VERSION: ${{ needs.classify.outputs.candidate-version }}
-          LFC_EVENT_NAME: ${{ github.event_name }}
           LFC_PARENT_VERSION: ${{ needs.classify.outputs.parent-version }}
-          LFC_RECOVERY: ${{ needs.classify.outputs.recovery }}
-          LFC_RECOVERY_PARENT_COMMIT: ${{ env.LFC_RECOVERY_PARENT_COMMIT }}
-          LFC_RECOVERY_VERSION: ${{ env.LFC_RECOVERY_VERSION }}
           LFC_SOURCE_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -203,51 +151,22 @@ jobs:
           test "${source_commit}" = "${LFC_SOURCE_COMMIT}"
           git fetch --force --no-tags origin \
             refs/heads/main:refs/remotes/origin/main
+          test "$(git rev-parse --verify refs/remotes/origin/main^{commit})" = "${source_commit}"
 
           version="$(node --input-type=module -e 'import manifest from "./package.json" with { type: "json" }; process.stdout.write(manifest.version);')"
           test "${version}" = "${LFC_CLASSIFIED_VERSION}"
           parent_version="$(git show HEAD^1:package.json | jq -r '.version // empty')"
           test "${parent_version}" = "${LFC_PARENT_VERSION}"
+          test "${parent_version}" != "${version}"
           tag="v${version}"
 
           mapfile -t changed_files < <(
             git diff --name-only HEAD^1 HEAD | LC_ALL=C sort -u
           )
-          if [[ "${LFC_RECOVERY}" == "true" ]]; then
-            test "${LFC_EVENT_NAME}" = "workflow_dispatch"
-            test "${parent_version}" = "${version}"
-            test "${version}" = "${LFC_RECOVERY_VERSION}"
-            test "$(git rev-parse --verify HEAD^1)" = "${LFC_RECOVERY_PARENT_COMMIT}"
-            test "$(git rev-parse --verify refs/remotes/origin/main^{commit})" = "${source_commit}"
-            git diff --quiet HEAD^1 HEAD -- CHANGELOG.md package-lock.json package.json
-            allowed_files=(
-              .github/workflows/deploy-examples.yml
-              .github/workflows/publish-alpha.yml
-              docs/release-administration.md
-              docs/release-operations.md
-              docs/releasing.md
-              scripts/tests/publish-alpha-policy.test.mjs
-              scripts/tests/workflow-contracts.test.mjs
-              tests/e2e/swipe-gestures.spec.js
-            )
-            mapfile -t unexpected_files < <(
-              comm -23 \
-                <(printf '%s\n' "${changed_files[@]}") \
-                <(printf '%s\n' "${allowed_files[@]}" | LC_ALL=C sort -u)
-            )
-            test "${#unexpected_files[@]}" -eq 0
-            printf '%s\n' "${changed_files[@]}" | grep --fixed-strings --line-regexp \
-              '.github/workflows/publish-alpha.yml' > /dev/null
-            printf '%s\n' "${changed_files[@]}" | grep --fixed-strings --line-regexp \
-              'scripts/tests/workflow-contracts.test.mjs' > /dev/null
-          else
-            test "${LFC_EVENT_NAME}" = "push"
-            test "${parent_version}" != "${version}"
-            expected_files=(CHANGELOG.md package-lock.json package.json)
-            diff -u \
-              <(printf '%s\n' "${expected_files[@]}") \
-              <(printf '%s\n' "${changed_files[@]}")
-          fi
+          expected_files=(CHANGELOG.md package-lock.json package.json)
+          diff -u \
+            <(printf '%s\n' "${expected_files[@]}") \
+            <(printf '%s\n' "${changed_files[@]}")
 
           npm run release:verify -- \
             --version "${version}" \
@@ -341,11 +260,9 @@ jobs:
                 throw new Error(`npm ${name} ${value} cannot move to ${candidate}.`);
               }
             }
-            const legacyDivergence = tags.alpha === "0.2.0-alpha.0" &&
-              tags.latest === "0.1.0-alpha.0";
             const publicationInProgress = versions.includes(candidate) &&
               tags.alpha === candidate && tags.latest !== candidate;
-            if (tags.alpha !== tags.latest && !legacyDivergence && !publicationInProgress) {
+            if (tags.alpha !== tags.latest && !publicationInProgress) {
               throw new Error(
                 `npm alpha and latest must match before a release; found alpha=${tags.alpha}, latest=${tags.latest}.`
               );
@@ -375,7 +292,6 @@ jobs:
         env:
           LFC_BUNDLE_DIRECTORY: .artifacts/${{ steps.identity.outputs.bundle-name }}
           LFC_NOTES_DIRECTORY: ${{ runner.temp }}/release-notes
-          LFC_RECOVERY: ${{ needs.classify.outputs.recovery }}
           LFC_VERSION: ${{ steps.identity.outputs.version }}
         run: |
           set -euo pipefail
@@ -413,13 +329,6 @@ jobs:
           for (const name of actual) {
             const bytes = await readFile(`${directory}/${name}`);
             digests[name] = createHash("sha256").update(bytes).digest("hex");
-          }
-          if (process.env.LFC_RECOVERY === "true") {
-            const tarball = `tryagaindev-litefold-calendar-${version}.tgz`;
-            if (!/^[0-9a-f]{64}$/u.test(process.env.LFC_RECOVERY_TARBALL_SHA256 ?? "") ||
-              digests[tarball] !== process.env.LFC_RECOVERY_TARBALL_SHA256) {
-              throw new Error("Recovery tarball bytes differ from the retained verified candidate.");
-            }
           }
           const notesSha = createHash("sha256").update(notes).digest("hex");
           await appendFile(
@@ -654,7 +563,7 @@ jobs:
 
           if [[ "${candidate_exists}" == "true" ]]; then
             if [[ "${registry_alpha}" != "${LFC_VERSION}" ]]; then
-              echo "The candidate exists on npm but alpha does not select it; refusing ambiguous recovery." >&2
+              echo "The candidate exists on npm but alpha does not select it; refusing ambiguous registry state." >&2
               exit 1
             fi
             exit 0
@@ -718,7 +627,7 @@ jobs:
             )"
           elif [[ "${tag_object_type}" == "commit" ]]; then
             case "${registry_alpha}:${tag_object}" in
-              "0.1.0-alpha.0:17d8db664834d8e6e8ded8689df404827c11bfa3"|"0.2.0-alpha.0:8250ac4da9ada72a2915b8f810be404667ab47da")
+              "0.1.0-alpha.0:53cf1fbb5f4176929c3105030a62e1d0c235b54f"|"0.2.0-alpha.0:8250ac4da9ada72a2915b8f810be404667ab47da")
                 registry_alpha_commit="${tag_object}"
                 ;;
               *)
@@ -1143,7 +1052,7 @@ jobs:
             repository.toLowerCase() === "tryagaindev/litefold-calendar" &&
             process.env.GITHUB_REPOSITORY_OWNER.toLowerCase() === "tryagaindev",
           "Current workflow is not the canonical release repository.");
-          requireValue(new Set(["push", "workflow_dispatch"]).has(eventName) &&
+          requireValue(eventName === "push" &&
             process.env.GITHUB_REF === sourceRef &&
             process.env.GITHUB_SHA === sourceCommit &&
             process.env.GITHUB_WORKFLOW_REF === workflowRef &&
