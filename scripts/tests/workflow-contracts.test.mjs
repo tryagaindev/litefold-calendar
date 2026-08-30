@@ -526,6 +526,33 @@ void test("all third-party workflow actions are pinned to full commits", async (
 	}
 });
 
+void test("CI rejects high-severity dependency regressions on pull requests", async () => {
+	const source = await workflow("ci.yml");
+	const verify = job(source, "verify");
+	assert.match(trigger(source), /pull_request:/u);
+	assert.match(source, /^permissions:\s*\n\s*contents: read/mu);
+	assert.match(
+		verify,
+		/name: Reject high-severity dependency regressions[\s\S]*?if: \$\{\{ github\.event_name == 'pull_request' \}\}[\s\S]*?uses: actions\/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5\.0\.0[\s\S]*?fail-on-severity: high/u
+	);
+	assert.doesNotMatch(source, /pull-requests: write|issues: write/u);
+});
+
+void test("workflow artifacts use bounded purpose-specific retention", async () => {
+	const expectations = new Map([
+		["ci.yml", [7]],
+		["deploy-examples.yml", [1, 1]],
+		["prepare-alpha.yml", [1]],
+		["publish-alpha.yml", [30, 30]],
+		["rollback-examples.yml", [1]]
+	]);
+	for (const [name, expected] of expectations) {
+		const source = await workflow(name);
+		const actual = [...source.matchAll(/retention-days:\s*(\d+)/gu)].map((match) => Number(match[1]));
+		assert.deepEqual(actual, expected, name);
+	}
+});
+
 void test("artifact downloads use the official Node 24 action", async () => {
 	const workflows = [
 		"deploy-examples.yml",
