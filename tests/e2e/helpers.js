@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect } from "@playwright/test";
 
-const READY_SELECTOR = 'html[data-example-ready="true"]';
+const READY_SELECTOR = 'html[data-test-ready="true"]';
 const WCAG_TAGS = Object.freeze([
 	"wcag2a",
 	"wcag2aa",
@@ -14,7 +14,7 @@ export async function expectExampleReady(page, route) {
 	const response = await page.goto(route, { waitUntil: "domcontentloaded" });
 	expect(response?.ok(), `Expected ${route} to return a successful response.`).toBe(true);
 	await expect(page.locator(READY_SELECTOR)).toHaveCount(1);
-	await expect(page.locator("[data-example-calendar]")).not.toHaveAttribute("aria-busy", "true");
+	await expect(page.locator("[data-my-calendar]")).not.toHaveAttribute("aria-busy", "true");
 }
 
 export async function expectNoAutomatedAccessibilityViolations(page, testInfo) {
@@ -34,8 +34,8 @@ export async function expectNoAutomatedAccessibilityViolations(page, testInfo) {
 }
 
 export function gridEventActions(page, eventId) {
-	const idSelector = eventId === undefined ? "" : `[data-example-event-id="${eventId}"]`;
-	const fixtureSelector = `[data-example-event-surface="grid-summary"]${idSelector}`;
+	const idSelector = eventId === undefined ? "" : `[data-test-event-id="${eventId}"]`;
+	const fixtureSelector = `[data-test-event-surface="grid-summary"]${idSelector}`;
 	return page.locator(
 		`:is(a, button)${fixtureSelector}, ${fixtureSelector} :is(a, button)`
 	);
@@ -43,8 +43,8 @@ export function gridEventActions(page, eventId) {
 
 export function focusedGridEventAction(page) {
 	return page.locator(
-		':is(a, button)[data-example-event-surface="grid-summary"]:focus, ' +
-		'[data-example-event-surface="grid-summary"] :is(a, button):focus'
+		':is(a, button)[data-test-event-surface="grid-summary"]:focus, ' +
+		'[data-test-event-surface="grid-summary"] :is(a, button):focus'
 	);
 }
 
@@ -53,8 +53,8 @@ export async function focusedEventId(page) {
 		if (!(document.activeElement instanceof HTMLElement)) {
 			return null;
 		}
-		return document.activeElement.closest("[data-example-event-id]")
-			?.getAttribute("data-example-event-id") ?? null;
+		return document.activeElement.closest("[data-test-event-id]")
+			?.getAttribute("data-test-event-id") ?? null;
 	});
 }
 

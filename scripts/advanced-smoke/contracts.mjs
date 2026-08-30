@@ -49,7 +49,7 @@ export async function verifyAdvancedStyleContracts() {
 	);
 	assert.match(
 		exampleStyles,
-		/\.advanced-example-calendar:dir\(rtl\)\s+\.advanced-example-navigation-icon\s*\{[^}]*\btransform:\s*scaleX\(-1\);/u,
+		/\.my-calendar:dir\(rtl\)\s+\.my-navigation-icon\s*\{[^}]*\btransform:\s*scaleX\(-1\);/u,
 		"Expected custom navigation icons to mirror with semantic RTL direction."
 	);
 	const publicTokens = new Set(

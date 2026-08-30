@@ -10,18 +10,18 @@
 	<link rel="stylesheet" href="../example.css">
 </head>
 <body>
-	<main class="example-shell">
-		<header class="example-intro">
+	<main class="my-shell">
+		<header class="my-intro">
 			<h1>Enhance a server-rendered schedule</h1>
 			<p>This page starts with an ordinary HTML schedule. JavaScript adds the interactive calendar and hides the fallback only after usable event data arrives.</p>
 		</header>
 
-		<section class="example-panel" id="server-schedule" data-example-fallback aria-labelledby="progressive-fallback-title">
-			<h2 id="progressive-fallback-title">Schedule for August 4, 2026</h2>
+		<section class="my-panel" id="my-server-schedule" data-my-fallback aria-labelledby="my-progressive-fallback-title">
+			<h2 id="my-progressive-fallback-title">Schedule for August 4, 2026</h2>
 			<ol>
 				<li>
-					<time datetime="2026-08-04T09:30">9:30 AM</time>
-					<a href="./?event=design-review&amp;from=fallback#server-schedule">Calendar design review</a>
+					<time datetime="2026-08-04T11:38">11:38 AM</time>
+					<a href="./?event=design-review&amp;from=fallback#my-server-schedule">Calendar design review</a>
 				</li>
 				<li>
 					<time datetime="2026-08-04">All day</time>
@@ -30,20 +30,20 @@
 			</ol>
 		</section>
 
-		<div class="example-calendar" data-example-calendar></div>
+		<div class="my-calendar" data-my-calendar></div>
 
-		<section class="example-panel" data-example-controls aria-labelledby="progressive-controls-title" hidden>
-			<h2 id="progressive-controls-title">Test initial-load outcomes</h2>
+		<section class="my-panel" data-my-controls aria-labelledby="my-progressive-controls-title" hidden>
+			<h2 id="my-progressive-controls-title">Test initial-load outcomes</h2>
 			<p>Each rebuild destroys the current calendar first, restoring the fallback before the next source request starts.</p>
-			<p class="example-result" data-example-result></p>
-			<div class="example-control-row">
-				<button class="example-button" type="button" data-example-rebuild="failure">Rebuild with an unavailable source</button>
-				<button class="example-button" type="button" data-example-rebuild="success">Rebuild with a usable source</button>
+			<p class="my-result" data-my-result></p>
+			<div class="my-control-row">
+				<button class="my-button" type="button" data-my-rebuild="failure">Rebuild with an unavailable source</button>
+				<button class="my-button" type="button" data-my-rebuild="success">Rebuild with a usable source</button>
 			</div>
 		</section>
 
-		<div class="example-visually-hidden" data-example-announcer-polite role="status" aria-live="polite" aria-atomic="true"></div>
-		<div class="example-visually-hidden" data-example-announcer-assertive role="alert" aria-live="assertive" aria-atomic="true"></div>
+		<div class="my-visually-hidden" data-my-announcer-polite role="status" aria-live="polite" aria-atomic="true"></div>
+		<div class="my-visually-hidden" data-my-announcer-assertive role="alert" aria-live="assertive" aria-atomic="true"></div>
 	</main>
 
 	<script type="module" src="./main.js"></script>

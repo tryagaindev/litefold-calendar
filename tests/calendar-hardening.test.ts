@@ -403,7 +403,7 @@ void test("destroy aborts requests, removes package DOM and classes, and is term
 	assert.equal(errors.length, 0);
 });
 
-void test("callback reentrancy cannot invoke a source or overwrite destroyed state", async (context) => {
+void test("loading callback reentrancy cannot prevent invocation or overwrite destroyed state", async (context) => {
 	const { host } = setupDom(context);
 	let sourceCalls = 0;
 	const loadingReference: { current: Calendar | null } = { current: null };
@@ -421,7 +421,7 @@ void test("callback reentrancy cannot invoke a source or overwrite destroyed sta
 	});
 	loadingReference.current = loadingCalendar;
 	loadingCalendar.render();
-	assert.equal(sourceCalls, 0);
+	assert.equal(sourceCalls, 1);
 	assert.equal(loadingCalendar.getState().phase, "destroyed");
 	assert.equal(host.childElementCount, 0);
 
@@ -650,7 +650,7 @@ void test("interactive icon content is rejected and later clock failures become 
 		onError: (error) => { errors.push(error); }
 	});
 	calendar.render();
-	assert.equal(sourceCalls, 0);
+	assert.equal(sourceCalls, 1);
 	assert.equal(calendar.getState().phase, "unavailable");
 	assert.ok(errors.some((error) => error.code === "internal-error"));
 	assert.ok(host.querySelector(".lfc-calendar-status-panel:not([hidden])"));
@@ -659,7 +659,6 @@ void test("interactive icon content is rejected and later clock failures become 
 void test("a fatal retry render cannot be followed by a recovery announcement", async (context) => {
 	const { dom, host } = setupDom(context);
 	const announcements: string[] = [];
-	let clockCalls = 0;
 	let sourceCalls = 0;
 	const calendar = createCalendar(host, {
 		onAnnounce: ({ message }) => { announcements.push(message); },
@@ -672,8 +671,7 @@ void test("a fatal retry render cannot be followed by a recovery announcement", 
 		},
 		initialDate: "2026-07-14",
 		now: () => {
-			clockCalls += 1;
-			if (clockCalls >= 6) {
+			if (sourceCalls >= 2) {
 				throw new Error("retry render failure");
 			}
 			return new Date("2026-07-14T12:00:00.000Z");

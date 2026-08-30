@@ -20,8 +20,10 @@ Try the following:
 - `onEventActivate` receiving the normalized event, native event, rendered element, and the activating `surface`.
 - Optional `url` and `accentColor` event fields.
 - A small documented `--lfc-*` CSS-token override in the shared example stylesheet.
-- Explicit cleanup with `destroy()` on a non-cached page exit while preserving the instance in the browser's back/forward cache.
+- Application-owned cleanup: this standalone example explicitly calls `destroy()` on a non-cached `pagehide` while preserving the instance in the browser's back/forward cache. Litefold Calendar does not register that handler automatically.
 
-The example intentionally avoids providers, metadata, bounds, render hooks, extensions, and framework code. Its unprefixed `data-*` attributes are application-owned selectors, not litefold-calendar output.
+Because `events` is a static array, `render()` validates the snapshot and completes its single terminal DOM render before returning. This recipe never enters loading state or sets `aria-busy`.
+
+The example intentionally avoids providers, metadata, bounds, render hooks, extensions, and framework code. Its `data-my-*` attributes are application-owned selectors; Litefold Calendar output uses the package namespaces.
 
 Browse the [JavaScript](main.js), [HTML](index.html), and [shared example CSS](../example.css). For exact contracts, continue to the [API reference](../../docs/api.md); for a larger application integration, see [Advanced TypeScript](../advanced/).

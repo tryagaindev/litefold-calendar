@@ -8,12 +8,14 @@ import {
 	markdownVisibleText,
 	maskMarkdownNonProse
 } from "./lib/markdown-heading.mjs";
+import { findMermaidDiagramViolations } from "./lib/markdown-diagrams.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
 
 const API_DOCUMENT_PATH = join(REPOSITORY_ROOT, "docs", "api.md");
 const DOCUMENTATION_ENTRY_PATH = join(REPOSITORY_ROOT, "docs", "README.md");
 const ROOT_EXPORT_PATH = join(REPOSITORY_ROOT, "src", "index.ts");
 const DEPRECATED_WEB_MCP_PATTERN = /\bnavigator\s*(?:\?\s*)?\.\s*modelContext\b/gu;
+const SHORT_PRODUCT_NAME_PATTERN = /\blitefold\b(?![ -]calendar\b)/giu;
 const EXCLUDED_DIRECTORIES = new Set([
 	".artifacts",
 	".cache",
@@ -372,7 +374,15 @@ async function validateDestination(sourcePath, source, link) {
 
 async function validateMarkdownFile(path) {
 	const source = await readFile(path, "utf8");
+	for (const violation of findMermaidDiagramViolations(source)) {
+		addError(`${displayPath(path)}:${String(violation.line)} ${violation.message}`);
+	}
 	const prose = maskNonProse(source);
+	for (const match of prose.matchAll(SHORT_PRODUCT_NAME_PATTERN)) {
+		addError(
+			`${displayPath(path)}:${String(lineNumberAt(source, match.index ?? 0))} uses the shortened product name; use Litefold Calendar in documentation prose.`
+		);
+	}
 	const links = [...extractInlineLinks(prose), ...extractReferenceLinks(prose)];
 	const localMarkdownTargets = new Set();
 	for (const link of links) {

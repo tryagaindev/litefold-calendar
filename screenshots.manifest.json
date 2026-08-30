@@ -7,7 +7,7 @@
     "playwright": "1.62.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "5df2eee8b756a6eee9b65a6a385b0676ee39af43bae04f34196eee5e07ecd5d7",
+  "sourceFingerprint": "48f6c0a80a6582b4319fb85b44b18c900c872cb4a653c524e39829d732ebd944",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -22,11 +22,11 @@
         "wait-ready",
         "scroll-calendar"
       ],
-      "alt": "Wide litefold-calendar month grid with category filters, direct event actions, and overflow",
+      "alt": "Desktop advanced calendar example",
       "references": [
         "README.md"
       ],
-      "sha256": "462c170d2f5c48b64548e0781ff1f6032d552ad22b17b9151b0ec839c740ae73"
+      "sha256": "36a47c79d26e3b16cddc57de3b2bed8fed7c8263bc959038df4690e8083dfebd"
     },
     {
       "id": "month-year-jump",
@@ -42,11 +42,11 @@
         "scroll-calendar",
         "open-month-picker"
       ],
-      "alt": "Native month and year jump popover over a bounded litefold-calendar month",
+      "alt": "Month and year picker",
       "references": [
         "README.md"
       ],
-      "sha256": "510407539acd87974b451797d61b193b5c0aa58a08f98cdb09a3e89937bc7421"
+      "sha256": "02a300884f1459d00be0b627f1aa906382b7a7cecc403cde26066657199db364"
     },
     {
       "id": "mobile-month-agenda-dark",
@@ -62,11 +62,11 @@
         "set-dark-theme",
         "scroll-calendar"
       ],
-      "alt": "Mobile dark-theme litefold-calendar with compact navigation, custom event marker, three-layer event-slip fan, and selected-day agenda",
+      "alt": "Mobile dark-theme calendar example",
       "references": [
         "README.md"
       ],
-      "sha256": "3a25819c7b82d5aa8bfb7200f90649d3254b059cc62eb0cf71b4606a268c4fbb"
+      "sha256": "ee341e7c306bbcc9077c8d6616906b60732792ce2f40ec119182a6cb0e256a11"
     },
     {
       "id": "mobile-month-swipe-pull",
@@ -82,11 +82,11 @@
         "scroll-calendar",
         "hold-touch-swipe-left"
       ],
-      "alt": "Mobile litefold-calendar held partway through a horizontal touch swipe, revealing the adjacent month snap affordance",
+      "alt": "Mobile calendar touch paging",
       "references": [
         "README.md"
       ],
-      "sha256": "0ecedec503ca91f3944241fbd7c954592f13fce653af66789a1ef69bb5618abe"
+      "sha256": "a26acd7a0a3932706acdf9b3ea8d356c56e2a0545dbec050188b5a2b2a1bc17f"
     },
     {
       "id": "event-details-dark",
@@ -102,11 +102,11 @@
         "set-dark-theme",
         "open-agenda-event-dialog"
       ],
-      "alt": "Dark-theme event details dialog opened from a litefold-calendar agenda action",
+      "alt": "Event details dialog",
       "references": [
         "README.md"
       ],
-      "sha256": "5c17a037dc75307f9b826b137d5957b97377e75c00d671e1567632f22fed6ed1"
+      "sha256": "4905e43d8985d88ebc22a12c7181c3c0f34e9082b3d517eda984dd1797b0375a"
     },
     {
       "id": "grid-event-keyboard-focus",
@@ -123,11 +123,11 @@
         "focus-selected-day",
         "press-f2"
       ],
-      "alt": "Visible keyboard focus on a litefold-calendar grid event action",
+      "alt": "Keyboard focus on an event action",
       "references": [
         "README.md"
       ],
-      "sha256": "9389ac6833e27c2ac4084fc9c6b292be890d147e9ae200822b7a5c7ce8f95cfe"
+      "sha256": "8872f478112779c5b6c1ec1352976f677d2beb06b1a156da4d666d999566222d"
     }
   ]
 }

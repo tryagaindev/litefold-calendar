@@ -2,7 +2,7 @@
 
 ## Executive summary
 
-litefold-calendar has three primary risk centers:
+Litefold Calendar has three primary risk centers:
 
 1. Untrusted event data crossing into an application's DOM, navigation, and error surfaces.
 2. Optional WebMCP arguments and structured calendar results crossing between a browser agent and a live calendar instance.
@@ -45,6 +45,10 @@ The model assumes:
 
 ```mermaid
 flowchart LR
+  accTitle: Litefold Calendar runtime and publication trust paths
+  accDescr {
+    At runtime, browser users, application event sources, trusted render hooks, and the optional WebMCP extension interact with the calendar core, DOM, and callbacks. Separately, read-only CI verifies the exact main commit and can update the queued retained-state writer directly. Verified artifacts pass through protected npm and an immutable GitHub prerelease before triggering that writer; an authorized rollback may instead supply an authenticated retained snapshot. The writer hands the exact snapshot to a separately authorized Pages deployment.
+  }
   U[Browser user] --> C[Calendar core]
   S[Application event source] --> C
   C --> D[Application DOM]

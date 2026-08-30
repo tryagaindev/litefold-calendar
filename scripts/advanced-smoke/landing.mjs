@@ -91,11 +91,11 @@ export async function verifyExamplesLandingPage() {
 	const dom = new JSDOM(markup, { url: "https://example.test/examples/" });
 	try {
 		assert.equal(dom.window.document.documentElement.lang, "en");
-		assert.ok(dom.window.document.querySelector("main#example-list"));
-		assert.ok(dom.window.document.querySelector('a[href="#example-list"]'));
+		assert.ok(dom.window.document.querySelector("main#my-list"));
+		assert.ok(dom.window.document.querySelector('a[href="#my-list"]'));
 		verifyLocalRuntimeAssets(dom.window.document);
 
-		const exampleLinks = [...dom.window.document.querySelectorAll(".example-card h3 a")]
+		const exampleLinks = [...dom.window.document.querySelectorAll(".my-card h3 a")]
 			.map((link) => link.getAttribute("href")?.replace(/^\.\//u, "") ?? "")
 			.sort();
 		assert.deepEqual(exampleLinks, EXPECTED_EXAMPLE_PATHS);
@@ -105,16 +105,16 @@ export async function verifyExamplesLandingPage() {
 
 		await renderMetadata(dom, metadata);
 		assert.equal(
-			dom.window.document.querySelector("[data-example-version]")?.textContent,
+			dom.window.document.querySelector("[data-my-version]")?.textContent,
 			metadata.version
 		);
 		assert.equal(
-			dom.window.document.querySelector("[data-example-commit]")?.textContent,
+			dom.window.document.querySelector("[data-my-commit]")?.textContent,
 			metadata.commit ?? "Not available"
 		);
 		assert.equal(
-			dom.window.document.querySelector("[data-example-metadata-state]")
-				?.getAttribute("data-example-metadata-state"),
+			dom.window.document.querySelector("[data-my-metadata-state]")
+				?.getAttribute("data-my-metadata-state"),
 			"ready"
 		);
 	} finally {

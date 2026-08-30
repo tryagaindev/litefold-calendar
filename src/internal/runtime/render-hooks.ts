@@ -1,4 +1,5 @@
 import type { CalendarRenderHooks } from "../../types.js";
+import type { RenderHookElementIntegritySnapshot } from "./render-hook-element-integrity.js";
 import {
 	assertKnownConfigurationKeys,
 	createConfigurationError,
@@ -13,11 +14,10 @@ const RENDER_HOOK_SCHEMA = Object.freeze({
 	id: "id",
 	renderDayBadge: "hook",
 	renderEventDetails: "hook",
+	renderEventOverflow: "hook",
 	renderEventLeading: "hook",
 	renderEventMarker: "hook",
-	renderEventTrailing: "hook",
-	renderGridOverflowContent: "hook",
-	renderMultipleEventIndicator: "hook"
+	renderEventTrailing: "hook"
 } as const satisfies Record<keyof CalendarRenderHooks, "hook" | "id">);
 
 const RENDER_HOOK_NAMES = Object.freeze(
@@ -29,8 +29,7 @@ const RENDER_HOOK_NAMES = Object.freeze(
 const RENDER_HOOK_KEY_SET: ReadonlySet<string> = new Set(["id", ...RENDER_HOOK_NAMES]);
 const SINGLETON_RENDER_HOOK_NAMES = Object.freeze([
 	"renderEventMarker",
-	"renderGridOverflowContent",
-	"renderMultipleEventIndicator"
+	"renderEventOverflow"
 ] as const satisfies readonly (keyof CalendarRenderHooks)[]);
 
 /** Identifies the render invocation that owns one leased render-hook node. */
@@ -40,16 +39,25 @@ export interface RenderHookNodeInvocation {
 	readonly surface: unknown;
 }
 
+/** Canonical package-owned overflow content retained for render-hook isolation recovery. */
+export interface RenderHookEventOverflowFallback {
+	readonly content: HTMLElement;
+	readonly defaultChildren: readonly Node[];
+	readonly detachedPackageIntegrity: Readonly<RenderHookElementIntegritySnapshot> | null;
+	readonly packageChildren: readonly Node[];
+	readonly root: HTMLElement;
+	readonly surface: "day" | "grid-summary";
+}
+
 /** Mutable state for one consumer-owned render-hook set. */
 export interface RenderHookRuntime<TMetadata> {
 	controller: AbortController;
 	readonly createController: () => AbortController;
 	readonly definition: CalendarRenderHooks<TMetadata>;
 	readonly cleanups: (() => void)[];
-	readonly gridOverflowContentFallbacks: Set<HTMLButtonElement>;
+	readonly eventOverflowFallbacks: Map<HTMLElement, Readonly<RenderHookEventOverflowFallback>>;
 	readonly leaseToken: object;
 	readonly markerFallbacks: Map<HTMLElement, string | null>;
-	readonly multipleEventIndicatorFallbacks: Set<HTMLElement>;
 	readonly nodeInvocations: WeakMap<Node, Readonly<RenderHookNodeInvocation>>;
 	readonly nodes: Map<Node, Node>;
 	quarantined: boolean;
@@ -124,10 +132,9 @@ export function createRenderHookRuntimes<TMetadata>(
 			controller: createController(),
 			createController,
 			definition: frozenDefinition,
-			gridOverflowContentFallbacks: new Set<HTMLButtonElement>(),
+			eventOverflowFallbacks: new Map<HTMLElement, Readonly<RenderHookEventOverflowFallback>>(),
 			leaseToken: {},
 			markerFallbacks: new Map<HTMLElement, string | null>(),
-			multipleEventIndicatorFallbacks: new Set<HTMLElement>(),
 			nodeInvocations: new WeakMap<Node, Readonly<RenderHookNodeInvocation>>(),
 			nodes: new Map<Node, Node>(),
 			quarantined: false

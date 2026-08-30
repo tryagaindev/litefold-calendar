@@ -127,6 +127,7 @@ async function createSourceFixture(context, options = {}) {
 		canonicalMetadata = true,
 		channel = "main",
 		commit = FIRST_COMMIT,
+		duplicateDeveloperFooter = false,
 		marker = "first",
 		remoteAsset = false,
 		unsafeMark = false,
@@ -190,6 +191,9 @@ async function createSourceFixture(context, options = {}) {
 		"</head>",
 		"<body>",
 		"\t<h1>Basic example</h1>",
+		duplicateDeveloperFooter
+			? '\t<footer class="my-fixture my-developer-footer my-retained">Existing footer</footer>'
+			: "",
 		'\t<script type="module" src="./main.js"></script>',
 		"</body>",
 		"</html>",
@@ -256,7 +260,8 @@ void test("Pages staging includes self-contained assets and commit-pinned develo
 	assert.match(nestedHtml, /Rolling main preview/u);
 	assert.match(nestedHtml, new RegExp(FIRST_COMMIT, "u"));
 	assert.match(nestedHtml, /href="\.\.\/\.\.\/deployment-details\.css"/u);
-	assert.match(nestedHtml, /class="lfc-developer-footer"/u);
+	assert.match(nestedHtml, /class="my-developer-footer"/u);
+	assert.match(nestedHtml, /data-my-deployment-channel="main"/u);
 	assert.match(nestedHtml, /aria-label="Developer resources"/u);
 	assert.match(nestedHtml, /href="\.\.\/">All examples<\/a>/u);
 	assert.match(
@@ -282,7 +287,7 @@ void test("Pages staging includes self-contained assets and commit-pinned develo
 	assert.match(nestedHtml, /default-src 'self'; base-uri 'none'; connect-src 'self'/u);
 	assert.doesNotMatch(
 		await readFile(join(artifact, "content", "examples", "index.html"), "utf8"),
-		/lfc-developer-footer/u
+		/my-developer-footer/u
 	);
 	assert.match(
 		await readFile(join(artifact, "content", "examples", "index.html"), "utf8"),
@@ -302,7 +307,7 @@ void test("Pages staging includes self-contained assets and commit-pinned develo
 		shellHtml,
 		/http-equiv="Content-Security-Policy"/u
 	);
-	assert.match(shellHtml, /class="lfc-pages-mark"/u);
+	assert.match(shellHtml, /class="my-pages-mark"/u);
 	assert.match(shellHtml, /src="\.\/litefold-calendar-mark\.svg"/u);
 	assert.match(shellHtml, /alt="" width="48" height="48"/u);
 	assert.ok(
@@ -384,6 +389,17 @@ void test("Pages staging rejects ambiguous identity and remote runtime assets", 
 			shellDirectory: SHELL_DIRECTORY
 		}),
 		/self-contained, script-free SVG/u
+	);
+	const duplicateFooterRoot = await createSourceFixture(context, {
+		duplicateDeveloperFooter: true
+	});
+	await assert.rejects(
+		buildPagesArtifact({
+			outputDirectory: await snapshotOutput(context),
+			repositoryRoot: duplicateFooterRoot,
+			shellDirectory: SHELL_DIRECTORY
+		}),
+		/already contains a developer footer/u
 	);
 });
 
@@ -624,34 +640,34 @@ void test("retained snapshots preserve releases, replace main, and reject releas
 	});
 	const releaseFirstDocument = releaseFirstDom.window.document;
 	assert.equal(
-		releaseFirstDocument.querySelector("#primary-run-link")?.getAttribute("href"),
+		releaseFirstDocument.querySelector("#my-primary-run-link")?.getAttribute("href"),
 		"./releases/1.0.0/examples/basic/"
 	);
 	assert.equal(
-		releaseFirstDocument.querySelector("#primary-browse-link")?.getAttribute("href"),
+		releaseFirstDocument.querySelector("#my-primary-browse-link")?.getAttribute("href"),
 		"./releases/1.0.0/examples/"
 	);
 	assert.equal(
-		releaseFirstDocument.querySelector("#install-command")?.textContent,
+		releaseFirstDocument.querySelector("#my-install-command")?.textContent,
 		"npm install @tryagaindev/litefold-calendar@1.0.0"
 	);
-	assert.equal(releaseFirstDocument.querySelector("#selected-version")?.textContent, "1.0.0");
-	assert.equal(releaseFirstDocument.querySelector("#selected-channel")?.textContent, "Immutable release");
-	assert.equal(releaseFirstDocument.querySelector("#selected-commit code")?.textContent, FIRST_COMMIT);
+	assert.equal(releaseFirstDocument.querySelector("#my-selected-version")?.textContent, "1.0.0");
+	assert.equal(releaseFirstDocument.querySelector("#my-selected-channel")?.textContent, "Immutable release");
+	assert.equal(releaseFirstDocument.querySelector("#my-selected-commit code")?.textContent, FIRST_COMMIT);
 	for (const [selector, expected] of [
-		["#primary-source-link", `/tree/${FIRST_COMMIT}/examples/basic`],
-		["#api-link", `/blob/${FIRST_COMMIT}/docs/api.md`],
-		["#integration-link", `/blob/${FIRST_COMMIT}/docs/integration-guide.md`],
-		["#quick-start-link", `/blob/${FIRST_COMMIT}/README.md#quick-start`],
-		["#selected-commit", `/commit/${FIRST_COMMIT}`]
+		["#my-primary-source-link", `/tree/${FIRST_COMMIT}/examples/basic`],
+		["#my-api-link", `/blob/${FIRST_COMMIT}/docs/api.md`],
+		["#my-integration-link", `/blob/${FIRST_COMMIT}/docs/integration-guide.md`],
+		["#my-quick-start-link", `/blob/${FIRST_COMMIT}/README.md#quick-start`],
+		["#my-selected-commit", `/commit/${FIRST_COMMIT}`]
 	]) {
 		assert.ok(
 			releaseFirstDocument.querySelector(selector)?.getAttribute("href")?.endsWith(expected),
 			`${selector} should be pinned in the static shell`
 		);
 	}
-	assert.equal(releaseFirstDocument.querySelectorAll("#release-history li").length, 1);
-	assert.match(releaseFirstDocument.querySelector("#main-preview")?.textContent ?? "", /not available/u);
+	assert.equal(releaseFirstDocument.querySelectorAll("#my-release-history li").length, 1);
+	assert.match(releaseFirstDocument.querySelector("#my-main-preview")?.textContent ?? "", /not available/u);
 	assert.equal(
 		[...releaseFirstDocument.querySelectorAll('a[href^="./main/"]')].length,
 		0,
@@ -711,7 +727,7 @@ void test("retained snapshots preserve releases, replace main, and reject releas
 	await writeFile(
 		legacyIndexPath,
 		(await readFile(legacyIndexPath, "utf8"))
-			.replace(/\t{4}<img class="lfc-pages-mark"[^>]*>\r?\n/u, ""),
+			.replace(/\t{4}<img class="my-pages-mark"[^>]*>\r?\n/u, ""),
 		"utf8"
 	);
 
@@ -764,7 +780,7 @@ void test("retained snapshots preserve releases, replace main, and reject releas
 	);
 });
 
-void test("release assembly upgrades a retained shell that the current renderer cannot stamp", async (context) => {
+void test("release assembly upgrades a retained bare-ID shell that the current renderer cannot stamp", async (context) => {
 	const empty = await emptyPreviousDirectory(context);
 	const previousArtifact = await buildFixtureArtifact(context, {
 		channel: "release",
@@ -780,7 +796,7 @@ void test("release assembly upgrades a retained shell that the current renderer 
 	const previousIndexPath = join(previousSite, "index.html");
 	await writeFile(
 		previousIndexPath,
-		(await readFile(previousIndexPath, "utf8")).replace('id="release-history"', 'id="release-demos"'),
+		(await readFile(previousIndexPath, "utf8")).replace('id="my-release-history"', 'id="release-demos"'),
 		"utf8"
 	);
 
@@ -796,10 +812,10 @@ void test("release assembly upgrades a retained shell that the current renderer 
 		previousDirectory: previousSite
 	});
 	const migratedIndex = await readFile(join(nextSnapshot, "site", "index.html"), "utf8");
-	assert.match(migratedIndex, /id="release-history"/u);
+	assert.match(migratedIndex, /id="my-release-history"/u);
 	assert.doesNotMatch(migratedIndex, /id="release-demos"/u);
 	const dom = new JSDOM(migratedIndex);
-	assert.equal(dom.window.document.querySelectorAll("#release-history li").length, 2);
+	assert.equal(dom.window.document.querySelectorAll("#my-release-history li").length, 2);
 	dom.window.close();
 });
 
@@ -884,10 +900,10 @@ void test("exact release reruns are no-ops while later releases retain earlier p
 		{ url: "https://tryagaindev.github.io/litefold-calendar/" }
 	);
 	assert.equal(
-		secondDom.window.document.querySelector("#primary-run-link")?.getAttribute("href"),
+		secondDom.window.document.querySelector("#my-primary-run-link")?.getAttribute("href"),
 		"./releases/2.0.0/examples/basic/"
 	);
-	assert.equal(secondDom.window.document.querySelector("#selected-version")?.textContent, "2.0.0");
+	assert.equal(secondDom.window.document.querySelector("#my-selected-version")?.textContent, "2.0.0");
 	secondDom.window.close();
 	assert.equal(
 		await readFile(join(secondSnapshot, "site", "releases", "1.0.0", "examples", "basic", "main.js"), "utf8"),
@@ -896,7 +912,7 @@ void test("exact release reruns are no-ops while later releases retain earlier p
 	await writeFile(
 		join(firstArtifact, "shell", "index.html"),
 		(await readFile(join(firstArtifact, "shell", "index.html"), "utf8"))
-			.replace('id="release-history"', 'id="release-demos"'),
+			.replace('id="my-release-history"', 'id="release-demos"'),
 		"utf8"
 	);
 	const oldReleaseRerun = await snapshotOutput(context);
@@ -946,7 +962,7 @@ void test("a missing older release backfills without replacing a compatible reta
 	);
 	assert.deepEqual(manifest.releases.map((release) => release.version), ["2.0.0", "1.0.0"]);
 	const dom = new JSDOM(await readFile(join(backfilledSnapshot, "site", "index.html"), "utf8"));
-	assert.equal(dom.window.document.querySelectorAll("#release-history li").length, 2);
+	assert.equal(dom.window.document.querySelectorAll("#my-release-history li").length, 2);
 	dom.window.close();
 });
 
@@ -1003,26 +1019,26 @@ void test("developer shell trusts canonical release order and pins commands and 
 
 	renderDeploymentManifest(dom.window.document, manifest);
 	assert.equal(
-		dom.window.document.querySelector("#primary-run-link")?.getAttribute("href"),
+		dom.window.document.querySelector("#my-primary-run-link")?.getAttribute("href"),
 		"./releases/1.0.0/examples/basic/"
 	);
 	assert.equal(
-		dom.window.document.querySelector("#install-command")?.textContent,
+		dom.window.document.querySelector("#my-install-command")?.textContent,
 		"npm install @tryagaindev/litefold-calendar@1.0.0"
 	);
 	for (const [selector, expected] of [
-		["#primary-source-link", `/tree/${FIRST_COMMIT}/examples/basic`],
-		["#api-link", `/blob/${FIRST_COMMIT}/docs/api.md`],
-		["#integration-link", `/blob/${FIRST_COMMIT}/docs/integration-guide.md`],
-		["#quick-start-link", `/blob/${FIRST_COMMIT}/README.md#quick-start`],
-		["#selected-commit", `/commit/${FIRST_COMMIT}`]
+		["#my-primary-source-link", `/tree/${FIRST_COMMIT}/examples/basic`],
+		["#my-api-link", `/blob/${FIRST_COMMIT}/docs/api.md`],
+		["#my-integration-link", `/blob/${FIRST_COMMIT}/docs/integration-guide.md`],
+		["#my-quick-start-link", `/blob/${FIRST_COMMIT}/README.md#quick-start`],
+		["#my-selected-commit", `/commit/${FIRST_COMMIT}`]
 	]) {
 		assert.ok(
 			dom.window.document.querySelector(selector)?.getAttribute("href")?.endsWith(expected),
 			`${selector} should pin ${expected}`
 		);
 	}
-	assert.equal(dom.window.document.querySelectorAll("#release-history li").length, 3);
+	assert.equal(dom.window.document.querySelectorAll("#my-release-history li").length, 3);
 	dom.window.close();
 });
 
@@ -1034,44 +1050,44 @@ void test("developer shell falls back to main and keeps static links on metadata
 		ok: true
 	}));
 	assert.equal(
-		dom.window.document.querySelector("#primary-run-link")?.getAttribute("href"),
+		dom.window.document.querySelector("#my-primary-run-link")?.getAttribute("href"),
 		"./main/examples/basic/"
 	);
 	assert.equal(
-		dom.window.document.querySelector("#install-command")?.textContent,
+		dom.window.document.querySelector("#my-install-command")?.textContent,
 		"npm install @tryagaindev/litefold-calendar@alpha"
 	);
-	assert.match(dom.window.document.querySelector("#main-preview")?.textContent ?? "", new RegExp(SECOND_COMMIT, "u"));
+	assert.match(dom.window.document.querySelector("#my-main-preview")?.textContent ?? "", new RegExp(SECOND_COMMIT, "u"));
 
 	renderDeploymentManifest(dom.window.document, {
 		main: null,
 		releases: [deploymentEntry("release", "2.0.0", FIRST_COMMIT)],
 		schemaVersion: 1
 	});
-	assert.match(dom.window.document.querySelector("#main-preview")?.textContent ?? "", /not available/u);
+	assert.match(dom.window.document.querySelector("#my-main-preview")?.textContent ?? "", /not available/u);
 	renderDeploymentManifest(dom.window.document, {
 		main,
 		releases: [],
 		schemaVersion: 1
 	});
 	assert.equal(
-		dom.window.document.querySelector("#main-preview-link")?.getAttribute("href"),
+		dom.window.document.querySelector("#my-main-preview-link")?.getAttribute("href"),
 		"./main/examples/"
 	);
 
 	const fallbackDom = await createShellDom();
 	const staticRunHref = fallbackDom.window.document
-		.querySelector("#primary-run-link")?.getAttribute("href");
+		.querySelector("#my-primary-run-link")?.getAttribute("href");
 	await assert.rejects(
 		renderDeployments(fallbackDom.window.document, async () => ({ ok: false, status: 503 })),
 		/failed with 503/u
 	);
 	assert.equal(
-		fallbackDom.window.document.querySelector("#primary-run-link")?.getAttribute("href"),
+		fallbackDom.window.document.querySelector("#my-primary-run-link")?.getAttribute("href"),
 		staticRunHref
 	);
 	assert.equal(
-		fallbackDom.window.document.querySelector("#install-command")?.textContent,
+		fallbackDom.window.document.querySelector("#my-install-command")?.textContent,
 		"npm install @tryagaindev/litefold-calendar@alpha"
 	);
 	dom.window.close();
@@ -1084,8 +1100,8 @@ void test("developer shell keeps repository links usable for an empty manifest",
 		json: async () => ({ main: null, releases: [], schemaVersion: 1 }),
 		ok: true
 	}));
-	const runLink = dom.window.document.querySelector("#primary-run-link");
-	const browseLink = dom.window.document.querySelector("#primary-browse-link");
+	const runLink = dom.window.document.querySelector("#my-primary-run-link");
+	const browseLink = dom.window.document.querySelector("#my-primary-browse-link");
 	assert.equal(runLink?.textContent, "Browse basic source");
 	assert.equal(
 		runLink?.getAttribute("href"),
@@ -1102,14 +1118,14 @@ void test("developer shell keeps repository links usable for an empty manifest",
 void test("developer shell announces copy success and selects code when clipboard access fails", async () => {
 	const dom = await createShellDom();
 	const documentReference = dom.window.document;
-	const button = documentReference.querySelector('[data-copy-target="install-command"]');
+	const button = documentReference.querySelector('[data-my-copy-target="my-install-command"]');
 	assert.ok(button instanceof dom.window.HTMLButtonElement);
 	let copied = "";
 	assert.equal(await copyCode(button, documentReference, {
 		clipboard: { writeText: async (value) => { copied = value; } }
 	}), "copied");
 	assert.equal(copied, "npm install @tryagaindev/litefold-calendar@alpha");
-	assert.equal(documentReference.querySelector("#copy-status")?.textContent, "Install command copied.");
+	assert.equal(documentReference.querySelector("#my-copy-status")?.textContent, "Install command copied.");
 
 	assert.equal(await copyCode(button, documentReference, {
 		clipboard: { writeText: async () => { throw new Error("Denied"); } }
@@ -1118,6 +1134,6 @@ void test("developer shell announces copy success and selects code when clipboar
 		documentReference.defaultView?.getSelection()?.toString(),
 		"npm install @tryagaindev/litefold-calendar@alpha"
 	);
-	assert.match(documentReference.querySelector("#copy-status")?.textContent ?? "", /selected.*Ctrl\+C/u);
+	assert.match(documentReference.querySelector("#my-copy-status")?.textContent ?? "", /selected.*Ctrl\+C/u);
 	dom.window.close();
 });

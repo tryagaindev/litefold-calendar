@@ -3,9 +3,8 @@ import test from "node:test";
 
 import type {
 	CalendarDayRenderContext,
+	CalendarEventOverflowContext,
 	CalendarEventRenderContext,
-	CalendarGridOverflowContentContext,
-	CalendarMultipleEventIndicatorContext,
 	CalendarRenderContext,
 	CalendarRenderHooks
 } from "../src/index.js";
@@ -23,11 +22,10 @@ const RENDER_HOOK_EXTENSION_BOUNDARIES: readonly [
 	HasNoKeys<CalendarRenderContext, ExtensionOnlyContextKey>,
 	HasNoKeys<CalendarDayRenderContext, ExtensionOnlyContextKey>,
 	HasNoKeys<CalendarEventRenderContext, ExtensionOnlyContextKey>,
-	HasNoKeys<CalendarGridOverflowContentContext, ExtensionOnlyContextKey>,
-	HasNoKeys<CalendarMultipleEventIndicatorContext, ExtensionOnlyContextKey>,
+	HasNoKeys<CalendarEventOverflowContext, ExtensionOnlyContextKey>,
 	HasNoKeys<CalendarRenderHooks, ExtensionLifecycleKey>
-] = [true, true, true, true, true, true];
+] = [true, true, true, true, true];
 
 void test("render-hook types expose no extension capabilities or lifecycle", () => {
-	assert.deepEqual(RENDER_HOOK_EXTENSION_BOUNDARIES, [true, true, true, true, true, true]);
+	assert.deepEqual(RENDER_HOOK_EXTENSION_BOUNDARIES, [true, true, true, true, true]);
 });

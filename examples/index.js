@@ -36,12 +36,12 @@ function parseMetadata(value) {
 }
 
 function pinRepositoryLinks(commit) {
-	for (const element of document.querySelectorAll("[data-example-repository-path]")) {
+	for (const element of document.querySelectorAll("[data-my-repository-path]")) {
 		if (!(element instanceof HTMLElement) || element.localName !== "a") {
 			throw new Error("Example repository links must be anchors.");
 		}
-		const kind = element.dataset["exampleRepositoryKind"];
-		const path = element.dataset["exampleRepositoryPath"];
+		const kind = element.dataset["myRepositoryKind"];
+		const path = element.dataset["myRepositoryPath"];
 		if ((kind !== "blob" && kind !== "tree") ||
 			typeof path !== "string" || !REPOSITORY_PATH_PATTERN.test(path)) {
 			throw new Error("Example repository link metadata is invalid.");
@@ -50,12 +50,12 @@ function pinRepositoryLinks(commit) {
 	}
 }
 
-const metadataRoot = requireElement("[data-example-metadata-state]");
-const versionElement = requireElement("[data-example-version]");
-const commitElement = requireElement("[data-example-commit]");
-const commitLink = requireElement("[data-example-commit-link]");
-const channelElement = requireElement("[data-example-channel]");
-const statusElement = requireElement("[data-example-metadata-status]");
+const metadataRoot = requireElement("[data-my-metadata-state]");
+const versionElement = requireElement("[data-my-version]");
+const commitElement = requireElement("[data-my-commit]");
+const commitLink = requireElement("[data-my-commit-link]");
+const channelElement = requireElement("[data-my-channel]");
+const statusElement = requireElement("[data-my-metadata-status]");
 
 try {
 	const response = await fetch("./metadata.json", {
@@ -78,12 +78,12 @@ try {
 		pinRepositoryLinks(metadata.commit);
 		statusElement.textContent = "Source and documentation links are pinned to this build.";
 	}
-	metadataRoot.dataset["exampleMetadataState"] = "ready";
+	metadataRoot.dataset["myMetadataState"] = "ready";
 } catch {
 	versionElement.textContent = "@alpha";
 	commitElement.textContent = "main branch";
 	commitLink.setAttribute("href", `${REPOSITORY_URL}/tree/main`);
 	channelElement.textContent = "Metadata unavailable";
 	statusElement.textContent = "Run npm run build for exact provenance. Source links still target the main branch.";
-	metadataRoot.dataset["exampleMetadataState"] = "error";
+	metadataRoot.dataset["myMetadataState"] = "error";
 }

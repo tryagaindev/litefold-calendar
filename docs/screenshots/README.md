@@ -10,7 +10,7 @@ The manifest covers exactly these PNG files:
 |---|---|---|
 | `desktop-month-grid-1440x900.png` | Wide advanced month grid with direct event actions and overflow | 1440 × 900 |
 | `month-year-jump-1280x800.png` | Open native month-and-year chooser at a bounded month | 1280 × 800 |
-| `mobile-month-agenda-dark-390x844.png` | Compact dark navigation, month grid with three-layer event-slip fan, and selected-day agenda | 390 × 844 |
+| `mobile-month-agenda-dark-390x844.png` | Compact dark navigation, month grid with bottom-aligned marker/count blocks, and selected-day agenda | 390 × 844 |
 | `mobile-month-swipe-pull-390x844.png` | Held native touch pull revealing the decorative adjacent-month lane | 390 × 844 |
 | `event-details-dark-1280x800.png` | Application-owned event details dialog opened from the agenda | 1280 × 800 |
 | `grid-event-keyboard-focus-1440x900.png` | Visible keyboard focus on a wide-layout grid event action after F2 | 1440 × 900 |
@@ -41,8 +41,8 @@ Five scenes capture settled states. The held-pull scene intentionally captures d
 Review each image at native dimensions and compare it with the intended change and [`DESIGN.md`](../../DESIGN.md):
 
 - Confirm the scene-specific focus, selection, Today, overflow, navigation, month title, event marker, agenda, dialog, or month-picker state.
-- In the settled 390px scene, confirm controls share one compact row above application toolbar content; the three-layer event-slip fan does not intersect the custom `1.25rem` marker; and no pager lane, offset, motion residue, clipping, or horizontal scrollbar remains.
-- Review the fan in both text directions and with dark, forced-colors, and increased-contrast treatments. Browser coverage remains responsible for the generic inline-end satellite case, 200% text, and 400% zoom.
+- In the settled 390px scene, confirm controls share one compact row above application toolbar content; the social-style count and custom `1.25rem` marker occupy centered, equal, gap-free stacked rows aligned to the day cell's block end without intersection; and no pager lane, offset, motion residue, clipping, or horizontal scrollbar remains.
+- Review paired blocks stacked throughout supported phone widths and sharing a row, with centers evenly dividing the full area beneath the date, only when both compact-control-size tracks fit near the compact ceiling. Check markerless single-block and `maxGridEventsPerDay: 0` single-action states, both text directions, dark mode, forced colors, and increased contrast. Browser coverage remains responsible for an allowed `2rem` marker with an inline-end satellite, compact hook content that fits its assigned block, 200% text, and 400% zoom.
 - In the held-pull scene, confirm there is one live grid and the exposed lane shows the correct arrow and localized adjacent month without event content.
 - Check for system-font drift, unexpected network content, and personal or secret data.
 

@@ -1,0 +1,252 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="calendar-anatomy-title calendar-anatomy-desc" width="1200" height="1030" viewBox="0 0 1200 1030">
+  <!--
+    Maintenance: this explanatory diagram mirrors public terminology and relationships from
+    src/types.ts, src/internal/dom/month-grid.ts, src/internal/dom/event-representation.ts,
+    src/internal/runtime/event-overflow-presentation.ts, src/styles/month-grid.css,
+    src/styles/agenda.css, and DESIGN.md. Review this SVG whenever those files rename or
+    reorder illustrated parts, change render-hook slots, change overflow variants, or change
+    accent-color ownership. Keep the adjacent text equivalent in docs/component-anatomy.md
+    synchronized; do not turn private lfc-* selectors into consumer API.
+  -->
+  <title id="calendar-anatomy-title">Litefold Calendar and event anatomy</title>
+  <desc id="calendar-anatomy-desc">An annotated schematic identifies the month title, day button and date, selected day, grid event summary or action, compact social-style overflow count, wide overflow action, selected-day agenda, event leading rule, marker slot, leading content, time, title, details, and trailing content. A color key distinguishes the primary interface color, event leading-rule color, and per-event marker color.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+    </marker>
+  </defs>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --canvas: #f5f8f8;
+      --surface: #ffffff;
+      --surface-muted: #edf3f2;
+      --grid-line: #b7c8c7;
+      --text: #102d34;
+      --muted: #526b70;
+      --primary: #087a5b;
+      --on-primary: #ffffff;
+      --selected: #dcfce7;
+      --event-surface: #efeeff;
+      --event-text: #262050;
+      --event-border: #665cc3;
+      --event-rule: #a52a78;
+      --marker-override: #d53d56;
+      --callout: #29464e;
+      --callout-fill: #ffffff;
+      --hook-fill: #fff4d6;
+      --hook-border: #9b6b12;
+      --shadow: #d5dfdf;
+    }
+
+    text {
+      fill: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .canvas { fill: var(--canvas); }
+    .surface { fill: var(--surface); stroke: var(--grid-line); stroke-width: 2; }
+    .surface-muted { fill: var(--surface-muted); stroke: var(--grid-line); stroke-width: 2; }
+    .grid-line { stroke: var(--grid-line); stroke-width: 1.5; }
+    .section-title { font-size: 25px; font-weight: 700; }
+    .month-title { font-size: 21px; font-weight: 700; }
+    .weekday { fill: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+    .day-number { font-size: 17px; font-weight: 650; }
+    .small { font-size: 13px; }
+    .event-label { fill: var(--event-text); font-size: 14px; }
+    .event-strong { fill: var(--event-text); font-size: 14px; font-weight: 700; }
+    .muted { fill: var(--muted); }
+    .quiet-control { fill: var(--surface); stroke: var(--grid-line); stroke-width: 1.5; }
+    .today { fill: var(--primary); stroke: var(--text); stroke-width: 1.5; }
+    .today-text { fill: var(--on-primary); font-size: 14px; font-weight: 700; }
+    .selected-cell { fill: var(--selected); stroke: var(--primary); stroke-width: 4; }
+    .event { fill: var(--event-surface); stroke: var(--event-border); stroke-width: 2; }
+    .event-rule { fill: var(--event-rule); }
+    .marker-default { fill: var(--event-rule); }
+    .marker-custom { fill: var(--marker-override); }
+    .hook { fill: var(--hook-fill); stroke: var(--hook-border); stroke-width: 1.5; }
+    .callout-box { fill: var(--callout-fill); stroke: var(--grid-line); stroke-width: 1.5; }
+    .callout { fill: var(--callout); font-size: 16px; font-weight: 650; }
+    .arrow { fill: none; stroke: var(--callout); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; marker-end: url(#arrow); }
+    .key-label { font-size: 15px; font-weight: 650; }
+    .code-label { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; font-size: 13px; }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --canvas: #102327;
+        --surface: #152d32;
+        --surface-muted: #1d393d;
+        --grid-line: #5c787c;
+        --text: #edfafa;
+        --muted: #b4cbce;
+        --primary: #66e0b5;
+        --on-primary: #062a20;
+        --selected: #163c33;
+        --event-surface: #282853;
+        --event-text: #f1eeff;
+        --event-border: #a39aff;
+        --event-rule: #ff88c8;
+        --marker-override: #ff6f83;
+        --callout: #d5eaec;
+        --callout-fill: #183238;
+        --hook-fill: #493914;
+        --hook-border: #e2b958;
+        --shadow: #0a171a;
+      }
+    }
+  </style>
+
+  <rect class="canvas" width="1200" height="1030" rx="24" />
+  <text class="section-title" x="54" y="48">Calendar surface</text>
+
+  <!-- Wide calendar schematic. -->
+  <rect x="54" y="70" width="800" height="512" rx="16" fill="var(--shadow)" opacity="0.55" />
+  <rect class="surface" x="48" y="64" width="800" height="512" rx="16" />
+
+  <!-- Toolbar. -->
+  <rect class="surface-muted" x="70" y="86" width="756" height="64" rx="10" />
+  <rect class="quiet-control" x="90" y="101" width="40" height="36" rx="8" />
+  <path d="M 115 110 L 105 119 L 115 128" fill="none" stroke="var(--text)" stroke-width="2.5" />
+  <rect class="quiet-control" x="140" y="101" width="40" height="36" rx="8" />
+  <path d="M 155 110 L 165 119 L 155 128" fill="none" stroke="var(--text)" stroke-width="2.5" />
+  <text class="month-title" x="335" y="126">August 2026</text>
+  <rect class="today" x="742" y="99" width="58" height="40" rx="20" />
+  <text class="today-text" x="771" y="124" text-anchor="middle">Today</text>
+
+  <!-- Month grid headings. -->
+  <rect class="surface" x="70" y="170" width="756" height="262" rx="8" />
+  <line class="grid-line" x1="70" y1="203" x2="826" y2="203" />
+  <text class="weekday" x="124" y="192" text-anchor="middle">SUN</text>
+  <text class="weekday" x="232" y="192" text-anchor="middle">MON</text>
+  <text class="weekday" x="340" y="192" text-anchor="middle">TUE</text>
+  <text class="weekday" x="448" y="192" text-anchor="middle">WED</text>
+  <text class="weekday" x="556" y="192" text-anchor="middle">THU</text>
+  <text class="weekday" x="664" y="192" text-anchor="middle">FRI</text>
+  <text class="weekday" x="772" y="192" text-anchor="middle">SAT</text>
+  <line class="grid-line" x1="178" y1="170" x2="178" y2="432" />
+  <line class="grid-line" x1="286" y1="170" x2="286" y2="432" />
+  <line class="grid-line" x1="394" y1="170" x2="394" y2="432" />
+  <line class="grid-line" x1="502" y1="170" x2="502" y2="432" />
+  <line class="grid-line" x1="610" y1="170" x2="610" y2="432" />
+  <line class="grid-line" x1="718" y1="170" x2="718" y2="432" />
+  <line class="grid-line" x1="70" y1="317" x2="826" y2="317" />
+
+  <!-- Day buttons and selected day. -->
+  <text class="day-number muted" x="86" y="229">2</text>
+  <text class="day-number" x="194" y="229">3</text>
+  <rect class="selected-cell" x="288" y="205" width="104" height="110" />
+  <text class="day-number" x="304" y="229">4</text>
+  <text class="day-number" x="410" y="229">5</text>
+  <text class="day-number" x="518" y="229">6</text>
+  <text class="day-number" x="626" y="229">7</text>
+  <text class="day-number" x="734" y="229">8</text>
+  <text class="day-number" x="86" y="343">9</text>
+  <text class="day-number" x="194" y="343">10</text>
+  <text class="day-number" x="302" y="343">11</text>
+  <text class="day-number" x="410" y="343">12</text>
+  <text class="day-number" x="518" y="343">13</text>
+  <text class="day-number" x="626" y="343">14</text>
+  <text class="day-number" x="734" y="343">15</text>
+
+  <!-- Wide grid event and overflow action. -->
+  <rect class="event" x="401" y="244" width="94" height="28" rx="7" />
+  <rect class="event-rule" x="401" y="244" width="5" height="28" rx="3" />
+  <circle class="marker-custom" cx="416" cy="258" r="5" />
+  <text class="event-strong" x="426" y="263">Review</text>
+  <rect class="quiet-control" x="407" y="278" width="80" height="25" rx="7" />
+  <text class="event-label" x="447" y="296" text-anchor="middle">2 more</text>
+
+  <!-- Compact primary plus passive social count. -->
+  <rect x="507" y="244" width="48" height="58" rx="8" fill="none" stroke="var(--grid-line)" stroke-dasharray="4 4" />
+  <rect x="557" y="244" width="48" height="58" rx="8" fill="none" stroke="var(--grid-line)" stroke-dasharray="4 4" />
+  <circle class="marker-default" cx="531" cy="273" r="9" />
+  <text class="event-strong" x="581" y="279" text-anchor="middle">+3</text>
+
+  <!-- Selected-day agenda. -->
+  <rect class="surface-muted" x="70" y="452" width="756" height="100" rx="10" />
+  <text class="month-title" x="92" y="481">Tuesday, August 4</text>
+  <rect class="event" x="92" y="495" width="712" height="40" rx="8" />
+  <rect class="event-rule" x="92" y="495" width="6" height="40" rx="3" />
+  <circle class="marker-custom" cx="117" cy="515" r="6" />
+  <text class="event-label muted" x="138" y="520">11:38 AM</text>
+  <text class="event-strong" x="227" y="520">Design review</text>
+  <text class="event-label" x="705" y="520">Open notes →</text>
+
+  <!-- Calendar callouts. -->
+  <rect class="callout-box" x="882" y="78" width="278" height="54" rx="10" />
+  <text class="callout" x="902" y="111">Month title</text>
+  <path class="arrow" d="M 882 105 C 760 105, 590 110, 460 118" />
+
+  <rect class="callout-box" x="882" y="148" width="278" height="54" rx="10" />
+  <text class="callout" x="902" y="181">Day button and date</text>
+  <path class="arrow" d="M 882 174 C 760 176, 695 197, 664 218" />
+
+  <rect class="callout-box" x="882" y="218" width="278" height="54" rx="10" />
+  <text class="callout" x="902" y="251">Selected day</text>
+  <path class="arrow" d="M 882 246 C 700 236, 510 240, 360 254" />
+
+  <rect class="callout-box" x="882" y="288" width="278" height="54" rx="10" />
+  <text class="callout" x="902" y="321">Grid event summary/action</text>
+  <path class="arrow" d="M 882 316 C 730 310, 590 284, 493 262" />
+
+  <rect class="callout-box" x="882" y="358" width="278" height="54" rx="10" />
+  <text class="callout" x="902" y="381">Compact overflow cue</text>
+  <text class="small muted" x="902" y="400">Social-style count (+N)</text>
+  <path class="arrow" d="M 882 385 C 760 370, 665 320, 584 282" />
+
+  <rect class="callout-box" x="882" y="428" width="278" height="54" rx="10" />
+  <text class="callout" x="902" y="451">Wide overflow action</text>
+  <text class="small muted" x="902" y="470">Localized “N more” button</text>
+  <path class="arrow" d="M 882 456 C 720 430, 565 350, 474 302" />
+
+  <rect class="callout-box" x="882" y="498" width="278" height="54" rx="10" />
+  <text class="callout" x="902" y="531">Selected-day agenda</text>
+  <path class="arrow" d="M 882 526 C 850 526, 829 521, 803 516" />
+
+  <!-- Event representation detail. -->
+  <text class="section-title" x="54" y="635">Event representation (grid and agenda)</text>
+  <text class="small muted" x="54" y="659">The surface changes layout, but the supported content order and hook slots stay the same.</text>
+
+  <rect class="event" x="70" y="704" width="1060" height="82" rx="12" />
+  <rect class="event-rule" x="70" y="704" width="8" height="82" rx="4" />
+  <circle class="marker-custom" cx="112" cy="745" r="11" />
+  <rect class="hook" x="139" y="724" width="93" height="42" rx="8" />
+  <text class="event-label" x="186" y="750" text-anchor="middle">leading</text>
+  <text class="event-label muted" x="264" y="750">11:38 AM</text>
+  <text class="event-strong" x="355" y="750">Design review</text>
+  <rect class="hook" x="520" y="724" width="173" height="42" rx="8" />
+  <text class="event-label" x="607" y="750" text-anchor="middle">details content</text>
+  <rect class="hook" x="906" y="724" width="188" height="42" rx="8" />
+  <text class="event-label" x="1000" y="750" text-anchor="middle">trailing content</text>
+
+  <text class="callout" x="72" y="825">Leading rule</text>
+  <path class="arrow" d="M 125 812 L 80 770" />
+  <text class="callout" x="196" y="865">Marker slot</text>
+  <path class="arrow" d="M 240 849 C 208 818, 164 779, 120 753" />
+  <text class="callout code-label" x="340" y="825">renderEventLeading</text>
+  <path class="arrow" d="M 405 812 C 340 785, 271 758, 232 748" />
+  <text class="callout" x="550" y="865">Localized time</text>
+  <path class="arrow" d="M 600 848 C 520 815, 375 775, 293 753" />
+  <text class="callout" x="721" y="825">Event title</text>
+  <path class="arrow" d="M 760 812 C 655 782, 510 760, 442 750" />
+  <text class="callout code-label" x="820" y="865">renderEventDetails</text>
+  <path class="arrow" d="M 875 848 C 798 816, 706 776, 664 758" />
+  <text class="callout code-label" x="989" y="825">renderEventTrailing</text>
+  <path class="arrow" d="M 1051 812 L 1030 766" />
+
+  <text class="small muted" x="70" y="898">The root is the native action when actionable; otherwise it is a static event surface. The logical-leading rule is decoration, not a render-hook slot.</text>
+
+  <!-- Color ownership key. -->
+  <rect class="callout-box" x="48" y="926" width="1112" height="74" rx="12" />
+  <circle class="today" cx="82" cy="952" r="11" />
+  <text class="key-label" x="104" y="957">Primary interface color</text>
+  <text class="code-label muted" x="104" y="979">--lfc-accent-color</text>
+
+  <rect class="event-rule" x="397" y="939" width="10" height="26" rx="4" />
+  <text class="key-label" x="421" y="957">Event leading-rule color</text>
+  <text class="code-label muted" x="421" y="979">--lfc-event-accent-color</text>
+
+  <circle class="marker-custom" cx="792" cy="952" r="11" />
+  <text class="key-label" x="814" y="957">Per-event marker color</text>
+  <text class="code-label muted" x="814" y="979">CalendarEventInput.accentColor</text>
+</svg>

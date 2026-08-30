@@ -4,7 +4,7 @@ Use this policy to report a suspected vulnerability in the published package, pu
 
 ## Supported versions
 
-litefold-calendar is pre-1.0.  Security fixes are released only for the newest public alpha and the current `main` branch.
+Litefold Calendar is pre-1.0.  Security fixes are released only for the newest public alpha and the current `main` branch.
 
 | Version | Supported |
 | --- | --- |
@@ -86,7 +86,7 @@ A development-tool advisory is relevant when it can affect CI, repository integr
 
 ## Out of scope and accepted limitations
 
-The following are not vulnerabilities unless litefold-calendar adds an unexpected privilege boundary or violates a documented guarantee:
+The following are not vulnerabilities unless Litefold Calendar adds an unexpected privilege boundary or violates a documented guarantee:
 
 - Malicious application code or extensions already executing in the same JavaScript realm.
 - Main-thread blocking caused solely by trusted callback or extension code.

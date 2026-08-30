@@ -101,8 +101,8 @@ async function verifyBasicExample() {
 	const environment = await createExampleEnvironment("basic");
 	const { document, dom } = environment;
 	try {
-		const host = requireElement(document, "[data-calendar]", dom.window.HTMLElement);
-		const result = requireElement(document, "[data-result]", dom.window.HTMLElement);
+		const host = requireElement(document, "[data-my-calendar]", dom.window.HTMLElement);
+		const result = requireElement(document, "[data-my-result]", dom.window.HTMLElement);
 		await waitFor(
 			() => host.textContent?.includes("Calendar design review") === true &&
 				host.getAttribute("aria-busy") !== "true",
@@ -136,17 +136,17 @@ async function verifyAsyncErrorsExample() {
 	const environment = await createExampleEnvironment("async-errors");
 	const { document, dom, observedWarnings } = environment;
 	try {
-		const host = requireElement(document, "[data-calendar]", dom.window.HTMLElement);
+		const host = requireElement(document, "[data-my-calendar]", dom.window.HTMLElement);
 		const applicationOwnership = requireElement(
 			document,
-			"[data-host-ownership]",
+			"[data-my-host-ownership]",
 			dom.window.HTMLInputElement
 		);
-		const failAction = requireElement(document, "[data-fail-action]", dom.window.HTMLInputElement);
-		const failRenderHooks = requireElement(document, "[data-fail-render-hooks]", dom.window.HTMLInputElement);
-		const failNext = requireElement(document, "[data-fail-next]", dom.window.HTMLButtonElement);
-		const applicationError = requireElement(document, "[data-host-error]", dom.window.HTMLElement);
-		const applicationRetry = requireElement(document, "[data-host-retry]", dom.window.HTMLButtonElement);
+		const failAction = requireElement(document, "[data-my-fail-action]", dom.window.HTMLInputElement);
+		const failRenderHooks = requireElement(document, "[data-my-fail-render-hooks]", dom.window.HTMLInputElement);
+		const failNext = requireElement(document, "[data-my-fail-next]", dom.window.HTMLButtonElement);
+		const applicationError = requireElement(document, "[data-my-host-error]", dom.window.HTMLElement);
+		const applicationRetry = requireElement(document, "[data-my-host-retry]", dom.window.HTMLButtonElement);
 
 		await waitFor(
 			() => host.textContent?.includes("Render hooks active") === true &&
@@ -223,10 +223,10 @@ async function verifyAsyncErrorsExample() {
 function createMigrationRecord(overrides = {}) {
 	return {
 		backgroundColor: "#805FC0",
-		end: "2026-08-04T10:15",
+		end: "2026-08-04T12:23",
 		extendedProps: { kind: "meeting", ownerLabel: "Design group" },
 		id: "design-review",
-		start: "2026-08-04T09:30",
+		start: "2026-08-04T11:38",
 		title: "Calendar design review",
 		url: "/events/design-review?from=month&view=summary#agenda",
 		...overrides
@@ -237,13 +237,13 @@ async function verifyMigrationRecipe() {
 	const environment = await createExampleEnvironment("fullcalendar-v6-migration");
 	const { document, dom, module } = environment;
 	try {
-		const host = requireElement(document, "[data-example-calendar]", dom.window.HTMLElement);
-		const selection = requireElement(document, "[data-example-selection]", dom.window.HTMLElement);
-		const activation = requireElement(document, "[data-example-activation]", dom.window.HTMLElement);
-		assert.equal(host.dataset["exampleRangeDays"], "42");
+		const host = requireElement(document, "[data-my-calendar]", dom.window.HTMLElement);
+		const selection = requireElement(document, "[data-my-selection]", dom.window.HTMLElement);
+		const activation = requireElement(document, "[data-my-activation]", dom.window.HTMLElement);
+		assert.equal(host.dataset["testRangeDays"], "42");
 
 		await waitFor(
-			() => document.documentElement.dataset["exampleReady"] === "true",
+			() => document.documentElement.dataset["testReady"] === "true",
 			"the migration recipe's first usable snapshot"
 		);
 		const grid = requireElement(host, '[role="grid"]', dom.window.HTMLElement);
@@ -275,7 +275,7 @@ async function verifyMigrationRecipe() {
 		assert.equal(agendaClick.defaultPrevented, true);
 		assert.match(activation.textContent ?? "", /from agenda/u);
 		assert.equal(
-			requireElement(document, "[data-example-status]", dom.window.HTMLElement).textContent,
+			requireElement(document, "[data-my-status]", dom.window.HTMLElement).textContent,
 			activation.textContent,
 			"Canceled native navigation must also produce live completion feedback."
 		);
@@ -290,7 +290,7 @@ async function verifyMigrationRecipe() {
 		assert.equal(adaptSnapshot([createMigrationRecord({ id: 42 })])[0]?.id, "42");
 		assert.equal(
 			adaptSnapshot([createMigrationRecord({ allDay: false })])[0]?.start,
-			"2026-08-04T09:30"
+			"2026-08-04T11:38"
 		);
 		assert.equal(
 			adaptSnapshot([createMigrationRecord({
@@ -320,17 +320,17 @@ async function verifyMigrationRecipe() {
 		}
 		assert.throws(() => previousCivilDate("0001-01-01"), RangeError);
 
-		const previousReturnedRequest = host.dataset["exampleReturnedRequest"];
+		const previousReturnedRequest = host.dataset["testReturnedRequest"];
 		const refetch = requireElement(
 			document,
-			"[data-example-refetch]",
+			"[data-my-refetch]",
 			dom.window.HTMLButtonElement
 		);
 		refetch.click();
 		await waitFor(
-			() => host.dataset["exampleAbortedRequests"] === "1" &&
-				host.dataset["exampleReturnedRequest"] !== previousReturnedRequest &&
-				document.documentElement.dataset["examplePhase"] === "ready",
+			() => host.dataset["testAbortedRequests"] === "1" &&
+				host.dataset["testReturnedRequest"] !== previousReturnedRequest &&
+				document.documentElement.dataset["testPhase"] === "ready",
 			"the superseded migration request to abort and the latest snapshot to commit"
 		);
 	} finally {
@@ -342,17 +342,17 @@ async function verifyProgressiveRecipe() {
 	const environment = await createExampleEnvironment("progressive-enhancement");
 	const { document, dom } = environment;
 	try {
-		const host = requireElement(document, "[data-example-calendar]", dom.window.HTMLElement);
-		const fallback = requireElement(document, "[data-example-fallback]", dom.window.HTMLElement);
+		const host = requireElement(document, "[data-my-calendar]", dom.window.HTMLElement);
+		const fallback = requireElement(document, "[data-my-fallback]", dom.window.HTMLElement);
 		assert.equal(fallback.hidden, false, "The fallback must remain unchanged during first loading.");
 		assert.ok(fallback.querySelector("ol > li time[datetime]") instanceof dom.window.HTMLTimeElement);
 		assert.equal(
 			findLinkByText(fallback, "Calendar design review", dom.window).getAttribute("href"),
-			"./?event=design-review&from=fallback#server-schedule"
+			"./?event=design-review&from=fallback#my-server-schedule"
 		);
 
 		await waitFor(
-			() => document.documentElement.dataset["exampleReady"] === "true",
+			() => document.documentElement.dataset["testReady"] === "true",
 			"the progressive recipe's first usable snapshot"
 		);
 		assert.equal(fallback.hidden, true, "The first usable snapshot must hide the fallback.");
@@ -362,7 +362,7 @@ async function verifyProgressiveRecipe() {
 		const agendaLink = findLinkByText(agenda, "Calendar design review", dom.window);
 		assert.equal(agendaLink.pathname, "/examples/progressive-enhancement/");
 		assert.equal(agendaLink.search, "?event=design-review&from=calendar");
-		assert.equal(agendaLink.hash, "#server-schedule");
+		assert.equal(agendaLink.hash, "#my-server-schedule");
 		const staticEvent = [...agenda.querySelectorAll("li")]
 			.find((item) => item.textContent?.includes("Release window") === true);
 		assert.ok(staticEvent !== undefined);
@@ -370,19 +370,19 @@ async function verifyProgressiveRecipe() {
 
 		const failure = requireElement(
 			document,
-			'[data-example-rebuild="failure"]',
+			'[data-my-rebuild="failure"]',
 			dom.window.HTMLButtonElement
 		);
 		failure.click();
 		assert.equal(fallback.hidden, false, "Destroy/rebuild must restore fallback before loading.");
 		await waitFor(
-			() => document.documentElement.dataset["examplePhase"] === "unavailable",
+			() => document.documentElement.dataset["testPhase"] === "unavailable",
 			"the progressive recipe's unavailable first load"
 		);
 		assert.equal(fallback.hidden, false, "An unavailable first load must preserve the fallback.");
 		const assertiveAnnouncer = requireElement(
 			document,
-			"[data-example-announcer-assertive]",
+			"[data-my-announcer-assertive]",
 			dom.window.HTMLElement
 		);
 		await waitFor(
@@ -392,13 +392,13 @@ async function verifyProgressiveRecipe() {
 
 		const success = requireElement(
 			document,
-			'[data-example-rebuild="success"]',
+			'[data-my-rebuild="success"]',
 			dom.window.HTMLButtonElement
 		);
 		success.click();
 		assert.equal(fallback.hidden, false, "Retry loading must leave the fallback visible.");
 		await waitFor(
-			() => document.documentElement.dataset["exampleReady"] === "true",
+			() => document.documentElement.dataset["testReady"] === "true",
 			"the progressive recipe's rebuilt usable snapshot"
 		);
 		assert.equal(fallback.hidden, true);

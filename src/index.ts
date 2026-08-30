@@ -17,6 +17,7 @@ export type {
 	Calendar,
 	CalendarAction,
 	CalendarAnnouncement,
+	CalendarCompactEventOverflowContext,
 	CalendarDayContextMenu,
 	CalendarDayElements,
 	CalendarDayRenderContext,
@@ -29,6 +30,8 @@ export type {
 	CalendarEventContextMenu,
 	CalendarEventContextMenuAvailability,
 	CalendarEventElements,
+	CalendarEventOverflowContext,
+	CalendarEventOverflowElements,
 	CalendarEventRenderContext,
 	CalendarEventSource,
 	CalendarEventInput,
@@ -40,11 +43,10 @@ export type {
 	CalendarRenderContext,
 	CalendarRenderHooks,
 	CalendarFirstDay,
-	CalendarGridOverflowContentContext,
 	CalendarHeadingLevel,
-	CalendarMultipleEventIndicatorContext,
 	CalendarOptions,
 	CalendarPhase,
 	CalendarRange,
-	CalendarState
+	CalendarState,
+	CalendarWideEventOverflowContext
 } from "./types.js";

@@ -6,16 +6,27 @@ This guide helps contributors decide where a change belongs and which invariants
 
 The root package has one composition edge into the generic runtime. Optional extension facades form separate public composition edges and never become root imports:
 
-```text
-index.ts -> calendar.ts -> internal/runtime/coordinator.ts
-internal/runtime/coordinator.ts -> internal/runtime/*
-internal/runtime/* -> internal/dom/*, internal/domain/*, public contracts
-internal/dom/*     -> internal/dom/*, internal/domain/*, public contracts
-internal/domain/*  -> internal/domain/*, public contracts
-extensions/<id>/index.ts -> matching extension implementation, neutral extension contract
+```mermaid
+flowchart TB
+  accTitle: Litefold Calendar source dependency direction
+  accDescr: The root facade composes the runtime. Runtime may depend on DOM and domain, DOM may depend on domain, and all layers use approved public contracts. Optional extension subpaths stay outside the root graph and may use only approved neutral leaves.
+  index["Root entry: src/index.ts"] --> calendar["Composition facade: src/calendar.ts"]
+  index --> contracts["Public contracts: types, errors, icons, messages"]
+  calendar --> runtime["Transaction owner: internal/runtime"]
+  runtime --> dom["DOM presentation: internal/dom"]
+  runtime --> domain["Pure date and event logic: internal/domain"]
+  runtime --> contracts
+  dom --> domain
+  dom --> contracts
+  domain --> contracts
+  extensionFacade["Optional subpath facade: extensions/EXTENSION_ID/index.ts"] --> extensionImplementation["Matching extension implementation"]
+  extensionFacade --> contracts
+  extensionImplementation --> contracts
+  extensionFacade -. "approved neutral leaves only" .-> neutral["civil-date + registered-extension-contract"]
+  extensionImplementation -. "approved neutral leaves only" .-> neutral
 ```
 
-The arrows show allowed direction, not a requirement to use every lower layer. For example, a runtime policy that only needs public types should not import DOM or domain modules just because it may do so.
+The arrows show allowed direction, not a requirement to use every lower layer. For example, a runtime policy that only needs public types should not import DOM or domain modules just because it may do so. The missing root/runtime-to-extension arrow is intentional: an optional subpath must remain unreachable from the root graph.
 
 | Area | Owns | Dependency rule |
 |---|---|---|
@@ -24,7 +35,7 @@ The arrows show allowed direction, not a requirement to use every lower layer. F
 | `internal/domain` | Gregorian civil-date parsing and arithmetic, ranges, bounds, fixed month grids, and atomic event normalization | No DOM or runtime imports. Domain code may use public types and errors. |
 | `internal/dom` | Stable semantic element creation, localized presentation, focus helpers, and bounded DOM rendering primitives | May use domain and public contracts, but does not own lifecycle, requests, or state transitions. |
 | `internal/runtime` | Option normalization, event-source generations, actions, consumer render-hook isolation, generic registered-extension lifecycle, integration-node leases, swipe state, observable state, and transaction coordination | May compose public, domain, DOM, and focused runtime peers. Root-reachable modules remain neutral and must not import a specific optional extension implementation. Runtime modules do not themselves become public subpath APIs. |
-| `src/styles/*.css` and `scripts/lib/styles.mjs` | Implementation of [DESIGN.md](../DESIGN.md), responsive preferences, direction, and public-token authoring | The composer preserves the canonical cascade and emits the package's one public `dist/styles.css`; layout remains CSS-only. |
+| `src/styles/*.css` and `scripts/lib/styles.mjs` | Implementation of [DESIGN.md](../DESIGN.md), responsive preferences, direction, and public-token authoring | The composer preserves readable source modules and the canonical cascade, then minifies the package's one public `dist/styles.css`; layout remains CSS-only. |
 
 Do not add internal barrel files, cross-layer cycles, extension-to-extension imports, or a generic catch-all helper module. Import the narrow module that owns the behavior. The repository ESLint architecture rule enforces these layer edges, permits `calendar.ts` to compose the root surface with the runtime coordinator, and permits each public extension facade to compose only its matching implementation.
 
@@ -36,7 +47,7 @@ Extension implementation files may use root public contracts and the small neutr
 |---|---|
 | Civil-date parsing, comparison, projection, range math, or locale week start | `internal/domain` |
 | Stable markup, native semantics, localized display formatting, or focus mechanics | `internal/dom` |
-| Configuration validation, async source behavior, abort/reentrancy policy, actions, render hooks, generic extension hosting, integration leases, or state | `internal/runtime` |
+| Configuration validation, source timing, abort/reentrancy policy, actions, render hooks, generic extension hosting, integration leases, or state | `internal/runtime` |
 | WebMCP schemas, registration, bounded result projection, and unregister lifecycle | The WebMCP extension implementation reached only through `extensions/webmcp`; never the root coordinator, DOM presentation, or domain parsing |
 | Public names, callback shapes, defaults, exports, or diagnostics | Root contract modules plus the API documentation and examples |
 | Responsive placement, sizing, focus visuals, forced colors, or motion styling | `DESIGN.md`, `src/styles/*.css`, `scripts/lib/styles.mjs`, the CSS token contract, `scripts/tests/styles.test.mjs`, and affected browser tests |
@@ -56,21 +67,55 @@ These focused DOM presenters illustrate the boundary; the table is not an exhaus
 
 ## Render transaction ownership
 
-The coordinator's `MonthCalendar` class is the sole transaction owner. Its size is deliberate: it sequences behavior that must remain atomic and reentrancy-safe, while leaf modules own separable policies and presentation details.
+The coordinator's `MonthCalendar` class is the sole transaction owner, but it remains an orchestrator rather than a policy container. Focused runtime modules own source-shape classification, PromiseLike observation, source-error construction, and other separable concerns; the coordinator retains generation checks and atomic state/DOM commits.
 
-A normal lifecycle follows this order:
+### Instance lifetime
 
 1. Construction snapshots and validates application options, render-hook definitions, and opaque extension values before package DOM is committed.
 2. `render()` establishes one stable package-owned shell, acquires application-node leases, and starts the first source generation for one complete 42-day request range.
-3. Configured first-party extensions activate in caller order only after that successful host claim and render. WebMCP performs its sequential tool registration inside its own activation rather than through a core import.
-4. A current source result is validated and normalized atomically; malformed or stale results never partially commit.
-5. The coordinator commits the displayed month, selected date, normalized events, and observable phase as one current generation. Application state observers run synchronously; active extension state delivery is coalesced and follows in caller order.
-6. DOM modules render from that committed snapshot; render hooks, focus restoration, issue presentation, and announcements follow the same generation checks.
-7. `destroy()` first makes retained capabilities inert, tears down extensions in reverse order, aborts remaining source work, runs consumer render-hook cleanup, releases leases, restores managed fallback state, and removes package ownership.
+3. Configured first-party extensions activate in caller order after the initial direct terminal render or initial PromiseLike loading render. WebMCP registers its tools inside its own activation rather than through a core import.
+4. `destroy()` makes retained capabilities inert, tears down extensions in reverse order, aborts remaining source work, runs consumer render-hook cleanup, releases leases, restores managed fallback state, and removes package ownership.
 
-The immutable options snapshot keeps the construction-time `events` value, while the coordinator owns a separate current event provider. `setEvents()` validates and snapshots a replacement before changing that provider, then starts a new source generation. Abort-listener and validation-getter reentrancy must not let an older transaction reclaim provider or controller ownership from a newer accepted replacement.
+### Successful visible-range source and render order
+
+```mermaid
+sequenceDiagram
+  accTitle: Successful visible-range source and render order
+  accDescr: Every load claims a generation and aborts the prior request. Direct arrays commit once. Promise-like results attach terminal handlers before the loading callback and render, then commit a terminal state after fulfillment. State observers run before the matching DOM replacement.
+  actor Consumer as Application
+  participant Coordinator
+  participant Source as Event input
+  participant DOM as DOM presenters
+  Consumer->>Coordinator: render(), range-changing navigation, setEvents(), or refetchEvents()
+  Coordinator->>Coordinator: Claim generation N; abort generation N - 1
+  Coordinator->>Source: Request the 42-day range with AbortSignal
+  alt Direct array
+    Source-->>Coordinator: Event array
+    Coordinator->>Coordinator: Validate, normalize, index, commit terminal state
+    Coordinator->>Consumer: onStateChange(ready or degraded)
+    Coordinator->>DOM: Render terminal snapshot
+  else PromiseLike
+    Source-->>Coordinator: PromiseLike
+    Coordinator->>Coordinator: Attach fulfillment and rejection handlers
+    Coordinator->>Consumer: onStateChange(loading)
+    Coordinator->>DOM: Render loading snapshot
+    Source-->>Coordinator: Fulfilled event array
+    Coordinator->>Coordinator: Check N; validate, normalize, index, commit terminal state
+    Coordinator->>Consumer: onStateChange(ready or degraded)
+    Coordinator->>DOM: Render terminal snapshot
+  end
+  Note over Coordinator,DOM: Current-generation checks guard provider work, normalization, callbacks, render hooks, and commits.
+```
+
+A direct array performs one terminal render without a loading or busy phase. A PromiseLike attaches both settlement handlers before publishing loading, then performs one loading render and one terminal render. Source rejection or invalid payload follows the same ownership and generation gates: a current failure enters the documented error-admission path, while stale work may be reported but cannot update state or DOM. See the [error guide](errors.md) for failure presentation and recovery.
+
+Configured extensions receive state through their separate queued lifecycle after the consumer callback; the [first-party extension guide](first-party-extensions.md#capabilities-lifecycle-and-isolation) owns that ordering contract.
+
+The immutable options snapshot keeps the construction-time `events` value, while the coordinator owns the current static array or provider without wrapping one as the other. `setEvents()` validates and snapshots a replacement before changing that input, then starts a new source generation. Abort-listener and validation-getter reentrancy must not let an older transaction reclaim source or controller ownership from a newer accepted replacement.
 
 Keep generation checks and commit decisions in the coordinator or a focused runtime policy module. Do not let DOM renderers start requests, mutate public state, or decide whether stale work may commit.
+
+Performance fast paths must preserve those ownership boundaries. Event indexing may parse once, sort once, and distribute occurrences because it is a pure domain operation. A calendar with no render hooks may skip hook-integrity snapshots and mount-context construction because those render regions contain no consumer render-hook nodes to protect; any configured hook set always uses the complete integrity and quarantine path. Shared and optional formatters belong to focused presentation helpers, and disabled features must avoid installing inactive listeners or observers. Full grid and agenda replacement remains the transaction boundary for selection and source commits until a partial-render design can preserve focus restoration, hook cleanup, quarantine recovery, and callback reentrancy together.
 
 ## Stable DOM and ownership invariants
 

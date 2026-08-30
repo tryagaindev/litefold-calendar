@@ -69,6 +69,8 @@ export interface CalendarRange extends CalendarRangeBounds {
  * An abort-aware provider for the one current fixed 42-day grid.
  * Called for initial load, each committed month change, each explicit refetch, and
  * when installed through `setEvents()`; pager pulls never request an adjacent range before commit.
+ * Each invocation is timed by its return shape: an array commits synchronously,
+ * while any PromiseLike publishes loading state before its terminal settlement.
  */
 export type CalendarEventSource<TMetadata = unknown> = (
 	this: void,
@@ -76,7 +78,7 @@ export type CalendarEventSource<TMetadata = unknown> = (
 ) => readonly CalendarEventInput<TMetadata>[] |
 	PromiseLike<readonly CalendarEventInput<TMetadata>[]>;
 
-/** Static events or an abort-aware `CalendarEventSource`. */
+/** Static immediate events or an abort-aware, independently timed `CalendarEventSource`. */
 export type CalendarEvents<TMetadata = unknown> =
 	readonly CalendarEventInput<TMetadata>[] | CalendarEventSource<TMetadata>;
 
@@ -141,16 +143,6 @@ export interface CalendarDayRenderContext extends CalendarRenderContext<"day"> {
 	readonly isToday: boolean;
 }
 
-/** Values supplied when rendering the compact cue for a day with multiple events. */
-export interface CalendarMultipleEventIndicatorContext extends CalendarRenderContext<"day"> {
-	/** Structured Gregorian date for the rendered day. */
-	readonly date: CalendarDate;
-	/** Strict `YYYY-MM-DD` form of `date`. */
-	readonly dateString: string;
-	/** Authoritative total number of event occurrences for the day. */
-	readonly eventCount: number;
-}
-
 /** Stable element references supplied to day render hooks without exposing private selectors. */
 export interface CalendarDayElements {
 	/** Visual-only render-hook slot for a day badge. */
@@ -174,20 +166,61 @@ export type CalendarEventSurface = "grid-summary" | "agenda";
 /** Calendar surfaces on which event times remain visually displayed. */
 export type CalendarEventTimeDisplay = "all" | "grid" | "agenda" | "none";
 
-/** Values supplied when rendering visual content for the native grid-overflow action. */
-export interface CalendarGridOverflowContentContext
-	extends CalendarRenderContext<"grid-summary"> {
+/** Package-owned element references supplied for event-overflow inspection and placement. */
+export interface CalendarEventOverflowElements<
+	TAction extends HTMLButtonElement | null = HTMLButtonElement | null
+> {
+	/** Native package-owned overflow action, or `null` for a passive compact cue; do not mutate it. */
+	readonly action: TAction;
+	/** Owned slot containing the built-in or returned visual content; do not mutate it directly. */
+	readonly content: HTMLElement;
+	/** Root element for this overflow rendering variant; do not mutate it directly. */
+	readonly root: HTMLElement;
+}
+
+/** Values supplied when rendering a compact event-overflow cue. */
+export interface CalendarCompactEventOverflowContext extends CalendarRenderContext<"day"> {
 	/** Structured Gregorian date for the rendered day. */
 	readonly date: CalendarDate;
 	/** Strict `YYYY-MM-DD` form of `date`. */
 	readonly dateString: string;
+	/** Stable owned elements for supported overflow customization. */
+	readonly elements: CalendarEventOverflowElements;
 	/** Authoritative total number of event occurrences for the day. */
 	readonly eventCount: number;
-	/** Number of event occurrences omitted from the grid cell. */
-	readonly hiddenEventCount: number;
-	/** Localized built-in overflow text retained by the native action. */
+	/** Number of occurrences not represented by the compact primary visual. */
+	readonly overflowCount: number;
+	/** Locale-aware built-in compact number, including `+` when paired with a primary visual. */
 	readonly text: string;
+	/** Number of occurrences already represented by the compact primary visual. */
+	readonly visibleEventCount: number;
+	/** Discriminant for the compact overflow rendering variant. */
+	readonly variant: "compact";
 }
+
+/** Values supplied when rendering wide content for the native grid-overflow action. */
+export interface CalendarWideEventOverflowContext extends CalendarRenderContext<"grid-summary"> {
+	/** Structured Gregorian date for the rendered day. */
+	readonly date: CalendarDate;
+	/** Strict `YYYY-MM-DD` form of `date`. */
+	readonly dateString: string;
+	/** Stable owned elements for supported overflow customization. */
+	readonly elements: CalendarEventOverflowElements<HTMLButtonElement>;
+	/** Authoritative total number of event occurrences for the day. */
+	readonly eventCount: number;
+	/** Number of occurrences omitted from the visible wide grid summaries. */
+	readonly overflowCount: number;
+	/** Localized text used by the built-in wide overflow fallback. */
+	readonly text: string;
+	/** Number of occurrences represented by visible wide grid summaries. */
+	readonly visibleEventCount: number;
+	/** Discriminant for the wide overflow rendering variant. */
+	readonly variant: "wide";
+}
+
+/** Values supplied when rendering one pre-rendered event-overflow variant. */
+export type CalendarEventOverflowContext =
+	CalendarCompactEventOverflowContext | CalendarWideEventOverflowContext;
 
 /** Stable element references supplied to event render hooks without exposing private selectors. */
 export interface CalendarEventElements {
@@ -255,6 +288,16 @@ export interface CalendarRenderHooks<TMetadata = unknown> {
 		this: void,
 		context: Readonly<CalendarEventRenderContext<TMetadata>>
 	) => Node | null | undefined;
+	/**
+	 * Synchronously returns a detached, same-document, unique, presentational node for a pre-rendered
+	 * compact or wide overflow variant. `undefined` keeps the built-in content. `null`
+	 * suppresses an optional passive compact cue; native compact and wide actions keep
+	 * their localized built-in content.
+	 */
+	readonly renderEventOverflow?: (
+		this: void,
+		context: Readonly<CalendarEventOverflowContext>
+	) => Node | null | undefined;
 	/** Returns detached, noninteractive content before an event time and title. */
 	readonly renderEventLeading?: (
 		this: void,
@@ -269,16 +312,6 @@ export interface CalendarRenderHooks<TMetadata = unknown> {
 	readonly renderEventTrailing?: (
 		this: void,
 		context: Readonly<CalendarEventRenderContext<TMetadata>>
-	) => Node | null | undefined;
-	/** Returns detached, noninteractive wide content for the native grid-overflow action. */
-	readonly renderGridOverflowContent?: (
-		this: void,
-		context: Readonly<CalendarGridOverflowContentContext>
-	) => Node | null | undefined;
-	/** Replaces the built-in compact three-layer event-slip fan, or suppresses it with `null`. */
-	readonly renderMultipleEventIndicator?: (
-		this: void,
-		context: Readonly<CalendarMultipleEventIndicatorContext>
 	) => Node | null | undefined;
 }
 
@@ -381,7 +414,7 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly onEventActivate?: CalendarAction<CalendarEventActivation<TMetadata>>;
 	/** Handles context gestures and primary activation when context is an unlinked occurrence's only action. */
 	readonly onEventContextMenu?: CalendarAction<CalendarEventContextMenu<TMetadata>>;
-	/** Static events or an abort-aware provider for the one current fixed 42-day grid. */
+	/** Immediate static events or an abort-aware provider whose return shape selects each request's timing. */
 	readonly events: CalendarEvents<TMetadata>;
 	/** Complete configured components registered in deterministic lifecycle order. */
 	readonly extensions?: readonly CalendarExtension[];
@@ -419,7 +452,7 @@ export interface CalendarOptions<TMetadata = unknown> {
 		this: void,
 		error: LitefoldCalendarError
 	) => CalendarErrorDisposition | undefined;
-	/** Synchronously observes immutable, presentation-safe state snapshots. */
+	/** Synchronously observes immutable state after publication and before its corresponding DOM replacement. */
 	readonly onStateChange?: (this: void, state: Readonly<CalendarState>) => undefined;
 	/** Maximum events accepted from one source result; defaults to `10,000`. */
 	readonly sourceEventLimit?: number;
@@ -435,13 +468,17 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly toolbarEnd?: HTMLElement;
 }
 
-/** The intentionally small calendar lifecycle, event-data, state, and navigation API. */
+/**
+ * The intentionally small calendar lifecycle, event-data, state, and navigation API.
+ * Void methods remain synchronous: direct event arrays finish validation, terminal
+ * state, DOM, fallback, and focus work before returning; PromiseLike work settles later.
+ */
 export interface Calendar<in out TMetadata = unknown> {
-	/** Adds the calendar to its host and starts loading the visible month; throws when the instance cannot claim the host. */
+	/** Adds the calendar to its host and resolves the visible month; throws when the instance cannot claim the host. */
 	render(this: Calendar<TMetadata>): void;
 	/** Aborts pending work, removes listeners, and clears the host. */
 	destroy(this: Calendar<TMetadata>): void;
-	/** Replaces the complete static snapshot or provider and loads the current visible range; throws for invalid input or lifecycle state. */
+	/** Replaces the complete static snapshot or provider and resolves the current visible range; throws for invalid input or lifecycle state. */
 	setEvents(this: Calendar<TMetadata>, events: CalendarEvents<TMetadata>): void;
 	/** Forces the current visible range to be loaded again; throws unless the instance is rendered and live. */
 	refetchEvents(this: Calendar<TMetadata>): void;

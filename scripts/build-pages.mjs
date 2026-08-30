@@ -257,9 +257,9 @@ function developerFooter(metadata, stylesheetHref, navigation) {
 	const version = escapeHtml(metadata.version);
 	return [
 		`\t<link rel="stylesheet" href="${escapeHtml(stylesheetHref)}">`,
-		`\t<footer class="lfc-developer-footer" data-deployment-channel="${escapeHtml(metadata.channel)}">`,
+		`\t<footer class="my-developer-footer" data-my-deployment-channel="${escapeHtml(metadata.channel)}">`,
 		'\t\t<nav aria-label="Developer resources">',
-		'\t\t\t<ul class="lfc-developer-footer-links">',
+		'\t\t\t<ul class="my-developer-footer-links">',
 		`\t\t\t\t<li><a href="${escapeHtml(navigation.examplesHref)}">All examples</a></li>`,
 		`\t\t\t\t<li><a href="${escapeHtml(navigation.sourceHref)}">Recipe source</a></li>`,
 		`\t\t\t\t<li><a href="${escapeHtml(navigation.apiHref)}">API reference</a></li>`,
@@ -278,9 +278,19 @@ function developerFooter(metadata, stylesheetHref, navigation) {
 	].join("\n");
 }
 
+function hasHtmlClass(source, className) {
+	for (const match of source.matchAll(/\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')/giu)) {
+		const value = match[1] ?? match[2] ?? "";
+		if (value.split(/\s+/u).includes(className)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 async function injectDeveloperFooter(htmlPath, contentDirectory, exampleDirectory, metadata, repositoryUrl) {
 	const source = await readFile(htmlPath, "utf8");
-	if (source.includes("class=\"lfc-developer-footer\"")) {
+	if (hasHtmlClass(source, "my-developer-footer")) {
 		throw new Error(`${displayPath(htmlPath, contentDirectory)} already contains a developer footer.`);
 	}
 	if (!source.includes("</head>") || !source.includes("</body>")) {

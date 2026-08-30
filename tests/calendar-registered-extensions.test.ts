@@ -19,6 +19,100 @@ import {
 	waitForCalendarPhase
 } from "./helpers/registered-extensions.js";
 
+void test("direct initial events activate extensions against ready state and queue one terminal delivery", async (context) => {
+	const { host } = setupRegisteredExtensionDom(context);
+	const lifecycle: string[] = [];
+	const deliveries: string[] = [];
+	const applicationPhases: string[] = [];
+	const extensions = ["first", "second"].map((id) => createRegisteredExtensionProbe({
+		activate: ({ state }) => {
+			lifecycle.push(`activate:${id}:${state?.getState().phase ?? "missing"}`);
+			return {
+				stateChanged: () => {
+					deliveries.push(`${id}:${state?.getState().phase ?? "missing"}`);
+				}
+			};
+		},
+		capabilities: ["state"],
+		id: `direct-initial-${id}`
+	}));
+	const calendar = createCalendar(host, {
+		events: [],
+		extensions,
+		initialDate: "2026-07-14",
+		onStateChange: (state) => {
+			applicationPhases.push(state.phase);
+			lifecycle.push(`application:${state.phase}`);
+		}
+	});
+
+	calendar.render();
+
+	assert.equal(calendar.getState().phase, "ready");
+	assert.equal(host.hasAttribute("aria-busy"), false);
+	assert.deepEqual(applicationPhases, ["ready"]);
+	assert.deepEqual(lifecycle, [
+		"application:ready",
+		"activate:first:ready",
+		"activate:second:ready"
+	]);
+	assert.deepEqual(deliveries, []);
+
+	await flushRegisteredExtensionTasks();
+	assert.deepEqual(deliveries, ["first:ready", "second:ready"]);
+	await flushRegisteredExtensionTasks();
+	assert.deepEqual(deliveries, ["first:ready", "second:ready"]);
+	calendar.destroy();
+});
+
+void test("controlled initial PromiseLike skips retroactive loading delivery and queues one terminal delivery", async (context) => {
+	const { host } = setupRegisteredExtensionDom(context);
+	let completeEvents!: (events: readonly never[]) => void;
+	const pendingEvents = new Promise<readonly never[]>((resolve) => {
+		completeEvents = resolve;
+	});
+	const applicationPhases: string[] = [];
+	const activationPhases: string[] = [];
+	const deliveries: string[] = [];
+	const observer = createRegisteredExtensionProbe({
+		activate: ({ state }) => {
+			activationPhases.push(state?.getState().phase ?? "missing");
+			return {
+				stateChanged: () => {
+					deliveries.push(state?.getState().phase ?? "missing");
+				}
+			};
+		},
+		capabilities: ["state"],
+		id: "controlled-initial-promise-like"
+	});
+	const calendar = createCalendar(host, {
+		events: () => pendingEvents,
+		extensions: [observer],
+		initialDate: "2026-07-14",
+		onStateChange: (state) => { applicationPhases.push(state.phase); }
+	});
+
+	calendar.render();
+
+	assert.equal(calendar.getState().phase, "loading");
+	assert.equal(host.getAttribute("aria-busy"), "true");
+	assert.deepEqual(applicationPhases, ["loading"]);
+	assert.deepEqual(activationPhases, ["loading"]);
+	await flushRegisteredExtensionTasks();
+	assert.deepEqual(deliveries, []);
+
+	completeEvents([]);
+	await waitForCalendarPhase(calendar, "ready");
+	await flushRegisteredExtensionTasks();
+	assert.equal(host.hasAttribute("aria-busy"), false);
+	assert.deepEqual(applicationPhases, ["loading", "ready"]);
+	assert.deepEqual(deliveries, ["ready"]);
+	await flushRegisteredExtensionTasks();
+	assert.deepEqual(deliveries, ["ready"]);
+	calendar.destroy();
+});
+
 void test("registered extensions activate and observe state in input order, then stop in reverse order", async (context) => {
 	const { host } = setupRegisteredExtensionDom(context);
 	const activationOrder: string[] = [];

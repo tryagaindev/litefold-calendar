@@ -58,8 +58,8 @@ export class IntegrationNodeController {
 			return;
 		}
 		const hidden = hasCurrentSnapshot && !hasFatalError ? true : this.fallbackWasHidden;
-		fallback.hidden = hidden;
 		this.fallbackLastWrittenHidden = hidden;
+		fallback.hidden = hidden;
 	}
 
 	/** Restores fallback visibility without overwriting application mutation. */

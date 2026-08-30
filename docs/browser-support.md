@@ -1,6 +1,6 @@
 # Browser support
 
-litefold-calendar targets current standards-based browsers and ships no polyfills or legacy build. The support window rolls forward with stable browser releases instead of being pinned to package-specific version numbers.
+Litefold Calendar targets current standards-based browsers and ships no polyfills or legacy build. The support window rolls forward with stable browser releases instead of being pinned to package-specific version numbers.
 
 ## Supported release window
 
@@ -65,6 +65,6 @@ An unsupported browser may happen to work, but compatibility is not tested or gu
 
 ## Reporting compatibility defects
 
-Include the exact litefold-calendar version, browser version, operating-system version, available calendar width, input device and gesture type when relevant, and a minimal reproduction. Verify the problem with the package's unmodified ESM and CSS exports in a supported stable browser before filing it. See the [support policy](../SUPPORT.md) for reporting routes.
+Include the exact Litefold Calendar version, browser version, operating-system version, available calendar width, input device and gesture type when relevant, and a minimal reproduction. Verify the problem with the package's unmodified ESM and CSS exports in a supported stable browser before filing it. See the [support policy](../SUPPORT.md) for reporting routes.
 
 [Back to the documentation hub](README.md)

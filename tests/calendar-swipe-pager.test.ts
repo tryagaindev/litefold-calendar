@@ -234,6 +234,16 @@ void test("pager maps RTL lanes, excludes bounded lanes, and disables paging wit
 	assert.equal(boundedRequests, 2);
 
 	const disabledHost = requireHost(dom, "#disabled");
+	let disabledResizeObservations = 0;
+	class DisabledResizeObserver {
+		public disconnect(): void { return; }
+		public observe(): void { disabledResizeObservations += 1; }
+		public unobserve(): void { return; }
+	}
+	Object.defineProperty(dom.window, "ResizeObserver", {
+		configurable: true,
+		value: DisabledResizeObserver
+	});
 	let disabledRequests = 0;
 	const disabledCalendar = createCalendar(disabledHost, {
 		events: () => {
@@ -258,7 +268,12 @@ void test("pager maps RTL lanes, excludes bounded lanes, and disables paging wit
 	setPagerScroll(dom, disabledPager.viewport, disabledGeometry.nextOffset, true);
 	assert.equal(disabledCalendar.getState().displayedMonth.month, 8);
 	assert.equal(disabledRequests, 1);
-	assert.equal(disabledPager.viewport.scrollLeft, 0);
+	assert.equal(
+		disabledPager.viewport.scrollLeft,
+		disabledGeometry.nextOffset,
+		"Disabled swipe must not install a scroll handler that resets programmatic scrolling."
+	);
+	assert.equal(disabledResizeObservations, 0);
 });
 
 void test("touch contacts guard clicks and multi-touch or touchcancel returns to the current month", async (context) => {

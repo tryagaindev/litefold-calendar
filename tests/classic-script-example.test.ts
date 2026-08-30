@@ -20,7 +20,7 @@ void test("the classic-script example starts and tears down through a regular sc
 	const entry = await loadClassicEntry();
 	context.after(() => { entry.dom.window.close(); });
 
-	const host = requireElement(entry.dom, "[data-calendar]");
+	const host = requireElement(entry.dom, "[data-my-calendar]");
 	const restoreHTMLElement = exposeHTMLElement(entry.dom);
 	try {
 		executeEntry(entry, async () => publicApi as unknown as Module);
@@ -41,7 +41,7 @@ void test("the classic-script example starts and tears down through a regular sc
 		"/events/design-review?from=classic-script#details"
 	);
 	eventLink.click();
-	const result = requireElement(entry.dom, "[data-result]");
+	const result = requireElement(entry.dom, "[data-my-result]");
 	await waitFor(
 		() => result.textContent?.includes("Calendar design review") === true,
 		"classic-script event activation"
@@ -63,11 +63,11 @@ void test("the classic-script example reports module-loading startup failures ac
 	});
 
 	executeEntry(entry, async () => { throw failure; });
-	const alert = requireElement(entry.dom, "[data-startup-error]");
+	const alert = requireElement(entry.dom, "[data-my-startup-error]");
 	await waitFor(() => (alert.textContent?.trim().length ?? 0) > 0, "classic-script startup error");
 
 	assert.equal(reported, failure);
-	assert.equal(requireElement(entry.dom, "[data-calendar]").childElementCount, 0);
+	assert.equal(requireElement(entry.dom, "[data-my-calendar]").childElementCount, 0);
 });
 
 async function loadClassicEntry(): Promise<ClassicEntry> {

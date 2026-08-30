@@ -1,7 +1,7 @@
 import { createCalendar } from "../../dist/index.js";
 
-const host = document.querySelector("[data-calendar]");
-const result = document.querySelector("[data-result]");
+const host = document.querySelector("[data-my-calendar]");
+const result = document.querySelector("[data-my-result]");
 
 if (!(host instanceof HTMLElement) || !(result instanceof HTMLElement)) {
 	throw new Error("The example markup is incomplete.");
@@ -36,8 +36,8 @@ const EVENTS = [
 	{
 		id: "design-review",
 		title: "Calendar design review",
-		start: `${TODAY}T09:30`,
-		end: `${TODAY}T10:15`,
+		start: `${TODAY}T11:38`,
+		end: `${TODAY}T12:23`,
 		accentColor: "#805FC0"
 	},
 	{

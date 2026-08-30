@@ -1,8 +1,18 @@
-import type { CalendarDate } from "../../types.js";
 import { createEventAccent } from "../dom/event-accent.js";
-import { createMultipleEventIndicator } from "../dom/multiple-event-indicator.js";
-import type { RenderHookRuntime } from "./render-hooks.js";
+import type { PreparedEventOverflowVariant } from "./event-overflow-presentation.js";
+import {
+	assertRenderHookElementIntegrity,
+	assertRenderHookElementValueIntegrity,
+	captureRenderHookElementIntegrity
+} from "./render-hook-element-integrity.js";
+import type {
+	RenderHookEventOverflowFallback,
+	RenderHookRuntime
+} from "./render-hooks.js";
 import { observeThenable } from "./safety.js";
+
+const CUSTOM_EVENT_OVERFLOW_CLASS = "lfc-has-custom-event-overflow";
+const SUPPRESSED_EVENT_OVERFLOW_CLASS = "lfc-is-event-overflow-suppressed";
 
 interface RenderHookVisualRendererOptions<TMetadata> {
 	readonly appendNode: (
@@ -46,6 +56,7 @@ export class RenderHookVisualRenderer<TMetadata> {
 	public renderEventMarker(
 		container: HTMLElement,
 		accentColor: string | null,
+		protectedElements: readonly (HTMLElement | null)[],
 		createContext: (signal: AbortSignal) => Readonly<Record<string, unknown>>
 	): void {
 		if (this.options.isDestroyed()) {
@@ -66,6 +77,7 @@ export class RenderHookVisualRenderer<TMetadata> {
 		const context = Object.freeze(createContext(controller.signal));
 		const surface = context["surface"];
 		try {
+			const elementIntegrity = captureRenderHookElementIntegrity(protectedElements);
 			const result = hook(context);
 			const returnedThenable = observeThenable(result, (cause) => {
 				this.options.reportLateFailure(runtime, "renderEventMarker", cause, surface);
@@ -81,6 +93,7 @@ export class RenderHookVisualRenderer<TMetadata> {
 				}
 				return;
 			}
+			assertRenderHookElementIntegrity(elementIntegrity, "renderEventMarker");
 			if (returnedThenable) {
 				throw new TypeError("renderEventMarker must return a node or null synchronously.");
 			}
@@ -104,6 +117,7 @@ export class RenderHookVisualRenderer<TMetadata> {
 				}
 				return;
 			}
+			assertRenderHookElementValueIntegrity(elementIntegrity, "renderEventMarker");
 			runtime.markerFallbacks.set(container, accentColor);
 		} catch (cause: unknown) {
 			if (!this.options.isInvocationCurrent(runtime, controller)) {
@@ -117,44 +131,67 @@ export class RenderHookVisualRenderer<TMetadata> {
 		}
 	}
 
-	/** Renders the compact multiple-event cue through its singleton hook or the package default. */
-	public renderMultipleEventIndicator(
-		container: HTMLElement,
-		date: CalendarDate,
-		dateString: string,
-		eventCount: number
-	): void {
+	/** Renders one pre-rendered compact or wide overflow variant through its singleton hook. */
+	public renderEventOverflow(options: Readonly<PreparedEventOverflowVariant>): void {
 		if (this.options.isDestroyed()) {
 			return;
 		}
-		const fallback = createMultipleEventIndicator(this.options.document);
-		container.append(fallback);
 		const runtime = this.options.renderHooks.find((candidate) =>
-			!candidate.quarantined && candidate.definition.renderMultipleEventIndicator !== undefined);
+			!candidate.quarantined && candidate.definition.renderEventOverflow !== undefined);
 		if (runtime === undefined) {
 			return;
 		}
-		const hook = runtime.definition.renderMultipleEventIndicator as
+		const hook = runtime.definition.renderEventOverflow as
 			((context: unknown) => unknown) | undefined;
 		if (hook === undefined) {
 			return;
 		}
 		const controller = runtime.controller;
-		const surface = "day" as const;
+		const surface = options.variant === "compact" ? "day" as const : "grid-summary" as const;
 		const context = Object.freeze({
-			date: Object.freeze({ ...date }),
-			dateString,
+			date: Object.freeze({ ...options.date }),
+			dateString: options.dateString,
 			document: this.options.document,
-			eventCount,
+			elements: Object.freeze({
+				action: options.action,
+				content: options.content,
+				root: options.root
+			}),
+			eventCount: options.eventCount,
+			overflowCount: options.overflowCount,
 			signal: controller.signal,
-			surface
+			surface,
+			text: options.text,
+			variant: options.variant,
+			visibleEventCount: options.visibleEventCount
 		});
 		try {
+			let fallback = runtime.eventOverflowFallbacks.get(options.content);
+			if (fallback === undefined) {
+				const packageChildren = Object.freeze([...options.content.childNodes]);
+				fallback = Object.freeze({
+					content: options.content,
+					defaultChildren: Object.freeze(
+						packageChildren.map((node) => node.cloneNode(true))
+					),
+					detachedPackageIntegrity: null,
+					packageChildren,
+					root: options.root,
+					surface
+				});
+				runtime.eventOverflowFallbacks.set(options.content, fallback);
+			}
+			const elementIntegrity = captureRenderHookElementIntegrity(
+				getEventOverflowProtectedElements(options)
+			);
+			const packageChildrenIntegrity = captureRenderHookElementIntegrity(
+				fallback.packageChildren
+			);
 			const result = hook(context);
 			const returnedThenable = observeThenable(result, (cause) => {
 				this.options.reportLateFailure(
 					runtime,
-					"renderMultipleEventIndicator",
+					"renderEventOverflow",
 					cause,
 					surface
 				);
@@ -163,162 +200,76 @@ export class RenderHookVisualRenderer<TMetadata> {
 				if (returnedThenable) {
 					this.options.reportLateFailure(
 						runtime,
-						"renderMultipleEventIndicator",
+						"renderEventOverflow",
 						new TypeError(
-							"renderMultipleEventIndicator must return a node, null, or undefined synchronously."
+							"renderEventOverflow must return a node, null, or undefined synchronously."
 						),
 						surface
 					);
 				}
 				return;
 			}
+			assertRenderHookElementIntegrity(elementIntegrity, "renderEventOverflow");
 			if (returnedThenable) {
 				throw new TypeError(
-					"renderMultipleEventIndicator must return a node, null, or undefined synchronously."
+					"renderEventOverflow must return a node, null, or undefined synchronously."
 				);
 			}
 			if (result === undefined) {
 				return;
 			}
 			if (result === null) {
-				runtime.multipleEventIndicatorFallbacks.add(container);
-				fallback.remove();
-				return;
-			}
-			if (!this.options.appendNode(
-				runtime,
-				"renderMultipleEventIndicator",
-				container,
-				result,
-				true,
-				surface
-			)) {
-				return;
-			}
-			runtime.multipleEventIndicatorFallbacks.add(container);
-			fallback.remove();
-		} catch (cause: unknown) {
-			if (!this.options.isInvocationCurrent(runtime, controller)) {
-				this.options.reportLateFailure(
-					runtime,
-					"renderMultipleEventIndicator",
-					cause,
-					surface
-				);
-				return;
-			}
-			this.options.quarantine(runtime, "renderMultipleEventIndicator", cause, surface);
-			if (this.canRestoreFallback(container)) {
-				container.append(createMultipleEventIndicator(this.options.document));
-			}
-		}
-	}
-
-	/** Renders optional wide visual content without replacing the native overflow action. */
-	public renderGridOverflowContent(
-		button: HTMLButtonElement,
-		container: HTMLElement,
-		date: CalendarDate,
-		dateString: string,
-		eventCount: number,
-		hiddenEventCount: number,
-		text: string
-	): void {
-		if (this.options.isDestroyed()) {
-			return;
-		}
-		const runtime = this.options.renderHooks.find((candidate) =>
-			!candidate.quarantined && candidate.definition.renderGridOverflowContent !== undefined);
-		if (runtime === undefined) {
-			return;
-		}
-		const hook = runtime.definition.renderGridOverflowContent as
-			((context: unknown) => unknown) | undefined;
-		if (hook === undefined) {
-			return;
-		}
-		const controller = runtime.controller;
-		const surface = "grid-summary" as const;
-		const context = Object.freeze({
-			date: Object.freeze({ ...date }),
-			dateString,
-			document: this.options.document,
-			eventCount,
-			hiddenEventCount,
-			signal: controller.signal,
-			surface,
-			text
-		});
-		try {
-			const result = hook(context);
-			const returnedThenable = observeThenable(result, (cause) => {
-				this.options.reportLateFailure(
-					runtime,
-					"renderGridOverflowContent",
-					cause,
-					surface
-				);
-			});
-			if (!this.options.isInvocationCurrent(runtime, controller)) {
-				if (returnedThenable) {
-					this.options.reportLateFailure(
-						runtime,
-						"renderGridOverflowContent",
-						new TypeError(
-							"renderGridOverflowContent must return a node, null, or undefined synchronously."
-						),
-						surface
-					);
+				if (options.variant === "compact" && options.action === null) {
+					options.root.classList.add(SUPPRESSED_EVENT_OVERFLOW_CLASS);
+					fallback = detachPackageFallbackChildren(fallback);
+					runtime.eventOverflowFallbacks.set(options.content, fallback);
 				}
 				return;
 			}
-			if (returnedThenable) {
-				throw new TypeError(
-					"renderGridOverflowContent must return a node, null, or undefined synchronously."
-				);
-			}
-			if (result === null || result === undefined) {
-				return;
-			}
 			if (!this.options.appendNode(
 				runtime,
-				"renderGridOverflowContent",
-				container,
+				"renderEventOverflow",
+				options.content,
 				result,
 				true,
 				surface
 			)) {
 				return;
 			}
-			button.classList.add("lfc-has-custom-grid-overflow-content");
-			runtime.gridOverflowContentFallbacks.add(button);
+			assertRenderHookElementIntegrity(packageChildrenIntegrity, "renderEventOverflow");
+			assertRenderHookElementValueIntegrity(elementIntegrity, "renderEventOverflow");
+			fallback = detachPackageFallbackChildren(fallback);
+			runtime.eventOverflowFallbacks.set(options.content, fallback);
+			options.root.classList.add(CUSTOM_EVENT_OVERFLOW_CLASS);
 		} catch (cause: unknown) {
 			if (!this.options.isInvocationCurrent(runtime, controller)) {
 				this.options.reportLateFailure(
 					runtime,
-					"renderGridOverflowContent",
+					"renderEventOverflow",
 					cause,
 					surface
 				);
 				return;
 			}
-			this.options.quarantine(runtime, "renderGridOverflowContent", cause, surface);
+			this.options.quarantine(runtime, "renderEventOverflow", cause, surface);
 		}
 	}
 
 	/** Clears stale fallback bookkeeping when an ordinary render or teardown releases render-hook nodes. */
 	public clearFallbackTracking(runtime: RenderHookRuntime<TMetadata>): unknown[] {
 		const errors: unknown[] = [];
-		for (const button of runtime.gridOverflowContentFallbacks) {
+		for (const { root } of runtime.eventOverflowFallbacks.values()) {
 			try {
-				button.classList.remove("lfc-has-custom-grid-overflow-content");
+				root.classList.remove(
+					CUSTOM_EVENT_OVERFLOW_CLASS,
+					SUPPRESSED_EVENT_OVERFLOW_CLASS
+				);
 			} catch (cause: unknown) {
 				errors.push(cause);
 			}
 		}
-		runtime.gridOverflowContentFallbacks.clear();
+		runtime.eventOverflowFallbacks.clear();
 		runtime.markerFallbacks.clear();
-		runtime.multipleEventIndicatorFallbacks.clear();
 		return errors;
 	}
 
@@ -336,31 +287,68 @@ export class RenderHookVisualRenderer<TMetadata> {
 					errors.push(cause);
 				}
 			}
-			for (const container of runtime.multipleEventIndicatorFallbacks) {
-				if (container.childNodes.length > 0) {
-					continue;
-				}
+			for (const fallback of runtime.eventOverflowFallbacks.values()) {
 				try {
-					container.append(createMultipleEventIndicator(this.options.document));
+					fallback.root.classList.remove(
+						CUSTOM_EVENT_OVERFLOW_CLASS,
+						SUPPRESSED_EVENT_OVERFLOW_CLASS
+					);
 				} catch (cause: unknown) {
 					errors.push(cause);
 				}
-			}
-			for (const button of runtime.gridOverflowContentFallbacks) {
 				try {
-					button.classList.remove("lfc-has-custom-grid-overflow-content");
+					if (!hasEquivalentChildren(fallback.content, fallback.defaultChildren)) {
+						fallback.content.replaceChildren(
+							...fallback.defaultChildren.map((node) => node.cloneNode(true))
+						);
+					}
 				} catch (cause: unknown) {
 					errors.push(cause);
 				}
 			}
 		}
-		runtime.gridOverflowContentFallbacks.clear();
+		runtime.eventOverflowFallbacks.clear();
 		runtime.markerFallbacks.clear();
-		runtime.multipleEventIndicatorFallbacks.clear();
 		return errors;
 	}
 
 	private canRestoreFallback(container: HTMLElement): boolean {
 		return !this.options.isDestroyed() && container.childNodes.length === 0;
 	}
+}
+
+function hasEquivalentChildren(container: HTMLElement, expectedChildren: readonly Node[]): boolean {
+	if (container.childNodes.length !== expectedChildren.length) {
+		return false;
+	}
+	return expectedChildren.every((expected, index) =>
+		container.childNodes.item(index).isEqualNode(expected));
+}
+
+function detachPackageFallbackChildren(
+	fallback: Readonly<RenderHookEventOverflowFallback>
+): Readonly<RenderHookEventOverflowFallback> {
+	for (const child of fallback.packageChildren) {
+		if (child.parentNode === fallback.content) {
+			fallback.content.removeChild(child);
+		}
+	}
+	return Object.freeze({
+		...fallback,
+		detachedPackageIntegrity: captureRenderHookElementIntegrity(fallback.packageChildren)
+	});
+}
+
+function getEventOverflowProtectedElements(
+	options: Readonly<PreparedEventOverflowVariant>
+): readonly (HTMLElement | null)[] {
+	const protectedElements: (HTMLElement | null)[] = [
+		options.action,
+		options.root,
+		options.content
+	];
+	if (options.variant === "compact" && options.action === null) {
+		protectedElements.push(options.placementBoundary);
+	}
+	return Object.freeze(protectedElements);
 }

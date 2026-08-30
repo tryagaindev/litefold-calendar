@@ -2,7 +2,7 @@
 
 WebMCP is an experimental browser JavaScript API for exposing structured **site tools** to a compatible user agent. It is not a network transport, a remote MCP server, or a replacement for the calendar's visible interface. The current Web Machine Learning Community Group report is a proposal rather than a W3C Standard or Standards Track specification.
 
-Litefold's integration is an explicit optional first-party extension. A calendar configured with that extension registers two imperative tools while the instance is rendered and removes them when the instance is destroyed. Applications that do not import the WebMCP subpath keep its implementation outside their import graph. Browsers without the API continue to receive the complete ordinary calendar experience.
+Litefold Calendar's integration is an explicit optional first-party extension. A calendar configured with that extension registers two imperative tools while the instance is rendered and removes them when the instance is destroyed. Applications that do not import the WebMCP subpath keep its implementation outside their import graph. Browsers without the API continue to receive the complete ordinary calendar experience.
 
 ## Enable site tools
 
@@ -12,12 +12,12 @@ Make the opt-in decision in application or server policy, then configure the ext
 import { createCalendar } from "@tryagaindev/litefold-calendar";
 import { webMcp } from "@tryagaindev/litefold-calendar/extensions/webmcp";
 
-const webMcpEnabled = host.dataset.webMcpEnabled === "true";
+const myWebMcpEnabled = host.dataset.myWebMcpEnabled === "true";
 
 const calendar = createCalendar(host, {
 	events,
-	extensions: webMcpEnabled
-		? [webMcp({ toolNamePrefix: "team-schedule" })]
+	extensions: myWebMcpEnabled
+		? [webMcp({ toolNamePrefix: "my-schedule" })]
 		: []
 });
 
@@ -44,7 +44,7 @@ function hasWebMcpSupport(document: Document): boolean {
 
 ## Registered tools
 
-For a prefix of `team-schedule`, Litefold registers `team-schedule-get-events` and `team-schedule-navigate`.
+For a prefix of `my-schedule`, Litefold Calendar registers `my-schedule-get-events` and `my-schedule-navigate`.
 
 | Tool | Access and side effects | Input | Result |
 | --- | --- | --- | --- |
@@ -63,7 +63,7 @@ The page size is fixed at 10:
 
 Treat cursors as opaque and short-lived. Do not inspect or construct them, combine them with `date`, or persist them across calendar recreation. Each cursor is bound to one calendar instance, visible range, range-or-date scope, next offset, and exact usable event snapshot. It remains valid while a same-range refresh or replacement is pending or fails and retained data stays authoritative. A successful refresh or `setEvents()` replacement commit, visible-range navigation, or recreation returns `pagination-stale`; restart with `{}` or `{ date }`.
 
-Litefold validates continuations against the current snapshot instead of retaining old event payloads. Stale pagination therefore cannot restore superseded or newly unauthorized data.
+Litefold Calendar validates continuations against the current snapshot instead of retaining old event payloads. Stale pagination therefore cannot restore superseded or newly unauthorized data.
 
 When `date` is omitted, the tool returns every unique source event whose date span intersects at least one allowed date in that visible range. A multi-day event appears once in this range scope, even when it spans several visible days. Events that fall only on grid dates disabled by `minDate` or `maxDate`, and events entirely outside `state.range`, are excluded. Required source IDs deduplicate occurrences of the same source event across dates while preserving distinct events whose presentation-safe fields happen to match; IDs are never returned. In each result event, `end` is exclusive and is `null` when the source omitted it. The successful result uses `date: null` to identify this range scope; `null` is not accepted as an input value, so omit the property instead.
 
@@ -71,7 +71,9 @@ Grid density, overflow, agenda paging, and agenda DOM limits affect presentation
 
 When `date` is supplied, the tool returns events intersecting that allowed date, including multi-day events. An allowed date with no matching events returns a successful empty page. A disabled date inside the rendered grid is likewise excluded rather than disclosing events outside the configured bounds. A date outside `state.range` fails without loading another range.
 
-A current or retained usable snapshot returns `ok: true`, the numeric total, and the bounded page. While the current visible range has no loaded snapshot, it instead returns `ok: false` with error code `date-not-loaded`; an unavailable calendar with no usable snapshot returns `calendar-unavailable`. It never presents an unloaded range as an empty schedule. `navigate` is not read-only and returns no event content: it uses the same bounds, lifecycle, source cancellation, validation, loading, failure, and stale-result rules as the public navigation methods, and waits for its own resulting source generation before returning. A destination load that ends unavailable also returns `calendar-unavailable`.
+A current or retained usable snapshot returns `ok: true`, the numeric total, and the bounded page. While the current visible range has no loaded snapshot, it instead returns `ok: false` with error code `date-not-loaded`; an unavailable calendar with no usable snapshot returns `calendar-unavailable`. It never presents an unloaded range as an empty schedule. `navigate` is not read-only and returns no event content: it uses the same bounds, source cancellation, validation, failure, and stale-result rules as the public navigation methods, and waits for its own resulting source generation before returning. A destination load that ends unavailable also returns `calendar-unavailable`.
+
+Each navigation load is classified by its source value. A configured static array or an array returned directly by a provider commits its terminal state synchronously with one full render and no `loading` state or `aria-busy`. Any PromiseLike—including `Promise.resolve(...)`, an `async` function result, or a custom thenable—uses a loading render followed by a terminal render. Litefold Calendar invokes a provider before loading callbacks run and attaches PromiseLike handlers before those callbacks; `onStateChange` runs before the corresponding DOM replacement. The tool still waits for its own generation and returns the committed result in either case.
 
 Every handled failure is a stable `{ ok: false, error: { code, message }, state }` envelope. Raw causes are never returned.
 
@@ -88,13 +90,13 @@ Canceling an execution rejects it with `AbortError` and stops waiting. Cancellat
 
 Neither tool activates an event, selects an application command, follows a link, invokes `onDaySelect`, invokes an event or context-action callback, edits data, or bypasses application authorization. Ordinary state observation and event-source lifecycle callbacks still run for a committed navigation, just as they do for the equivalent public method. Tool results omit event identifiers, URLs, metadata, raw errors, and render-hook content. They expose only the bounded normalized fields required to understand the visible schedule.
 
-Litefold supports only imperative top-level registration through `document.modelContext.registerTool`. It does not use the deprecated navigator-scoped predecessor, declarative tools, cross-origin `exposedTo`, consumer APIs such as `getTools()` or `executeTool()`, or a WebMCP polyfill.
+Litefold Calendar supports only imperative top-level registration through `document.modelContext.registerTool`. It does not use the deprecated navigator-scoped predecessor, declarative tools, cross-origin `exposedTo`, consumer APIs such as `getTools()` or `executeTool()`, or a WebMCP polyfill.
 
 The [public API reference](api.md#webmcp-extension) owns the exported factory and option shape. The [first-party extension guide](first-party-extensions.md) owns composition and bundle behavior. The [application integration guide](integration-guide.md#webmcp-site-tools) shows how to assign prefixes in a page that may host more than one calendar.
 
 ## Lifecycle and fallback
 
-Extension activation begins only after a calendar successfully claims and renders its host. The two registration calls are sequential because WebMCP has no atomic batch API, and both share the extension lifetime `AbortSignal`. Destroying the instance aborts that signal, removes both registrations, and leaves lifecycle guards so a stale tool cannot act through the destroyed calendar. An observed registration rejection also aborts the shared signal, rolling back both registrations where the host honors it. WebMCP provides no registration timeout, so Litefold cannot make a never-settling `registerTool()` call atomic or time it out.
+Extension activation begins only after a calendar successfully claims and initially renders its host. With a direct initial array, WebMCP activates after the synchronous terminal render and receives one queued delivery of that terminal state. With an initial PromiseLike, it activates after the loading render; that loading state is not replayed, and the extension receives the later terminal state. The two registration calls are sequential because WebMCP has no atomic batch API, and both share the extension lifetime `AbortSignal`. Destroying the instance aborts that signal, removes both registrations, and leaves lifecycle guards so a stale tool cannot act through the destroyed calendar. An observed registration rejection also aborts the shared signal, rolling back both registrations where the host honors it. WebMCP provides no registration timeout, so Litefold Calendar cannot make a never-settling `registerTool()` call atomic or time it out.
 
 Tool-name conflicts fail closed without replacing another site's or calendar instance's registration. A registration rejection is reported through `onError` as diagnostic-only `extension-failed` with `extensionId: "webmcp"`, `hook: "register"`, and phase `integration`, or through the global error channel when no observer exists. It does not add an issue to `CalendarState` or disable the UI. Keep prefixes unique and recreate the calendar with a corrected prefix rather than manipulating `document.modelContext` behind the package.
 
@@ -105,12 +107,12 @@ The ordinary UI remains authoritative and usable at all times. Unsupported WebMC
 Enabling site tools creates an additional structured disclosure path from the signed-in document to the configured browser agent and its provider. Before opting in, confirm that this recipient is allowed to receive every event in the allowed portion of the loaded 42-day range, including each returned title plus raw normalized `start`, `end`, and `isAllDay` value. Same-origin controls which document registers the tools; it does not guarantee where an agent or model processes returned data. `eventTimeDisplay` controls visual presentation only; choosing `"grid"`, `"agenda"`, or `"none"` does not remove start/end civil values from `get-events`.
 
 - Apply the same authentication, authorization, tenant isolation, and event-source filtering used for the visible calendar. WebMCP grants no new server permission.
-- Treat every tool argument as untrusted. Litefold revalidates dates, opaque cursor fields and snapshot binding, navigation targets, lifecycle state, and configured bounds instead of trusting the agent.
-- Treat returned event titles as untrusted content even though Litefold supplies structured JSON rather than executable markup.
+- Treat every tool argument as untrusted. Litefold Calendar revalidates dates, opaque cursor fields and snapshot binding, navigation targets, lifecycle state, and configured bounds instead of trusting the agent.
+- Treat returned event titles as untrusted content even though Litefold Calendar supplies structured JSON rather than executable markup.
 - Do not place secrets or sensitive application payloads in event titles. Metadata, URLs, identifiers, diagnostic causes, and render-hook content are deliberately excluded from tool results.
 - Remember that navigation can fetch another permitted month through the configured event source. Keep source requests bounded, abort-aware, authorization-aware, and safe to repeat.
 - A pending or failed same-range refresh deliberately retains the last usable snapshot and its cursors. If an authorization change requires immediate revocation, destroy and recreate the calendar with the newly authorized source—and omit the extension until that policy permits disclosure—instead of relying on a failed refresh to remove old data.
-- Preserve the visible interface and normal review path for consequential application actions. Litefold's tools intentionally provide no create, edit, delete, link-following, or callback-activation operation.
+- Preserve the visible interface and normal review path for consequential application actions. Litefold Calendar's tools intentionally provide no create, edit, delete, link-following, or callback-activation operation.
 
 The repository [security model](security-model.md) covers the model/tool trust boundary and residual risks. Report a realistic disclosure, stale-registration, collision, validation, or authorization bypass privately under the [security policy](../SECURITY.md).
 

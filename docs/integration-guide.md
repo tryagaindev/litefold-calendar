@@ -1,10 +1,10 @@
 # Application integration guide
 
-This guide shows how an existing web application can adopt litefold-calendar while keeping application policy outside the package.
+This guide shows how an existing web application can adopt Litefold Calendar while keeping application policy outside the package.
 
 ## Ownership boundary
 
-litefold-calendar owns:
+Litefold Calendar owns:
 
 - Civil-date parsing, interval placement, inclusive instance bounds, the one-current-range month grid, selected-day agenda, and navigation, including the native month/year jump popover.
 - Loading, request cancellation, generation guards, default retry/error UI, managed grid/event focus, progressive fallback coordination, and native pull/snap paging.
@@ -18,7 +18,7 @@ The application owns:
 - Application identifiers, metadata, routes, dialogs, commands, design tokens, and per-event surface-color policy.
 - Canonical pages, metadata, structured data, privacy, and no-JavaScript fallback content.
 
-Custom attributes such as `data-calendar-filters` and `data-application-calendar` in this guide are application-owned integration selectors. Package output uses the public `data-litefold-calendar` root marker and private `data-lfc-*` attributes.
+In copyable examples, `my-*` names are application-owned placeholders: DOM IDs and classes, `data-my-*` attributes, `--my-*` custom properties, `@layer my` or `my.*` layers, render-hook IDs, and WebMCP prefixes. Replace them consistently for your application. `.litefold-calendar`, `data-litefold-calendar`, and documented `--lfc-*` properties are public hooks owned by Litefold Calendar; generated `.lfc-*` and `data-lfc-*` identifiers remain private.
 
 Do not add application-specific branches, URLs, entity rules, or selectors to the package core.
 
@@ -86,9 +86,9 @@ Event URLs must be relative or HTTP(S), free of whitespace changes, control char
 
 When adaptation runs inside an event provider, a thrown adapter error rejects the complete result and activates the package's safe error presentation. Keep raw response details in trusted application diagnostics only.
 
-### Validate event accents
+### Validate event marker colors
 
-Only one safe per-event accent crosses the public boundary:
+Only one validated per-event marker color crosses the public boundary:
 
 ```ts
 const OPAQUE_HEX_COLOR = /^#[0-9A-F]{6}$/u;
@@ -103,7 +103,7 @@ function toAccentColor(value: string | null): string | undefined {
 }
 ```
 
-The package applies `accentColor` only to its built-in SVG marker. It does not tint the event summary or change its text, background, border, or leading-accent colors, and core rendering does not emit a `style` attribute. Use public tokens for application-wide styling and render-hook-owned classes for a finite event palette; use `renderEventMarker` for richer marker content.
+The package applies the event marker color field, `accentColor`, only to its built-in SVG marker. It does not tint the event summary or change its text, background, border, or event leading-rule color, and core rendering does not emit a `style` attribute. The [calendar anatomy and color guide](component-anatomy.md#three-color-roles-that-sound-similar) distinguishes this per-event field from the calendar-wide primary interface color and event leading-rule color. Use public tokens for application-wide styling and render-hook-owned classes for a finite event palette; use `renderEventMarker` for richer marker content.
 
 Dynamic event-surface colors remain an application concern. A trusted `eventDidMount` hook can place a previously validated color in an application-owned custom property on `elements.root`, but doing so creates inline style state and is incompatible with `style-src-attr 'none'`. Prefer finite render-hook-owned classes for strict-CSP integrations. Never copy unvalidated feed values into CSS, and keep text contrast, focus, forced-colors, and cleanup behavior application-owned.
 
@@ -116,9 +116,9 @@ const localEvents: CalendarEvents<EventData> =
 	applicationRecords.map(toCalendarInput);
 ```
 
-This eager mapping runs before calendar construction, so the application must present and report any adapter failure as a startup error. Use a provider when package-owned source failure and Retry behavior should apply.
+This eager mapping runs before calendar construction, so the application must present and report any adapter failure as a startup error. A static array validates and commits its terminal state before the initiating `render()` or `setEvents()` call returns. It uses one full calendar render and never publishes `"loading"` or `aria-busy`.
 
-An asynchronous source may return any promise-like result. Forward the provided `signal` to cancellable work and reject on transport, authorization, response-validation, or adapter failure:
+Use a provider when package-owned source failure and Retry behavior should apply. Each provider invocation chooses its own timing from its returned shape. A directly returned array follows the same immediate, one-render path as a static array. Any PromiseLike—including `Promise.resolve(array)`, an `async` function result, or a custom thenable—publishes a loading render and then a terminal render. Forward the provided `signal` to cancellable work and reject on transport, authorization, response-validation, or adapter failure:
 
 ```ts
 const remoteEvents: CalendarEventSource<EventData> = async ({ end, signal, start }) => {
@@ -127,7 +127,7 @@ const remoteEvents: CalendarEventSource<EventData> = async ({ end, signal, start
 };
 ```
 
-Treat the supplied provider range as authoritative rather than deriving requests from viewport or gesture state. The [event-source contract](api.md#supply-events-calendarevents-and-calendareventsource) owns exact invocation, range, cancellation, replacement, and commit behavior.
+Litefold Calendar invokes the provider and attaches PromiseLike handlers before publishing loading callbacks. `onStateChange` receives each current state before the corresponding DOM replacement, so callback reentrancy may supersede that work safely. Treat the supplied provider range as authoritative rather than deriving requests from viewport or gesture state. The [event-source contract](api.md#supply-events-calendarevents-and-calendareventsource) owns exact invocation, range, cancellation, replacement, and commit behavior.
 
 ## Bound one calendar instance
 
@@ -152,19 +152,19 @@ WebMCP is an optional first-party extension with document-wide tool names. Assig
 import { createCalendar } from "@tryagaindev/litefold-calendar";
 import { webMcp } from "@tryagaindev/litefold-calendar/extensions/webmcp";
 
-const webMcpEnabled = host.dataset.webMcpEnabled === "true";
+const myWebMcpEnabled = host.dataset.myWebMcpEnabled === "true";
 
 const calendar = createCalendar(host, {
 	events: remoteEvents,
-	extensions: webMcpEnabled
-		? [webMcp({ toolNamePrefix: "team-schedule" })]
+	extensions: myWebMcpEnabled
+		? [webMcp({ toolNamePrefix: "my-schedule" })]
 		: []
 });
 ```
 
-`webMcp()` defaults to `"litefold-calendar"`. Use explicit role-based prefixes such as `my-schedule` and `public-calendar` whenever a page can host more than one calendar. Do not use array positions, counters, random values, tenant secrets, user identifiers, or localized labels. Tool names live in the document registry and are part of the application integration contract.
+`webMcp()` defaults to `"litefold-calendar"`. Use explicit role-based prefixes such as `my-schedule` and `my-public-calendar` whenever a page can host more than one calendar. Do not use array positions, counters, random values, tenant secrets, user identifiers, or localized labels. Tool names live in the document registry and are part of the application integration contract.
 
-The static import above remains in the application import graph even when `webMcpEnabled` is false at runtime. Builds that must remove WebMCP bytes should omit the subpath import through an application build-time branch, or dynamically import the extension before constructing the calendar. Litefold performs no runtime extension discovery. See [first-party extensions](first-party-extensions.md#bundle-and-import-behavior) for the exact bundle boundary.
+The static import above remains in the application import graph even when `myWebMcpEnabled` is false at runtime. Builds that must remove WebMCP bytes should omit the subpath import through an application build-time branch, or dynamically import the extension before constructing the calendar. Litefold Calendar performs no runtime extension discovery. See [first-party extensions](first-party-extensions.md#bundle-and-import-behavior) for the exact bundle boundary.
 
 The two tools either page through presentation-safe events in the currently loaded 42-day range or navigate through existing public paths. `<prefix>-get-events` can cover the allowed range or filter one date; it never fetches to satisfy a read. Neither tool exposes IDs, URLs, metadata, render-hook nodes, raw errors, or application activation commands.
 
@@ -215,14 +215,14 @@ calendar.render();
 calendar.setEvents(remoteEvents);
 ```
 
-Replacement is complete rather than additive. Use `setEvents()` only for event-input replacement and recreate the instance for other configuration changes. The [canonical `setEvents()` contract](api.md#control-the-calendar-calendar) owns lifecycle admission, preserved state and focus, cancellation, retained data, Retry, and reentrancy.
+Replacement is complete rather than additive. A static array or directly returned provider array commits before `setEvents()` returns; a PromiseLike replacement returns after its loading render and settles later. An immediate replacement supersedes pending async work and clears its busy state. Use `setEvents()` only for event-input replacement and recreate the instance for other configuration changes. The [canonical `setEvents()` contract](api.md#control-the-calendar-calendar) owns lifecycle admission, preserved state and focus, cancellation, retained data, Retry, and reentrancy.
 
 ## Toolbar content
 
 Pass an existing host-descendant element through the supported option instead of cloning it or locating private package descendants:
 
 ```ts
-const toolbarEnd = host.querySelector<HTMLElement>("[data-calendar-filters]");
+const toolbarEnd = host.querySelector<HTMLElement>("[data-my-calendar-filters]");
 
 const calendar = createCalendar(host, {
 	events,
@@ -242,29 +242,33 @@ Render hooks must synchronously create a new, detached, same-document node for e
 import type { CalendarRenderHooks } from "@tryagaindev/litefold-calendar";
 
 const EVENT_CLASS_BY_KIND = {
-	appointment: "application-calendar-event--appointment",
-	milestone: "application-calendar-event--milestone",
-	task: "application-calendar-event--task"
+	appointment: "my-calendar-event--appointment",
+	milestone: "my-calendar-event--milestone",
+	task: "my-calendar-event--task"
 } as const satisfies Readonly<Record<EventKind, string>>;
 
 const MARKER_CLASS_BY_KIND = {
-	appointment: "application-calendar-marker--appointment",
-	milestone: "application-calendar-marker--milestone",
+	appointment: "my-calendar-marker--appointment",
+	milestone: "my-calendar-marker--milestone",
 	task: null
 } as const satisfies Readonly<Record<EventKind, string | null>>;
 
 const applicationRenderHooks: CalendarRenderHooks<EventData> = {
-	id: "application",
-	renderMultipleEventIndicator({ document: ownerDocument, eventCount }) {
-		const indicator = ownerDocument.createElement("span");
-		indicator.classList.add("application-calendar-multiple-indicator");
-		indicator.textContent = String(eventCount);
-		return indicator;
-	},
-	renderGridOverflowContent({ document: ownerDocument, text }) {
+	id: "my-calendar",
+	renderEventOverflow(context) {
+		const ownerDocument = context.document;
+		if (context.variant === "compact") {
+			//Keep locale-aware compact formatting while making a small text-only tweak.
+			return ownerDocument.createTextNode(`${context.text}…`);
+		}
+
 		const content = ownerDocument.createElement("span");
-		content.classList.add("application-calendar-overflow-content");
-		content.textContent = text;
+		content.classList.add("my-calendar-overflow-content");
+
+		const label = ownerDocument.createElement("strong");
+		label.classList.add("my-calendar-overflow-label");
+		label.textContent = context.text;
+		content.append(label);
 		return content;
 	},
 	renderEventMarker({ document: ownerDocument, event }) {
@@ -275,7 +279,7 @@ const applicationRenderHooks: CalendarRenderHooks<EventData> = {
 		}
 
 		const marker = ownerDocument.createElement("span");
-		marker.classList.add("application-calendar-marker", markerClass);
+		marker.classList.add("my-calendar-marker", markerClass);
 		marker.setAttribute("aria-hidden", "true");
 		return marker;
 	},
@@ -296,22 +300,22 @@ const applicationRenderHooks: CalendarRenderHooks<EventData> = {
 		}
 
 		const eventClass = EVENT_CLASS_BY_KIND[kind];
-		elements.root.classList.add("application-calendar-event", eventClass);
-		elements.root.setAttribute("data-application-event-kind", kind);
+		elements.root.classList.add("my-calendar-event", eventClass);
+		elements.root.setAttribute("data-my-event-kind", kind);
 
 		const action = elements.action;
 		if (action !== null) {
-			action.setAttribute("data-application-event-id", event.id);
-			action.setAttribute("data-application-event-date", dateString);
-			action.setAttribute("data-application-event-surface", surface);
+			action.setAttribute("data-my-event-id", event.id);
+			action.setAttribute("data-my-event-date", dateString);
+			action.setAttribute("data-my-event-surface", surface);
 		}
 
 		return () => {
-			elements.root.classList.remove("application-calendar-event", eventClass);
-			elements.root.removeAttribute("data-application-event-kind");
-			action?.removeAttribute("data-application-event-id");
-			action?.removeAttribute("data-application-event-date");
-			action?.removeAttribute("data-application-event-surface");
+			elements.root.classList.remove("my-calendar-event", eventClass);
+			elements.root.removeAttribute("data-my-event-kind");
+			action?.removeAttribute("data-my-event-id");
+			action?.removeAttribute("data-my-event-date");
+			action?.removeAttribute("data-my-event-surface");
 		};
 	}
 };
@@ -326,22 +330,27 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The three singleton presentation hooks have distinct behavior:
+The two singleton presentation hooks have distinct behavior:
 
 | Hook | Hook omitted | `null` / `undefined` return | Returned node |
 | --- | --- | --- | --- |
 | `renderEventMarker` | Keeps the built-in marker | `null` suppresses it; `undefined` is invalid | Replaces the built-in marker |
-| `renderMultipleEventIndicator` | Keeps the compact multiple-event fan | `null` suppresses it; `undefined` keeps it | Replaces the fan for days with at least two occurrences |
-| `renderGridOverflowContent` | Keeps the localized default | Either value keeps the default | Replaces only the non-compact visual content |
+| `renderEventOverflow` | Keeps the social-style compact number and localized wide text | `undefined` keeps that variant; `null` suppresses only a passive compact cue and otherwise keeps the native action's default | Replaces that variant's visual content |
 
-Only one hook set can own each singleton hook. The overflow button's text, accessible name, activation, and agenda focus transfer remain package-owned. Container resizing changes CSS visibility only; it does not invoke these hooks again. See the [render-hook API](api.md#customize-rendering-calendarrenderhooks) for every context field and return rule.
+Only one hook set can own each singleton hook. `renderEventOverflow` owns its compact and wide branches together and receives each applicable variant during the calendar render. When a native overflow action has both responsive presentations, both are pre-rendered before CSS chooses which one to expose. The compact branch has `variant: "compact"`, `surface: "day"`, and package-formatted social text such as `+1` when paired with a visible primary marker or an unsigned total when there is no marker. The wide branch has `variant: "wide"`, `surface: "grid-summary"`, and localized exact text such as `2 more`.
+
+Both contexts expose `eventCount`, `visibleEventCount`, `overflowCount`, `text`, and stable `elements.root` / `elements.content` references. `elements.action` is `null` for a passive compact cue and is the package-owned overflow button for the wide branch or a compact-primary overflow action. Treat those elements as inspection and placement context rather than mutation targets; return the visual node. That button's accessible name, activation, focus transfer, and canonical fallback remain package-owned. Returned nodes must be new, detached, same-document, synchronous, and entirely noninteractive; the package treats them as presentational content.
+
+The package places a compact-primary marker/action and passive compact cue at the cell's block end in two equal, gap-free auto-fit grid blocks. Their centers evenly divide the full area beneath the date when both compact-control-size tracks, 44 CSS pixels by default, fit; otherwise they stack into centered equal full-width rows. This keeps them stacked through supported phone widths and moves them onto one row only near the compact ceiling. A markerless total uses one centered block; `maxGridEventsPerDay: 0` keeps the fallback inside one package-owned overflow action. The hook replaces only the visual content inside its assigned block. There is no public overflow-layout selector or CSS token to override this placement. Auto-fit uses the compact-control-size floor instead of measuring arbitrary hook content's intrinsic width, so keep returned compact content concise enough for its block; oversized application output remains application-owned.
+
+Container resizing changes CSS visibility only; it does not invoke the hook again or replace either returned node. A failure in either branch quarantines the complete hook set and restores both compact and wide defaults. See the [render-hook API](api.md#customize-rendering-calendarrenderhooks) for every context field and return rule.
 
 ### Style hook output
 
 Style the finite palette in application CSS, without inline styles or package-private selectors:
 
 ```css
-.application-calendar-marker {
+.my-calendar-marker {
 	display: inline-block;
 	inline-size: 0.625rem;
 	block-size: 0.625rem;
@@ -349,16 +358,25 @@ Style the finite palette in application CSS, without inline styles or package-pr
 	border-radius: 50%;
 }
 
-.application-calendar-marker--appointment {
-	color: var(--app-appointment-color);
+.my-calendar-marker--appointment {
+	color: var(--my-appointment-color);
 }
 
-.application-calendar-marker--milestone {
-	color: var(--app-milestone-color);
+.my-calendar-marker--milestone {
+	color: var(--my-milestone-color);
 }
 
-.application-calendar-event--task {
+.my-calendar-event--task {
 	font-style: italic;
+}
+
+.my-calendar-overflow-content {
+	display: inline-flex;
+	align-items: baseline;
+}
+
+.my-calendar-overflow-label {
+	font-weight: 700;
 }
 ```
 
@@ -372,9 +390,9 @@ function findAgendaOccurrence(
 	dateString: string
 ): CalendarEventActionElement | null {
 	return host.querySelector<CalendarEventActionElement>(
-		`[data-application-event-id="${CSS.escape(eventId)}"]` +
-		`[data-application-event-date="${CSS.escape(dateString)}"]` +
-		`[data-application-event-surface="agenda"]`
+		`[data-my-event-id="${CSS.escape(eventId)}"]` +
+		`[data-my-event-date="${CSS.escape(dateString)}"]` +
+		`[data-my-event-surface="agenda"]`
 	);
 }
 ```
@@ -385,14 +403,14 @@ Add the application-owned surface attribute from the render context when focus m
 
 Use `context.signal` for signal-aware listeners or observers, and return synchronous cleanup from mount hooks. The application owns every class, attribute, node, style, listener, and asset that its hooks add.
 
-If a hook set throws, returns an invalid or asynchronous result, or fails cleanup, Litefold quarantines that set and restores package defaults for its singleton slots. Core UI and other hook sets remain available. Style hook output only through application-owned classes; hooks add no public package selector, token, or message key. See the [canonical render-hook lifecycle](api.md#customize-rendering-calendarrenderhooks) for node release and cleanup details.
+If a hook set throws, returns an invalid or asynchronous result, or fails cleanup, Litefold Calendar quarantines that set and restores package defaults for its singleton slots. Core UI and other hook sets remain available. Style hook output only through application-owned classes; hooks add no public package selector, token, or message key. See the [canonical render-hook lifecycle](api.md#customize-rendering-calendarrenderhooks) for node release and cleanup details.
 
 ## Progressive fallback
 
 Keep server-authored or otherwise application-owned fallback content DOM-disjoint from the host—normally as a sibling, with neither element containing the other—and pass its element to the calendar:
 
 ```ts
-const fallbackElement = document.querySelector<HTMLElement>("[data-calendar-fallback]");
+const fallbackElement = document.querySelector<HTMLElement>("[data-my-calendar-fallback]");
 
 const calendar = createCalendar(host, {
 	events,
@@ -400,7 +418,7 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The application owns the fallback's content, authorization, freshness, canonical links, metadata, structured data, and privacy policy. The [API reference owns lease and visibility lifecycle](api.md#application-integration-options); [SEO and progressive enhancement](seo-and-progressive-enhancement.md) owns the server-content recipe and verification guidance.
+The application owns the fallback's content, authorization, freshness, canonical links, metadata, structured data, and privacy policy. With a direct array, the terminal fallback visibility decision completes before the initiating void method returns. A PromiseLike source leaves the fallback at its loading visibility while settlement is pending. The [API reference owns lease and visibility lifecycle](api.md#application-integration-options); [SEO and progressive enhancement](seo-and-progressive-enhancement.md) owns the server-content recipe and verification guidance.
 
 ## Actions and errors
 
@@ -457,7 +475,7 @@ Place the calendar in a host whose border box provides at least **320 CSS pixels
 
 ## Classic-script entry point
 
-litefold-calendar remains a pure ESM package. An application that cannot mark its entry script as a module can use a regular external script and load the package with standard dynamic `import()`:
+Litefold Calendar remains a pure ESM package. An application that cannot mark its entry script as a module can use a regular external script and load the package with standard dynamic `import()`:
 
 ```html
 <script defer src="./calendar-loader.js"></script>
@@ -485,7 +503,7 @@ An integration is ready when:
 
 - Data adapters, authorization, range caching, filtering, and diagnostic handling remain application-owned and fail atomically.
 - Event replacement, actions, toolbar content, render hooks, extensions, and fallback coordination use documented public surfaces without private selectors.
-- Multiple-event and grid-overflow customizations preserve canonical overflow text and native behavior, and container resizing changes only CSS visibility without rerunning their hooks.
+- Compact and wide `renderEventOverflow` customizations preserve canonical native-action behavior, use the package-supplied localized text and counts, stay within package-assigned blocks, and change CSS visibility on resize without rerunning the hook. At narrow widths, verify paired blocks remain equal, gap-free, and block-end aligned, evenly divide the full area beneath the date when sharing a row, and stay centered when stacked; markerless and `maxGridEventsPerDay: 0` cases remain one centered block/action. Keep custom compact content concise enough for its assigned block.
 - Lifecycle, validation, replacement, fallback, render-hook, and extension scenarios satisfy the [API reference](api.md) and failures satisfy the [error guide](errors.md).
 - Keyboard, direct-input, RTL, zoom, forced-color, reduced-motion, localization, and screen-reader flows satisfy the [accessibility verification matrix](../ACCESSIBILITY.md#testing).
 - Visual overrides satisfy [DESIGN.md](../DESIGN.md) and the [CSS token contract](css-tokens.md), including affected screenshot evidence.

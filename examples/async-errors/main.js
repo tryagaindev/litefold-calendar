@@ -9,18 +9,18 @@ const getElement = (selector, constructor) => {
 	return element;
 };
 
-const host = getElement("[data-calendar]", HTMLElement);
-const applicationOwnsSourceErrors = getElement("[data-host-ownership]", HTMLInputElement);
-const failRenderHooks = getElement("[data-fail-render-hooks]", HTMLInputElement);
-const failEventActions = getElement("[data-fail-action]", HTMLInputElement);
-const failNextButton = getElement("[data-fail-next]", HTMLButtonElement);
-const refetchButton = getElement("[data-refetch]", HTMLButtonElement);
-const applicationErrorRegion = getElement("[data-host-error]", HTMLElement);
-const applicationErrorTitle = getElement("[data-host-error-title]", HTMLElement);
-const applicationErrorMessage = getElement("[data-host-error-message]", HTMLElement);
-const applicationRetryButton = getElement("[data-host-retry]", HTMLButtonElement);
-const politeAnnouncer = getElement("[data-announcer-polite]", HTMLElement);
-const assertiveAnnouncer = getElement("[data-announcer-assertive]", HTMLElement);
+const host = getElement("[data-my-calendar]", HTMLElement);
+const applicationOwnsSourceErrors = getElement("[data-my-host-ownership]", HTMLInputElement);
+const failRenderHooks = getElement("[data-my-fail-render-hooks]", HTMLInputElement);
+const failEventActions = getElement("[data-my-fail-action]", HTMLInputElement);
+const failNextButton = getElement("[data-my-fail-next]", HTMLButtonElement);
+const refetchButton = getElement("[data-my-refetch]", HTMLButtonElement);
+const applicationErrorRegion = getElement("[data-my-host-error]", HTMLElement);
+const applicationErrorTitle = getElement("[data-my-host-error-title]", HTMLElement);
+const applicationErrorMessage = getElement("[data-my-host-error-message]", HTMLElement);
+const applicationRetryButton = getElement("[data-my-host-retry]", HTMLButtonElement);
+const politeAnnouncer = getElement("[data-my-announcer-polite]", HTMLElement);
+const assertiveAnnouncer = getElement("[data-my-announcer-assertive]", HTMLElement);
 
 let failNextSourceRequest = false;
 let applicationErrorActive = false;
@@ -48,14 +48,14 @@ const EVENTS = [
 	{
 		id: "async-demo",
 		title: "Open async details",
-		start: "2026-08-04T14:00",
-		end: "2026-08-04T14:30",
+		start: "2026-08-04T11:38",
+		end: "2026-08-04T12:08",
 		accentColor: "#008577"
 	}
 ];
 
 const EVENT_DETAILS_RENDER_HOOKS = {
-	id: "async-errors-event-details",
+	id: "my-async-errors-event-details",
 	renderEventDetails: ({ document: ownerDocument }) => {
 		if (failRenderHooks.checked) {
 			throw new Error("Demonstration render-hook failure with developer-only detail.");

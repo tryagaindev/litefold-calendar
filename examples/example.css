@@ -1,60 +1,60 @@
-@layer example.base {
+@layer my.base {
 	:root {
-		--example-font-family: system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", sans-serif;
-		--example-color: light-dark(#102A36, #EAF7F7);
-		--example-muted-color: light-dark(#405F68, #A8C8CC);
-		--example-page-background: light-dark(#EDF5F5, #031017);
-		--example-surface-background: light-dark(#F7FCFC, #061A23);
-		--example-subtle-background: light-dark(#E9F4F5, #0C2A34);
-		--example-border-color: light-dark(#56737B, #6E929A);
-		--example-primary-color: light-dark(#047857, #62E3A8);
-		--example-primary-contrast-color: light-dark(#F4FFFB, #062A20);
-		--example-focus-color: light-dark(#4E46C7, #C0B6FF);
-		--example-selected-background: light-dark(#D4F4E5, #12483F);
-		--example-selected-color: light-dark(#0A3B32, #D5FFF1);
-		--example-today-border-color: light-dark(#071E26, #062A20);
-		--example-event-background: light-dark(#EFEEFF, #282853);
-		--example-event-color: light-dark(#262050, #F1EEFF);
-		--example-event-border-color: light-dark(#665CC3, #A39AFF);
-		--example-event-accent-color: light-dark(#A52A78, #FF88C8);
-		--example-warning-background: light-dark(#FFF7ED, #431407);
-		--example-warning-color: light-dark(#7C2D12, #FFEDD5);
-		--example-warning-border-color: light-dark(#C2410C, #FDBA74);
-		--example-error-background: light-dark(#FEF2F2, #450A0A);
-		--example-error-color: light-dark(#7F1D1D, #FEE2E2);
-		--example-error-border-color: light-dark(#B91C1C, #FCA5A5);
-		--example-gap: 0.75rem;
-		--example-radius: 0.75rem;
-		--example-control-min-size: 2.75rem;
-		--example-motion-duration: 120ms;
+		--my-font-family: system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", sans-serif;
+		--my-color: light-dark(#102A36, #EAF7F7);
+		--my-muted-color: light-dark(#405F68, #A8C8CC);
+		--my-page-background: light-dark(#EDF5F5, #031017);
+		--my-surface-background: light-dark(#F7FCFC, #061A23);
+		--my-subtle-background: light-dark(#E9F4F5, #0C2A34);
+		--my-border-color: light-dark(#56737B, #6E929A);
+		--my-primary-color: light-dark(#047857, #62E3A8);
+		--my-primary-contrast-color: light-dark(#F4FFFB, #062A20);
+		--my-focus-color: light-dark(#4E46C7, #C0B6FF);
+		--my-selected-background: light-dark(#D4F4E5, #12483F);
+		--my-selected-color: light-dark(#0A3B32, #D5FFF1);
+		--my-today-border-color: light-dark(#071E26, #062A20);
+		--my-event-background: light-dark(#EFEEFF, #282853);
+		--my-event-color: light-dark(#262050, #F1EEFF);
+		--my-event-border-color: light-dark(#665CC3, #A39AFF);
+		--my-event-accent-color: light-dark(#A52A78, #FF88C8);
+		--my-warning-background: light-dark(#FFF7ED, #431407);
+		--my-warning-color: light-dark(#7C2D12, #FFEDD5);
+		--my-warning-border-color: light-dark(#C2410C, #FDBA74);
+		--my-error-background: light-dark(#FEF2F2, #450A0A);
+		--my-error-color: light-dark(#7F1D1D, #FEE2E2);
+		--my-error-border-color: light-dark(#B91C1C, #FCA5A5);
+		--my-gap: 0.75rem;
+		--my-radius: 0.75rem;
+		--my-control-min-size: 2.75rem;
+		--my-motion-duration: 120ms;
 
-		accent-color: var(--example-primary-color);
+		accent-color: var(--my-primary-color);
 		color-scheme: light dark;
-		font-family: var(--example-font-family);
+		font-family: var(--my-font-family);
 	}
 
-	:root[data-example-theme="light"] {
+	:root[data-my-theme="light"] {
 		color-scheme: light;
 	}
 
-	:root[data-example-theme="light"] .litefold-calendar {
+	:root[data-my-theme="light"] .litefold-calendar {
 		color-scheme: light;
 	}
 
-	:root[data-example-theme="dark"] {
+	:root[data-my-theme="dark"] {
 		color-scheme: dark;
 	}
 
-	:root[data-example-theme="dark"] .litefold-calendar {
+	:root[data-my-theme="dark"] .litefold-calendar {
 		color-scheme: dark;
 	}
 
 	body {
 		min-block-size: 100dvb;
 		margin: 0;
-		background: var(--example-page-background);
-		color: var(--example-color);
-		font-family: var(--example-font-family);
+		background: var(--my-page-background);
+		color: var(--my-color);
+		font-family: var(--my-font-family);
 		line-height: 1.5;
 	}
 
@@ -65,11 +65,11 @@
 	}
 
 	::selection {
-		background: var(--example-selected-background);
-		color: var(--example-selected-color);
+		background: var(--my-selected-background);
+		color: var(--my-selected-color);
 	}
 
-	.example-shell {
+	.my-shell {
 		box-sizing: border-box;
 		display: grid;
 		gap: clamp(1rem, 2vw, 1.5rem);
@@ -78,57 +78,57 @@
 		padding: clamp(1rem, 3vw, 2rem);
 	}
 
-	.example-intro {
+	.my-intro {
 		display: grid;
 		gap: 0.375rem;
 		max-inline-size: 70ch;
 	}
 
-	.example-intro > * {
+	.my-intro > * {
 		margin: 0;
 	}
 
-	.example-intro h1 {
+	.my-intro h1 {
 		font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.5rem);
 		line-height: 1.1;
 		overflow-wrap: anywhere;
 		text-wrap: balance;
 	}
 
-	.example-intro p {
-		color: var(--example-muted-color);
+	.my-intro p {
+		color: var(--my-muted-color);
 		font-size: 1.0625rem;
 		text-wrap: pretty;
 	}
 
-	.example-panel {
+	.my-panel {
 		box-sizing: border-box;
 		display: grid;
-		gap: var(--example-gap);
+		gap: var(--my-gap);
 		min-inline-size: 0;
 		padding: clamp(0.875rem, 2vw, 1.125rem);
 		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
-		border: 1px solid var(--example-border-color);
-		border-radius: var(--example-radius);
-		background: var(--example-surface-background);
+		border: 1px solid var(--my-border-color);
+		border-radius: var(--my-radius);
+		background: var(--my-surface-background);
 		box-shadow: 0 0.125rem 0.375rem rgb(15 23 42 / 0.06);
 	}
 
-	.example-panel[hidden] {
+	.my-panel[hidden] {
 		display: none;
 	}
 
-	.example-panel > :is(h2, p) {
+	.my-panel > :is(h2, p) {
 		margin: 0;
 	}
 
-	.example-panel > h2 {
+	.my-panel > h2 {
 		font-size: 1.125rem;
 		line-height: 1.3;
 	}
 
-	.example-control-row,
-	.example-field-row {
+	.my-control-row,
+	.my-field-row {
 		align-items: safe center;
 		display: flex;
 		flex-wrap: wrap;
@@ -136,121 +136,121 @@
 		min-inline-size: 0;
 	}
 
-	.example-button,
-	.example-field {
+	.my-button,
+	.my-field {
 		box-sizing: border-box;
 		max-inline-size: 100%;
-		min-block-size: var(--example-control-min-size);
+		min-block-size: var(--my-control-min-size);
 		min-inline-size: 0;
 		padding-block: 0.5rem;
 		padding-inline: 0.75rem;
 		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
-		border: 1px solid var(--example-border-color);
+		border: 1px solid var(--my-border-color);
 		border-radius: 0.5rem;
-		background: var(--example-surface-background);
-		color: var(--example-color);
-		transition-duration: var(--example-motion-duration);
+		background: var(--my-surface-background);
+		color: var(--my-color);
+		transition-duration: var(--my-motion-duration);
 		transition-property: background-color, border-color, color;
 		transition-timing-function: ease-out;
 	}
 
-	.example-button {
+	.my-button {
 		appearance: none;
 		cursor: pointer;
 		touch-action: manipulation;
 	}
 
-	.example-button--primary {
-		background: var(--example-primary-color);
-		border-color: var(--example-primary-color);
-		color: var(--example-primary-contrast-color);
+	.my-button-primary {
+		background: var(--my-primary-color);
+		border-color: var(--my-primary-color);
+		color: var(--my-primary-contrast-color);
 		font-weight: 700;
 	}
 
-	.example-button:where([disabled], [aria-disabled="true"]),
-	.example-field:disabled {
+	.my-button:where([disabled], [aria-disabled="true"]),
+	.my-field:disabled {
 		cursor: not-allowed;
 		opacity: 0.65;
 	}
 
-	.example-button:focus-visible,
-	.example-field:focus-visible,
-	.example-check input:focus-visible {
-		outline: 0.1875rem solid var(--example-focus-color);
+	.my-button:focus-visible,
+	.my-field:focus-visible,
+	.my-check input:focus-visible {
+		outline: 0.1875rem solid var(--my-focus-color);
 		outline-offset: 0.1875rem;
 	}
 
-	.example-check {
+	.my-check {
 		align-items: safe center;
 		display: inline-flex;
 		gap: 0.5rem;
-		min-block-size: var(--example-control-min-size);
+		min-block-size: var(--my-control-min-size);
 		min-inline-size: 0;
 	}
 
-	.example-check input {
+	.my-check input {
 		block-size: 1.125rem;
 		flex: none;
 		inline-size: 1.125rem;
 		margin: 0;
 	}
 
-	.example-calendar {
-		--lfc-border-radius: var(--example-radius);
-		--lfc-control-min-size: var(--example-control-min-size);
+	.my-calendar {
+		--lfc-border-radius: var(--my-radius);
+		--lfc-control-min-size: var(--my-control-min-size);
 
 		min-inline-size: 0;
 	}
 
-	.example-result {
+	.my-result {
 		box-sizing: border-box;
 		min-block-size: 1.5em;
 		margin: 0;
-		color: var(--example-muted-color);
+		color: var(--my-muted-color);
 		overflow-wrap: anywhere;
 	}
 
-	.example-result:not(:empty) {
+	.my-result:not(:empty) {
 		padding: 0.75rem;
 		/* stylelint-disable-next-line unit-disallowed-list -- Intentional one-CSS-pixel hairline. */
-		border: 1px solid var(--example-border-color);
-		border-radius: var(--example-radius);
-		background: var(--example-surface-background);
+		border: 1px solid var(--my-border-color);
+		border-radius: var(--my-radius);
+		background: var(--my-surface-background);
 	}
 
-	.example-alert {
+	.my-alert {
 		box-sizing: border-box;
 		display: grid;
-		gap: 0.25rem var(--example-gap);
+		gap: 0.25rem var(--my-gap);
 		grid-template-columns: minmax(0, 1fr) auto;
 		min-inline-size: 0;
 		margin: 0;
-		padding: var(--example-gap);
-		border: 0.125rem solid var(--example-error-border-color);
-		border-radius: var(--example-radius);
-		background: var(--example-error-background);
-		color: var(--example-error-color);
+		padding: var(--my-gap);
+		border: 0.125rem solid var(--my-error-border-color);
+		border-radius: var(--my-radius);
+		background: var(--my-error-background);
+		color: var(--my-error-color);
 		overflow-wrap: anywhere;
 	}
 
-	.example-alert > h2 {
+	.my-alert > h2 {
 		font-size: 1rem;
 		grid-column: 1;
 		margin: 0;
 	}
 
-	.example-alert > .example-button {
+	.my-alert > .my-button {
 		align-self: center;
 		grid-column: 2;
 		grid-row: 1 / span 2;
 	}
 
-	.example-alert:empty,
-	.example-alert[hidden] {
+	.my-alert:empty,
+	.my-alert[hidden] {
 		display: none;
 	}
 
-	.example-visually-hidden {
+	.my-visually-hidden {
 		/* stylelint-disable unit-disallowed-list -- Canonical visually-hidden sentinel. */
 		block-size: 1px;
 		border: 0;
@@ -268,39 +268,39 @@
 		padding-block: 0.0625rem;
 		padding-inline: 0.25rem;
 		border-radius: 0.25rem;
-		background: var(--example-subtle-background);
+		background: var(--my-subtle-background);
 		font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", consolas, monospace;
 		font-size: 0.9em;
 	}
 
 	@media (hover: hover) {
-		.example-button:not([disabled], [aria-disabled="true"]):hover,
-		.example-field:not(:disabled):hover {
-			border-color: var(--example-primary-color);
+		.my-button:not([disabled], [aria-disabled="true"]):hover,
+		.my-field:not(:disabled):hover {
+			border-color: var(--my-primary-color);
 		}
 
-		.example-button--primary:not([disabled], [aria-disabled="true"]):hover {
-			background: var(--example-selected-background);
-			color: var(--example-selected-color);
+		.my-button-primary:not([disabled], [aria-disabled="true"]):hover {
+			background: var(--my-selected-background);
+			color: var(--my-selected-color);
 		}
 	}
 
 	@media (width < 32rem) {
-		.example-control-row,
-		.example-field-row {
+		.my-control-row,
+		.my-field-row {
 			align-items: stretch;
 		}
 
-		.example-control-row > :not(.example-check),
-		.example-field-row > :not(.example-check) {
+		.my-control-row > :not(.my-check),
+		.my-field-row > :not(.my-check) {
 			inline-size: 100%;
 		}
 
-		.example-alert {
+		.my-alert {
 			grid-template-columns: minmax(0, 1fr);
 		}
 
-		.example-alert > .example-button {
+		.my-alert > .my-button {
 			grid-column: 1;
 			grid-row: auto;
 			justify-self: start;
@@ -309,52 +309,52 @@
 
 	@media (prefers-contrast: more) {
 		:root {
-			--example-border-color: currentcolor;
-			--example-muted-color: var(--example-color);
+			--my-border-color: currentcolor;
+			--my-muted-color: var(--my-color);
 		}
 
-		.example-panel,
-		.example-button,
-		.example-field,
-		.example-result:not(:empty) {
+		.my-panel,
+		.my-button,
+		.my-field,
+		.my-result:not(:empty) {
 			border-width: 0.125rem;
 		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
 		:root {
-			--example-motion-duration: 0ms;
+			--my-motion-duration: 0ms;
 		}
 	}
 
 	@media (forced-colors: active) {
 		:root {
-			--example-color: CanvasText;
-			--example-muted-color: CanvasText;
-			--example-page-background: Canvas;
-			--example-surface-background: Canvas;
-			--example-subtle-background: Canvas;
-			--example-border-color: CanvasText;
-			--example-primary-color: Highlight;
-			--example-primary-contrast-color: HighlightText;
-			--example-focus-color: Highlight;
-			--example-selected-background: Canvas;
-			--example-selected-color: CanvasText;
-			--example-today-border-color: Highlight;
-			--example-event-background: Canvas;
-			--example-event-color: CanvasText;
-			--example-event-border-color: CanvasText;
-			--example-event-accent-color: Highlight;
-			--example-warning-background: Canvas;
-			--example-warning-color: CanvasText;
-			--example-warning-border-color: CanvasText;
-			--example-error-background: Canvas;
-			--example-error-color: CanvasText;
-			--example-error-border-color: CanvasText;
+			--my-color: CanvasText;
+			--my-muted-color: CanvasText;
+			--my-page-background: Canvas;
+			--my-surface-background: Canvas;
+			--my-subtle-background: Canvas;
+			--my-border-color: CanvasText;
+			--my-primary-color: Highlight;
+			--my-primary-contrast-color: HighlightText;
+			--my-focus-color: Highlight;
+			--my-selected-background: Canvas;
+			--my-selected-color: CanvasText;
+			--my-today-border-color: Highlight;
+			--my-event-background: Canvas;
+			--my-event-color: CanvasText;
+			--my-event-border-color: CanvasText;
+			--my-event-accent-color: Highlight;
+			--my-warning-background: Canvas;
+			--my-warning-color: CanvasText;
+			--my-warning-border-color: CanvasText;
+			--my-error-background: Canvas;
+			--my-error-color: CanvasText;
+			--my-error-border-color: CanvasText;
 		}
 
-		.example-panel,
-		.example-result:not(:empty) {
+		.my-panel,
+		.my-result:not(:empty) {
 			box-shadow: none;
 		}
 	}

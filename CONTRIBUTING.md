@@ -1,6 +1,8 @@
-# Contributing to litefold-calendar
+# Contributing to Litefold Calendar
 
-Thanks for helping improve litefold-calendar. The project is maintained by TryAgainDev and released under the MIT License. Participation is governed by the [Contributor Covenant 3.0 Code of Conduct](CODE_OF_CONDUCT.md).
+Thanks for helping improve Litefold Calendar. The project is maintained by TryAgainDev and released under the MIT License. Participation is governed by the [Contributor Covenant 3.0 Code of Conduct](CODE_OF_CONDUCT.md).
+
+This guide owns contribution policy and validation requirements. Use the [common contributor commands](CONTRIBUTOR_COMMANDS.md) as a copyable or IDE-runnable command index.
 
 ## Before you start
 

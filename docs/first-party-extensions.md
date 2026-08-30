@@ -1,6 +1,6 @@
 # First-party extensions
 
-Litefold exposes two deliberately different integration mechanisms. Choose between them by ownership and scope, not by whether the code happens to run during rendering.
+Litefold Calendar exposes two deliberately different integration mechanisms. Choose between them by ownership and scope, not by whether the code happens to run during rendering.
 
 | Mechanism | Use it for | Public surface |
 | --- | --- | --- |
@@ -9,7 +9,7 @@ Litefold exposes two deliberately different integration mechanisms. Choose betwe
 
 Render hooks are the stable customization API for application-owned presentation. They receive documented elements and contexts; they do not become package extensions merely because several hooks are grouped in one object. A failing render-hook set is quarantined and reported as diagnostic `render-hook-failed` with `renderHookId`.
 
-Extensions are configured components implemented and shipped by Litefold. Consumers obtain them from explicit optional subpaths and cannot construct or inspect the opaque `CalendarExtension` value themselves. Extension failures are isolated from the ordinary calendar UI and reported as diagnostic `extension-failed` with `extensionId`.
+Extensions are configured components implemented and shipped by Litefold Calendar. Consumers obtain them from explicit optional subpaths and cannot construct or inspect the opaque `CalendarExtension` value themselves. Extension failures are isolated from the ordinary calendar UI and reported as diagnostic `extension-failed` with `extensionId`.
 
 ## Available extensions
 
@@ -30,7 +30,7 @@ import { webMcp } from "@tryagaindev/litefold-calendar/extensions/webmcp";
 const calendar = createCalendar(host, {
 	events,
 	extensions: [
-		webMcp({ toolNamePrefix: "team-schedule" })
+		webMcp({ toolNamePrefix: "my-schedule" })
 	],
 	renderHooks: [applicationRenderHooks]
 });
@@ -42,7 +42,9 @@ calendar.render();
 
 Factories validate and snapshot their configuration synchronously. The returned extension value is immutable and reusable across independent calendar instances, with separate runtime state for each. Reuse does not bypass platform-wide constraints: co-resident WebMCP calendars still need distinct tool-name prefixes. A calendar rejects duplicate stable extension IDs, including two separately configured WebMCP values, as synchronous `invalid-configuration` before mutating its host.
 
-Selected extensions activate and receive state in caller order. Teardown runs in reverse order. Distinct extension IDs are independent: Litefold defines no dependency, priority, precedence, or conflict system between them. One failed extension is quarantined without disabling the core calendar or another extension.
+Selected extensions activate and receive state in caller order. Teardown runs in reverse order. Distinct extension IDs are independent: Litefold Calendar defines no dependency, priority, precedence, or conflict system between them. One failed extension is quarantined without disabling the core calendar or another extension.
+
+Event-source timing is decided independently for each load. A configured static array or an array returned directly by a provider commits `ready`, `degraded`, or `unavailable` synchronously with one full render and no intermediate `loading` state or `aria-busy`. Any PromiseLike—including `Promise.resolve(...)`, an `async` function result, or a custom thenable—uses a loading render followed by a terminal render. Litefold Calendar invokes a provider before publishing loading callbacks and, when it returns a PromiseLike, attaches handlers before those callbacks. For every published state, the consumer's `onStateChange` runs before the corresponding DOM replacement.
 
 ## Choose the right boundary
 
@@ -50,9 +52,9 @@ Use the narrowest ownership boundary that fits the work:
 
 | Boundary | Choose it when | Ownership and distribution |
 | --- | --- | --- |
-| Calendar core | The behavior is required for the calendar's ordinary documented semantics, safety, accessibility, or lifecycle | Litefold owns it and every root consumer receives it |
+| Calendar core | The behavior is required for the calendar's ordinary documented semantics, safety, accessibility, or lifecycle | Litefold Calendar owns it and every root consumer receives it |
 | Render hook | An application needs localized presentation at an existing mount point | The consumer owns the callback, created content, external resources, and returned cleanup; it ships in the application |
-| First-party extension | Optional functionality needs coordinated state observation, navigation, platform integration, presentation, or an independently removable lifecycle | Litefold owns the complete component; the application only imports its subpath, configures it, and registers the returned value |
+| First-party extension | Optional functionality needs coordinated state observation, navigation, platform integration, presentation, or an independently removable lifecycle | Litefold Calendar owns the complete component; the application only imports its subpath, configures it, and registers the returned value |
 | Separate package | The functionality needs independent installation, versioning, dependencies, security policy, ownership, or removal from installed package bytes | Its publisher owns a distinct package and compatibility boundary |
 
 A complete component does not need to render UI. WebMCP is an extension because it coordinates a browser integration, state projection, navigation, cancellation, and disposal even though it is headless. Conversely, grouping several visual callbacks does not turn consumer-owned render hooks into an extension.
@@ -61,21 +63,51 @@ A complete component does not need to render UI. WebMCP is an extension because 
 
 Registration is declarative: add a factory result to `CalendarOptions.extensions`. Importing an extension module alone does nothing, and there is no `registerExtension` method or runtime discovery system.
 
-During construction, Litefold snapshots and validates the complete array before mutating the host. Unreadable or forged values, repeated values, and duplicate extension IDs are invalid configuration. Distinct IDs can coexist. A configured value can be reused across calendars; each instance creates independent runtime state and cancellation, but a document-wide platform registry may still require instance-specific configuration such as distinct WebMCP prefixes.
+During construction, Litefold Calendar snapshots and validates the complete array before mutating the host. Unreadable or forged values, repeated values, and duplicate extension IDs are invalid configuration. Distinct IDs can coexist. A configured value can be reused across calendars; each instance creates independent runtime state and cancellation, but a document-wide platform registry may still require instance-specific configuration such as distinct WebMCP prefixes.
 
 The runtime protocol is package-private. Treat configured extension values as opaque: store, reuse, and pass them to `extensions`, but do not inspect or forge them.
 
 ## Capabilities, lifecycle, and isolation
 
-Litefold gives an extension only the capabilities declared by its private definition. Capability objects and state snapshots are immutable, and retained capabilities fail closed after quarantine or calendar destruction. Consumer render hooks cannot request extension capabilities, observe peers, or join this lifecycle.
+Litefold Calendar gives an extension only the capabilities declared by its private definition. Capability objects and state snapshots are immutable, and retained capabilities fail closed after quarantine or calendar destruction. Consumer render hooks cannot request extension capabilities, observe peers, or join this lifecycle.
 
 The observable order is:
 
-1. Extensions activate in registration order after the calendar shell renders and initial loading begins.
-2. Coalesced state updates run in registration order after the consumer's `onStateChange` callback.
-3. Fatal shutdown and `destroy()` abort extensions and dispose them in reverse order.
+```mermaid
+sequenceDiagram
+  accTitle: First-party extension activation, delivery, and teardown order
+  accDescr: Extensions activate and receive state in registration order. A direct initial result renders before activation and is then delivered once. An initial promise-like loading state is not replayed. Destruction aborts and disposes extensions in reverse order.
+  actor Consumer as Application
+  participant Calendar
+  participant First as Extension 1
+  participant Last as Extension n
+  Consumer->>Calendar: render()
+  alt Direct initial array
+    Calendar->>Calendar: Terminal commit, onStateChange, and DOM render
+    Calendar->>First: activate()
+    Calendar->>Last: activate()
+    Calendar-->>First: Queued terminal state delivery
+    Calendar-->>Last: Queued terminal state delivery
+  else Initial PromiseLike
+    Calendar->>Calendar: Attach settlement handlers; loading callback and render
+    Calendar->>First: activate()
+    Calendar->>Last: activate()
+    Note over First,Last: The already-published loading state is not replayed.
+    Calendar->>Calendar: Terminal commit, onStateChange, and DOM render
+    Calendar-->>First: Queued terminal state delivery
+    Calendar-->>Last: Queued terminal state delivery
+  end
+  Note over Calendar,Last: Later coalesced state deliveries run 1 to n after consumer onStateChange.
+  Consumer->>Calendar: destroy()
+  Calendar--x Last: Abort lifetime
+  Calendar->>Last: dispose()
+  Calendar--x First: Abort lifetime
+  Calendar->>First: dispose()
+```
 
-Lifecycle entry points are synchronous. An extension binds asynchronous work to its supplied lifetime signal rather than returning a promise. A failure quarantines, aborts, and disposes only that extension, then emits one diagnostic; ordinary calendar behavior and other extensions continue. The [optional-extension architecture](architecture.md#optional-extension-boundary) documents reentrancy, stale capability behavior, and navigation transaction safeguards.
+In prose: activation and state delivery follow registration order, while teardown reverses it. A direct initial result renders before activation and receives one queued terminal delivery. An initial PromiseLike activates extensions after the loading render without replaying loading, then delivers the settled terminal state. Later deliveries are coalesced and occur after the consumer's `onStateChange` callback.
+
+Lifecycle entry points are synchronous. An extension binds asynchronous work to its supplied lifetime signal rather than returning a promise. A fatal stop uses the same reverse teardown as `destroy()`. A hook failure quarantines, aborts, and disposes only that extension, then emits one diagnostic; ordinary calendar behavior and other extensions continue. The [optional-extension architecture](architecture.md#optional-extension-boundary) documents reentrancy, stale capability behavior, and navigation transaction safeguards.
 
 ## Bundle and import behavior
 

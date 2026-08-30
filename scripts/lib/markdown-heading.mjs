@@ -257,6 +257,31 @@ export function markdownExplicitAnchors(source) {
 	return anchors;
 }
 
+/**
+ * Returns fenced Markdown code blocks with their source locations.
+ *
+ * Indented code blocks have no language and are intentionally excluded because
+ * repository diagram policy applies only to explicitly identified fences.
+ *
+ * @param {string} source Complete Markdown source.
+ * @returns {Array<{ content: string, language: string, line: number }>} Fenced blocks in document order.
+ */
+export function markdownFencedCodeBlocks(source) {
+	const blocks = [];
+	visit(parseMarkdown(source), (node) => {
+		if (node.type !== "code" || typeof node.lang !== "string" ||
+			typeof node.value !== "string") {
+			return;
+		}
+		blocks.push({
+			content: node.value,
+			language: node.lang,
+			line: Number.isInteger(node.position?.start.line) ? node.position.start.line : 1
+		});
+	});
+	return blocks;
+}
+
 export function maskMarkdownNonProse(source, options = {}) {
 	const ranges = gfmHtmlCommentRanges(source);
 	visit(parseMarkdown(source), (node) => {

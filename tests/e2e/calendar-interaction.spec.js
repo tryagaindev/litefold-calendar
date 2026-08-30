@@ -60,7 +60,7 @@ test("activating a grid event preserves day selection and opens the application 
 	await expect(action).toBeVisible();
 	await action.click();
 
-	await expect(page.locator("[data-example-event-dialog]")).toBeVisible();
+	await expect(page.locator("[data-my-event-dialog]")).toBeVisible();
 	await expect(grid.locator('[role="gridcell"][aria-selected="true"] > button'))
 		.toHaveAttribute("aria-label", selectedDayName ?? "");
 });
@@ -77,5 +77,5 @@ test("compact layout retains a keyboard-operable grid event target", async ({ pa
 	await action.focus();
 	await expect(action).toBeFocused();
 	await action.press("Enter");
-	await expect(page.locator("[data-example-event-dialog]")).toBeVisible();
+	await expect(page.locator("[data-my-event-dialog]")).toBeVisible();
 });

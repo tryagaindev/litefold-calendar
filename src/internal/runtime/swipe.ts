@@ -51,6 +51,9 @@ export class SwipeGestureController {
 
 	/** Connects the native pager after its stable DOM has been mounted. */
 	public connect(dom: CalendarDom): void {
+		if (!this.options.enabled) {
+			return;
+		}
 		if (this.connectedDom === dom) {
 			this.recenter(dom);
 			return;
@@ -182,6 +185,9 @@ export class SwipeGestureController {
 
 	/** Recenters and clears transient state before the live 42-cell grid is rerendered. */
 	public prepareForRender(dom: CalendarDom): void {
+		if (!this.options.enabled) {
+			return;
+		}
 		if (this.connectedDom !== dom) {
 			this.connect(dom);
 			return;

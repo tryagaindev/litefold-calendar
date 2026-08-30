@@ -1,6 +1,6 @@
 # SEO and progressive enhancement
 
-litefold-calendar renders meaningful native client-side markup and can coordinate an application-owned no-JavaScript fallback. It does not render HTML on the server, create canonical pages, inject metadata, or determine whether event data may be indexed.
+Litefold Calendar renders meaningful native client-side markup and can coordinate an application-owned no-JavaScript fallback. It does not render HTML on the server, create canonical pages, inject metadata, or determine whether event data may be indexed.
 
 Optional [WebMCP site tools](webmcp.md) provide structured interaction to a compatible browser agent only after JavaScript runs. They do not make content server-rendered, crawlable, indexable, or available as a no-JavaScript fallback.
 
@@ -34,12 +34,12 @@ This improves document semantics, link behavior, keyboard support, and machine r
 Render useful application-owned HTML outside the calendar host, then pass that element through `fallbackElement`:
 
 ```html
-<section aria-labelledby="schedule-heading">
-	<h2 id="schedule-heading">Schedule</h2>
+<section aria-labelledby="my-schedule-heading">
+	<h2 id="my-schedule-heading">Schedule</h2>
 
-	<div id="calendar"></div>
+	<div id="my-calendar"></div>
 
-	<div id="calendar-fallback">
+	<div id="my-calendar-fallback">
 		<p>Browse the current schedule:</p>
 		<ol>
 			<li>
@@ -53,8 +53,8 @@ Render useful application-owned HTML outside the calendar host, then pass that e
 ```
 
 ```js
-const host = document.querySelector("#calendar");
-const fallbackElement = document.querySelector("#calendar-fallback");
+const host = document.querySelector("#my-calendar");
+const fallbackElement = document.querySelector("#my-calendar-fallback");
 
 if (!(host instanceof HTMLElement) || !(fallbackElement instanceof HTMLElement)) {
 	throw new Error("Calendar integration nodes were not found.");
@@ -72,23 +72,25 @@ The fallback must belong to the host document and remain outside the calendar ho
 
 ## Fallback lifecycle
 
+Each event-source load is timed by its source value. A configured static array or an array returned directly by a provider commits its terminal state synchronously with one full render, never sets `aria-busy`, and settles the fallback before the initiating void method returns. Any PromiseLike—including an already-fulfilled `Promise.resolve(...)`, an `async` function result, or a custom thenable—keeps the fallback in its pending state for the loading render, then settles it with the terminal render. Litefold Calendar invokes a provider before loading callbacks run and attaches PromiseLike handlers before those callbacks; `onStateChange` runs before each corresponding DOM replacement.
+
 The package changes only the fallback element's `hidden` property:
 
 | Calendar state | Fallback behavior |
 | --- | --- |
-| Construction and initial loading | Keeps the application's original visibility |
-| First usable snapshot, including an empty result | Hides the fallback |
+| Before the first commit, including a pending initial PromiseLike | Keeps the application's original visibility |
+| First usable snapshot, including an empty direct array or fulfilled PromiseLike | Hides the fallback |
 | Later refresh failure with retained usable data | Keeps the fallback hidden |
 | Unavailable or fatal state with no usable data | Restores the original visibility |
 | `destroy()` | Restores the original visibility when the package still owns the current value |
 
-If application code changes `hidden`, Litefold preserves that value instead of overwriting it. The [API reference](api.md#application-integration-options) defines exact lease admission, Retry, application-mutation, and destruction behavior.
+If application code changes `hidden`, Litefold Calendar preserves that value instead of overwriting it. The [API reference](api.md#application-integration-options) defines exact lease admission, Retry, application-mutation, and destruction behavior.
 
 Keep fallback content independently correct; the package does not reconcile or rewrite it. When fallback data changes, update it through the application's server or content workflow.
 
 ## Event URL policy
 
-`CalendarEventInput.url` is optional. Litefold accepts validated relative references and HTTP(S) URLs, resolves them against the host document, and renders them as native anchors. An invalid URL rejects the complete source snapshot rather than silently dropping one event. See the [event URL contract](api.md#define-events-calendareventinput-and-calendarevent) for exact length, whitespace, credential, character, and scheme rules.
+`CalendarEventInput.url` is optional. Litefold Calendar accepts validated relative references and HTTP(S) URLs, resolves them against the host document, and renders them as native anchors. An invalid URL rejects the complete source snapshot rather than silently dropping one event. See the [event URL contract](api.md#define-events-calendareventinput-and-calendarevent) for exact length, whitespace, credential, character, and scheme rules.
 
 Use same-origin relative links when possible. The application remains responsible for authorization, privacy, canonical routing, destination security, and deciding whether a link may expose an event's existence.
 
@@ -109,16 +111,18 @@ Applications own:
 
 Do not infer that an event URL should be public merely because the current user can see it. For private schedules, the correct SEO policy may be authenticated pages plus `noindex` and no public fallback content.
 
-litefold-calendar deliberately does not emit JSON-LD. Rich-result schemas require product-specific policy and complete server context; generic automatic output would risk incorrect or private metadata.
+Litefold Calendar deliberately does not emit JSON-LD. Rich-result schemas require product-specific policy and complete server context; generic automatic output would risk incorrect or private metadata.
 
 ## Verify progressive behavior
 
 1. Load the page with JavaScript disabled and confirm the fallback is useful, ordered, linked where appropriate, and authorized.
-2. Load with a slow source and confirm the fallback stays available until usable calendar data commits.
-3. Exercise the fallback states required by the [canonical lifecycle](api.md#application-integration-options).
-4. Inspect the rendered agenda for native `ol`/`li`/`time`/`a` semantics; repeat with each visual time mode and confirm hidden times remain semantic and accessible.
-5. Confirm links work with ordinary navigation, new-tab commands, copy-link, and the native context menu.
-6. Test keyboard and assistive-technology reading order across the server content, calendar grid, agenda, and fallback transition.
-7. Validate canonical, metadata, robots, privacy, and structured-data decisions in the complete application.
+2. Load from a direct array and confirm the fallback settles synchronously without a loading state or `aria-busy`.
+3. Load with a slow PromiseLike and confirm the fallback stays available until usable calendar data commits.
+4. Repeat with `Promise.resolve(events)` to confirm that an already-fulfilled Promise still uses the asynchronous lifecycle.
+5. Exercise the fallback states required by the [canonical lifecycle](api.md#application-integration-options).
+6. Inspect the rendered agenda for native `ol`/`li`/`time`/`a` semantics; repeat with each visual time mode and confirm hidden times remain semantic and accessible.
+7. Confirm links work with ordinary navigation, new-tab commands, copy-link, and the native context menu.
+8. Test keyboard and assistive-technology reading order across the server content, calendar grid, agenda, and fallback transition.
+9. Validate canonical, metadata, robots, privacy, and structured-data decisions in the complete application.
 
 See the [runnable progressive-enhancement fixture](../examples/progressive-enhancement/) for a generic implementation.

@@ -6,7 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-<!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
+### Added
+
+- Added `npm run measure:workflows` for reproducible root-import, render, source-update, DOM-operation, and emitted-size diagnostics. Optional extensions remain excluded from root-load accounting, and timing results remain measurements rather than CI thresholds.
+- Added Mermaid event-order and architecture diagrams, an annotated calendar anatomy guide, and an IDE-runnable contributor command launcher.
+
+### Changed
+
+- Reworked visible-range event indexing to sort normalized events once and distribute them across the 42-day grid, avoiding a day-by-event scan while preserving exclusive ends, ordering, and arbitrary date-list behavior. Hook-free calendars now skip render-hook integrity snapshots and unused mount-context construction; event actions share listener types; optional formatters initialize on first use; and `swipe: false` installs no pager listeners or resize observer.
+- Minified only the composed public `dist/styles.css` while keeping source modules readable.
+- Direct event arrays, including arrays returned by providers, now validate, publish terminal state, render, coordinate fallback, and restore focus before the initiating `void` method returns. They use one full render and never publish `loading` or `aria-busy`. PromiseLike results, including fulfilled promises, async functions, and custom thenables, retain the loading-then-terminal lifecycle. **Migration:** return `Promise.resolve(events)` only when loading callbacks are intentionally required for otherwise immediate data.
+- Renamed application-owned hooks throughout runnable examples, copyable documentation, and the Pages site to the `my-*`, `data-my-*`, `--my-*`, and `@layer my` namespaces; repository-only probes now use `data-test-*`. Package-owned `litefold-calendar` and `lfc-*` hooks are unchanged, and `check:ownership` now enforces the boundary.
+- Replaced the compact three-slip multiple-event fan with a locale-aware social-style number (`+N` for additional events, or the total when no marker is visible), with the same customizable presentation available in wide cells. When a primary marker/action and passive count coexist, the package places them at the cell's block end in two equal, gap-free auto-fitting grid blocks. Their centers evenly divide the full area beneath the date when both compact-control-size tracks, 44 CSS pixels by default, fit; the blocks stack as centered, equal-width rows otherwise. This keeps them stacked through supported phone widths and moves them onto one row only near the compact ceiling. Markerless totals and `maxGridEventsPerDay: 0` action-backed fallbacks remain single blocks. Consumer compact output must remain concise enough for its assigned block because the auto-fit threshold does not measure arbitrary intrinsic hook-content width.
+- **0.4 migration:** Unified `renderMultipleEventIndicator` and `renderGridOverflowContent` as the discriminated `renderEventOverflow` hook. Replace `CalendarMultipleEventIndicatorContext` and `CalendarGridOverflowContentContext` with `CalendarCompactEventOverflowContext`, `CalendarWideEventOverflowContext`, or their `CalendarEventOverflowContext` union; branch on `context.variant`; rename `hiddenEventCount` to `overflowCount`; and use `visibleEventCount`, `text`, and `elements` for package-owned presentation state.
 
 ## [0.3.0-alpha.0] - 2026-08-29
 

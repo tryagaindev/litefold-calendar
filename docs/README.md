@@ -1,6 +1,6 @@
 # Documentation
 
-Start with the [project README](../README.md) for installation and a first render. Use this index when you need a specific integration, behavior, or maintenance contract.
+Start with the [project README](../README.md) for installation and a first render. Use this index when you need a specific integration, behavior, or maintenance contract. Consumers should use **Evaluate and start** or **Integrate**; contributors and maintainers should use **Contribute and maintain**.
 
 ## Evaluate and start
 
@@ -17,6 +17,7 @@ Start with the [project README](../README.md) for installation and a first rende
 | --- | --- |
 | Look up exports, signatures, defaults, dates, events, methods, state, or lifecycle | [Public API reference](api.md) |
 | Adapt application data, caching, filters, actions, render hooks, and toolbar content | [Application integration guide](integration-guide.md) |
+| Identify day, event, overflow, render-hook, and color roles | [Calendar anatomy and color vocabulary](component-anatomy.md) |
 | Choose and configure a tree-shakeable optional component | [First-party extensions](first-party-extensions.md) |
 | Opt a calendar into experimental browser site tools | [WebMCP site-tool integration](webmcp.md) |
 | Handle loading, failure, Retry, and presentation ownership | [Error handling](errors.md) |
@@ -30,10 +31,11 @@ Start with the [project README](../README.md) for installation and a first rende
 
 | Goal | Canonical guide |
 | --- | --- |
-| Set up development and submit a change | [Contributing](../CONTRIBUTING.md) and [coding conventions](code-style.md) |
-| Author or review a package-owned optional component | [First-party extensions](first-party-extensions.md) |
-| Understand dependency direction and transaction ownership | [Internal architecture](architecture.md) |
-| Review the `setEvents()` decision and reproduce its measurement | [Dynamic event update decision record](dynamic-event-updates-adr.md) |
+| Set up development, run common commands, and submit a change | [Contributing](../CONTRIBUTING.md), [contributor commands](../CONTRIBUTOR_COMMANDS.md), and [coding conventions](code-style.md) |
+| Understand extension lifecycle order or author a package-owned optional component | [First-party extensions](first-party-extensions.md) |
+| Understand dependency direction and source/render order | [Internal architecture](architecture.md) |
+| Reproduce root-import, render, source-update, DOM-operation, and output-size measurements | [Measurement protocol](dynamic-event-updates-adr.md#measurement-protocol) |
+| Review the `setEvents()` decision and lifecycle tradeoffs | [Dynamic event update decision record](dynamic-event-updates-adr.md) |
 | Review trust boundaries and report a vulnerability | [Security model](security-model.md) and [security policy](../SECURITY.md) |
 | Reproduce the six canonical images | [Screenshot contract](screenshots/README.md) |
 | Verify package artifacts as a consumer | [Package verification](package-verification.md) |

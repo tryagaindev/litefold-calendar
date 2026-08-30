@@ -1,6 +1,6 @@
 # Support
 
-litefold-calendar is an open-source prerelease maintained on a best-effort basis. There is no guaranteed response time or private implementation support.
+Litefold Calendar is an open-source prerelease maintained on a best-effort basis. There is no guaranteed response time or private implementation support.
 
 ## Choose the right channel
 

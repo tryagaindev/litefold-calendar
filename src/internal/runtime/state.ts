@@ -1,10 +1,12 @@
-import type {
-	CalendarErrorCode,
-	CalendarErrorPhase,
-	CalendarErrorSeverity,
-	CalendarIssue,
-	CalendarRangeBounds,
-	CalendarSurface
+import {
+	LitefoldCalendarError,
+	type CalendarErrorCode,
+	type CalendarErrorPhase,
+	type CalendarErrorSeverity,
+	type CalendarIssue,
+	type CalendarRangeBounds,
+	type CalendarSurface,
+	type LitefoldCalendarErrorOptions
 } from "../../errors.js";
 import type {
 	CalendarAnnouncement,
@@ -12,6 +14,7 @@ import type {
 	CalendarPhase,
 	CalendarState
 } from "../../types.js";
+import type { CalendarMessages } from "../../messages.js";
 
 /** Coordinator-owned issue metadata retained outside the public state snapshot. */
 export interface InternalIssue {
@@ -39,6 +42,50 @@ export interface InternalErrorOptions {
 	readonly surface?: CalendarSurface | undefined;
 	readonly userMessage: string;
 	readonly userTitle: string;
+}
+
+/** Creates one typed package error from coordinator-owned internal values. */
+export function createInternalError(options: InternalErrorOptions): LitefoldCalendarError {
+	const phase = options.phase ?? phaseForCode(options.code);
+	const values: LitefoldCalendarErrorOptions = {
+		...(options.cause === undefined ? {} : { cause: options.cause }),
+		code: options.code,
+		...(options.eventIndex === undefined ? {} : { eventIndex: options.eventIndex }),
+		...(options.extensionId === undefined ? {} : { extensionId: options.extensionId }),
+		...(options.renderHookId === undefined ? {} : { renderHookId: options.renderHookId }),
+		...(options.hook === undefined ? {} : { hook: options.hook }),
+		message: options.message ?? `${options.code} during ${phase}.`,
+		phase,
+		...(options.range === undefined ? {} : { range: options.range }),
+		recoverable: options.recoverable,
+		severity: options.severity,
+		...(options.stale === undefined ? {} : { stale: options.stale }),
+		...(options.surface === undefined ? {} : { surface: options.surface }),
+		userMessage: options.userMessage,
+		userTitle: options.userTitle
+	};
+	return new LitefoldCalendarError(values);
+}
+
+/** Creates a typed error for a rejected public calendar method call. */
+export function createPublicMethodError(
+	code: "invalid-argument" | "invalid-state",
+	hook: string,
+	message: string,
+	messages: Readonly<CalendarMessages>,
+	isLive: boolean,
+	cause?: unknown
+): LitefoldCalendarError {
+	return createInternalError({
+		...(cause === undefined ? {} : { cause }),
+		code,
+		hook,
+		message,
+		recoverable: code === "invalid-argument" || isLive,
+		severity: "error",
+		userMessage: code === "invalid-argument" ? messages.actionErrorMessage : messages.internalErrorMessage,
+		userTitle: code === "invalid-argument" ? messages.actionErrorTitle : messages.internalErrorTitle
+	});
 }
 
 /** Creates an immutable public state snapshot. */

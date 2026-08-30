@@ -4,10 +4,9 @@ import test, { type TestContext } from "node:test";
 import {
 	createCalendar,
 	type Calendar,
+	type CalendarEventOverflowContext,
 	type CalendarEventInput,
 	type CalendarRenderHooks,
-	type CalendarGridOverflowContentContext,
-	type CalendarMultipleEventIndicatorContext,
 	type LitefoldCalendarError
 } from "../src/index.js";
 import {
@@ -280,284 +279,391 @@ void test("connected render-hook output cannot add interactive descendants", asy
 	assert.ok(markerSlots.every((marker) => marker.querySelector(".lfc-calendar-event-accent") !== null));
 });
 
-void test("the built-in multiple-event cue uses the authoritative count independently of the grid cap", async (context) => {
+void test("built-in event-overflow variants use adaptive counts independently of the grid cap", async (context) => {
 	const { host } = setupDom(context);
 	const calendar = createCalendar(host, {
 		events: [
 			event("single", "2026-07-13T09:00", "Single event"),
-			event("multiple-a", "2026-07-14T09:00", "First multiple event"),
-			event("multiple-b", "2026-07-14T10:00", "Second multiple event")
+			...eventsForDate("2026-07-14", 4, "multiple")
 		],
 		initialDate: "2026-07-14",
-		maxGridEventsPerDay: 0
-	});
-
-	calendar.render();
-	await waitForPhase(calendar, "ready");
-
-	assert.equal(getMultipleEventIndicator(host, "2026-07-12").childNodes.length, 0);
-	assert.equal(getMultipleEventIndicator(host, "2026-07-13").childNodes.length, 0);
-	const multipleIndicator = getMultipleEventIndicator(host, "2026-07-14");
-	assert.equal(multipleIndicator.getAttribute("aria-hidden"), "true");
-	assert.equal(
-		multipleIndicator.querySelectorAll(":scope > .lfc-calendar-multiple-event-indicator-icon").length,
-		1
-	);
-	assert.equal(
-		multipleIndicator.querySelectorAll(
-			":scope > .lfc-calendar-multiple-event-indicator-icon > .lfc-calendar-multiple-event-indicator-card"
-		).length,
-		3
-	);
-	const overflow = getGridOverflowButton(host, "2026-07-14");
-	const customContent = overflow.querySelector<HTMLElement>(
-		":scope > .lfc-calendar-grid-more-custom-content"
-	);
-	const defaultContent = overflow.querySelector<HTMLElement>(
-		":scope > .lfc-calendar-grid-more-default-content"
-	);
-	assert.ok(customContent);
-	assert.equal(customContent.getAttribute("aria-hidden"), "true");
-	assert.equal(customContent.childNodes.length, 0);
-	assert.ok(defaultContent);
-	assert.ok((defaultContent.textContent ?? "").trim().length > 0);
-	assert.ok((overflow.getAttribute("aria-label") ?? "").trim().length > 0);
-});
-
-void test("renderMultipleEventIndicator skips out-of-range structural days", async (context) => {
-	const { host } = setupDom(context);
-	const dates: string[] = [];
-	const calendar = createCalendar(host, {
-		events: [
-			event("outside-a", "2026-07-13T09:00", "Outside A"),
-			event("outside-b", "2026-07-13T10:00", "Outside B"),
-			event("inside-a", "2026-07-14T09:00", "Inside A"),
-			event("inside-b", "2026-07-14T10:00", "Inside B")
-		],
-		renderHooks: [{
-			id: "range-aware-multiple-event-indicator",
-			renderMultipleEventIndicator: ({ dateString }) => {
-				dates.push(dateString);
-				return undefined;
-			}
-		}],
-		initialDate: "2026-07-14",
-		maxDate: "2026-07-14",
-		minDate: "2026-07-14"
-	});
-
-	calendar.render();
-	await waitForPhase(calendar, "ready");
-
-	assert.deepEqual(dates, ["2026-07-14"]);
-	assert.equal(getMultipleEventIndicator(host, "2026-07-13").childNodes.length, 0);
-	assert.equal(
-		getMultipleEventIndicator(host, "2026-07-14")
-			.querySelectorAll(":scope > .lfc-calendar-multiple-event-indicator-icon").length,
-		1
-	);
-});
-
-void test("renderMultipleEventIndicator receives day context and supports custom, null, and undefined results", async (context) => {
-	const { dom, host } = setupDom(context);
-	const contexts: Readonly<CalendarMultipleEventIndicatorContext>[] = [];
-	const calendar = createCalendar(host, {
-		events: [
-			event("single", "2026-07-13T09:00", "Single event"),
-			event("custom-a", "2026-07-14T09:00", "Custom one"),
-			event("custom-b", "2026-07-14T10:00", "Custom two"),
-			event("suppressed-a", "2026-07-15T09:00", "Suppressed one"),
-			event("suppressed-b", "2026-07-15T10:00", "Suppressed two"),
-			event("default-a", "2026-07-16T09:00", "Default one"),
-			event("default-b", "2026-07-16T10:00", "Default two")
-		],
-		renderHooks: [{
-			id: "multiple-event-presentations",
-			renderMultipleEventIndicator: (renderContext) => {
-				contexts.push(renderContext);
-				if (renderContext.dateString === "2026-07-14") {
-					const replacement = renderContext.document.createElement("span");
-					replacement.className = "example-multiple-event-indicator";
-					replacement.textContent = "Multiple";
-					return replacement;
-				}
-				return renderContext.dateString === "2026-07-15" ? null : undefined;
-			}
-		}],
-		initialDate: "2026-07-14"
-	});
-
-	calendar.render();
-	await waitForPhase(calendar, "ready");
-
-	assert.deepEqual(contexts.map((renderContext) => renderContext.dateString), [
-		"2026-07-14",
-		"2026-07-15",
-		"2026-07-16"
-	]);
-	for (const renderContext of contexts) {
-		assert.equal(renderContext.document, dom.window.document);
-		assert.equal(renderContext.surface, "day");
-		assert.equal(renderContext.eventCount, 2);
-		assert.equal(renderContext.signal.aborted, false);
-		assert.equal(Object.isFrozen(renderContext), true);
-		assert.equal(Object.isFrozen(renderContext.date), true);
-		assert.deepEqual(renderContext.date, {
-			day: Number(renderContext.dateString.slice(-2)),
-			month: 7,
-			year: 2026
-		});
-	}
-	assert.equal(
-		getMultipleEventIndicator(host, "2026-07-14")
-			.querySelectorAll(":scope > .example-multiple-event-indicator").length,
-		1
-	);
-	assert.equal(
-		getMultipleEventIndicator(host, "2026-07-14")
-			.querySelector(".lfc-calendar-multiple-event-indicator-icon"),
-		null
-	);
-	assert.equal(getMultipleEventIndicator(host, "2026-07-15").childNodes.length, 0);
-	assert.ok(
-		getMultipleEventIndicator(host, "2026-07-16")
-			.querySelector(":scope > .lfc-calendar-multiple-event-indicator-icon")
-	);
-
-	calendar.destroy();
-	assert.ok(contexts.every((renderContext) => renderContext.signal.aborted));
-});
-
-void test("a quarantined multiple-event renderer restores all built-in cue fallbacks", async (context) => {
-	const { host } = setupDom(context);
-	let calls = 0;
-	let captured: LitefoldCalendarError | undefined;
-	const calendar = createCalendar(host, {
-		events: [
-			event("first-a", "2026-07-14T09:00", "First day one"),
-			event("first-b", "2026-07-14T10:00", "First day two"),
-			event("second-a", "2026-07-15T09:00", "Second day one"),
-			event("second-b", "2026-07-15T10:00", "Second day two")
-		],
-		renderHooks: [{
-			id: "failing-multiple-event-indicator",
-			renderMultipleEventIndicator: ({ document: ownerDocument }) => {
-				calls += 1;
-				if (calls === 2) {
-					throw new Error("private multiple-event indicator failure");
-				}
-				const replacement = ownerDocument.createElement("span");
-				replacement.className = "temporary-multiple-event-indicator";
-				return replacement;
-			}
-		}],
-		initialDate: "2026-07-14",
-		onError: (error) => {
-			captured = error;
-		}
-	});
-
-	calendar.render();
-	await waitForPhase(calendar, "degraded");
-
-	assert.equal(calls, 2);
-	assert.equal(captured?.hook, "renderMultipleEventIndicator");
-	assert.equal(captured?.surface, "day");
-	assert.equal(host.querySelector(".temporary-multiple-event-indicator"), null);
-	for (const dateString of ["2026-07-14", "2026-07-15"]) {
-		const indicator = getMultipleEventIndicator(host, dateString);
-		assert.equal(
-			indicator.querySelectorAll(":scope > .lfc-calendar-multiple-event-indicator-icon").length,
-			1
-		);
-	}
-	assert.doesNotMatch(
-		host.textContent ?? "",
-		/private multiple-event indicator failure|failing-multiple-event-indicator/u
-	);
-});
-
-void test("renderGridOverflowContent receives counts while preserving canonical button content", async (context) => {
-	const { dom, host } = setupDom(context);
-	const contexts: Readonly<CalendarGridOverflowContentContext>[] = [];
-	const calendar = createCalendar(host, {
-		events: [
-			event("custom-a", "2026-07-14T09:00", "Custom one"),
-			event("custom-b", "2026-07-14T10:00", "Custom two"),
-			event("null-a", "2026-07-15T09:00", "Null one"),
-			event("null-b", "2026-07-15T10:00", "Null two"),
-			event("undefined-a", "2026-07-16T09:00", "Undefined one"),
-			event("undefined-b", "2026-07-16T10:00", "Undefined two")
-		],
-		renderHooks: [{
-			id: "grid-overflow-presentations",
-			renderGridOverflowContent: (renderContext) => {
-				contexts.push(renderContext);
-				if (renderContext.dateString === "2026-07-14") {
-					const replacement = renderContext.document.createElement("span");
-					replacement.className = "example-grid-overflow-content";
-					replacement.textContent = `Wide ${renderContext.hiddenEventCount}`;
-					return replacement;
-				}
-				return renderContext.dateString === "2026-07-15" ? null : undefined;
-			}
-		}],
-		initialDate: "2026-07-14",
-		maxGridEventsPerDay: 1,
+		maxGridEventsPerDay: 2,
 		onEventActivate: () => undefined
 	});
 
 	calendar.render();
 	await waitForPhase(calendar, "ready");
 
-	assert.deepEqual(contexts.map((renderContext) => renderContext.dateString), [
-		"2026-07-14",
-		"2026-07-15",
-		"2026-07-16"
-	]);
+	assert.equal(findCompactOverflowRoot(host, "2026-07-12"), null);
+	assert.equal(findCompactOverflowRoot(host, "2026-07-13"), null);
+	const compact = getCompactOverflowRoot(host, "2026-07-14");
+	assert.equal(compact.getAttribute("aria-hidden"), "true");
+	assert.equal(getOverflowContent(compact).textContent, "+3");
+	const wide = getWideOverflowRoot(host, "2026-07-14");
+	assert.equal(getOverflowContent(wide).textContent, "2 more");
+	const overflow = getGridOverflowButton(host, "2026-07-14");
+	assert.ok((overflow.getAttribute("aria-label") ?? "").trim().length > 0);
+});
+
+void test("renderEventOverflow receives both frozen variants and stable element references", async (context) => {
+	const { dom, host } = setupDom(context);
+	const contexts: Readonly<CalendarEventOverflowContext>[] = [];
+	const calendar = createCalendar(host, {
+		events: eventsForDate("2026-07-14", 4, "context"),
+		initialDate: "2026-07-14",
+		maxGridEventsPerDay: 2,
+		onEventActivate: () => undefined,
+		renderHooks: [{
+			id: "overflow-context",
+			renderEventOverflow: (renderContext) => {
+				contexts.push(renderContext);
+				return undefined;
+			}
+		}]
+	});
+
+	calendar.render();
+	await waitForPhase(calendar, "ready");
+
+	assert.deepEqual(contexts.map(({ variant }) => variant), ["compact", "wide"]);
+	const [compact, wide] = contexts;
+	assert.ok(compact?.variant === "compact");
+	assert.equal(compact.document, dom.window.document);
+	assert.equal(compact.surface, "day");
+	assert.equal(compact.eventCount, 4);
+	assert.equal(compact.visibleEventCount, 1);
+	assert.equal(compact.overflowCount, 3);
+	assert.equal(compact.text, "+3");
+	assert.equal(compact.elements.action, null);
+	assert.equal(compact.elements.root.contains(compact.elements.content), true);
+	assert.equal(compact.elements.content.textContent, compact.text);
+
+	assert.ok(wide?.variant === "wide");
+	assert.equal(wide.document, dom.window.document);
+	assert.equal(wide.surface, "grid-summary");
+	assert.equal(wide.eventCount, 4);
+	assert.equal(wide.visibleEventCount, 2);
+	assert.equal(wide.overflowCount, 2);
+	assert.equal(wide.text, "2 more");
+	assert.equal(wide.elements.action, getGridOverflowButton(host, "2026-07-14"));
+	assert.equal(wide.elements.root.contains(wide.elements.content), true);
+	assert.equal(wide.elements.action.contains(wide.elements.root), true);
+	assert.equal(wide.elements.content.textContent, wide.text);
+
 	for (const renderContext of contexts) {
-		assert.equal(renderContext.document, dom.window.document);
-		assert.equal(renderContext.surface, "grid-summary");
-		assert.equal(renderContext.eventCount, 2);
-		assert.equal(renderContext.hiddenEventCount, 1);
 		assert.equal(renderContext.signal.aborted, false);
 		assert.equal(Object.isFrozen(renderContext), true);
 		assert.equal(Object.isFrozen(renderContext.date), true);
-		const defaultContent = getGridOverflowButton(host, renderContext.dateString)
-			.querySelector<HTMLElement>(":scope > .lfc-calendar-grid-more-default-content");
-		assert.ok(defaultContent);
-		assert.equal(defaultContent.textContent, renderContext.text);
-		assert.equal(defaultContent.childNodes.length, 1);
-		assert.equal(defaultContent.firstChild?.nodeType, dom.window.Node.TEXT_NODE);
-	}
-	const customButton = getGridOverflowButton(host, "2026-07-14");
-	const customSlot = customButton.querySelector<HTMLElement>(
-		":scope > .lfc-calendar-grid-more-custom-content"
-	);
-	assert.ok(customSlot);
-	assert.equal(customSlot.getAttribute("aria-hidden"), "true");
-	assert.ok(customSlot.querySelector(":scope > .example-grid-overflow-content"));
-	assert.equal(customButton.classList.contains("lfc-has-custom-grid-overflow-content"), true);
-	assert.ok((customButton.getAttribute("aria-label") ?? "").trim().length > 0);
-	for (const dateString of ["2026-07-15", "2026-07-16"]) {
-		const button = getGridOverflowButton(host, dateString);
-		const slot = button.querySelector<HTMLElement>(
-			":scope > .lfc-calendar-grid-more-custom-content"
-		);
-		assert.ok(slot);
-		assert.equal(slot.getAttribute("aria-hidden"), "true");
-		assert.equal(slot.childNodes.length, 0);
-		assert.equal(button.classList.contains("lfc-has-custom-grid-overflow-content"), false);
+		assert.equal(Object.isFrozen(renderContext.elements), true);
+		assert.deepEqual(renderContext.date, { day: 14, month: 7, year: 2026 });
 	}
 
 	calendar.destroy();
 	assert.ok(contexts.every((renderContext) => renderContext.signal.aborted));
-	assert.equal(customButton.classList.contains("lfc-has-custom-grid-overflow-content"), false);
-	assert.equal(customSlot.childNodes.length, 0);
 });
 
+void test("renderEventOverflow skips out-of-range structural days", async (context) => {
+	const { host } = setupDom(context);
+	const calls: string[] = [];
+	const calendar = createCalendar(host, {
+		events: [
+			...eventsForDate("2026-07-13", 2, "outside"),
+			...eventsForDate("2026-07-14", 2, "inside")
+		],
+		initialDate: "2026-07-14",
+		maxDate: "2026-07-14",
+		maxGridEventsPerDay: 1,
+		minDate: "2026-07-14",
+		onEventActivate: () => undefined,
+		renderHooks: [{
+			id: "range-aware-overflow",
+			renderEventOverflow: ({ dateString, variant }) => {
+				calls.push(`${dateString}:${variant}`);
+				return undefined;
+			}
+		}]
+	});
+
+	calendar.render();
+	await waitForPhase(calendar, "ready");
+
+	assert.deepEqual(calls, ["2026-07-14:compact", "2026-07-14:wide"]);
+	assert.equal(findCompactOverflowRoot(host, "2026-07-13"), null);
+	assert.equal(getOverflowContent(getCompactOverflowRoot(host, "2026-07-14")).textContent, "+1");
+});
+
+void test("renderEventOverflow supports custom, null, and undefined results in both variants", async (context) => {
+	const { host } = setupDom(context);
+	const contexts: Readonly<CalendarEventOverflowContext>[] = [];
+	const calendar = createCalendar(host, {
+		events: [
+			...eventsForDate("2026-07-14", 2, "custom"),
+			...eventsForDate("2026-07-15", 2, "null"),
+			...eventsForDate("2026-07-16", 2, "default")
+		],
+		initialDate: "2026-07-14",
+		maxGridEventsPerDay: 1,
+		onEventActivate: () => undefined,
+		renderHooks: [{
+			id: "overflow-presentations",
+			renderEventOverflow: (renderContext) => {
+				contexts.push(renderContext);
+				if (renderContext.dateString === "2026-07-14") {
+					const replacement = renderContext.document.createElement("span");
+					replacement.className = `example-${renderContext.variant}-overflow`;
+					replacement.textContent = `${renderContext.variant}:${renderContext.text}`;
+					return replacement;
+				}
+				return renderContext.dateString === "2026-07-15" ? null : undefined;
+			}
+		}]
+	});
+
+	calendar.render();
+	await waitForPhase(calendar, "ready");
+
+	assert.deepEqual(contexts.map(({ dateString, variant }) => `${dateString}:${variant}`), [
+		"2026-07-14:compact",
+		"2026-07-14:wide",
+		"2026-07-15:compact",
+		"2026-07-15:wide",
+		"2026-07-16:compact",
+		"2026-07-16:wide"
+	]);
+	const customContexts = contexts.filter(({ dateString }) => dateString === "2026-07-14");
+	for (const renderContext of customContexts) {
+		assert.equal(
+			renderContext.elements.content.querySelector(`.example-${renderContext.variant}-overflow`)?.textContent,
+			`${renderContext.variant}:${renderContext.text}`
+		);
+		assert.equal(renderContext.elements.root.classList.contains("lfc-has-custom-event-overflow"), true);
+	}
+	const nullCompact = contexts.find(({ dateString, variant }) =>
+		dateString === "2026-07-15" && variant === "compact");
+	assert.ok(nullCompact?.variant === "compact");
+	assert.equal(nullCompact.elements.action, null);
+	assert.equal(nullCompact.elements.content.textContent, "");
+	assert.equal(nullCompact.elements.root.classList.contains("lfc-is-event-overflow-suppressed"), true);
+	const nullWide = contexts.find(({ dateString, variant }) =>
+		dateString === "2026-07-15" && variant === "wide");
+	assert.ok(nullWide?.variant === "wide");
+	assert.equal(nullWide.elements.content.textContent, nullWide.text);
+	assert.equal(nullWide.elements.root.classList.contains("lfc-is-event-overflow-suppressed"), false);
+	for (const renderContext of contexts.filter(({ dateString }) => dateString === "2026-07-16")) {
+		assert.equal(renderContext.elements.content.textContent, renderContext.text);
+		assert.equal(renderContext.elements.root.classList.contains("lfc-has-custom-event-overflow"), false);
+	}
+});
+
+void test("a suppressed or absent primary marker makes the compact count standalone", async (context) => {
+	const { host } = setupDom(context);
+	const compactContexts: Readonly<CalendarEventOverflowContext>[] = [];
+	const calendar = createCalendar(host, {
+		events: eventsForDate("2026-07-14", 2, "markerless"),
+		initialDate: "2026-07-14",
+		onEventActivate: () => undefined,
+		renderHooks: [{
+			id: "markerless-overflow",
+			renderEventMarker: () => null,
+			renderEventOverflow: (renderContext) => {
+				if (renderContext.variant === "compact") {
+					compactContexts.push(renderContext);
+				}
+				return undefined;
+			}
+		}]
+	});
+
+	calendar.render();
+	await waitForPhase(calendar, "ready");
+
+	assert.equal(compactContexts.length, 1);
+	const [compact] = compactContexts;
+	assert.ok(compact?.variant === "compact");
+	assert.equal(compact.visibleEventCount, 0);
+	assert.equal(compact.overflowCount, 2);
+	assert.equal(compact.text, "2");
+	assert.equal(compact.elements.action, null);
+	assert.equal(compact.elements.content.textContent, "2");
+});
+
+void test("static multi-event days show a standalone total without creating a wide action", async (context) => {
+	const { host } = setupDom(context);
+	const contexts: Readonly<CalendarEventOverflowContext>[] = [];
+	const calendar = createCalendar(host, {
+		events: eventsForDate("2026-07-14", 2, "static"),
+		initialDate: "2026-07-14",
+		maxGridEventsPerDay: 2,
+		renderHooks: [{
+			id: "static-overflow",
+			renderEventOverflow: (renderContext) => {
+				contexts.push(renderContext);
+				return undefined;
+			}
+		}]
+	});
+
+	calendar.render();
+	await waitForPhase(calendar, "ready");
+
+	assert.deepEqual(contexts.map(({ variant }) => variant), ["compact"]);
+	const [compact] = contexts;
+	assert.ok(compact?.variant === "compact");
+	assert.equal(compact.visibleEventCount, 0);
+	assert.equal(compact.overflowCount, 2);
+	assert.equal(compact.text, "2");
+	assert.equal(compact.elements.action, null);
+	assert.equal(host.querySelector(".lfc-calendar-grid-more"), null);
+});
+
+void test("a compact-primary overflow action retains its fallback when customization returns null", async (context) => {
+	const { host } = setupDom(context);
+	const contexts: Readonly<CalendarEventOverflowContext>[] = [];
+	const calendar = createCalendar(host, {
+		events: eventsForDate("2026-07-14", 2, "zero-cap"),
+		initialDate: "2026-07-14",
+		maxGridEventsPerDay: 0,
+		onEventActivate: () => undefined,
+		renderHooks: [{
+			id: "zero-cap-overflow",
+			renderEventOverflow: (renderContext) => {
+				contexts.push(renderContext);
+				return null;
+			}
+		}]
+	});
+
+	calendar.render();
+	await waitForPhase(calendar, "ready");
+
+	assert.deepEqual(contexts.map(({ variant }) => variant), ["compact", "wide"]);
+	const [compact, wide] = contexts;
+	assert.ok(compact?.variant === "compact");
+	assert.equal(compact.visibleEventCount, 0);
+	assert.equal(compact.overflowCount, 2);
+	assert.equal(compact.text, "2");
+	assert.equal(compact.elements.action, getGridOverflowButton(host, "2026-07-14"));
+	assert.equal(compact.elements.content.textContent, "2");
+	assert.equal(compact.elements.root.classList.contains("lfc-is-event-overflow-suppressed"), false);
+	assert.ok(wide?.variant === "wide");
+	assert.equal(wide.visibleEventCount, 0);
+	assert.equal(wide.overflowCount, 2);
+	assert.equal(wide.elements.content.textContent, wide.text);
+
+	compact.elements.action.click();
+	assert.deepEqual(calendar.getState().selectedDate, { day: 14, month: 7, year: 2026 });
+	assert.match(getAgenda(host).textContent ?? "", /zero-cap/u);
+});
+
+void test("a wide overflow failure quarantines the unified hook and restores every variant fallback", async (context) => {
+	const { host } = setupDom(context);
+	const calls: string[] = [];
+	let captured: LitefoldCalendarError | undefined;
+	const calendar = createCalendar(host, {
+		events: [
+			...eventsForDate("2026-07-14", 2, "first"),
+			...eventsForDate("2026-07-15", 3, "second")
+		],
+		initialDate: "2026-07-14",
+		maxGridEventsPerDay: 1,
+		onError: (error) => { captured = error; },
+		onEventActivate: () => undefined,
+		renderHooks: [{
+			id: "failing-unified-overflow",
+			renderEventOverflow: ({ dateString, document: ownerDocument, variant }) => {
+				calls.push(`${dateString}:${variant}`);
+				if (dateString === "2026-07-15" && variant === "wide") {
+					throw new Error("private unified overflow failure");
+				}
+				const replacement = ownerDocument.createElement("span");
+				replacement.className = "temporary-event-overflow";
+				return replacement;
+			}
+		}]
+	});
+
+	calendar.render();
+	await waitForPhase(calendar, "degraded");
+
+	assert.deepEqual(calls, [
+		"2026-07-14:compact",
+		"2026-07-14:wide",
+		"2026-07-15:compact",
+		"2026-07-15:wide"
+	]);
+	assert.equal(captured?.hook, "renderEventOverflow");
+	assert.equal(captured?.surface, "grid-summary");
+	assert.equal(host.querySelector(".temporary-event-overflow"), null);
+	assert.equal(getOverflowContent(getCompactOverflowRoot(host, "2026-07-14")).textContent, "+1");
+	assert.equal(getOverflowContent(getWideOverflowRoot(host, "2026-07-14")).textContent, "1 more");
+	assert.equal(getOverflowContent(getCompactOverflowRoot(host, "2026-07-15")).textContent, "+2");
+	assert.equal(getOverflowContent(getWideOverflowRoot(host, "2026-07-15")).textContent, "2 more");
+	assert.ok([...host.querySelectorAll<HTMLElement>(".lfc-calendar-event-overflow")]
+		.every((root) => !root.classList.contains("lfc-has-custom-event-overflow")));
+	assert.doesNotMatch(
+		host.textContent ?? "",
+		/private unified overflow failure|failing-unified-overflow/u
+	);
+});
+
+void test("one node cannot be reused across compact and wide overflow variants", async (context) => {
+	const { dom, host } = setupDom(context);
+	const shared = dom.window.document.createElement("span");
+	shared.className = "shared-event-overflow";
+	let captured: LitefoldCalendarError | undefined;
+	const calendar = createCalendar(host, {
+		events: eventsForDate("2026-07-14", 2, "shared"),
+		initialDate: "2026-07-14",
+		maxGridEventsPerDay: 1,
+		onError: (error) => { captured = error; },
+		onEventActivate: () => undefined,
+		renderHooks: [{
+			id: "reused-overflow-node",
+			renderEventOverflow: () => shared
+		}]
+	});
+
+	calendar.render();
+	await waitForPhase(calendar, "degraded");
+
+	assert.equal(captured?.hook, "renderEventOverflow");
+	assert.equal(captured?.surface, "grid-summary");
+	assert.equal(host.querySelector(".shared-event-overflow"), null);
+	assert.equal(getOverflowContent(getCompactOverflowRoot(host, "2026-07-14")).textContent, "+1");
+	assert.equal(getOverflowContent(getWideOverflowRoot(host, "2026-07-14")).textContent, "1 more");
+});
+
+for (const invalidVariant of ["compact", "wide"] as const) {
+	void test(`interactive ${invalidVariant} overflow output quarantines the unified hook`, async (context) => {
+		const { host } = setupDom(context);
+		const errors: LitefoldCalendarError[] = [];
+		const calendar = createCalendar(host, {
+			events: eventsForDate("2026-07-14", 2, `interactive-${invalidVariant}`),
+			initialDate: "2026-07-14",
+			maxGridEventsPerDay: 1,
+			onError: (error) => { errors.push(error); },
+			onEventActivate: () => undefined,
+			renderHooks: [{
+				id: `interactive-${invalidVariant}-overflow`,
+				renderEventOverflow: ({ document: ownerDocument, variant }) =>
+					variant === invalidVariant ? ownerDocument.createElement("button") : undefined
+			}]
+		});
+
+		calendar.render();
+		await waitForPhase(calendar, "degraded");
+
+		assert.equal(errors.length, 1);
+		assert.equal(errors[0]?.hook, "renderEventOverflow");
+		assert.equal(errors[0]?.surface, invalidVariant === "compact" ? "day" : "grid-summary");
+		assert.equal(getOverflowContent(getCompactOverflowRoot(host, "2026-07-14")).textContent, "+1");
+		assert.equal(getOverflowContent(getWideOverflowRoot(host, "2026-07-14")).textContent, "1 more");
+		assert.equal(host.querySelector(".lfc-calendar-event-overflow button"), null);
+	});
+}
+
 for (const outputKind of ["empty fragment", "comment", "template"] as const) {
-	void test(`nonvisual singleton ${outputKind} output retains canonical visual fallbacks`, async (context) => {
+	void test(`nonvisual ${outputKind} overflow output retains both canonical fallbacks`, async (context) => {
 		const { host } = setupDom(context);
 		const createOutput = (ownerDocument: Document): Node => {
 			if (outputKind === "empty fragment") {
@@ -571,57 +677,39 @@ for (const outputKind of ["empty fragment", "comment", "template"] as const) {
 			return template;
 		};
 		const calendar = createCalendar(host, {
-			events: [
-				event("first", "2026-07-14T09:00", "First event"),
-				event("second", "2026-07-14T10:00", "Second event")
-			],
-			renderHooks: [{
-				id: `nonvisual-singletons-${outputKind}`,
-				renderEventMarker: ({ document: ownerDocument }) => createOutput(ownerDocument),
-				renderGridOverflowContent: ({ document: ownerDocument }) => createOutput(ownerDocument),
-				renderMultipleEventIndicator: ({ document: ownerDocument }) => createOutput(ownerDocument)
-			}],
+			events: eventsForDate("2026-07-14", 2, `nonvisual-${outputKind}`),
 			initialDate: "2026-07-14",
-			maxGridEventsPerDay: 1
+			maxGridEventsPerDay: 1,
+			onEventActivate: () => undefined,
+			renderHooks: [{
+				id: `nonvisual-overflow-${outputKind}`,
+				renderEventOverflow: ({ document: ownerDocument }) => createOutput(ownerDocument)
+			}]
 		});
 
 		calendar.render();
 		await waitForPhase(calendar, "ready");
 
-		const markerSlots = [...host.querySelectorAll<HTMLElement>(".lfc-calendar-event-marker")];
-		assert.ok(markerSlots.length > 0 && markerSlots.every((marker) => marker.querySelector(".lfc-calendar-event-accent") !== null));
-		assert.equal(
-			getMultipleEventIndicator(host, "2026-07-14")
-				.querySelectorAll(":scope > .lfc-calendar-multiple-event-indicator-icon").length,
-			1
-		);
-		const overflow = getGridOverflowButton(host, "2026-07-14");
-		const customContent = overflow.querySelector<HTMLElement>(
-			":scope > .lfc-calendar-grid-more-custom-content"
-		);
-		const defaultContent = overflow.querySelector<HTMLElement>(
-			":scope > .lfc-calendar-grid-more-default-content"
-		);
-		assert.ok(customContent);
-		assert.equal(customContent.childNodes.length, 0);
-		assert.equal(overflow.classList.contains("lfc-has-custom-grid-overflow-content"), false);
-		assert.ok(defaultContent);
-		assert.ok((defaultContent.textContent ?? "").trim().length > 0);
+		assert.equal(getOverflowContent(getCompactOverflowRoot(host, "2026-07-14")).textContent, "+1");
+		assert.equal(getOverflowContent(getWideOverflowRoot(host, "2026-07-14")).textContent, "1 more");
+		assert.ok([...host.querySelectorAll<HTMLElement>(".lfc-calendar-event-overflow")]
+			.every((root) => !root.classList.contains("lfc-has-custom-event-overflow")));
 	});
 }
 
-void test("a template plus visible fragment child is accepted as singleton content", async (context) => {
+void test("a template plus visible fragment child is accepted as overflow content", async (context) => {
 	const { host } = setupDom(context);
 	const calendar = createCalendar(host, {
-		events: [
-			event("first", "2026-07-14T09:00", "First event"),
-			event("second", "2026-07-14T10:00", "Second event")
-		],
+		events: eventsForDate("2026-07-14", 2, "visible-fragment"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 1,
+		onEventActivate: () => undefined,
 		renderHooks: [{
 			id: "visible-template-fragment",
-			renderGridOverflowContent: ({ document: ownerDocument }) => {
+			renderEventOverflow: ({ document: ownerDocument, variant }) => {
+				if (variant === "compact") {
+					return undefined;
+				}
 				const fragment = ownerDocument.createDocumentFragment();
 				const template = ownerDocument.createElement("template");
 				template.content.append(ownerDocument.createElement("span"));
@@ -637,171 +725,56 @@ void test("a template plus visible fragment child is accepted as singleton conte
 	calendar.render();
 	await waitForPhase(calendar, "ready");
 
-	const overflow = getGridOverflowButton(host, "2026-07-14");
-	assert.equal(overflow.classList.contains("lfc-has-custom-grid-overflow-content"), true);
-	assert.ok(overflow.querySelector(":scope > span > .example-visible-template-sibling"));
-});
-
-void test("a quarantined grid-overflow renderer restores every canonical fallback", async (context) => {
-	const { host } = setupDom(context);
-	let calls = 0;
-	let captured: LitefoldCalendarError | undefined;
-	const calendar = createCalendar(host, {
-		events: [
-			event("first-a", "2026-07-14T09:00", "First day one"),
-			event("first-b", "2026-07-14T10:00", "First day two"),
-			event("second-a", "2026-07-15T09:00", "Second day one"),
-			event("second-b", "2026-07-15T10:00", "Second day two")
-		],
-		renderHooks: [{
-			id: "failing-grid-overflow",
-			renderGridOverflowContent: ({ document: ownerDocument }) => {
-				calls += 1;
-				if (calls === 2) {
-					throw new Error("private grid-overflow failure");
-				}
-				const replacement = ownerDocument.createElement("span");
-				replacement.className = "temporary-grid-overflow-content";
-				return replacement;
-			}
-		}],
-		initialDate: "2026-07-14",
-		maxGridEventsPerDay: 1,
-		onError: (error) => {
-			captured = error;
-		}
-	});
-
-	calendar.render();
-	await waitForPhase(calendar, "degraded");
-
-	assert.equal(calls, 2);
-	assert.equal(captured?.hook, "renderGridOverflowContent");
-	assert.equal(captured?.surface, "grid-summary");
-	assert.equal(host.querySelector(".temporary-grid-overflow-content"), null);
-	for (const dateString of ["2026-07-14", "2026-07-15"]) {
-		const button = getGridOverflowButton(host, dateString);
-		const customContent = button.querySelector<HTMLElement>(
-			":scope > .lfc-calendar-grid-more-custom-content"
-		);
-		const defaultContent = button.querySelector<HTMLElement>(
-			":scope > .lfc-calendar-grid-more-default-content"
-		);
-		assert.ok(customContent);
-		assert.equal(customContent.childNodes.length, 0);
-		assert.ok(defaultContent);
-		assert.ok((defaultContent.textContent ?? "").trim().length > 0);
-		assert.equal(button.classList.contains("lfc-has-custom-grid-overflow-content"), false);
-	}
-	assert.doesNotMatch(
-		host.textContent ?? "",
-		/private grid-overflow failure|failing-grid-overflow/u
-	);
-});
-
-void test("the singleton day visuals reject interactive output and retain package defaults", async (context) => {
-	const { host } = setupDom(context);
-	const errors: LitefoldCalendarError[] = [];
-	const calendar = createCalendar(host, {
-		events: [
-			event("first", "2026-07-14T09:00", "First event"),
-			event("second", "2026-07-14T10:00", "Second event")
-		],
-		renderHooks: [
-			{
-				id: "interactive-multiple-event-indicator",
-				renderMultipleEventIndicator: ({ document: ownerDocument }) =>
-					ownerDocument.createElement("button")
-			},
-			{
-				id: "interactive-grid-overflow-content",
-				renderGridOverflowContent: ({ document: ownerDocument }) =>
-					ownerDocument.createElement("button")
-			}
-		],
-		initialDate: "2026-07-14",
-		maxGridEventsPerDay: 1,
-		onError: (error) => {
-			errors.push(error);
-		}
-	});
-
-	calendar.render();
-	await waitForPhase(calendar, "degraded");
-
-	assert.deepEqual(errors.map(({ hook }) => hook), [
-		"renderMultipleEventIndicator",
-		"renderGridOverflowContent"
-	]);
-	assert.equal(
-		getMultipleEventIndicator(host, "2026-07-14")
-			.querySelectorAll(":scope > .lfc-calendar-multiple-event-indicator-icon").length,
-		1
-	);
-	const overflow = getGridOverflowButton(host, "2026-07-14");
-	assert.equal(
-		overflow.querySelector(":scope > .lfc-calendar-grid-more-custom-content")?.childNodes.length,
-		0
-	);
-	assert.equal(overflow.classList.contains("lfc-has-custom-grid-overflow-content"), false);
-	assert.ok(
-		(overflow.querySelector(":scope > .lfc-calendar-grid-more-default-content")?.textContent ?? "")
-			.trim().length > 0
-	);
+	const wide = getWideOverflowRoot(host, "2026-07-14");
+	assert.equal(wide.classList.contains("lfc-has-custom-event-overflow"), true);
+	assert.equal(getOverflowContent(wide).querySelector(".example-visible-template-sibling")?.textContent, "Visible");
 });
 
 for (const mutation of ["append-sibling", "remove-ancestor"] as const) {
-	void test(`connected grid-overflow output cannot ${mutation}`, async (context) => {
+	void test(`connected wide-overflow output cannot ${mutation}`, async (context) => {
 		const { dom, host } = setupDom(context);
 		const tagName = `lfc-overflow-${mutation}`;
 		class MutatingOverflowElement extends dom.window.HTMLElement {
 			public connectedCallback(): void {
-				const overflow = this.parentElement?.parentElement;
+				const root = this.parentElement?.parentElement;
 				if (mutation === "append-sibling") {
-					overflow?.append(dom.window.document.createElement("button"));
+					root?.append(dom.window.document.createElement("button"));
 				} else {
-					overflow?.remove();
+					root?.remove();
 				}
 			}
 		}
 		dom.window.customElements.define(tagName, MutatingOverflowElement);
 		const errors: LitefoldCalendarError[] = [];
-		let calls = 0;
 		const calendar = createCalendar(host, {
-			events: [
-				event("first", "2026-07-15T09:00", "First event"),
-				event("second", "2026-07-15T10:00", "Second event")
-			],
+			events: eventsForDate("2026-07-15", 2, `mutating-${mutation}`),
 			initialDate: "2026-07-14",
 			maxGridEventsPerDay: 1,
 			onError: (error) => { errors.push(error); },
+			onEventActivate: () => undefined,
 			renderHooks: [{
 				id: `mutating-overflow-${mutation}`,
-				renderGridOverflowContent: ({ document: ownerDocument }) => {
-					calls += 1;
-					return ownerDocument.createElement(tagName);
-				}
+				renderEventOverflow: ({ document: ownerDocument, variant }) =>
+					variant === "wide" ? ownerDocument.createElement(tagName) : undefined
 			}]
 		});
 
 		calendar.render();
 		await waitForPhase(calendar, "degraded");
 
-		assert.equal(calls, 1);
-		assert.equal(errors[0]?.hook, "renderGridOverflowContent");
+		assert.equal(errors.length, 1);
+		assert.equal(errors[0]?.hook, "renderEventOverflow");
 		assert.equal(errors[0]?.surface, "grid-summary");
 		const overflow = getGridOverflowButton(host, "2026-07-15");
-		assert.equal(overflow.querySelector("button"), null);
 		assert.equal(overflow.querySelector(tagName), null);
-		assert.equal(overflow.classList.contains("lfc-has-custom-grid-overflow-content"), false);
-		assert.ok((overflow.textContent ?? "").trim().length > 0);
+		assert.equal(getOverflowContent(getWideOverflowRoot(host, "2026-07-15")).textContent, "1 more");
 		overflow.click();
 		assert.deepEqual(calendar.getState().selectedDate, { day: 15, month: 7, year: 2026 });
-		assert.match(getAgenda(host).textContent ?? "", /First event|Second event/u);
+		assert.match(getAgenda(host).textContent ?? "", /mutating/u);
 	});
 }
 
-void test("connected custom output may extend only its own noninteractive subtree", async (context) => {
+void test("connected custom overflow output may extend only its own noninteractive subtree", async (context) => {
 	const { dom, host } = setupDom(context);
 	class SelfContainedOverflowElement extends dom.window.HTMLElement {
 		public connectedCallback(): void {
@@ -812,25 +785,23 @@ void test("connected custom output may extend only its own noninteractive subtre
 	}
 	dom.window.customElements.define("lfc-self-contained-overflow", SelfContainedOverflowElement);
 	const calendar = createCalendar(host, {
-		events: [
-			event("first", "2026-07-14T09:00", "First event"),
-			event("second", "2026-07-14T10:00", "Second event")
-		],
+		events: eventsForDate("2026-07-14", 2, "self-contained"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 1,
+		onEventActivate: () => undefined,
 		renderHooks: [{
 			id: "self-contained-overflow",
-			renderGridOverflowContent: ({ document: ownerDocument }) =>
-				ownerDocument.createElement("lfc-self-contained-overflow")
+			renderEventOverflow: ({ document: ownerDocument, variant }) =>
+				variant === "wide" ? ownerDocument.createElement("lfc-self-contained-overflow") : undefined
 		}]
 	});
 
 	calendar.render();
 	await waitForPhase(calendar, "ready");
 
-	const overflow = getGridOverflowButton(host, "2026-07-14");
-	assert.equal(overflow.querySelector("lfc-self-contained-overflow")?.textContent, "Custom overflow");
-	assert.equal(overflow.classList.contains("lfc-has-custom-grid-overflow-content"), true);
+	const wide = getWideOverflowRoot(host, "2026-07-14");
+	assert.equal(wide.querySelector("lfc-self-contained-overflow")?.textContent, "Custom overflow");
+	assert.equal(wide.classList.contains("lfc-has-custom-event-overflow"), true);
 });
 
 void test("renderEventLeading contains text nodes in a compact-hideable wrapper", async (context) => {
@@ -929,6 +900,18 @@ function event(id: string, start: string, title: string): CalendarEventInput {
 	return { id, start, title };
 }
 
+function eventsForDate(
+	dateString: string,
+	count: number,
+	idPrefix: string
+): readonly CalendarEventInput[] {
+	return Array.from({ length: count }, (_, index) => event(
+		`${idPrefix}-${index.toString()}`,
+		`${dateString}T09:00`,
+		`${idPrefix} ${index.toString()}`
+	));
+}
+
 function getGrid(host: HTMLElement): HTMLElement {
 	const grid = host.querySelector<HTMLElement>("[role='grid']");
 	assert.ok(grid, "Expected the month grid to exist.");
@@ -941,16 +924,20 @@ function getAgenda(host: HTMLElement): HTMLElement {
 	return agenda;
 }
 
-function getMultipleEventIndicator(host: HTMLElement, dateString: string): HTMLElement {
+function getCompactOverflowRoot(host: HTMLElement, dateString: string): HTMLElement {
+	const root = findCompactOverflowRoot(host, dateString);
+	assert.ok(root, `Expected the ${dateString} compact overflow root to exist.`);
+	return root;
+}
+
+function findCompactOverflowRoot(host: HTMLElement, dateString: string): HTMLElement | null {
 	const button = host.querySelector<HTMLButtonElement>(
 		`.lfc-calendar-day-button[data-lfc-date='${dateString}']`
 	);
 	assert.ok(button, `Expected the ${dateString} day button to exist.`);
-	const indicator = button.closest("[role='gridcell']")?.querySelector<HTMLElement>(
-		".lfc-calendar-multiple-event-indicator"
-	);
-	assert.ok(indicator, `Expected the ${dateString} multiple-event indicator slot to exist.`);
-	return indicator;
+	return button.closest("[role='gridcell']")?.querySelector<HTMLElement>(
+		".lfc-calendar-event-overflow.lfc-is-compact"
+	) ?? null;
 }
 
 function getGridOverflowButton(host: HTMLElement, dateString: string): HTMLButtonElement {
@@ -959,6 +946,22 @@ function getGridOverflowButton(host: HTMLElement, dateString: string): HTMLButto
 	);
 	assert.ok(button, `Expected the ${dateString} grid-overflow button to exist.`);
 	return button;
+}
+
+function getOverflowContent(root: HTMLElement): HTMLElement {
+	const content = root.querySelector<HTMLElement>(
+		":scope > .lfc-calendar-event-overflow-content"
+	);
+	assert.ok(content, "Expected the event-overflow content slot to exist.");
+	return content;
+}
+
+function getWideOverflowRoot(host: HTMLElement, dateString: string): HTMLElement {
+	const root = getGridOverflowButton(host, dateString).querySelector<HTMLElement>(
+		":scope > .lfc-calendar-event-overflow.lfc-is-wide"
+	);
+	assert.ok(root, `Expected the ${dateString} wide overflow root to exist.`);
+	return root;
 }
 
 async function waitForPhase(
