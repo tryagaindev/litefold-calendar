@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Basic JavaScript | litefold-calendar</title>
+	<link rel="stylesheet" href="../../dist/styles.css">
+	<link rel="stylesheet" href="../example.css">
+	<link rel="stylesheet" href="../../deployment-details.css">
+</head>
+<body>
+	<main class="my-shell">
+		<header class="my-intro">
+			<h1>Render static events with JavaScript</h1>
+			<p>Select today, then activate an event from the month grid or agenda. The status below identifies the event and the surface that opened it.</p>
+		</header>
+
+		<div class="my-calendar" data-my-calendar></div>
+
+		<p class="my-result" data-my-result role="status" aria-atomic="true"></p>
+	</main>
+
+	<script type="module" src="./main.js"></script>
+	<footer class="my-developer-footer" data-my-deployment-channel="release">
+		<nav aria-label="Developer resources">
+			<ul class="my-developer-footer-links">
+				<li><a href="../">All examples</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/tree/4db11aad249979ccba3709f935b4a90277cb7688/examples/basic/">Recipe source</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/4db11aad249979ccba3709f935b4a90277cb7688/docs/api.md">API reference</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/4db11aad249979ccba3709f935b4a90277cb7688/docs/integration-guide.md">Integration guide</a></li>
+			</ul>
+		</nav>
+		<dl>
+			<dt>Package version</dt>
+			<dd><code>0.4.0-alpha.0</code></dd>
+			<dt>Deployment channel</dt>
+			<dd>Immutable release</dd>
+			<dt>Source commit</dt>
+			<dd><a href="https://github.com/tryagaindev/litefold-calendar/commit/4db11aad249979ccba3709f935b4a90277cb7688"><code>4db11aad249979ccba3709f935b4a90277cb7688</code></a></dd>
+		</dl>
+	</footer>
+</body>
+</html>

@@ -9,6 +9,12 @@
 	"releases": [
 		{
 			"channel": "release",
+			"commit": "4db11aad249979ccba3709f935b4a90277cb7688",
+			"version": "0.4.0-alpha.0",
+			"path": "releases/0.4.0-alpha.0/examples/"
+		},
+		{
+			"channel": "release",
 			"commit": "c06f4134d18a21f6ca71ec2fc62683c5cb81c39e",
 			"version": "0.3.0-alpha.0",
 			"path": "releases/0.3.0-alpha.0/examples/"
