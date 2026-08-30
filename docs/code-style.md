@@ -6,6 +6,16 @@ This document defines required repository conventions for TypeScript and JavaScr
 
 Do not duplicate exact package or runtime patch versions in prose. Name the supported major or release line and point readers to the authoritative manifest, lockfile, generated metadata, or executable configuration. Supported ranges and major selectors belong in repository configuration; exact resolved versions belong in lockfiles, generated receipts, capture metadata, and commands where the value is a required input.
 
+## Documentation diagrams
+
+Use diagrams when they make a relationship materially easier to understand, while keeping the surrounding prose or table as the complete text equivalent and canonical contract.
+
+- Use fenced Mermaid flowcharts or sequence diagrams for dependency direction, event order, and lifecycle. Every Mermaid block requires a concise `accTitle` and `accDescr`.
+- Use an annotated SVG under `docs/assets/` when spatial placement or component anatomy matters. Give it useful Markdown alternative text and describe every callout in nearby prose or a table. Its SVG source must include a maintenance comment naming the canonical code and documentation it illustrates and the changes that require reviewing or updating the asset.
+- Let the renderer own Mermaid colors and styling. Communicate meaning with labels, arrows, shapes, and text rather than color alone, and verify that static assets remain legible with repository light and dark presentation.
+- Do not use Mermaid frontmatter, embedded HTML, initialization/configuration directives, or `click` directives. Put navigation in ordinary Markdown links so repository checks can validate it.
+- Diagram stable concepts, public vocabulary, and ownership boundaries. Do not duplicate exhaustive module inventories, private selectors, incidental DOM order, or other volatile implementation details that would create a second source of truth.
+
 ## TypeScript contracts
 
 - Keep strict TypeScript and `exactOptionalPropertyTypes`; omit an optional property instead of assigning `undefined`.
@@ -54,7 +64,7 @@ When code owns both producer and consumer, return a typed interface containing t
 
 - Use kebab-case class names and the `lfc` namespace for package-owned selectors, containers, layers, keyframes, IDs, and custom data attributes.
 - Keep package selectors low-specificity and inside the package cascade layer.
-- Author package CSS in the canonical `tokens`, `base`, `toolbar`, `pager`, `month-grid`, `agenda`, `responsive`, and `preferences` module order beneath `src/styles/`. Each module contains one newline-terminated `@layer lfc` block; `scripts/lib/styles.mjs` validates and composes them into the single public `dist/styles.css` file. Do not add another public stylesheet or bypass the composer.
+- Author readable package CSS in the canonical `tokens`, `base`, `toolbar`, `pager`, `month-grid`, `agenda`, `responsive`, and `preferences` module order beneath `src/styles/`. Each module contains one newline-terminated `@layer lfc` block; `scripts/lib/styles.mjs` validates and composes them, then minifies only the single public `dist/styles.css` file. Do not add another public stylesheet or bypass the composer.
 - Follow [DESIGN.md](../DESIGN.md) for visual roles, values, state distinctions, and responsive composition. Expose reusable application-facing values through its documented `--lfc-*` map; reserve `--lfc-internal-*` for unsupported implementation details.
 - Use logical properties, container queries, CSS Grid, Flexbox, intrinsic sizing, and normal DOM flow to implement that design. Do not add physical-direction overrides, device-category breakpoints, viewport listeners, `ResizeObserver`, layout measurement, breakpoint-driven DOM movement, CSS `order`, reversed flow, or dense placement for interactive content. Interaction code may observe geometry only when a public behavior such as native pager recentering requires it.
 - Enforce the [design system's unit policy and documented pixel exceptions](../DESIGN.md#layout). Keep the Stylelint pixel-unit prohibition enabled and scope each allowed hairline or visually hidden literal to its canonical internal token declaration with an adjacent explanation.

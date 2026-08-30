@@ -10,9 +10,9 @@ async function waitForReady(page, route) {
 	if (response === null || !response.ok()) {
 		throw new Error(`Screenshot route failed to load: ${route}`);
 	}
-	await page.locator('html[data-example-ready="true"]').waitFor({ state: "attached" });
-	await page.locator("[data-example-calendar]").waitFor({ state: "visible" });
-	await page.locator("[data-example-calendar]").evaluate((element) => {
+	await page.locator('html[data-test-ready="true"]').waitFor({ state: "attached" });
+	await page.locator("[data-my-calendar]").waitFor({ state: "visible" });
+	await page.locator("[data-my-calendar]").evaluate((element) => {
 		if (element.getAttribute("aria-busy") === "true") {
 			throw new Error("The screenshot calendar is still busy.");
 		}
@@ -23,15 +23,15 @@ async function waitForReady(page, route) {
 }
 
 async function scrollCalendarIntoView(page) {
-	await page.locator("[data-example-calendar]").evaluate((element) => {
+	await page.locator("[data-my-calendar]").evaluate((element) => {
 		const top = element.getBoundingClientRect().top + window.scrollY;
 		window.scrollTo({ behavior: "instant", left: 0, top });
 	});
 }
 
 async function setDarkTheme(page) {
-	await page.locator("[data-example-theme-control]").selectOption("dark");
-	await page.locator('html[data-example-theme="dark"]').waitFor({ state: "attached" });
+	await page.locator("[data-my-theme-control]").selectOption("dark");
+	await page.locator('html[data-my-theme="dark"]').waitFor({ state: "attached" });
 }
 
 async function openMonthPicker(page) {
@@ -40,13 +40,13 @@ async function openMonthPicker(page) {
 }
 
 function agendaAction(page, eventId) {
-	const fixture = `[data-example-event-surface="agenda"][data-example-event-id="${eventId}"]`;
+	const fixture = `[data-test-event-surface="agenda"][data-test-event-id="${eventId}"]`;
 	return page.locator(`:is(a, button)${fixture}, ${fixture} :is(a, button)`).first();
 }
 
 async function openAgendaDialog(page) {
 	await agendaAction(page, "appointment:41").click();
-	await page.locator("[data-example-event-dialog]").waitFor({ state: "visible" });
+	await page.locator("[data-my-event-dialog]").waitFor({ state: "visible" });
 }
 
 async function enterGridActionMode(page) {
@@ -54,8 +54,8 @@ async function enterGridActionMode(page) {
 	await selectedDay.focus();
 	await selectedDay.press("F2");
 	const action = page.locator(
-		':is(a, button)[data-example-event-surface="grid-summary"]:focus, ' +
-		'[data-example-event-surface="grid-summary"] :is(a, button):focus'
+		':is(a, button)[data-test-event-surface="grid-summary"]:focus, ' +
+		'[data-test-event-surface="grid-summary"] :is(a, button):focus'
 	);
 	await action.waitFor({ state: "visible" });
 	await action.scrollIntoViewIfNeeded();

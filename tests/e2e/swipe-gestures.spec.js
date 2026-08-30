@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 import { expectExampleReady } from "./helpers.js";
 
-const HOST_SELECTOR = "[data-example-calendar]";
-const MONTH_SELECTOR = "[data-example-state-month]";
+const HOST_SELECTOR = "[data-my-calendar]";
+const MONTH_SELECTOR = "[data-my-state-month]";
 const VIEWPORT_SELECTOR = ".lfc-calendar-swipe-viewport";
 const WHEEL_BURST_EVENT_SPACING_SECONDS = 0.01;
 
@@ -69,9 +69,9 @@ async function mountCalendarFixture(page, options = {}) {
 	await page.evaluate(async (fixtureOptions) => {
 		const { createCalendar } = await import("/dist/index.js");
 		const fixture = document.createElement("section");
-		fixture.id = "lfc-swipe-fixture";
+		fixture.id = "my-swipe-fixture";
 		const toolbarAction = document.createElement("button");
-		toolbarAction.className = "lfc-test-toolbar-action";
+		toolbarAction.className = "my-test-toolbar-action";
 		toolbarAction.type = "button";
 		toolbarAction.textContent = "Fixture action";
 		const host = document.createElement("div");
@@ -109,7 +109,7 @@ async function mountCalendarFixture(page, options = {}) {
 	await expect.poll(() => page.evaluate(() =>
 		window.__lfcSwipeFixture.calendar.getState().phase
 	)).toBe("ready");
-	return page.locator("#lfc-swipe-fixture > div");
+	return page.locator("#my-swipe-fixture > div");
 }
 
 async function readPagerMetrics(host) {
@@ -305,7 +305,7 @@ test.describe("native month pager", () => {
 			for (const sheet of document.styleSheets) {
 				try {
 					sheet.insertRule(
-						"#lfc-swipe-fixture { transform: scale(.5); transform-origin: top left; }",
+						"#my-swipe-fixture { transform: scale(.5); transform-origin: top left; }",
 						sheet.cssRules.length
 					);
 					return true;
@@ -400,7 +400,7 @@ test.describe("native month pager", () => {
 		const client = await createInputClient(page, "no-preference");
 		const host = page.locator(HOST_SELECTOR);
 		const viewport = host.locator(VIEWPORT_SELECTOR);
-		const actionResult = page.locator("[data-example-action-result]");
+		const actionResult = page.locator("[data-my-action-result]");
 		const initialActionResult = await actionResult.textContent();
 		let point = await gesturePoint(viewport);
 
@@ -415,7 +415,7 @@ test.describe("native month pager", () => {
 		await expectPagerClean(host);
 		await expect(actionResult).toHaveText(initialActionResult ?? "");
 
-		await page.locator("[data-example-direction]").check();
+		await page.locator("[data-my-direction]").check();
 		const rtlAction = await actionResult.textContent();
 		point = await gesturePoint(viewport);
 		await runTouchGesture(page, client, point, -120, 0);
@@ -440,7 +440,7 @@ test.describe("native month pager", () => {
 		const client = await createInputClient(page, "no-preference");
 		const host = page.locator(HOST_SELECTOR);
 		const viewport = host.locator(VIEWPORT_SELECTOR);
-		const actionResult = page.locator("[data-example-action-result]");
+		const actionResult = page.locator("[data-my-action-result]");
 		const initialActionResult = await actionResult.textContent();
 		let point = await gesturePoint(viewport);
 		const scrollStart = await page.evaluate(() => scrollY);
@@ -512,8 +512,8 @@ test.describe("native month pager", () => {
 		await dispatchPen(client, "mouseReleased", { x: point.x + 80, y: point.y }, false);
 		const penOutcome = await page.evaluate(() => ({
 			events: window.__lfcPenEvents,
-			hasInlineStyle: document.querySelector("[data-example-calendar]")?.matches("[style]") ||
-				document.querySelector("[data-example-calendar] [style]") !== null
+			hasInlineStyle: document.querySelector("[data-my-calendar]")?.matches("[style]") ||
+				document.querySelector("[data-my-calendar] [style]") !== null
 		}));
 		expect(penOutcome.events.length).toBeGreaterThanOrEqual(3);
 		expect(penOutcome.events.every((event) =>
@@ -532,8 +532,8 @@ test.describe("native month pager", () => {
 		await dispatchTouch(client, "touchStart", [point]);
 		await dispatchTouch(client, "touchMove", [{ x: point.x - 40, y: point.y }]);
 		await expect(host).toHaveAttribute("data-lfc-swipe-state", "scrolling");
-		await host.locator(".lfc-test-toolbar-action").focus();
-		await host.locator(".lfc-test-toolbar-action").press("Enter");
+		await host.locator(".my-test-toolbar-action").focus();
+		await host.locator(".my-test-toolbar-action").press("Enter");
 		expect(await page.evaluate(() =>
 			window.__lfcSwipeFixture.observations.toolbarActivations
 		)).toBe(1);

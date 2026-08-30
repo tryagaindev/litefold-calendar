@@ -27,6 +27,7 @@ const EXPOSED_GLOBALS = [
 	"HTMLTimeElement",
 	"KeyboardEvent",
 	"MouseEvent",
+	"MutationObserver",
 	"Node"
 ];
 
@@ -128,7 +129,7 @@ function installPopoverStubs(dom, openPopovers) {
 }
 
 function installDialogStubs(dom) {
-	const eventDialog = dom.window.document.querySelector("[data-example-event-dialog]");
+	const eventDialog = dom.window.document.querySelector("[data-my-event-dialog]");
 	assert.ok(eventDialog instanceof dom.window.HTMLDialogElement, "Expected the native event-details dialog.");
 	if (typeof eventDialog.showModal !== "function") {
 		Object.defineProperty(eventDialog, "showModal", {

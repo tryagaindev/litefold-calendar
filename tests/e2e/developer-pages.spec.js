@@ -79,7 +79,7 @@ async function mountPagesShell(page, baseURL, manifest = releaseManifest()) {
 	const expectedSummary = manifest.releases.length > 0
 		? `release ${manifest.releases[0].version}`
 		: `main at ${manifest.main?.commit ?? ""}`;
-	await expect(page.locator("#deployment-summary")).toContainText(expectedSummary);
+	await expect(page.locator("#my-deployment-summary")).toContainText(expectedSummary);
 }
 
 async function expectNoDocumentHorizontalOverflow(page) {
@@ -91,7 +91,7 @@ async function expectNoDocumentHorizontalOverflow(page) {
 async function codeBlockFocusStyle(locator) {
 	await locator.focus();
 	return locator.evaluate((element) => {
-		const block = element.closest(".lfc-pages-code-block");
+		const block = element.closest(".my-pages-code-block");
 		const code = block?.querySelector("code");
 		if (!(block instanceof HTMLElement) || !(code instanceof HTMLElement)) {
 			throw new Error("Focused code-block element is missing its code content.");
@@ -142,7 +142,7 @@ for (const [name, route] of EXAMPLE_ROUTES) {
 test("examples landing exposes six keyboard-visible task cards", async ({ page }, testInfo) => {
 	const response = await page.goto("/examples/", { waitUntil: "domcontentloaded" });
 	expect(response?.ok()).toBe(true);
-	await expect(page.locator(".example-card")).toHaveCount(6);
+	await expect(page.locator(".my-card")).toHaveCount(6);
 	await page.keyboard.press("Tab");
 	const skipLink = page.getByRole("link", { name: "Skip to examples" });
 	await expect(skipLink).toBeFocused();
@@ -153,7 +153,7 @@ test("examples landing exposes six keyboard-visible task cards", async ({ page }
 	expect(focus.style).toBe("solid");
 	expect(focus.width).toBeGreaterThan(0);
 	await page.keyboard.press("Enter");
-	await expect(page.locator("#example-list")).toBeFocused();
+	await expect(page.locator("#my-list")).toBeFocused();
 	await expectNoAutomatedAccessibilityViolations(page, testInfo);
 });
 
@@ -168,7 +168,7 @@ test.describe("large-text developer-page reflow", () => {
 		await mountPagesShell(page, baseURL);
 		await page.addStyleTag({ content: "html { font-size: 200%; }" });
 
-		const eyebrow = page.locator(".lfc-pages-eyebrow");
+		const eyebrow = page.locator(".my-pages-eyebrow");
 		await expect.poll(() => eyebrow.evaluate((element) =>
 			element.scrollWidth - element.clientWidth
 		)).toBeLessThanOrEqual(1);
@@ -183,9 +183,9 @@ test.describe("large-text developer-page reflow", () => {
 		await page.setViewportSize({ height: 844, width: 320 });
 		const response = await page.goto("/examples/", { waitUntil: "domcontentloaded" });
 		expect(response?.ok()).toBe(true);
-		await expect(page.locator(".example-card")).toHaveCount(6);
-		await expect(page.locator("[data-example-metadata-state]"))
-			.toHaveAttribute("data-example-metadata-state", "ready");
+		await expect(page.locator(".my-card")).toHaveCount(6);
+		await expect(page.locator("[data-my-metadata-state]"))
+			.toHaveAttribute("data-my-metadata-state", "ready");
 		await page.addStyleTag({ content: "html { font-size: 150%; }" });
 
 		const runLink = page.getByRole("link", {
@@ -193,7 +193,7 @@ test.describe("large-text developer-page reflow", () => {
 			name: "Rewrite a dayGridMonth view"
 		});
 		await expect.poll(() => runLink.evaluate((element) => {
-			const card = element.closest(".example-card");
+			const card = element.closest(".my-card");
 			if (!(card instanceof HTMLElement)) {
 				throw new Error("Example run link is missing its card container.");
 			}
@@ -214,7 +214,7 @@ test.describe("large-text developer-page reflow", () => {
 		await page.addStyleTag({ content: "html { font-size: 200%; }" });
 
 		await expect.poll(() => heading.evaluate((element) => {
-			const shell = element.closest(".example-shell");
+			const shell = element.closest(".my-shell");
 			if (!(shell instanceof HTMLElement)) {
 				throw new Error("Async-errors heading is missing its example shell.");
 			}
@@ -262,7 +262,7 @@ test("Pages shell supports keyboard, copy status, preferences, and narrow reflow
 	await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
 	await page.setViewportSize({ height: 844, width: 390 });
 	await mountPagesShell(page, baseURL);
-	const projectMark = page.locator(".lfc-pages-mark");
+	const projectMark = page.locator(".my-pages-mark");
 	await expect(projectMark).toBeVisible();
 	await expect(projectMark).toHaveAttribute("alt", "");
 	expect(await projectMark.evaluate((image) =>
@@ -274,13 +274,13 @@ test("Pages shell supports keyboard, copy status, preferences, and narrow reflow
 	const skipLink = page.getByRole("link", { name: "Skip to main content" });
 	await expect(skipLink).toBeFocused();
 	await page.keyboard.press("Enter");
-	await expect(page.locator("#lfc-pages-content")).toBeFocused();
+	await expect(page.locator("#my-pages-content")).toBeFocused();
 
 	const installCode = page.getByLabel("Install command", { exact: true });
 	await installCode.focus();
 
 	await page.getByRole("button", { name: "Copy install command" }).click();
-	await expect(page.locator("#copy-status")).toHaveText("Install command copied.");
+	await expect(page.locator("#my-copy-status")).toHaveText("Install command copied.");
 	expect(await page.evaluate(() => globalThis.__lfcCopiedText)).toBe(
 		`npm install @tryagaindev/litefold-calendar@${RELEASE_VERSION}`
 	);
@@ -291,7 +291,7 @@ test("Pages shell supports keyboard, copy status, preferences, and narrow reflow
 		});
 	});
 	await page.getByRole("button", { name: "Copy install command" }).click();
-	await expect(page.locator("#copy-status")).toContainText("selected");
+	await expect(page.locator("#my-copy-status")).toContainText("selected");
 	expect(await page.evaluate(() => getSelection()?.toString())).toBe(
 		`npm install @tryagaindev/litefold-calendar@${RELEASE_VERSION}`
 	);
@@ -322,14 +322,14 @@ test("Pages shell wraps full provenance commits at 320px", async ({ baseURL, pag
 		schemaVersion: 1
 	});
 
-	await expect(page.locator("#deployment-summary")).toContainText(COMMIT);
-	await expect(page.locator("#main-preview")).toContainText(COMMIT);
+	await expect(page.locator("#my-deployment-summary")).toContainText(COMMIT);
+	await expect(page.locator("#my-main-preview")).toContainText(COMMIT);
 	const widths = await page.evaluate(() => ({
 		document: document.documentElement.scrollWidth,
-		previewClient: document.querySelector("#main-preview")?.clientWidth ?? 0,
-		previewScroll: document.querySelector("#main-preview")?.scrollWidth ?? 0,
-		summaryClient: document.querySelector("#deployment-summary")?.clientWidth ?? 0,
-		summaryScroll: document.querySelector("#deployment-summary")?.scrollWidth ?? 0,
+		previewClient: document.querySelector("#my-main-preview")?.clientWidth ?? 0,
+		previewScroll: document.querySelector("#my-main-preview")?.scrollWidth ?? 0,
+		summaryClient: document.querySelector("#my-deployment-summary")?.clientWidth ?? 0,
+		summaryScroll: document.querySelector("#my-deployment-summary")?.scrollWidth ?? 0,
 		viewport: innerWidth
 	}));
 	expect(widths.document).toBeLessThanOrEqual(widths.viewport);

@@ -54,7 +54,7 @@ void test("native event actions preserve semantic grid, list, and time markup wi
 	const cell = dayButton.parentElement;
 	assert.ok(cell);
 	const gridLink = cell.querySelector<HTMLAnchorElement>(
-		":scope > .lfc-calendar-day-summaries > a[data-lfc-event-id='linked']"
+		":scope > .lfc-calendar-day-summaries a[data-lfc-event-id='linked']"
 	);
 	assert.ok(gridLink);
 	assert.equal(dayButton.contains(gridLink), false);
@@ -280,7 +280,7 @@ void test("F2 action mode is non-wrapping and exits to the day proxy or agenda h
 	const cell = dayButton.parentElement;
 	assert.ok(cell);
 	const actions = [...cell.querySelectorAll<HTMLElement>(
-		":scope > .lfc-calendar-day-summaries > :is(a, button)"
+		":scope > .lfc-calendar-day-summaries :is(a, button)"
 	)];
 	assert.equal(actions.length, 3, "Two capped events and the overflow action must be reachable.");
 	assert.equal(actions[0]?.classList.contains("lfc-is-compact-primary"), true);
@@ -326,7 +326,7 @@ void test("F2 action mode is non-wrapping and exits to the day proxy or agenda h
 	assert.equal(dom.window.document.activeElement, host.querySelector(".lfc-calendar-agenda-title"));
 	assert.equal(findDayButton(host, "2026-07-14").tabIndex, 0);
 	assert.ok([...host.querySelectorAll<HTMLElement>(
-		".lfc-calendar-day-summaries > :is(a, button)"
+		".lfc-calendar-day-summaries :is(a, button)"
 	)].every((action) => action.tabIndex === -1));
 });
 

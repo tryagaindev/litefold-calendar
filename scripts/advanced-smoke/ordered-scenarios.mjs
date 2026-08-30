@@ -16,6 +16,12 @@ const APPOINTMENT_TITLE = "Design review";
 const POINT_APPOINTMENT_ID = "appointment:44";
 const TASK_ID = "task:8";
 
+function readCompletedGridRenderCount(element) {
+	const count = Number.parseInt(element.textContent ?? "", 10);
+	assert.ok(Number.isSafeInteger(count) && count >= 0, "Expected a non-negative grid-render count.");
+	return count;
+}
+
 export async function runAdvancedSmokeScenarios(environment) {
 	const {
 		document,
@@ -26,36 +32,61 @@ export async function runAdvancedSmokeScenarios(environment) {
 	} = environment;
 	const eventDialog = requireElement(
 		document,
-		"[data-example-event-dialog]",
+		"[data-my-event-dialog]",
 		dom.window.HTMLDialogElement
 	);
 
-	const host = requireElement(document, "[data-example-calendar]", dom.window.HTMLElement);
+	const host = requireElement(document, "[data-my-calendar]", dom.window.HTMLElement);
 	const fallbackElement = requireElement(
 		document,
-		"[data-example-fallback]",
+		"[data-my-fallback]",
 		dom.window.HTMLElement
 	);
-	const boundsNote = requireElement(document, "[data-example-bounds-note]", dom.window.HTMLElement);
+	const boundsNote = requireElement(document, "[data-my-bounds-note]", dom.window.HTMLElement);
 	const actionResult = requireElement(
 		document,
-		"[data-example-action-result]",
+		"[data-my-action-result]",
 		dom.window.HTMLElement
 	);
-	const phase = requireElement(document, "[data-example-state-phase]", dom.window.HTMLElement);
+	const phase = requireElement(document, "[data-my-state-phase]", dom.window.HTMLElement);
+	const phaseHistory = requireElement(
+		document,
+		"[data-my-state-phase-history]",
+		dom.window.HTMLElement
+	);
+	const busyState = requireElement(
+		document,
+		"[data-my-state-busy]",
+		dom.window.HTMLElement
+	);
+	const gridRenders = requireElement(
+		document,
+		"[data-my-state-grid-renders]",
+		dom.window.HTMLElement
+	);
+	const sourceTiming = requireElement(
+		document,
+		"[data-my-source-timing]",
+		dom.window.HTMLSelectElement
+	);
+	const completePending = requireElement(
+		document,
+		"[data-my-complete-pending]",
+		dom.window.HTMLButtonElement
+	);
 	const displayedMonth = requireElement(
 		document,
-		"[data-example-state-month]",
+		"[data-my-state-month]",
 		dom.window.HTMLElement
 	);
 	const selectedDate = requireElement(
 		document,
-		"[data-example-state-selected]",
+		"[data-my-state-selected]",
 		dom.window.HTMLElement
 	);
 	const assertiveAnnouncer = requireElement(
 		document,
-		"[data-example-announcer-assertive]",
+		"[data-my-announcer-assertive]",
 		dom.window.HTMLElement
 	);
 	const agenda = requireElement(host, "section[aria-labelledby]", dom.window.HTMLElement);
@@ -65,6 +96,20 @@ export async function runAdvancedSmokeScenarios(environment) {
 			host.getAttribute("aria-busy") !== "true" &&
 			phase.textContent === "ready",
 		"the advanced example to render its ready agenda"
+	);
+	assert.equal(sourceTiming.value, "immediate", "Immediate arrays must be the default source timing.");
+	assert.equal(completePending.disabled, true, "An immediate source must not expose pending work.");
+	assert.notEqual(host.getAttribute("aria-busy"), "true", "An immediate source must not mark the host busy.");
+	assert.equal(busyState.textContent, "false", "The host-busy observation must match the root state.");
+	assert.equal(
+		phaseHistory.textContent,
+		"ready",
+		"The initial immediate source must commit directly without a loading phase."
+	);
+	assert.equal(
+		readCompletedGridRenderCount(gridRenders),
+		1,
+		"The initial immediate source must complete one 42-day grid render."
 	);
 
 	assert.equal(host.classList.contains("litefold-calendar"), true, "Expected the public root class.");
@@ -86,7 +131,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"The legacy root marker must be absent."
 	);
 	assert.ok(
-		host.querySelector("[data-example-toolbar-end]") !== null,
+		host.querySelector("[data-my-toolbar-end]") !== null,
 		"Expected the host-owned toolbar filter slot to mount."
 	);
 	assert.equal(host.querySelector("h3")?.tagName, "H3", "Expected headingLevel 3.");
@@ -101,21 +146,21 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"Expected the explicit Monday week start."
 	);
 	assert.deepEqual(
-		[...host.querySelectorAll(".advanced-example-navigation-icon")].map((node) => node.textContent),
+		[...host.querySelectorAll(".my-navigation-icon")].map((node) => node.textContent),
 		["\u2190", "\u2192"],
 		"Expected both custom navigation icon factories."
 	);
 	assert.equal(
-		[...host.querySelectorAll(".advanced-example-navigation-icon")].every((node) => node.getAttribute("dir") === "ltr"),
+		[...host.querySelectorAll(".my-navigation-icon")].every((node) => node.getAttribute("dir") === "ltr"),
 		true,
 		"Expected custom icons to have a deterministic base direction before RTL mirroring."
 	);
 
 	assert.equal(displayedMonth.textContent, "2026-08-01");
 	assert.equal(selectedDate.textContent, "2026-08-06");
-	assert.equal(document.querySelector("[data-example-state-issues]")?.textContent, "0");
+	assert.equal(document.querySelector("[data-my-state-issues]")?.textContent, "0");
 	assert.equal(
-		document.querySelector("[data-example-state-range]")?.textContent,
+		document.querySelector("[data-my-state-range]")?.textContent,
 		"2026-07-27 to 2026-09-07 (exclusive)"
 	);
 	const title = requireElement(host, ".lfc-calendar-title", dom.window.HTMLElement);
@@ -238,12 +283,12 @@ export async function runAdvancedSmokeScenarios(environment) {
 	assert.equal(document.activeElement, titleButton, "Jump must restore title-trigger focus.");
 	assert.equal(selectedDate.textContent, "2027-09-06");
 	assert.equal(
-		document.querySelector("[data-example-state-range]")?.textContent,
+		document.querySelector("[data-my-state-range]")?.textContent,
 		"2027-08-30 to 2027-10-11 (exclusive)",
 		"Configured bounds must not clip the fixed 42-day provider range."
 	);
 	assert.equal(
-		host.getAttribute("data-example-source-range"),
+		host.getAttribute("data-test-source-range"),
 		"2027-08-30 to 2027-10-11 (exclusive)",
 		"The event source itself must receive the complete 42-day range."
 	);
@@ -265,12 +310,12 @@ export async function runAdvancedSmokeScenarios(environment) {
 	assert.equal(maximumDay.disabled, false, "The inclusive maxDate must remain selectable.");
 	assert.equal(disabledDay.disabled, true, "The day after maxDate must be disabled.");
 	assert.equal(
-		disabledDay.closest('[role="gridcell"]')?.hasAttribute("data-example-day-badge-rendered"),
+		disabledDay.closest('[role="gridcell"]')?.hasAttribute("data-test-day-badge-rendered"),
 		true,
 		"Day extensions must still inspect an out-of-range structural cell."
 	);
 	assert.equal(
-		disabledDay.querySelector('[data-example-event-surface="grid-summary"]'),
+		disabledDay.querySelector('[data-test-event-surface="grid-summary"]'),
 		null,
 		"An out-of-range provider event must not render a grid summary."
 	);
@@ -308,12 +353,12 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"Expected the day number to use a native time element."
 	);
 	assert.equal(
-		selectedDay.querySelector('[data-example-event-surface="grid-summary"]'),
+		selectedDay.querySelector('[data-test-event-surface="grid-summary"]'),
 		null,
 		"Grid actions must be siblings of the full-cell day button."
 	);
 	const selectedGridActions = [...selectedCell.querySelectorAll(
-		'[data-example-event-surface="grid-summary"], .lfc-calendar-grid-more'
+		'[data-test-event-surface="grid-summary"], .lfc-calendar-grid-more'
 	)];
 	assert.ok(selectedGridActions.length > 0, "Expected visible grid actions for the selected day.");
 	assert.equal(
@@ -323,22 +368,22 @@ export async function runAdvancedSmokeScenarios(environment) {
 	);
 	assert.match(selectedDay.getAttribute("aria-label") ?? "", /53 items/u);
 	assert.equal(
-		selectedCell.classList.contains("advanced-example-today-hook"),
+		selectedCell.classList.contains("my-today-hook"),
 		true,
 		"Expected dayDidMount to decorate the configured current date."
 	);
 	assert.equal(
-		selectedCell.classList.contains("advanced-example-current-month-hook") &&
-			selectedCell.classList.contains("advanced-example-selected-hook"),
+		selectedCell.classList.contains("my-current-month-hook") &&
+			selectedCell.classList.contains("my-selected-hook"),
 		true,
 		"Expected dayDidMount to expose current-month and selection state."
 	);
 	assert.ok(
-		host.querySelector('[role="gridcell"].advanced-example-outside-month-hook') !== null,
+		host.querySelector('[role="gridcell"].my-outside-month-hook') !== null,
 		"Expected dayDidMount to expose adjacent-month state."
 	);
 	assert.equal(
-		host.querySelectorAll('[role="gridcell"][data-example-day-badge-rendered]').length,
+		host.querySelectorAll('[role="gridcell"][data-test-day-badge-rendered]').length,
 		42,
 		"Expected renderDayBadge to run for every fixed-grid day before returning no output."
 	);
@@ -348,78 +393,120 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"Expected renderDayBadge to leave every visual badge slot empty."
 	);
 	assert.equal(
-		selectedCell.querySelectorAll('[data-example-event-surface="grid-summary"]').length,
+		selectedCell.querySelectorAll('[data-test-event-surface="grid-summary"]').length,
 		2,
 		"Expected maxGridEventsPerDay to cap visual summaries."
 	);
-	const multipleEventIndicator = requireElement(
+	const compactOverflow = requireElement(
 		selectedCell,
-		":scope .lfc-calendar-day-summaries > .lfc-calendar-multiple-event-indicator",
+		":scope .lfc-calendar-event-overflow-cluster " +
+			"> .lfc-calendar-event-overflow.lfc-is-compact",
 		dom.window.HTMLSpanElement
 	);
 	assert.equal(
-		multipleEventIndicator.getAttribute("aria-hidden"),
+		compactOverflow.getAttribute("aria-hidden"),
 		"true",
-		"The decorative multiple-event cue must remain outside the accessibility tree."
-	);
-	const defaultMultipleEventIcon = requireElement(
-		multipleEventIndicator,
-		".lfc-calendar-multiple-event-indicator-icon",
-		dom.window.SVGSVGElement
+		"The compact event-overflow number must remain outside the accessibility tree."
 	);
 	assert.equal(
-		defaultMultipleEventIcon.querySelectorAll(".lfc-calendar-multiple-event-indicator-card").length,
-		3,
-		"Returning undefined from the compact hook must retain the built-in three-layer event-slip fan."
+		compactOverflow.classList.contains("lfc-has-custom-event-overflow"),
+		true,
+		"Expected the unified hook to expose its custom compact state."
+	);
+	const compactOverflowContent = requireElement(
+		compactOverflow,
+		":scope > .lfc-calendar-event-overflow-content " +
+			"> .my-event-overflow-compact",
+		dom.window.HTMLSpanElement
+	);
+	assert.equal(compactOverflowContent.textContent, "+52");
+	assert.deepEqual(
+		{
+			actionBacked: compactOverflowContent.dataset["testActionBacked"],
+			date: compactOverflowContent.dataset["testDate"],
+			eventCount: compactOverflowContent.dataset["testEventCount"],
+			overflowCount: compactOverflowContent.dataset["testOverflowCount"],
+			surface: compactOverflowContent.dataset["testSurface"],
+			variant: compactOverflowContent.dataset["testVariant"],
+			visibleEventCount: compactOverflowContent.dataset["testVisibleEventCount"]
+		},
+		{
+			actionBacked: "false",
+			date: "2026-08-06",
+			eventCount: "53",
+			overflowCount: "52",
+			surface: "day",
+			variant: "compact",
+			visibleEventCount: "1"
+		},
+		"Expected the compact branch to receive the authoritative adaptive count context."
 	);
 	assert.ok(
 		selectedCell.querySelector(
-			'[data-example-event-surface="grid-summary"] .advanced-example-event-marker'
+			'[data-test-event-surface="grid-summary"] .my-event-marker'
 		) instanceof dom.window.HTMLSpanElement,
-		"The built-in multiple-event cue must coexist with a custom event marker."
+		"The compact event-overflow number must coexist with a custom event marker."
 	);
 	const selectedOverflowAction = requireElement(
 		selectedCell,
 		":scope .lfc-calendar-grid-more",
 		dom.window.HTMLButtonElement
 	);
-	const defaultOverflowContent = requireElement(
+	const wideOverflow = requireElement(
 		selectedOverflowAction,
-		":scope > .lfc-calendar-grid-more-default-content",
+		":scope > .lfc-calendar-event-overflow.lfc-is-wide",
 		dom.window.HTMLSpanElement
 	);
-	const customOverflowSlot = requireElement(
-		selectedOverflowAction,
-		":scope > .lfc-calendar-grid-more-custom-content",
+	const wideOverflowContent = requireElement(
+		wideOverflow,
+		":scope > .lfc-calendar-event-overflow-content",
 		dom.window.HTMLSpanElement
 	);
 	const customOverflowContent = requireElement(
-		customOverflowSlot,
-		":scope > .advanced-example-grid-overflow-content",
+		wideOverflowContent,
+		":scope > .my-event-overflow-wide",
 		dom.window.HTMLSpanElement
 	);
 	assert.equal(
-		defaultOverflowContent.textContent,
-		"51 additional",
-		"Expected the canonical localized overflow text to remain in the native action."
+		wideOverflowContent.querySelector(".lfc-event-overflow-default-content"),
+		null,
+		"Expected custom wide DOM to replace only the variant's package visual."
 	);
-	assert.equal(customOverflowSlot.getAttribute("aria-hidden"), "true");
+	assert.equal(wideOverflow.getAttribute("aria-hidden"), "true");
 	assert.equal(customOverflowContent.ownerDocument, document);
-	assert.equal(customOverflowContent.textContent, "51 additional");
+	assert.equal(customOverflowContent.textContent, "51 additionalin agenda");
+	assert.equal(
+		customOverflowContent.querySelector(
+			":scope > .my-event-overflow-wide-count"
+		)?.textContent,
+		"51 additional"
+	);
+	assert.equal(
+		customOverflowContent.querySelector(
+			":scope > .my-event-overflow-wide-destination"
+		)?.textContent,
+		"in agenda"
+	);
 	assert.deepEqual(
 		{
-			date: customOverflowContent.dataset["exampleDate"],
-			eventCount: customOverflowContent.dataset["exampleEventCount"],
-			hiddenEventCount: customOverflowContent.dataset["exampleHiddenEventCount"],
-			surface: customOverflowContent.dataset["exampleSurface"]
+			actionBacked: customOverflowContent.dataset["testActionBacked"],
+			date: customOverflowContent.dataset["testDate"],
+			eventCount: customOverflowContent.dataset["testEventCount"],
+			overflowCount: customOverflowContent.dataset["testOverflowCount"],
+			surface: customOverflowContent.dataset["testSurface"],
+			variant: customOverflowContent.dataset["testVariant"],
+			visibleEventCount: customOverflowContent.dataset["testVisibleEventCount"]
 		},
 		{
+			actionBacked: "true",
 			date: "2026-08-06",
 			eventCount: "53",
-			hiddenEventCount: "51",
-			surface: "grid-summary"
+			overflowCount: "51",
+			surface: "grid-summary",
+			variant: "wide",
+			visibleEventCount: "2"
 		},
-		"Expected the custom wide overflow content to receive authoritative context."
+		"Expected the wide branch to receive the authoritative adaptive count context."
 	);
 	assert.equal(
 		customOverflowContent.querySelector("a, button, input, select, textarea, [tabindex]"),
@@ -427,9 +514,9 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"Custom overflow content must remain noninteractive."
 	);
 	assert.equal(
-		selectedOverflowAction.classList.contains("lfc-has-custom-grid-overflow-content"),
+		wideOverflow.classList.contains("lfc-has-custom-event-overflow"),
 		true,
-		"Expected the native overflow action to expose its custom wide-content state."
+		"Expected the wide variant root to expose its custom-content state."
 	);
 	assert.match(
 		selectedOverflowAction.getAttribute("aria-label") ?? "",
@@ -502,13 +589,13 @@ export async function runAdvancedSmokeScenarios(environment) {
 	const staleMountedEvent = initialAgendaActions[0];
 	assert.ok(staleMountedEvent instanceof dom.window.HTMLButtonElement);
 	assert.equal(
-		staleMountedEvent.classList.contains("advanced-example-event-milestone"),
+		staleMountedEvent.classList.contains("my-event-milestone"),
 		true,
 		"Expected eventDidMount output."
 	);
 	const taskButton = requireAgendaAction(host, TASK_ID);
 	assert.equal(
-		taskButton.querySelector(".advanced-example-event-marker"),
+		taskButton.querySelector(".my-event-marker"),
 		null,
 		"Expected renderEventMarker to suppress task markers."
 	);
@@ -517,23 +604,23 @@ export async function runAdvancedSmokeScenarios(environment) {
 	assert.ok(initialAppointment instanceof dom.window.HTMLAnchorElement, "A URL event must render as an anchor.");
 	assert.equal(initialAppointment.pathname, "/examples/advanced/");
 	assert.equal(initialAppointment.search, "?event=design-review&from=calendar");
-	assert.equal(initialAppointment.hash, "#advanced-example-calendar-title");
-	const fallbackAppointment = document.querySelector("[data-example-fallback] a");
+	assert.equal(initialAppointment.hash, "#my-calendar-title");
+	const fallbackAppointment = document.querySelector("[data-my-fallback] a");
 	assert.ok(fallbackAppointment instanceof dom.window.HTMLAnchorElement);
 	assert.equal(fallbackAppointment.pathname, "/examples/advanced/");
 	assert.equal(fallbackAppointment.search, "?event=design-review&from=fallback");
-	assert.equal(fallbackAppointment.hash, "#advanced-example-fallback-title");
+	assert.equal(fallbackAppointment.hash, "#my-fallback-title");
 	assert.ok(
-		initialAppointment.querySelector("time[datetime=\"2026-08-06T09:30\"]") instanceof
+		initialAppointment.querySelector("time[datetime=\"2026-08-06T11:38\"]") instanceof
 			dom.window.HTMLTimeElement,
 		"Expected native event-time markup."
 	);
-	assert.equal(initialAppointment.querySelector(".advanced-example-event-marker")?.textContent, "A");
-	assert.equal(initialAppointment.querySelector(".advanced-example-item-type")?.textContent, "appointment");
-	assert.equal(initialAppointment.querySelector(".advanced-example-status")?.textContent, "Confirmed");
-	assert.equal(initialAppointment.querySelector(".advanced-example-action-hint")?.textContent, "View details");
+	assert.equal(initialAppointment.querySelector(".my-event-marker")?.textContent, "A");
+	assert.equal(initialAppointment.querySelector(".my-item-type")?.textContent, "appointment");
+	assert.equal(initialAppointment.querySelector(".my-status")?.textContent, "Confirmed");
+	assert.equal(initialAppointment.querySelector(".my-action-hint")?.textContent, "View details");
 	const accessibleAppointmentName = initialAppointment.getAttribute("aria-label") ?? "";
-	const localizedAppointmentTime = initialAppointment.getAttribute("data-example-time-text") ?? "";
+	const localizedAppointmentTime = initialAppointment.getAttribute("data-test-time-text") ?? "";
 	assert.notEqual(localizedAppointmentTime, "", "Expected localized appointment time context.");
 	assert.ok(
 		accessibleAppointmentName.includes(localizedAppointmentTime) &&
@@ -553,7 +640,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 	}
 	assert.equal(staleMountedEvent.isConnected, false, "Expected paging to replace prior event nodes.");
 	assert.equal(
-		staleMountedEvent.classList.contains("advanced-example-event-milestone"),
+		staleMountedEvent.classList.contains("my-event-milestone"),
 		false,
 		"Expected extension cleanup to remove mount-owned state."
 	);
@@ -563,7 +650,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"Showing 50 of 53 items"
 	);
 	await waitFor(
-		() => document.querySelector("[data-example-announcer-polite]")?.textContent ===
+		() => document.querySelector("[data-my-announcer-polite]")?.textContent ===
 			"Showing 50 of 53 items",
 		"the host-owned polite announcement"
 	);
@@ -605,41 +692,41 @@ export async function runAdvancedSmokeScenarios(environment) {
 	await waitFor(() => eventDialog.open, "the advanced event-details dialog");
 	assert.equal(actionResult.textContent, "Opened Design review from agenda with click on a.");
 	assert.equal(
-		eventDialog.querySelector("[data-example-event-dialog-title]")?.textContent,
+		eventDialog.querySelector("[data-my-event-dialog-title]")?.textContent,
 		"Design review"
 	);
 	assert.equal(
-		eventDialog.querySelector("[data-example-event-dialog-category]")?.textContent,
+		eventDialog.querySelector("[data-my-event-dialog-category]")?.textContent,
 		"Appointment"
 	);
 	assert.equal(
-		eventDialog.querySelector("[data-example-event-dialog-status]")?.textContent,
+		eventDialog.querySelector("[data-my-event-dialog-status]")?.textContent,
 		"Confirmed"
 	);
 	assert.equal(
-		eventDialog.querySelector("[data-example-event-dialog-occurrence]")?.textContent,
+		eventDialog.querySelector("[data-my-event-dialog-occurrence]")?.textContent,
 		"2026-08-06"
 	);
 	assert.equal(
-		eventDialog.querySelector("[data-example-event-dialog-start]")?.textContent,
-		"2026-08-06 at 09:30"
+		eventDialog.querySelector("[data-my-event-dialog-start]")?.textContent,
+		"2026-08-06 at 11:38"
 	);
 	assert.equal(
-		eventDialog.querySelector("[data-example-event-dialog-end]")?.textContent,
-		"2026-08-06 at 10:15"
+		eventDialog.querySelector("[data-my-event-dialog-end]")?.textContent,
+		"2026-08-06 at 12:23"
 	);
 	const dialogEndTime = requireElement(
 		eventDialog,
-		"[data-example-event-dialog-end]",
+		"[data-my-event-dialog-end]",
 		dom.window.HTMLTimeElement
 	);
 	const dialogNoEnd = requireElement(
 		eventDialog,
-		"[data-example-event-dialog-no-end]",
+		"[data-my-event-dialog-no-end]",
 		dom.window.HTMLElement
 	);
 	assert.equal(dialogEndTime.hidden, false);
-	assert.equal(dialogEndTime.dateTime, "2026-08-06T10:15");
+	assert.equal(dialogEndTime.dateTime, "2026-08-06T12:23");
 	assert.equal(dialogNoEnd.hidden, true);
 	assert.equal(
 		document.activeElement,
@@ -661,7 +748,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 	const selectedBeforeGridActivation = selectedDate.textContent;
 	const gridEvent = requireElement(
 		host,
-		'[data-example-event-id="appointment:45"][data-example-event-surface="grid-summary"]',
+		'[data-test-event-id="appointment:45"][data-test-event-surface="grid-summary"]',
 		dom.window.HTMLButtonElement
 	);
 	gridEvent.click();
@@ -711,7 +798,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 	);
 	assert.equal(selectedDate.textContent, "2026-07-15", "The preferred day must clamp to minDate.");
 	assert.equal(
-		document.querySelector("[data-example-state-range]")?.textContent,
+		document.querySelector("[data-my-state-range]")?.textContent,
 		"2026-06-29 to 2026-08-10 (exclusive)",
 		"The partial minimum month must retain its complete 42-day provider range."
 	);
@@ -728,10 +815,10 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"returning from the partial minimum month"
 	);
 
-	const dateInput = requireElement(document, "[data-example-target-date]", dom.window.HTMLInputElement);
+	const dateInput = requireElement(document, "[data-my-target-date]", dom.window.HTMLInputElement);
 	const dateError = requireElement(
 		document,
-		"[data-example-target-date-error]",
+		"[data-my-target-date-error]",
 		dom.window.HTMLElement
 	);
 	const unchangedMonth = displayedMonth.textContent;
@@ -817,22 +904,22 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"focusToday() using the configured clock"
 	);
 
-	const direction = requireElement(document, "[data-example-direction]", dom.window.HTMLInputElement);
+	const direction = requireElement(document, "[data-my-direction]", dom.window.HTMLInputElement);
 	direction.checked = true;
 	direction.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
 	assert.equal(host.dir, "rtl", "Expected the host-owned direction control to exercise RTL.");
 	const theme = requireElement(
 		document,
-		"[data-example-theme-control]",
+		"[data-my-theme-control]",
 		dom.window.HTMLSelectElement
 	);
 	theme.value = "dark";
 	theme.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
-	assert.equal(document.documentElement.getAttribute("data-example-theme"), "dark");
+	assert.equal(document.documentElement.getAttribute("data-my-theme"), "dark");
 
 	const appointmentFilter = requireElement(
 		document,
-		'[data-example-type-filter][value="appointment"]',
+		'[data-my-type-filter][value="appointment"]',
 		dom.window.HTMLInputElement
 	);
 	eventButton = requireAgendaAction(host, APPOINTMENT_ID);
@@ -843,7 +930,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"a filtered refetch"
 	);
 	assert.equal(
-		eventButton.classList.contains("advanced-example-event-appointment"),
+		eventButton.classList.contains("my-event-appointment"),
 		false,
 		"Expected refetch to run event mount cleanup."
 	);
@@ -853,26 +940,131 @@ export async function runAdvancedSmokeScenarios(environment) {
 		() => findAgendaAction(host, APPOINTMENT_ID) !== null && phase.textContent === "ready",
 		"restoring a filtered category"
 	);
+	const immediateRenderCount = readCompletedGridRenderCount(gridRenders);
 	clickCommand(document, "refetchEvents");
-	await waitFor(() => phase.textContent === "ready", "the explicit refetchEvents() command");
+	assert.equal(phase.textContent, "ready", "An immediate refetch must commit synchronously.");
+	assert.notEqual(host.getAttribute("aria-busy"), "true", "An immediate refetch must not mark the host busy.");
+	assert.equal(busyState.textContent, "false");
+	assert.equal(completePending.disabled, true);
+	assert.equal(
+		readCompletedGridRenderCount(gridRenders),
+		immediateRenderCount + 1,
+		"An immediate refetch must complete exactly one additional 42-day grid render."
+	);
+	assert.doesNotMatch(
+		phaseHistory.textContent ?? "",
+		/loading/u,
+		"Immediate array results must not manufacture a loading phase."
+	);
+
+	const replacementRenderCount = readCompletedGridRenderCount(gridRenders);
 	clickCommand(document, "setEvents");
 	await waitFor(
 		() => (host.textContent ?? "").includes("Dynamically replaced schedule") &&
 			phase.textContent === "ready",
 		"the setEvents() replacement"
 	);
+	assert.equal(sourceTiming.value, "immediate", "A static replacement must use immediate timing.");
+	assert.notEqual(host.getAttribute("aria-busy"), "true");
+	assert.equal(
+		readCompletedGridRenderCount(gridRenders),
+		replacementRenderCount + 1,
+		"A static replacement must complete in one grid render."
+	);
 	assert.doesNotMatch(host.textContent ?? "", /Design review/u);
 	const replacementAction = requireAgendaAction(host, "dynamic-replacement");
 	assert.ok(replacementAction instanceof dom.window.HTMLAnchorElement, "A replacement URL event must render as an anchor.");
 	assert.equal(replacementAction.pathname, "/examples/advanced/");
 	assert.equal(replacementAction.search, "?event=dynamic-replacement&from=calendar");
-	assert.equal(replacementAction.hash, "#advanced-example-calendar-title");
+	assert.equal(replacementAction.hash, "#my-calendar-title");
 	clickCommand(document, "refetchEvents");
 	await waitFor(
 		() => (host.textContent ?? "").includes("Dynamically replaced schedule") &&
 			phase.textContent === "ready",
 		"refetchEvents() using the latest replacement"
 	);
+
+	const controlledRenderCount = readCompletedGridRenderCount(gridRenders);
+	sourceTiming.value = "controlled";
+	sourceTiming.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+	assert.equal(phase.textContent, "loading", "A controlled PromiseLike must expose loading synchronously.");
+	assert.equal(host.getAttribute("aria-busy"), "true", "A controlled PromiseLike must mark the host busy.");
+	assert.equal(completePending.disabled, false, "Controlled work must enable its completion control.");
+	assert.equal(
+		readCompletedGridRenderCount(gridRenders),
+		controlledRenderCount + 1,
+		"Starting controlled work must complete the loading grid render."
+	);
+	await waitFor(() => busyState.textContent === "true", "the host-busy observation for controlled work");
+	assert.match(phaseHistory.textContent ?? "", /loading$/u);
+	completePending.click();
+	await waitFor(
+		() => phase.textContent === "ready" && busyState.textContent === "false" &&
+			findAgendaAction(host, APPOINTMENT_ID) !== null,
+		"completion of the controlled PromiseLike source"
+	);
+	assert.notEqual(host.getAttribute("aria-busy"), "true");
+	assert.equal(completePending.disabled, true, "Completed controlled work must clear its pending control.");
+	assert.equal(
+		readCompletedGridRenderCount(gridRenders),
+		controlledRenderCount + 2,
+		"Completing controlled work must add one committed grid render."
+	);
+	assert.match(
+		phaseHistory.textContent ?? "",
+		/loading → ready$/u,
+		"Controlled completion must preserve the observable phase transition."
+	);
+
+	const abortedRenderCount = readCompletedGridRenderCount(gridRenders);
+	sourceTiming.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+	assert.equal(phase.textContent, "loading");
+	assert.equal(host.getAttribute("aria-busy"), "true");
+	assert.equal(completePending.disabled, false);
+	assert.equal(readCompletedGridRenderCount(gridRenders), abortedRenderCount + 1);
+	await waitFor(() => busyState.textContent === "true", "the controlled request selected for abort");
+	sourceTiming.value = "immediate";
+	sourceTiming.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+	assert.equal(phase.textContent, "ready", "Switching to immediate must synchronously supersede controlled work.");
+	assert.notEqual(host.getAttribute("aria-busy"), "true");
+	assert.equal(completePending.disabled, true, "Aborted controlled work must release its completion control.");
+	assert.equal(
+		readCompletedGridRenderCount(gridRenders),
+		abortedRenderCount + 2,
+		"Superseding controlled work must complete one immediate provider render."
+	);
+	await waitFor(
+		() => busyState.textContent === "false" && findAgendaAction(host, APPOINTMENT_ID) !== null,
+		"the immediate provider restored after abort"
+	);
+	assert.equal(
+		actionResult.textContent,
+		"Restored the provider with an immediate array result."
+	);
+	assert.match(phaseHistory.textContent ?? "", /loading → ready$/u);
+	assert.equal(
+		(phaseHistory.textContent ?? "").split(" → ").length,
+		8,
+		"The phase history must retain only its eight most recent observations."
+	);
+
+	//Restore deterministic fixture state before exercising teardown.
+	direction.checked = false;
+	direction.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+	theme.value = "system";
+	theme.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+	dateInput.value = "2026-08-07";
+	dateInput.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+	assert.equal(sourceTiming.value, "immediate");
+	assert.equal(host.dir, "ltr");
+	assert.equal(document.documentElement.hasAttribute("data-my-theme"), false);
+	assert.equal(displayedMonth.textContent, "2026-08-01");
+	assert.equal(selectedDate.textContent, "2026-08-06");
+	assert.equal(appointmentFilter.checked, true);
+	assert.equal(findAgendaAction(host, APPOINTMENT_ID) !== null, true);
+	assert.equal(completePending.disabled, true);
+	assert.notEqual(host.getAttribute("aria-busy"), "true");
+	assert.equal(busyState.textContent, "false");
 
 	assert.equal(observedErrors.length, 0, "The advanced example must not report calendar errors.");
 	assert.equal(uncaughtErrors.length, 0, "The advanced example must not leak DOM event errors.");

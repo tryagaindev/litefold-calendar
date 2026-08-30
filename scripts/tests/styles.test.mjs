@@ -6,7 +6,9 @@ import test from "node:test";
 
 import {
 	assertStyleModuleOrder,
+	composeDistributedStyles,
 	composeStyles,
+	minifyStyles,
 	STYLE_MODULE_ORDER
 } from "../lib/styles.mjs";
 
@@ -62,6 +64,38 @@ void test("style modules compose deterministically in cascade order", async () =
 	assert.match(firstComposition, /@media \(prefers-contrast: more\)/u);
 	assert.match(firstComposition, /@media \(prefers-reduced-motion: reduce\)/u);
 	assert.match(firstComposition, /@media \(forced-colors: active\)/u);
+});
+
+void test("distributed styles are deterministically minified without changing critical CSS contracts", async () => {
+	const readable = await composeStyles();
+	const [firstDistribution, secondDistribution] = await Promise.all([
+		composeDistributedStyles(),
+		composeDistributedStyles()
+	]);
+
+	assert.equal(firstDistribution, secondDistribution);
+	assert.equal(await minifyStyles(firstDistribution), firstDistribution);
+	assert.ok(firstDistribution.endsWith("\n"), "Expected a newline-terminated stylesheet.");
+	assert.ok(
+		Buffer.byteLength(firstDistribution, "utf8") < Buffer.byteLength(readable, "utf8"),
+		"Expected distributed CSS to be smaller than its readable source composition."
+	);
+	assert.equal(
+		[...firstDistribution.matchAll(/@layer lfc\{/gu)].length,
+		1,
+		"Expected the distributed stylesheet to retain one lfc layer block."
+	);
+	assert.doesNotMatch(firstDistribution, /\/\*/u);
+	assert.match(firstDistribution, /:dir\(rtl\)/u);
+	assert.match(firstDistribution, /@container lfc-calendar \(inline-size <= 42rem\)/u);
+	assert.match(firstDistribution, /@keyframes lfc-day-selection-reveal/u);
+	assert.match(firstDistribution, /prefers-contrast:more/u);
+	assert.match(firstDistribution, /prefers-reduced-motion:reduce/u);
+	assert.match(firstDistribution, /forced-colors:active/u);
+});
+
+void test("style minification rejects non-string input", async () => {
+	await assert.rejects(minifyStyles(undefined), /must be a string/u);
 });
 
 void test("style module order rejects missing modules", () => {

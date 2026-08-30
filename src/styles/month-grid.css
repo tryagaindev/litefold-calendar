@@ -191,30 +191,50 @@
     z-index: 1;
   }
 
-  :where(.litefold-calendar) .lfc-calendar-multiple-event-indicator {
-    block-size: 1.25rem;
-    color: var(--lfc-event-border-color);
+  :where(.litefold-calendar) .lfc-calendar-event-overflow-cluster {
+    display: contents;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-event-overflow {
+    align-items: safe center;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
     display: none;
     flex: none;
-    inline-size: 0.75rem;
-    overflow: visible;
+    min-inline-size: 0;
+    padding: 0;
     pointer-events: none;
+    white-space: nowrap;
   }
 
-  :where(.litefold-calendar) .lfc-calendar-multiple-event-indicator > * {
-    max-block-size: 100%;
-    max-inline-size: 100%;
+  :where(.litefold-calendar)
+    .lfc-calendar-event-overflow.lfc-is-wide:not(
+      .lfc-is-event-overflow-suppressed
+    ) {
+    display: inline-flex;
   }
 
-  :where(.litefold-calendar) .lfc-calendar-multiple-event-indicator-icon {
-    block-size: auto;
-    fill: var(--lfc-event-background);
-    inline-size: 0.75rem;
-    overflow: visible;
-    shape-rendering: geometricprecision;
-    stroke: currentcolor;
-    stroke-linejoin: round;
-    stroke-width: 2;
+  :where(.litefold-calendar)
+    .lfc-calendar-event-overflow.lfc-is-compact {
+    color: var(--lfc-event-border-color);
+    font-size: clamp(0.625rem, 2.5cqi, 0.8125rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--lfc-internal-font-weight-semibold);
+    line-height: 1;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-event-overflow-content {
+    align-items: safe center;
+    display: inline-flex;
+    justify-content: safe center;
+    min-inline-size: 0;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-event-overflow.lfc-has-custom-event-overflow
+    .lfc-event-overflow-default-content {
+    display: none;
   }
 
   :where(.litefold-calendar) .lfc-calendar-event-summary {
@@ -241,10 +261,6 @@
   :where(.litefold-calendar) .lfc-calendar-event-summary.lfc-calendar-event-button,
   :where(.litefold-calendar) .lfc-calendar-grid-more {
     pointer-events: auto;
-  }
-
-  :where(.litefold-calendar) .lfc-calendar-grid-more-custom-content {
-    display: none;
   }
 
   :where(.litefold-calendar)

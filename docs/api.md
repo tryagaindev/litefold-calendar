@@ -35,7 +35,7 @@ The root module exports exactly the following symbols. Entries in the Types colu
 | State and announcements | — | `CalendarAnnouncement`, `CalendarIssue`, `CalendarPhase`, `CalendarState` |
 | Localization and icons | — | `CalendarFirstDay`, `CalendarHeadingLevel`, `CalendarIconFactory`, `CalendarIcons`, `CalendarMessages` |
 | First-party extensions | — | `CalendarExtension` |
-| Render hooks | — | `CalendarDayElements`, `CalendarDayRenderContext`, `CalendarEventElements`, `CalendarEventRenderContext`, `CalendarRenderCleanup`, `CalendarRenderContext`, `CalendarRenderHooks`, `CalendarGridOverflowContentContext`, `CalendarMultipleEventIndicatorContext`, `CalendarSurface` |
+| Render hooks | — | `CalendarCompactEventOverflowContext`, `CalendarDayElements`, `CalendarDayRenderContext`, `CalendarEventElements`, `CalendarEventOverflowContext`, `CalendarEventOverflowElements`, `CalendarEventRenderContext`, `CalendarRenderCleanup`, `CalendarRenderContext`, `CalendarRenderHooks`, `CalendarSurface`, `CalendarWideEventOverflowContext` |
 | Errors | `LitefoldCalendarError` | `CalendarErrorCode`, `CalendarErrorDisposition`, `CalendarErrorPhase`, `CalendarErrorSeverity`, `LitefoldCalendarErrorOptions` |
 
 ## Find a first-party extension export
@@ -57,13 +57,13 @@ function createCalendar<TMetadata = unknown>(
 
 `events` is the only required option. Pass an array for static data or a `CalendarEventSource` for range-aware data. `TMetadata` defaults to `unknown` and is normally inferred from typed events, an action, or render hooks. A basic calendar needs no generic argument. For supported visual layout, the host border box must provide at least **320 CSS pixels** of inline size; narrower hosts receive best-effort graceful degradation rather than a construction error.
 
-Given `<div id="calendar"></div>`:
+Given `<div id="my-calendar"></div>`:
 
 ```ts
 import { createCalendar, type CalendarEventInput } from "@tryagaindev/litefold-calendar";
 import "@tryagaindev/litefold-calendar/styles.css";
 
-const host = document.querySelector<HTMLElement>("#calendar");
+const host = document.querySelector<HTMLElement>("#my-calendar");
 if (host === null) {
 	throw new Error("Calendar host not found.");
 }
@@ -90,9 +90,11 @@ calendar.render();
 |---|---|
 | Module import | Does not read `window` or `document`; the ESM entry is safe to evaluate during server rendering. |
 | `createCalendar()` | Validates configuration, resolves package-owned defaults, and retains application callbacks, metadata, and nodes by reference. It does not claim or modify the host. |
-| `render()` | Atomically claims a connected or detached host and its accepted integration nodes, replaces the host's children, adds `.litefold-calendar` and the presence-only `data-litefold-calendar` discovery marker, renders, and starts the first source request. An integration node that became leased, reparented, or otherwise unavailable after construction causes recoverable `invalid-state` without modifying the host. Detached rendering still creates DOM and starts source work; insert the host into its document before relying on focus, pointer, or visual layout behavior. |
+| `render()` | Atomically claims a connected or detached host and its accepted integration nodes, adds `.litefold-calendar` and the presence-only `data-litefold-calendar` discovery marker, and evaluates the initial event input. A direct array produces one terminal full render before `render()` returns; a promise-like result produces a loading render followed by a terminal render. An integration node that became leased, reparented, or otherwise unavailable after construction causes recoverable `invalid-state` without modifying the host. Detached rendering still creates DOM and starts source work; insert the host into its document before relying on focus, pointer, or visual layout behavior. |
 | Active instance | Owns the host's children. Another live calendar cannot claim the same host. Mutating the original options object does not reconfigure the instance; use `setEvents()` to replace event input and recreate the calendar for other configuration changes. |
 | `destroy()` | If rendered, aborts pending work, removes host listeners and generated content, conditionally restores package-managed `fallbackElement` visibility, detaches an eligible `toolbarEnd` node, removes the root markers, and leaves the owned host empty. Before render, it leaves unclaimed nodes unchanged. Destruction is terminal. |
+
+Litefold Calendar does not infer application unmounts or register a global page-lifecycle listener. Call `destroy()` when a transient calendar is removed. A standalone page may call it from non-cached `pagehide` while skipping `event.persisted` entries so browser back/forward-cache restoration keeps a live instance.
 
 Invalid construction input throws a synchronous `LitefoldCalendarError` with code `invalid-configuration`. This includes an invalid or reversed `minDate` / `maxDate` range, a range that intersects no renderable month, and an explicitly supplied `initialDate` that is outside the inclusive range or cannot render its month. When `initialDate` is omitted, the date produced by `now` instead resolves to the nearest in-range date in a renderable month. Because no usable instance exists after a construction failure, `onError` cannot observe it; catch it at the application bootstrap boundary when startup fallback UI is required.
 
@@ -120,10 +122,10 @@ The [advanced TypeScript example](../examples/advanced/) exposes controls for ev
 
 | Method | Purpose and focus behavior | Lifecycle and failure behavior |
 |---|---|---|
-| `render()` | Renders once and starts the visible-range request. Repeated calls on a live rendered instance are no-ops; use `refetchEvents()` to reload. | A call after `destroy()`, competing ownership, or an unavailable integration node throws synchronously without claiming or changing the host. |
+| `render()` | Evaluates the initial event input and renders its lifecycle. Repeated calls on a live rendered instance are no-ops; use `refetchEvents()` to reload. | Direct arrays settle before the method returns; promise-like results remain asynchronous. A call after `destroy()`, competing ownership, or an unavailable integration node throws synchronously without claiming or changing the host. |
 | `destroy()` | Releases package resources and clears a rendered, owned host. | Idempotent and terminal. A call before render leaves the unclaimed host unchanged. |
-| `setEvents(events)` | Replaces the complete static snapshot or provider, then starts one load for the current visible range without recreating the instance. It preserves the displayed month, selected date, current agenda reveal count, and package-owned focus where the represented day or event still exists. | Requires a rendered, live instance. Lifecycle is checked before the argument. An invalid top-level value throws `invalid-argument` without changing or aborting current work; an accepted source or payload failure follows the operational-error flow and retains usable same-range data. |
-| `refetchEvents()` | Revalidates the most recently accepted static snapshot or requests the current visible range from the most recently accepted provider again without a package cache. | Requires a rendered, live instance. A same-range failure retains the last usable snapshot. |
+| `setEvents(events)` | Replaces the complete static snapshot or provider, then evaluates it for the current visible range without recreating the instance. It preserves the displayed month, selected date, current agenda reveal count, and package-owned focus where the represented day or event still exists. | Requires a rendered, live instance. Direct arrays settle before the method returns; promise-like results remain asynchronous. Lifecycle is checked before the argument. An invalid top-level value throws `invalid-argument` without changing or aborting current work; an accepted source or payload failure follows the operational-error flow and retains usable same-range data. |
+| `refetchEvents()` | Revalidates the most recently accepted static snapshot or invokes the most recently accepted provider again for the current visible range without a package cache. | Requires a rendered, live instance. Direct arrays settle before the method returns; promise-like results remain asynchronous. A same-range failure retains the last usable snapshot. |
 | `gotoDate(date)` | Displays the containing month and selects the date without explicitly moving DOM focus. | Accepts a `CalendarDate`, strict civil string, or valid `Date`; invalid or unrenderable values, and values outside the configured range, throw `invalid-argument` without changing state. |
 | `focusDate(date)` | Displays, selects, and focuses the requested day button. | Uses the same validation, time-zone projection, and inclusive `minDate` / `maxDate` enforcement as `gotoDate()`. |
 | `today()` | Displays and selects the date returned by `now` without explicitly moving DOM focus. | A later clock failure enters the fatal `internal-error` flow; navigation quietly stops when that date is outside the configured range or no supported destination is available. |
@@ -138,6 +140,8 @@ Invalid configuration, public method arguments, and lifecycle calls are programm
 `setEvents()` validates lifecycle before inspecting its argument. On a rendered, live instance—including one with a recoverable source failure—it accepts only an array or provider function. Invalid top-level input throws synchronous `invalid-argument` without aborting current work, changing state, or invoking `onError`.
 
 An accepted replacement becomes the current source immediately and aborts superseded source work. If that source later rejects or returns invalid data, Retry and `refetchEvents()` use the replacement rather than restoring the old source; usable data already rendered for the same range remains visible in the degraded state. Reentrant calls are deterministic: the last accepted source wins.
+
+An immediate replacement may supersede pending asynchronous work from inside a synchronous callback. The superseded generation cannot commit, and any busy state it published is cleared by the replacement's terminal commit before `setEvents()` returns.
 
 When replacement data commits, the calendar preserves the displayed month, selected date, and current agenda reveal count (capped by the new result and `agendaDomLimit`). Package-owned focus returns to the same day or event occurrence when possible; if the focused event was removed, focus falls back to its day. Focus outside the calendar is never moved.
 
@@ -215,9 +219,22 @@ calendar.render();
 calendar.setEvents(remoteSource);
 ```
 
+### Source timing and renders
+
+Each provider invocation is classified independently by the value it returns, not by whether the provider was declared with `async`:
+
+| Result shape | Observable lifecycle |
+|---|---|
+| Static array or array returned directly by a provider | Normalizes and commits `ready`, `degraded`, or `unavailable` during the initiating method. It performs exactly one full render, never publishes `loading`, and never sets `aria-busy`. |
+| Any `PromiseLike`, including `Promise.resolve(events)`, an `async` function result, an already-fulfilled promise, or a custom thenable | Publishes `loading` with a full render, then publishes the terminal phase with a second full render when it settles. |
+
+This classification is per call, so one provider may return an array for a cached range and a promise-like value for another range without changing API shape. `render()`, `setEvents()`, `refetchEvents()`, and navigation remain `void`; when their current evaluation yields a direct array, all normalization, state, DOM, and progressive-fallback work completes before the initiating method returns.
+
+The package invokes the provider before publishing `loading`. When it receives a promise-like value, it attaches fulfillment and rejection handlers before running loading callbacks. Synchronous callback reentrancy may therefore replace the source, navigate, refetch, or destroy safely: generation checks prevent superseded work from committing, and immediate work that supersedes a pending result clears `aria-busy` as part of its terminal commit.
+
 Provider bounds are strict date-only strings. `start` is inclusive and `end` is exclusive. A committed visible month always requests its complete fixed 42-day grid, including adjacent-month filler days. The pull/snap pager retains that one current grid and does not render an adjacent month grid or request or prefetch its event range while the user pulls. `minDate` and `maxDate` limit selection and navigation but never clip the committed provider range, including in a partial boundary month.
 
-Every committed visible-range transition and `refetchEvents()` invocation calls the current provider; same-month date selection and a partial pager pull do not. `setEvents()` accepts a replacement source and starts exactly one current-range load. For a static array, membership and supported event fields are snapshotted when accepted, while opaque `metadata` remains by reference; that snapshot is then reused and revalidated. litefold-calendar does not cache provider results. Forward `signal` to cancellable work and stop non-fetch work when it aborts. A newer request, accepted replacement, or `destroy()` aborts the previous request, and a stale result never replaces the current snapshot.
+Every committed visible-range transition and `refetchEvents()` invocation calls the current provider; same-month date selection and a partial pager pull do not. `setEvents()` accepts a replacement source and starts exactly one current-range evaluation. For a static array, membership and supported event fields are snapshotted when accepted, while opaque `metadata` remains by reference; that snapshot is then reused and revalidated. Litefold Calendar does not cache provider results. Forward `signal` to cancellable work and stop non-fetch work when it aborts. A newer request, accepted replacement, or `destroy()` aborts the previous request, and a stale result never replaces the current snapshot.
 
 The complete returned array is validated atomically. A non-array result, malformed event, duplicate ID, or result beyond `sourceEventLimit` rejects the entire snapshot. A synchronous throw or rejected promise-like result becomes an `event-source-failed` or validation error. Preserve failures as failures rather than converting them to an empty array, because an empty array means a successful range with no events.
 
@@ -261,7 +278,7 @@ Metadata is optional and opaque. The package preserves it by reference without i
 
 Event IDs must contain a non-whitespace character, remain at most 256 UTF-16 code units, and be unique within one returned snapshot. IDs are preserved without trimming. Titles are trimmed and must then contain 1 through 1,024 UTF-16 code units.
 
-`accentColor` accepts exactly an opaque six-digit hexadecimal color (`#RRGGBB`, case-insensitive input) and normalizes it to uppercase. An invalid value becomes `null` rather than invalidating the event. It colors only the built-in SVG marker; it does not tint an event summary or choose event text, background, or border colors. Core rendering does not emit a `style` attribute. Use `renderEventMarker` when metadata-driven visual treatment needs more than the built-in marker, and keep that application-owned output compatible with the application Content Security Policy.
+`accentColor` is the per-event **event marker color** field. It accepts exactly an opaque six-digit hexadecimal color (`#RRGGBB`, case-insensitive input) and normalizes it to uppercase. An invalid value becomes `null` rather than invalidating the event; the built-in marker then uses its CSS-token fallback. This field colors only the built-in SVG marker. It does not tint an event summary or choose its text, background, border, or event leading-rule color. Core rendering does not emit a `style` attribute. See [calendar anatomy and color vocabulary](component-anatomy.md#three-color-roles-that-sound-similar) for the related names. Use `renderEventMarker` when metadata-driven visual treatment needs more than the built-in marker, and keep that application-owned output compatible with the application Content Security Policy.
 
 `url` is optional. It must be unchanged by trimming, contain no control character or credentials, and resolve against the host document to a relative or HTTP(S) destination. Both the supplied string and the resolved destination must be no longer than 2,048 UTF-16 code units. Empty, malformed, unsupported-scheme, credential-bearing, control-character, trim-altered, or oversized values reject the complete snapshot. A normalized event exposes the validated relative reference unchanged, a canonical absolute HTTP(S) string, or `null`; the native anchor resolves a relative reference in the host document.
 
@@ -352,7 +369,7 @@ The [advanced TypeScript example](../examples/advanced/) demonstrates every opti
 
 | Option | Default | Purpose and lifecycle | Invalid or failed behavior |
 |---|---|---|---|
-| `events` | Required | Sets the initial static events or abort-aware provider for the one current fixed 42-day grid. Providers run for initial load, each committed displayed-month change, and each explicit refetch; a partial pager pull makes no adjacent-range call. Replace the complete input after render with `setEvents()`. | Invalid construction input is `invalid-configuration`. Provider and snapshot failures use the visible source-error flow; invalid top-level `setEvents()` input is `invalid-argument`. |
+| `events` | Required | Sets the initial static events or abort-aware provider for the one current fixed 42-day grid. Providers run for initial load, each committed displayed-month change, and each explicit refetch; a partial pager pull makes no adjacent-range call. Each invocation uses the returned shape to select the synchronous direct-array or asynchronous promise-like lifecycle. Replace the complete input after render with `setEvents()`. | Invalid construction input is `invalid-configuration`. Provider and snapshot failures use the visible source-error flow; invalid top-level `setEvents()` input is `invalid-argument`. |
 | `minDate` | No configured lower bound | Sets the earliest selectable date, inclusive. A boundary may fall within a month; earlier grid dates remain visible but disabled. `Date` values use the configured time-zone projection. | An invalid or unprojectable value, or a value later than `maxDate`, is `invalid-configuration`. Absolute supported-date and complete-grid renderability limits still apply. |
 | `maxDate` | No configured upper bound | Sets the latest selectable date, inclusive. A boundary may fall within a month; later grid dates remain visible but disabled. `Date` values use the configured time-zone projection. | An invalid or unprojectable value, or a value earlier than `minDate`, is `invalid-configuration`. Absolute supported-date and complete-grid renderability limits still apply. |
 | `initialDate` | Nearest in-range date in a renderable month, starting from `now` | Selects the initial day and displayed month from a `CalendarDate`, strict string, or `Date` without moving DOM focus. | An invalid, unprojectable, or unrenderable explicit value, or an explicit value outside the configured inclusive range, is `invalid-configuration`. |
@@ -375,21 +392,21 @@ The [advanced TypeScript example](../examples/advanced/) demonstrates every opti
 | `messages` | Immutable English messages | Partially replaces package-owned labels, errors, and announcements. | A non-object, unknown own string key, supported key with a non-string or whitespace-only value, or unsupported complete `{token}` placeholder is `invalid-configuration`. |
 | `icons` | Text previous/next icons | Partially replaces decorative navigation content through document-aware factories. | An unknown own string key, invalid factory, factory throw, or reused, interactive, parented, cross-document, or otherwise invalid factory result is `invalid-configuration` during construction. If an accepted icon node becomes leased, reparented, or otherwise unavailable before `render()` claims it, `render()` throws recoverable `invalid-state`. |
 | `toolbarEnd` | No custom toolbar element | Moves one detached or host-descendant, same-document `HTMLElement` after the built-in controls in DOM and focus order. The application retains its state and listeners. | A structurally invalid, cross-document, or externally parented element is `invalid-configuration` during construction. If an accepted element becomes leased, reparented, or otherwise unavailable before `render()` claims it, `render()` throws recoverable `invalid-state`. `destroy()` detaches an unchanged eligible element; the application owns reinsertion. |
-| `fallbackElement` | No fallback element | Exclusively leases a same-document element that is DOM-disjoint from the host—neither element may contain the other. Its original `hidden` state is preserved through initial loading, then coordinated as described below without overwriting an application mutation. A sibling is the normal arrangement. | A structurally invalid, cross-document, host-descendant, or host-ancestor element is `invalid-configuration` during construction. An element that is already leased or otherwise unavailable when `render()` claims integration nodes produces `invalid-state`. Both failures leave it untouched. |
-| `extensions` | Empty array | Activates configured opaque first-party components after a successful render. Activation and state delivery use caller order; teardown uses reverse order. | A forged value or duplicate stable ID is synchronous `invalid-configuration` before host mutation. A runtime failure quarantines only that extension and reports diagnostic-only `extension-failed` with `extensionId`. |
+| `fallbackElement` | No fallback element | Exclusively leases a same-document element that is DOM-disjoint from the host—neither element may contain the other. A pending initial promise-like result preserves its original `hidden` state; a direct-array result coordinates it before `render()` returns. Later commits follow the rules below without overwriting an application mutation. A sibling is the normal arrangement. | A structurally invalid, cross-document, host-descendant, or host-ancestor element is `invalid-configuration` during construction. An element that is already leased or otherwise unavailable when `render()` claims integration nodes produces `invalid-state`. Both failures leave it untouched. |
+| `extensions` | Empty array | Activates configured opaque first-party components after a successful render. Activation and state delivery use caller order; teardown uses reverse order. Initial direct-array work queues exactly one terminal state delivery after activation. Initial promise-like work activates after the loading transition and does not replay that earlier loading state. | A forged value or duplicate stable ID is synchronous `invalid-configuration` before host mutation. A runtime failure quarantines only that extension and reports diagnostic-only `extension-failed` with `extensionId`. |
 | `onEventActivate` | No callback action | Handles native anchor/button activation on `"grid-summary"` and `"agenda"`; may return `void` or `PromiseLike<void>`. A linked event remains an anchor regardless. | A throw or rejection becomes `action-failed`. A callback may synchronously prevent a link's default navigation. |
 | `isEventContextMenuAvailable` | Every occurrence is eligible when `onEventContextMenu` exists; otherwise none are | Synchronously narrows context-action availability per occurrence and surface. It receives date, event, and surface only. | A throw, non-boolean, or thenable fails closed and reports one recoverable `host-integration-failed` issue per calendar instance. |
 | `onEventContextMenu` | No event context action | Handles right-click, Context Menu, or Shift+F10 on eligible grid/agenda event actions. For an eligible non-link event with no `onEventActivate`, it also handles click, tap, Enter, or Space as the native button's only primary action. | A throw or rejection becomes `action-failed`. No long-press is synthesized; an ineligible link retains the native browser menu. |
 | `onDaySelect` | No day action | Provides a non-cancellable notification after pointer or keyboard selection updates the selected day and agenda. | A throw or rejection becomes `action-failed`; selection remains committed. |
 | `onDayContextMenu` | No context action | Handles right-click, Context Menu, or Shift+F10 day gestures. | A throw or rejection becomes `action-failed`. No long-press gesture is synthesized. |
-| `renderHooks` | Empty array | Runs ordered, named, consumer-owned node render and mount hooks for each replacement render. One hook set may independently own each of `renderEventMarker`, `renderMultipleEventIndicator`, and `renderGridOverflowContent`. | Unknown own string keys, invalid definitions, duplicate IDs, or multiple owners of a singleton hook are `invalid-configuration`; a runtime failure quarantines that hook set and produces `render-hook-failed`. |
+| `renderHooks` | Empty array | Runs ordered, named, consumer-owned node render and mount hooks for each replacement render. One hook set may independently own each of `renderEventMarker` and `renderEventOverflow`; the latter receives each applicable pre-rendered responsive overflow variant. | Unknown own string keys, invalid definitions, duplicate IDs, or multiple owners of a singleton hook are `invalid-configuration`; a runtime failure quarantines that hook set and produces `render-hook-failed`. |
 | `onError` | Package presentation plus global reporting when needed | Synchronously observes current operational errors and diagnostic-only late or stale failures. The exact value `"handled"` transfers presentation ownership only for a current error accepted into state. | A throw preserves current package UI and globally reports both failures. A thenable cannot claim ownership and is observed. |
 | `onAnnounce` | Package-owned live regions | Synchronously hands announcements to an application-owned live region. It does not transfer visible-error ownership. | A throw or thenable becomes `host-integration-failed`; the original message falls back to the internal live region. |
 | `onStateChange` | No state observer | Synchronously observes immutable state after transitions. | A throw or thenable becomes `host-integration-failed` without recursively invoking the failed observer. |
 
 Toolbar layout is container-driven and never changes sequential focus order: Previous, Next, month title, and Today, then `toolbarEnd`. The [responsive design](../DESIGN.md#responsive-model) owns the row composition. The title keeps one canonical full localized DOM string and accessible name; compact visual labels are `aria-hidden` and use a complete locale-formatted abbreviated month and year.
 
-`fallbackElement` stays unchanged through construction and initial loading. The first usable snapshot hides it, including a successful empty snapshot. A degraded refresh with retained usable data keeps it hidden. An unavailable or fatal state with no usable snapshot restores its original `hidden` state; retry success hides it again. Before each write, the package requires the current value to match its last observed or written value. If application code changes `hidden`, package writes are skipped while that value differs, and `destroy()` preserves the differing application value. If application code later restores the package's last value, normal package management can resume. `destroy()` always releases the lease and restores the original value only when the package still manages the current value.
+`fallbackElement` stays unchanged through construction and while an initial promise-like result is pending. A direct array has no loading interval: its usable or unavailable terminal result coordinates the fallback before the initiating `render()` returns. The first usable snapshot hides it, including a successful empty snapshot. A degraded refresh with retained usable data keeps it hidden. An unavailable or fatal state with no usable snapshot restores its original `hidden` state; retry success hides it again. Before each write, the package requires the current value to match its last observed or written value. If application code changes `hidden`, package writes are skipped while that value differs, and `destroy()` preserves the differing application value. If application code later restores the package's last value, normal package management can resume. `destroy()` always releases the lease and restores the original value only when the package still manages the current value.
 
 ## WebMCP extension
 
@@ -461,7 +478,7 @@ interface CalendarDayContextMenu
 }
 ```
 
-Return the action promise so litefold-calendar can observe completion and rejection. Detached work cannot be associated with its originating action and can create unhandled failures.
+Return the action promise so Litefold Calendar can observe completion and rejection. Detached work cannot be associated with its originating action and can create unhandled failures.
 
 The same rendering matrix applies to grid and agenda occurrences:
 
@@ -491,7 +508,7 @@ Day selection commits and rerenders before `onDaySelect` runs. Its `element` is 
 
 Within the grid, exactly one day proxy has `tabindex="0"`; event and overflow actions remain `-1`. The pager viewport is programmatically focusable only, and its decorative lanes are `aria-hidden` and noninteractive, so Tab continues from the toolbar into the managed grid rather than into paging chrome. F2 enters the current cell's first visible action. Up/Down moves without wrapping; Escape or F2 returns to the day. Tab exits forward toward the agenda, while Shift+Tab returns to the day proxy. Focus restoration identifies an occurrence by surface, date, and event ID rather than retaining a replaced node. Stale or detached elements cannot invoke actions.
 
-The native overflow action uses visible `gridMore` text and the localized `gridMoreLabel` date/count name. Activating it selects the represented date, resets the agenda expansion, and focuses the agenda heading without invoking `onDaySelect`.
+The native overflow action uses localized `gridMore` visual fallback content and the `gridMoreLabel` date/count accessible name. Custom wide overflow content may replace that visual fallback without replacing the action or its name. Activating the action selects the represented date, resets the agenda expansion, and focuses the agenda heading without invoking `onDaySelect`.
 
 ## Observe state: `CalendarState`
 
@@ -521,7 +538,7 @@ interface CalendarAnnouncement {
 | Phase | Meaning |
 |---|---|
 | `idle` | Constructed but not rendered. |
-| `loading` | Waiting for the current source request; a retained snapshot may still be visible. |
+| `loading` | Waiting for a promise-like source result; a retained snapshot may still be visible. Direct arrays bypass this phase. |
 | `ready` | The current range has a usable snapshot and no active issues. |
 | `degraded` | Usable content remains, but a refresh, render-hook, action, or integration issue is active. |
 | `unavailable` | The current range has no usable snapshot or a fatal failure prevents normal rendering. |
@@ -529,7 +546,7 @@ interface CalendarAnnouncement {
 
 State objects, dates, and issue arrays are frozen. `displayedMonth` is the first day of the month shown by the one current grid, while `selectedDate` owns the visible agenda and always remains within the configured inclusive bounds. `range` contains the inclusive-start/exclusive-end bounds of that complete committed 42-day source range, even when some grid days fall outside `minDate` or `maxDate`; pager lanes never create speculative state or ranges. It is `null` before render and after destroy. Issues contain only bounded, localized, presentation-safe data; they never expose raw causes, stack traces, URLs, response payloads, metadata, extension or render-hook IDs, or hook names.
 
-Use `getState()` for pull-based inspection and `onStateChange` for synchronous observation. Use `onAnnounce` only when the application already owns a centralized live announcer. Neither callback should perform asynchronous handoff before returning.
+Use `getState()` for pull-based inspection and `onStateChange` for synchronous observation. For every published phase, `onStateChange` runs after the immutable snapshot becomes current and before the corresponding package DOM replacement. Its synchronous reentrant work may supersede that replacement; generation checks keep stale work from rendering. Use `onAnnounce` only when the application already owns a centralized live announcer. Neither callback should perform asynchronous handoff before returning.
 
 ## Customize messages and icons
 
@@ -583,11 +600,14 @@ Each icon factory receives the host's `Document` and must return distinct, detac
 | `today` | `Today` | — |
 | `year` | `Year` | — |
 
-Every supplied message must be a string containing at least one non-whitespace character. Any complete `{token}` placeholder must be listed for that key; an unsupported placeholder is rejected as `invalid-configuration` rather than rendered literally. Only the placeholders shown above are substituted. In particular, `agendaTitle` and `chooseMonthYear` accept only `{date}`; the singular/plural event noun supplies `{eventLabel}` in `dayLabel` and `gridMoreLabel`. `gridMore` remains visible text, while `gridMoreLabel` names the native action with its date and hidden count. Rendered values remain text, not HTML. Override `event` and `events` together, and test long translations; the package does not download locale data or apply language-specific plural rules.
+Every supplied message must be a string containing at least one non-whitespace character. Any complete `{token}` placeholder must be listed for that key; an unsupported placeholder is rejected as `invalid-configuration` rather than rendered literally. Only the placeholders shown above are substituted. In particular, `agendaTitle` and `chooseMonthYear` accept only `{date}`; the singular/plural event noun supplies `{eventLabel}` in `dayLabel` and `gridMoreLabel`. `gridMore` supplies the default wide visual and `context.text`, while `gridMoreLabel` always names the native action with its date and hidden count. Rendered values remain text, not HTML. Override `event` and `events` together, and test long translations; the package does not download locale data or apply language-specific plural rules.
 
 <a id="render-hooks"></a>
 
 ## Customize rendering: `CalendarRenderHooks`
+
+The [calendar anatomy guide](component-anatomy.md) shows where each stable day,
+event, and overflow element belongs and maps the visual names to these hooks.
 
 ```ts
 type CalendarEventSurface = "grid-summary" | "agenda";
@@ -619,21 +639,41 @@ interface CalendarDayRenderContext extends CalendarRenderContext<"day"> {
 	readonly isToday: boolean;
 }
 
-interface CalendarMultipleEventIndicatorContext
+interface CalendarEventOverflowElements<
+	TAction extends HTMLButtonElement | null = HTMLButtonElement | null
+> {
+	readonly action: TAction;
+	readonly content: HTMLElement;
+	readonly root: HTMLElement;
+}
+
+interface CalendarCompactEventOverflowContext
 	extends CalendarRenderContext<"day"> {
 	readonly date: CalendarDate;
 	readonly dateString: string;
+	readonly elements: CalendarEventOverflowElements;
 	readonly eventCount: number;
+	readonly overflowCount: number;
+	readonly text: string;
+	readonly visibleEventCount: number;
+	readonly variant: "compact";
 }
 
-interface CalendarGridOverflowContentContext
+interface CalendarWideEventOverflowContext
 	extends CalendarRenderContext<"grid-summary"> {
 	readonly date: CalendarDate;
 	readonly dateString: string;
+	readonly elements: CalendarEventOverflowElements<HTMLButtonElement>;
 	readonly eventCount: number;
-	readonly hiddenEventCount: number;
+	readonly overflowCount: number;
 	readonly text: string;
+	readonly visibleEventCount: number;
+	readonly variant: "wide";
 }
+
+type CalendarEventOverflowContext =
+	| CalendarCompactEventOverflowContext
+	| CalendarWideEventOverflowContext;
 
 interface CalendarEventElements {
 	readonly action: CalendarEventActionElement | null;
@@ -661,13 +701,9 @@ interface CalendarRenderHooks<TMetadata = unknown> {
 		this: void,
 		context: Readonly<CalendarDayRenderContext>
 	) => Node | null | undefined;
-	readonly renderMultipleEventIndicator?: (
+	readonly renderEventOverflow?: (
 		this: void,
-		context: Readonly<CalendarMultipleEventIndicatorContext>
-	) => Node | null | undefined;
-	readonly renderGridOverflowContent?: (
-		this: void,
-		context: Readonly<CalendarGridOverflowContentContext>
+		context: Readonly<CalendarEventOverflowContext>
 	) => Node | null | undefined;
 	readonly renderEventLeading?: (
 		this: void,
@@ -703,14 +739,14 @@ import type { CalendarRenderHooks } from "@tryagaindev/litefold-calendar";
 
 const renderHooks = [
 	{
-		id: "external-event-label",
+		id: "my-external-event-label",
 		renderEventTrailing: ({ document, event }) => {
 			if (event.url === null) {
 				return null;
 			}
 
 			const label = document.createElement("span");
-			label.className = "calendar-external-event";
+			label.className = "my-calendar-external-event";
 			label.textContent = "External";
 			return label;
 		}
@@ -720,25 +756,31 @@ const renderHooks = [
 
 Pass this array through `CalendarOptions.renderHooks`. Hook sets run in array order. Each `id` must contain a non-whitespace character and be unique. IDs are preserved exactly, including leading or trailing whitespace.
 
-Three hooks have singleton ownership because each controls one package-owned presentation slot. Multiple owners of the same singleton hook are rejected during construction; one hook set may own multiple singleton hooks.
+Two hooks have singleton ownership because each controls package-owned presentation. Multiple owners of the same singleton hook are rejected during construction; one hook set may own both singleton hooks. `renderEventOverflow` is one ownership boundary across every applicable responsive variant.
 
 | Singleton hook | No owner | `undefined` | `null` | `Node` |
 |---|---|---|---|---|
 | `renderEventMarker` | Built-in marker | Invalid result | Suppress the marker | Replace the marker |
-| `renderMultipleEventIndicator` | Built-in event-slip fan | Keep the built-in fan | Suppress the fan | Replace the fan |
-| `renderGridOverflowContent` | Localized default text | Keep the localized default | Keep the localized default | Replace wide visual content |
+| `renderEventOverflow` | Social-style compact count and localized wide text | Keep the built-in content for that variant | Suppress a passive compact cue; keep built-in content inside a native action | Replace that variant's visual content |
 
-`renderMultipleEventIndicator` runs for each in-range day with at least two event occurrences, regardless of `maxGridEventsPerDay`. Its context uses `surface: "day"` and supplies the authoritative `eventCount`. The decorative fan is separate from per-event `renderEventMarker` output.
+`renderEventOverflow` receives a discriminated `CalendarEventOverflowContext` for each applicable pre-rendered variant. Branch on `variant`; do not infer the responsive state from viewport measurements:
 
-`renderGridOverflowContent` runs whenever the native grid-overflow action exists. Its context uses `surface: "grid-summary"` and supplies `eventCount`, `hiddenEventCount`, and the localized default `text`. A returned node replaces only the action's wide visual content. The native button, accessible name, activation, focus transfer, and canonical localized text remain package-owned. Custom content is `aria-hidden` and visible only above the `42rem` container threshold; compact-primary and focused overflow actions show the canonical text.
+- `variant: "compact"` uses `surface: "day"`. When a primary marker is visible, `visibleEventCount` is `1`, `overflowCount` is the additional count, and `text` is signed, such as `+1`, `+999`, `+1K`, or `+1.3K` in `en-US`. Without a visible primary marker, `visibleEventCount` is `0`, `overflowCount` equals `eventCount`, and `text` is the unsigned total, such as `2`. Formatting uses the configured locale and `Intl.NumberFormat` with `notation: "compact"`, `compactDisplay: "short"`, `maximumFractionDigits: 1`, and `useGrouping: false`; the paired-marker formatter also uses `signDisplay: "always"`. The built-in visual is a bare semibold number. When paired with a primary marker/action, the two visuals occupy equal, gap-free, block-end-aligned auto-fit grid blocks. Their centers evenly divide the full area beneath the date when both compact-control-size tracks, 44 CSS pixels by default, fit; otherwise they become centered equal full-width rows. They stay stacked through supported phone widths and share a row only near the compact ceiling. A markerless standalone total occupies one centered block.
+- `variant: "wide"` uses `surface: "grid-summary"`. `visibleEventCount` is the number of direct grid representations, `overflowCount` is the number omitted from them, and `text` is the localized exact `gridMore` value, such as `51 more`. This variant exists when the native grid-overflow action exists.
 
-Day mount and badge hooks inspect every structural cell in the fixed grid, including cells whose out-of-range day button is already disabled; they must not make that day interactive. The multiple-event indicator hook is narrower and never runs for out-of-range cells, zero-event days, or one-event days. Container-boundary changes are CSS-only: they do not rerun these hooks, rerender the calendar, measure width, or replace returned nodes.
+`eventCount` is always the authoritative total. `elements.root` is the package-owned variant root and `elements.content` is its visual slot. `elements.action` is `null` for a passive compact cue and is the native `HTMLButtonElement` for the wide variant or when the overflow action itself is the compact primary visual, such as with `maxGridEventsPerDay: 0`. These references are for inspection and placement context: return visual content instead of directly changing, removing, or reparenting package-owned elements. A returned compact node replaces content only and remains within its package-assigned block. In the compact-primary action case, the fallback remains one package-owned action; a returned node stays inside it and `null` keeps the built-in numeric fallback. The native button, accessible name, activation, and focus transfer remain package-owned; `context.text` remains the package-formatted fallback even when a custom node replaces it visually.
+
+Compact output is presentational, unfocusable, and hidden from the accessibility tree; the day label retains the exact event total. A passive compact cue is pointer-transparent, so activating that area selects the day instead of activating the first event. The package owns the compact block-end placement and automatic one- or two-column grid; no public overflow-layout selector or CSS token is exposed. The repeat threshold uses the compact-control-size floor rather than arbitrary returned content's intrinsic width. Consumers must keep compact output concise enough for its assigned block; oversized application output can overflow and remains consumer-owned. Returned wide content replaces only visual content inside the native overflow button and cannot alter its behavior.
+
+Each applicable variant is created during the calendar render. When a native overflow action has both responsive presentations, its compact and wide variants coexist and container CSS selects between them at the `42rem` boundary. Resizing therefore does not invoke the hook again, rerender the calendar, measure the host in JavaScript, or replace a returned node. If either variant throws or returns an invalid value, the owning hook set is quarantined as one unit and every compact and wide package default it displaced is restored.
+
+Day mount and badge hooks inspect every structural cell in the fixed grid, including cells whose out-of-range day button is already disabled; they must not make that day interactive. Overflow contexts are limited to in-range cells that have a rendered overflow variant; zero-event cells never invoke `renderEventOverflow`.
 
 The [advanced TypeScript example](../examples/advanced/) implements every consumer render hook, including mount cleanup and marker replacement or suppression.
 
-Every returned node must be detached, appendable, belong to `context.document`, be uniquely owned by that hook invocation, and contain no interactive content. Arrays, strings, connected or parented nodes, cross-document nodes, raw HTML, interactive descendants, and reused nodes are rejected. The same contract applies to every decorative-content hook.
+Every returned node must be detached, appendable, belong to `context.document`, be uniquely owned by that hook invocation, and contain no interactive content. Arrays, strings, connected or parented nodes, cross-document nodes, raw HTML, interactive descendants, reused nodes, and direct mutation of package-owned render elements are rejected. The same contract applies to every decorative-content hook.
 
-The day-badge and multiple-event indicator slots are decorative and hidden from the accessibility tree. `CalendarEventElements.action` is the native anchor/button for an actionable grid or agenda representation and `null` for a static representation; `CalendarEventElements.root` is always the owned representation root. `CalendarEventElements.marker` is the owned marker container whether it contains the default marker, render-hook content, or no marker. Day `number` and event `time` slots are native `HTMLTimeElement` values. `eventTimeDisplay` changes only whether an event time is visually exposed on a surface: the time element, `datetime`, and localized `timeText` remain available to assistive technology and render hooks, and actionable occurrences keep the time in the action's accessible name. Use `surface` to distinguish behavior and application-owned styling without private selectors. These hooks add no public selector, CSS token, or message key; style custom nodes through application-owned classes.
+The day-badge and event-overflow content slots are decorative and hidden from the accessibility tree. `CalendarEventElements.action` is the native anchor/button for an actionable grid or agenda representation and `null` for a static representation; `CalendarEventElements.root` is always the owned representation root. `CalendarEventElements.marker` is the owned marker container whether it contains the default marker, render-hook content, or no marker. Day `number` and event `time` slots are native `HTMLTimeElement` values. `eventTimeDisplay` changes only whether an event time is visually exposed on a surface: the time element, `datetime`, and localized `timeText` remain available to assistive technology and render hooks, and actionable occurrences keep the time in the action's accessible name. Use `variant`, `surface`, and the supplied stable elements to distinguish behavior and application-owned styling without private selectors. These hooks add no public selector, CSS token, or message key; style custom nodes through application-owned classes.
 
 Render hooks, mount hooks, and cleanup functions are synchronous. A mount hook may return one cleanup function; a no-result callback returns `undefined`, which keeps promise-returning functions out of these TypeScript contracts. Cleanups run before replacement renders; on quarantine or destroy, `signal` aborts before cleanup. Every mount registration receives its own cleanup call, and every cleanup is attempted if another throws. On replacement cleanup, quarantine, or destroy, a returned node is removed only while it remains under the package parent that received it. If application code reparents the node, the package releases its lease and preserves it.
 
@@ -842,7 +884,7 @@ For a current operational error accepted into state, returning `"default"` or `u
 - Treat native pager physics as browser/OS behavior and keep Previous/Next available; do not script private pull lanes, snap positions, or horizontal scroll state.
 - Style through `.litefold-calendar` and documented `--lfc-*` tokens. Do not style with `data-litefold-calendar` or depend on private `.lfc-*` / `data-lfc-*` output.
 - Return new detached nodes from consumer render hooks. Do not return HTML strings, connected nodes, interactive descendants, reused nodes, or promises.
-- Let only one render-hook set define each singleton hook: `renderEventMarker`, `renderMultipleEventIndicator`, and `renderGridOverflowContent`. Use each hook's documented `null` / `undefined` fallback semantics rather than querying or replacing private package structure.
+- Let only one render-hook set define each singleton hook: `renderEventMarker` and `renderEventOverflow`. The overflow hook owns both variants as one unit; use its documented `variant`, stable elements, counts, text, and `null` / `undefined` fallback semantics rather than querying or replacing private package structure.
 - Return action promises, but keep `onError`, `onAnnounce`, `onStateChange`, render/mount hooks, and cleanup functions synchronous.
 - Import complete first-party components only from documented extension subpaths. Do not treat `CalendarExtension` as an application authoring interface or expect a runtime branch around a static import to remove bundle bytes.
 - Do not return `"handled"` for a current error merely because telemetry recorded it; that value transfers presentation ownership.

@@ -1,8 +1,11 @@
 import type {
 	Calendar,
+	CalendarCompactEventOverflowContext,
+	CalendarEventOverflowElements,
 	CalendarOptions,
 	CalendarRenderCleanup,
-	CalendarRenderHooks
+	CalendarRenderHooks,
+	CalendarWideEventOverflowContext
 } from "../src/index.js";
 
 /* eslint-disable @typescript-eslint/unbound-method -- Compile-only assertions intentionally detach methods. */
@@ -25,7 +28,26 @@ export function verifyPublicApiTypeContracts(
 	const hooks: CalendarRenderHooks = {
 		dayDidMount: () => cleanup,
 		eventDidMount: () => undefined,
-		id: "synchronous"
+		id: "synchronous",
+		renderEventOverflow: (context) => {
+			if (context.variant === "compact") {
+				const compactContext: Readonly<CalendarCompactEventOverflowContext> = context;
+				const compactElements: Readonly<CalendarEventOverflowElements> =
+					context.elements;
+				const compactSurface: "day" = context.surface;
+				void compactContext;
+				void compactElements;
+				void compactSurface;
+			} else {
+				const wideContext: Readonly<CalendarWideEventOverflowContext> = context;
+				const wideAction: HTMLButtonElement = context.elements.action;
+				const wideSurface: "grid-summary" = context.surface;
+				void wideAction;
+				void wideContext;
+				void wideSurface;
+			}
+			return context.document.createTextNode(context.text);
+		}
 	};
 	const options: CalendarOptions = {
 		events: [],
@@ -69,6 +91,19 @@ export function verifyPublicApiTypeContracts(
 	void invalidErrorHandler;
 	void invalidStateObserver;
 	void invalidMountHook;
+
+	const removedMultipleEventIndicator: CalendarRenderHooks = {
+		id: "removed-multiple-event-indicator",
+		//@ts-expect-error The 0.4 overflow API replaces renderMultipleEventIndicator.
+		renderMultipleEventIndicator: () => null
+	};
+	const removedGridOverflowContent: CalendarRenderHooks = {
+		id: "removed-grid-overflow-content",
+		//@ts-expect-error The 0.4 overflow API replaces renderGridOverflowContent.
+		renderGridOverflowContent: () => null
+	};
+	void removedGridOverflowContent;
+	void removedMultipleEventIndicator;
 
 	// @ts-expect-error Calendar metadata is invariant; widening would make setEvents unsafe.
 	const widenedCalendar: Calendar<BaseMetadata> = detailedCalendar;

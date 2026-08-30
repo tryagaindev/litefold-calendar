@@ -26,25 +26,25 @@ Their observable visual behavior is owned by [DESIGN.md](../DESIGN.md); interact
 Set overrides directly on the rendered host. Package defaults are declared on that element, so values set only on an ancestor do not replace them through inheritance. Add an application-owned theme class to the host before rendering:
 
 ```html
-<div id="calendar" class="schedule-theme"></div>
+<div id="my-calendar" class="my-calendar-theme"></div>
 ```
 
-Declare an application layer after importing the package. This safe baseline maps non-color roles and leaves Litefold's adaptive light, dark, and forced-colors palette intact:
+Declare an application layer after importing the package. This safe baseline maps non-color roles and leaves Litefold Calendar's adaptive light, dark, and forced-colors palette intact:
 
 ```css
 @import "@tryagaindev/litefold-calendar/styles.css";
 
-@layer application {
-	.litefold-calendar.schedule-theme {
-		--lfc-font-family: var(--app-font-family, system-ui, sans-serif);
-		--lfc-border-radius: var(--app-control-radius, 0.5rem);
+@layer my.calendar {
+	.litefold-calendar.my-calendar-theme {
+		--lfc-font-family: var(--my-font-family, system-ui, sans-serif);
+		--lfc-border-radius: var(--my-control-radius, 0.5rem);
 	}
 }
 ```
 
 `render()` adds `.litefold-calendar`, so the selector starts matching without application code changing classes. If the application declares a global layer order, place `lfc` before the application override layer.
 
-Map color tokens only when the application already provides a complete semantic calendar palette whose variables adapt in light, dark, and forced-colors modes. In that case, map every corresponding role from the [public token map](../DESIGN.md#public-css-token-map) without fixed light-only fallbacks, for example `--lfc-color: var(--app-calendar-color)`. If that precondition is not met, leave Litefold's color tokens unset.
+Map color tokens only when the application already provides a complete semantic calendar palette whose variables adapt in light, dark, and forced-colors modes. In that case, map every corresponding role from the [public token map](../DESIGN.md#public-css-token-map) without fixed light-only fallbacks, for example `--lfc-color: var(--my-calendar-color)`. If that precondition is not met, leave Litefold Calendar's color tokens unset.
 
 If the build does not resolve CSS `@import`, import the package stylesheet from JavaScript and load application CSS after it:
 
@@ -53,7 +53,7 @@ import "@tryagaindev/litefold-calendar/styles.css";
 import "./calendar-theme.css";
 ```
 
-Application-prefixed variables are not package API. A validated event `accentColor` is also not a token override: it colors only the built-in marker. See the [`accentColor` API contract](api.md#define-events-calendareventinput-and-calendarevent) and [event color guidance](../DESIGN.md#events-and-agenda).
+Application-prefixed variables are not package API. The per-event **event marker color**, `accentColor`, is also not a token override: it colors only the built-in marker. The [calendar anatomy and color guide](component-anatomy.md#three-color-roles-that-sound-similar) distinguishes it from the **primary interface color** (`--lfc-accent-color`) and **event leading-rule color** (`--lfc-event-accent-color`). See the [`accentColor` API contract](api.md#define-events-calendareventinput-and-calendarevent) and [event color guidance](../DESIGN.md#events-and-agenda).
 
 ## Theme obligations
 

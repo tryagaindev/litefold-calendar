@@ -19,11 +19,12 @@ From the repository root, run `npm run demo`, then choose **Handle asynchronous 
 ## Implementation notes
 
 - The event source uses an abort-aware local delay; it makes no network request.
+- Its `async` declaration always returns a PromiseLike, so each current request renders loading with `aria-busy` and then renders its ready, degraded, or unavailable terminal state. Returning `Promise.resolve(events)` would use the same lifecycle.
 - Source errors return `"handled"` only when application ownership is enabled. Other failures return `"default"` so package presentation remains active.
 - `onAnnounce` forwards messages to one polite and one assertive live region created before the calendar starts.
 - A failed render-hook set stays quarantined for the lifetime of its calendar instance, so changing that toggle destroys and recreates the instance.
-- A non-cached `pagehide` destroys whichever instance is current; entering the browser's back/forward cache preserves it for restoration.
+- Application-owned cleanup destroys whichever instance is current on a non-cached `pagehide`; entering the browser's back/forward cache preserves it for restoration.
 
-The unprefixed `data-*` attributes are application-owned selectors, not litefold-calendar output.
+The `data-my-*` attributes are application-owned selectors; Litefold Calendar output uses the package namespaces.
 
 Browse the [JavaScript](main.js), [HTML](index.html), and [shared example CSS](../example.css). See the [error handling guide](../../docs/errors.md) for the full ownership, announcement, and recovery contracts.

@@ -41,6 +41,10 @@
     /* stylelint-disable-next-line unit-disallowed-list -- Canonical visually-hidden sentinel. */
     --lfc-internal-visually-hidden-offset: -1px;
     --lfc-internal-cell-gap: var(--lfc-internal-hairline);
+    --lfc-internal-compact-control-inline-size: min(
+      100%,
+      max(2.75rem, var(--lfc-control-min-size))
+    );
     --lfc-internal-day-padding: var(--lfc-day-padding);
     --lfc-internal-focus-size: 0.1875rem;
     --lfc-internal-full-radius: 999rem;

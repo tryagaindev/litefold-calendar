@@ -1,6 +1,6 @@
 # Error handling
 
-litefold-calendar separates failures into two paths:
+Litefold Calendar separates failures into two paths:
 
 - **Programmer errors** are invalid configuration, arguments, or lifecycle calls. They throw synchronously and must be caught at the application boundary that supplied the uncertain input.
 - **Operational failures** happen after a rendered calendar starts work. The package presents current failures by default and sends them to `onError` when configured. Late or stale failures are diagnostic only and never change the current UI or state.
@@ -9,8 +9,8 @@ litefold-calendar separates failures into two paths:
 
 | Goal | Use | Who presents the error? |
 |---|---|---|
-| Use the built-in error panel and announcements | Omit `onError`, or return `undefined` / `"default"` | litefold-calendar |
-| Add telemetry while keeping the built-in UI | Log in `onError`, then return `"default"` | litefold-calendar |
+| Use the built-in error panel and announcements | Omit `onError`, or return `undefined` / `"default"` | Litefold Calendar |
+| Add telemetry while keeping the built-in UI | Log in `onError`, then return `"default"` | Litefold Calendar |
 | Replace the built-in error UI | Synchronously render equivalent UI in `onError`, then return the exact string `"handled"` | Application |
 | Route all package announcements through a shared announcer | `onAnnounce` | Unchanged for visible UI; application owns announcements |
 | Observe presentation-safe state | `getState()` or `onStateChange` | Unchanged |
@@ -36,7 +36,9 @@ Persistent status/error UI appears after the toolbar and before the grid. It doe
 
 While a Retry is pending, its button remains mounted and focused, updates in place, exposes `aria-disabled="true"`, and guards repeated activation. After a successful Retry hides that control, focus moves to the selected day button or, if that button is unavailable, the calendar heading.
 
-The package creates empty live regions before they are needed and uses one announcement route for each message. Loading is represented by `aria-busy`; routine loading transitions are not repeatedly announced.
+The package creates empty live regions before they are needed and uses one announcement route for each message. Only a promise-like source result publishes `loading` and renders `aria-busy`; routine loading transitions are not repeatedly announced. A static array or provider-returned array proceeds directly to its terminal state with one full render and no busy interval. `Promise.resolve(events)`, an `async` provider, an already-fulfilled promise, and a custom thenable all retain the two-render asynchronous lifecycle.
+
+An immediate provider throw or invalid direct array completes the operational-error pipeline before the initiating `render()`, navigation, `setEvents()`, or `refetchEvents()` call returns. Promise-like rejection follows the same presentation rules after settlement. For promise-like work, settlement handlers are attached before loading callbacks run, so synchronous callback reentrancy may safely supersede or destroy the pending generation without allowing a stale result to change state or DOM.
 
 "No events" appears only after a successful empty source result. Loading, failed, invalid, and over-limit results never use the empty state.
 
@@ -134,9 +136,9 @@ import {
 	type LitefoldCalendarError
 } from "@tryagaindev/litefold-calendar";
 
-const applicationAlert = document.querySelector<HTMLElement>("#application-alert");
-const politeRegion = document.querySelector<HTMLElement>("#application-status");
-const assertiveRegion = document.querySelector<HTMLElement>("#application-assertive");
+const applicationAlert = document.querySelector<HTMLElement>("#my-application-alert");
+const politeRegion = document.querySelector<HTMLElement>("#my-application-status");
+const assertiveRegion = document.querySelector<HTMLElement>("#my-application-assertive");
 
 function announceApplicationError(error: LitefoldCalendarError): boolean {
 	const politeness = error.severity === "warning" ? "polite" : "assertive";

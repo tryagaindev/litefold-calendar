@@ -11,6 +11,7 @@ import {
 import {
 	calendarEventOccursOnDate,
 	compareCalendarEvents,
+	indexCalendarEventsByDate,
 	MAX_EVENT_ID_CODE_UNITS,
 	MAX_EVENT_TITLE_CODE_UNITS,
 	MAX_EVENT_URL_CODE_UNITS,
@@ -497,6 +498,99 @@ void test("event placement uses exclusive ends and point-event defaults", () => 
 
 	const sorted = [...normalized].sort(compareCalendarEvents);
 	assert.equal(sorted[0]?.event.id, "all-day");
+});
+
+void test("event indexing clips visible spans and preserves occurrence ordering", () => {
+	const range = getCalendarMonthRange({ day: 1, month: 8, year: 2026 }, 0);
+	const normalized = normalizeCalendarEvents([
+		{ end: "9999-12-31", id: "cross-era", start: "0001-01-01", title: "Cross era" },
+		{ end: "2026-07-26", id: "ends-at-start", start: "0001-01-01", title: "Before range" },
+		{ id: "first-point", start: "2026-07-26", title: "First point" },
+		{ id: "last-point", start: "2026-09-05", title: "Last point" },
+		{ id: "after-point", start: "2026-09-06", title: "After point" },
+		{
+			end: "2026-07-26T00:00",
+			id: "midnight-end",
+			start: "2026-07-25T23:00",
+			title: "Midnight end"
+		},
+		{
+			end: "2026-07-26T00:00:00.0000001",
+			id: "fractional-end",
+			start: "2026-07-25T23:00",
+			title: "Fractional end"
+		},
+		{ end: "2026-08-17", id: "all-day", start: "2026-08-15", title: "Zulu" },
+		{ id: "timed-b", start: "2026-08-15T09:00", title: "Bravo" },
+		{ id: "timed-a2", start: "2026-08-15T09:00", title: "Alpha" },
+		{ id: "timed-a1", start: "2026-08-15T09:00", title: "Alpha" },
+		{
+			end: "2026-08-15T10:00",
+			id: "same-day",
+			start: "2026-08-15T09:30",
+			title: "Same day"
+		}
+	]);
+	const indexed = indexCalendarEventsByDate(normalized, range.days);
+
+	assert.equal(indexed.size, range.days.length);
+	for (const date of range.days) {
+		const dateString = formatCalendarDate(date);
+		const expected = normalized
+			.filter((event) => calendarEventOccursOnDate(event, date))
+			.sort(compareCalendarEvents)
+			.map((event) => event.event.id);
+		const actual = indexed.get(dateString);
+		assert.ok(actual, dateString);
+		assert.ok(Object.isFrozen(actual), dateString);
+		assert.deepEqual(actual.map((event) => event.event.id), expected, dateString);
+	}
+
+	assert.deepEqual(
+		indexed.get("2026-08-15")?.map((event) => event.event.id),
+		["cross-era", "all-day", "timed-a1", "timed-a2", "timed-b", "same-day"]
+	);
+});
+
+void test("event indexing retains arbitrary date-list behavior", () => {
+	const normalized = normalizeCalendarEvents([
+		{ end: "2026-07-15", id: "span", start: "2026-07-13", title: "Span" },
+		{ id: "point", start: "2026-07-14T09:00", title: "Point" }
+	]);
+	const days = [
+		{ day: 14, month: 7, year: 2026 },
+		{ day: 13, month: 7, year: 2026 },
+		{ day: 14, month: 7, year: 2026 }
+	];
+	const indexed = indexCalendarEventsByDate(normalized, days);
+
+	assert.deepEqual(indexed.get("2026-07-13")?.map((event) => event.event.id), ["span"]);
+	assert.deepEqual(indexed.get("2026-07-14")?.map((event) => event.event.id), ["span", "point"]);
+});
+
+void test("event indexing handles ascending gaps and civil-year boundaries", () => {
+	const normalized = normalizeCalendarEvents([
+		{ end: "9999-12-31", id: "cross-era", start: "0001-01-01", title: "Cross era" },
+		{ end: "2024-01-02", id: "new-year", start: "2023-12-31", title: "New year" },
+		{ id: "leap-day", start: "2024-02-29T12:00", title: "Leap day" },
+		{ id: "maximum", start: "9999-12-31", title: "Maximum" }
+	]);
+	const days = [
+		{ day: 31, month: 12, year: 2023 },
+		{ day: 1, month: 1, year: 2024 },
+		{ day: 29, month: 2, year: 2024 },
+		{ day: 31, month: 12, year: 9999 }
+	];
+	const indexed = indexCalendarEventsByDate(normalized, days);
+
+	for (const date of days) {
+		const dateString = formatCalendarDate(date);
+		const expected = normalized
+			.filter((event) => calendarEventOccursOnDate(event, date))
+			.sort(compareCalendarEvents)
+			.map((event) => event.event.id);
+		assert.deepEqual(indexed.get(dateString)?.map((event) => event.event.id), expected, dateString);
+	}
 });
 
 function isValidationError(

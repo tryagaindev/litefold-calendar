@@ -1,6 +1,8 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
+import { transform } from "esbuild";
+
 import { REPOSITORY_ROOT } from "./process.mjs";
 
 const STYLE_SOURCE_DIRECTORY = join(REPOSITORY_ROOT, "src", "styles");
@@ -118,4 +120,24 @@ export async function composeStyles({
 	);
 
 	return `${LAYER_START}${layerBodies.join("\n\n")}${LAYER_END}`;
+}
+
+/** Minifies a composed stylesheet for distribution while preserving a trailing newline. */
+export async function minifyStyles(source) {
+	if (typeof source !== "string") {
+		throw new TypeError("Styles to minify must be a string.");
+	}
+
+	const result = await transform(source, {
+		legalComments: "none",
+		loader: "css",
+		minify: true,
+		sourcemap: false
+	});
+	return `${result.code.trimEnd()}\n`;
+}
+
+/** Composes the canonical source modules and minifies only the public distributed stylesheet. */
+export async function composeDistributedStyles(options = {}) {
+	return minifyStyles(await composeStyles(options));
 }

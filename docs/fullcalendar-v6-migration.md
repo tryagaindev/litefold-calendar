@@ -1,28 +1,28 @@
 # Migrate a basic FullCalendar month view
 
-This guide covers a focused rewrite from FullCalendar v6 `dayGridMonth` to Litefold. It fits applications that render one month grid, load events for the visible range, react to day or event activation, and navigate programmatically.
+This guide covers a focused rewrite from FullCalendar v6 `dayGridMonth` to Litefold Calendar. It fits applications that render one month grid, load events for the visible range, react to day or event activation, and navigate programmatically.
 
-Litefold is not a FullCalendar compatibility layer. Check the [feature gaps](#know-when-this-migration-is-not-a-fit) before starting.
+Litefold Calendar is not a FullCalendar compatibility layer. Check the [feature gaps](#know-when-this-migration-is-not-a-fit) before starting.
 
 ## Install and render
 
-Add Litefold to the application:
+Add Litefold Calendar to the application:
 
 ```sh
 npm install @tryagaindev/litefold-calendar@alpha
 ```
 
-Remove the FullCalendar packages and plugins after the rewrite no longer imports them. Unlike FullCalendar v6, Litefold requires an explicit stylesheet import.
+Remove the FullCalendar packages and plugins after the rewrite no longer imports them. Unlike FullCalendar v6, Litefold Calendar requires an explicit stylesheet import.
 
 ```html
-<div id="calendar"></div>
+<div id="my-calendar"></div>
 ```
 
 ```js
 import { createCalendar } from "@tryagaindev/litefold-calendar";
 import "@tryagaindev/litefold-calendar/styles.css";
 
-const host = document.querySelector("#calendar");
+const host = document.querySelector("#my-calendar");
 if (!(host instanceof HTMLElement)) {
 	throw new Error("Calendar host was not found.");
 }
@@ -39,27 +39,27 @@ The CSS import assumes a bundler that supports package CSS. Call `calendar.destr
 
 ## Map common options
 
-| FullCalendar v6 | Litefold | Migration note |
+| FullCalendar v6 | Litefold Calendar | Migration note |
 | --- | --- | --- |
-| `initialView: "dayGridMonth"` | No option | Month grid plus selected-day agenda is Litefold's only view. |
-| `initialDate` | `initialDate` | Prefer an exact civil-date string when no time-zone projection is needed. FullCalendar also accepts epoch-millisecond numbers; convert those to `Date` first because Litefold does not accept numeric date inputs. |
+| `initialView: "dayGridMonth"` | No option | Month grid plus selected-day agenda is Litefold Calendar's only view. |
+| `initialDate` | `initialDate` | Prefer an exact civil-date string when no time-zone projection is needed. FullCalendar also accepts epoch-millisecond numbers; convert those to `Date` first because Litefold Calendar does not accept numeric date inputs. |
 | `events: []` | `events: []` | Adapt the event fields first. |
-| `events(fetchInfo, success, failure)` | `events({ start, end, signal })` | Return an array or promise. Forward the supplied abort signal. |
-| `dateClick` | `onDaySelect` | Receives the selected civil date, the new live day button after Litefold commits its rerender, and the native event from the replaced button. |
+| `events(fetchInfo, success, failure)` | `events({ start, end, signal })` | Return an array or PromiseLike. The returned shape selects immediate or loading timing for that invocation; forward the supplied abort signal. |
+| `dateClick` | `onDaySelect` | Receives the selected civil date, the new live day button after Litefold Calendar commits its rerender, and the native event from the replaced button. |
 | `eventClick` | `onEventActivate` | Receives the event, native action element, native event, and surface. |
 | `eventContent` | Node-producing `renderHooks` members | Return detached same-document nodes, not HTML strings. |
 | `eventDidMount` | `eventDidMount` render hook | Mutate the supplied live elements and return `undefined` or a synchronous cleanup function—not a node. |
 | `headerToolbar` | Built-ins plus `toolbarEnd` | Previous/Next are at the start, the month title is centered, and Today is at the end. |
 | `customButtons` | Application controls in `toolbarEnd` | The application owns the markup, behavior, and cleanup. |
-| `locale`, `firstDay` | `locale`, `firstDay` | Numeric Sunday-through-Saturday values map directly; Litefold also accepts `"locale"`. |
-| `dayMaxEvents` | `maxGridEventsPerDay` | Litefold requires a fixed numeric cap and routes overflow to the agenda. |
+| `locale`, `firstDay` | `locale`, `firstDay` | Numeric Sunday-through-Saturday values map directly; Litefold Calendar also accepts `"locale"`. |
+| `dayMaxEvents` | `maxGridEventsPerDay` | Litefold Calendar requires a fixed numeric cap and routes overflow to the agenda. |
 | `validRange.start` | `minDate` | Both boundaries are inclusive. |
 | `validRange.end` | `maxDate` | FullCalendar's end is exclusive; convert a date-only end to the preceding civil date. |
-| `timeZone` | `timeZone` or omission | Pass an IANA zone or `"UTC"`. Map FullCalendar's `"local"` sentinel to an omitted Litefold option, which uses device-local fields for `Date` inputs. Litefold never reinterprets event strings. |
+| `timeZone` | `timeZone` or omission | Pass an IANA zone or `"UTC"`. Map FullCalendar's `"local"` sentinel to an omitted Litefold Calendar option, which uses device-local fields for `Date` inputs. Litefold Calendar never reinterprets event strings. |
 | `buttonText`, localized text | `messages` | Override only the message keys the application needs. |
-| `height`, `contentHeight`, `aspectRatio` | Application CSS | Litefold sizes from its host and content. The supported host width starts at 320 CSS pixels. |
+| `height`, `contentHeight`, `aspectRatio` | Application CSS | Litefold Calendar sizes from its host and content. The supported host width starts at 320 CSS pixels. |
 
-FullCalendar also permits `validRange` to be a function. Resolve dynamic bounds in application state before creating Litefold, then recreate the instance when those construction-time bounds change.
+FullCalendar also permits `validRange` to be a function. Resolve dynamic bounds in application state before creating Litefold Calendar, then recreate the instance when those construction-time bounds change.
 
 ### Convert an exclusive `validRange.end`
 
@@ -79,7 +79,7 @@ function previousCivilDate(value) {
 	date.setUTCDate(date.getUTCDate() - 1);
 	const previous = date.toISOString().slice(0, 10);
 	if (previous.startsWith("0000-")) {
-		throw new RangeError("validRange.end has no preceding date supported by Litefold.");
+		throw new RangeError("validRange.end has no preceding date supported by Litefold Calendar.");
 	}
 	return previous;
 }
@@ -96,13 +96,13 @@ const litefoldBounds = {
 
 The common event names are close, but their accepted values are not identical:
 
-| FullCalendar event input | Litefold event input |
+| FullCalendar event input | Litefold Calendar event input |
 | --- | --- |
 | Optional string or numeric `id` | Required non-empty string `id`, unique in the returned snapshot |
 | `title`, `url` | Same names after application validation |
 | `start`, `end` | Same names when already strict date-only or local date-time strings; `end` remains exclusive |
 | `allDay` | No field; inferred from date-only versus date-time strings |
-| Six-digit hexadecimal `backgroundColor` or `borderColor` | `accentColor` marker |
+| Six-digit hexadecimal `backgroundColor` or `borderColor` | `accentColor` event marker color |
 | `extendedProps` | Typed `metadata` |
 
 A small adapter is enough when the incoming service contract already meets those assumptions:
@@ -147,17 +147,17 @@ function adaptFullCalendarEvents(events) {
 
 Do not derive an ID from the array index: pagination, filtering, or sorting would change event identity. If the FullCalendar feed omitted IDs, add a stable domain identifier before adapting it.
 
-FullCalendar's explicit `allDay` can override what its date strings imply. Litefold has no override: date-only `start` and `end` values are all-day, while local date-times are timed. Reject a mismatch as above or normalize it deliberately before returning the event; silently dropping `allDay` can change duration and placement.
+FullCalendar's explicit `allDay` can override what its date strings imply. Litefold Calendar has no override: date-only `start` and `end` values are all-day, while local date-times are timed. Reject a mismatch as above or normalize it deliberately before returning the event; silently dropping `allDay` can change duration and placement.
 
-Litefold accepts Gregorian `YYYY-MM-DD` strings and local date-times such as `YYYY-MM-DDTHH:mm`; seconds and fractional seconds are also supported. It does not accept `Date` objects, UTC `Z` suffixes, or numeric offsets in event fields. Convert those values according to the application's scheduling semantics rather than stripping an offset.
+Litefold Calendar accepts Gregorian `YYYY-MM-DD` strings and local date-times such as `YYYY-MM-DDTHH:mm`; seconds and fractional seconds are also supported. It does not accept `Date` objects, UTC `Z` suffixes, or numeric offsets in event fields. Convert those values according to the application's scheduling semantics rather than stripping an offset.
 
-`accentColor` is a small built-in marker, not a replacement for arbitrary FullCalendar backgrounds, borders, or text colors. Use render hooks and application CSS when metadata needs richer treatment.
+`accentColor` is the built-in event marker color, not a replacement for arbitrary FullCalendar backgrounds, borders, or text colors. The [calendar anatomy guide](component-anatomy.md#three-color-roles-that-sound-similar) distinguishes it from the two calendar-wide color tokens. Use render hooks and application CSS when metadata needs richer treatment.
 
-Validate untrusted transport JSON against the application's service schema before adapting it. Litefold then validates the entire adapted snapshot atomically.
+Validate untrusted transport JSON against the application's service schema before adapting it. Litefold Calendar then validates the entire adapted snapshot atomically.
 
 ## Rewrite a JSON feed or event function
 
-FullCalendar supplies `Date` values and ISO strings through `fetchInfo`, then uses callbacks or a returned promise. Litefold passes one fixed 42-day range with strict date-only strings and expects the provider's return value:
+FullCalendar supplies `Date` values and ISO strings through `fetchInfo`, then uses callbacks or a returned promise. Litefold Calendar passes one fixed 42-day range with strict date-only strings and expects the provider's return value:
 
 ```js
 const calendar = createCalendar(host, {
@@ -175,7 +175,7 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The range start is inclusive and the end is exclusive. Litefold aborts superseded or destroyed requests and ignores stale results. It does not cache, combine first-class event sources, or expand recurrence; keep that work in application code.
+The range start is inclusive and the end is exclusive. Each invocation is timed by its returned shape: a direct array commits terminal state synchronously in one full render with no loading or `aria-busy`, while any PromiseLike uses a loading render followed by a terminal render. An `async` provider and even `Promise.resolve(array)` therefore opt into the async lifecycle. Litefold Calendar aborts superseded or destroyed requests and ignores stale results. It does not cache, combine first-class event sources, or expand recurrence; keep that work in application code.
 
 ## Rewrite callbacks
 
@@ -206,13 +206,13 @@ Use `setEvents()` when the application receives a new complete static snapshot o
 calendar.setEvents(adaptFullCalendarEvents(nextEvents));
 ```
 
-`setEvents()` replaces rather than adds or merges. It preserves the displayed month and selected date, aborts superseded provider work, and makes the replacement current for later Retry and `refetchEvents()` calls. Call it only after `render()` and before `destroy()`.
+`setEvents()` replaces rather than adds or merges. A direct array replacement commits before this void call returns; a PromiseLike replacement publishes loading and settles later. It preserves the displayed month and selected date, aborts superseded provider work, and makes the replacement current for later Retry and `refetchEvents()` calls. Call it only after `render()` and before `destroy()`.
 
 Recreate the calendar to change locale, time zone, bounds, callbacks, render hooks, extensions, limits, or any other construction-time option. The [API reference](api.md) documents focus preservation and failure behavior.
 
 ## Map navigation and data methods
 
-| FullCalendar method | Litefold replacement |
+| FullCalendar method | Litefold Calendar replacement |
 | --- | --- |
 | `prev()` | `prev()` |
 | `next()` | `next()` |
@@ -224,14 +224,14 @@ Recreate the calendar to change locale, time zone, bounds, callbacks, render hoo
 | `getEventSources()`, `addEventSource()`, source `remove()` | Compose sources in application code, then pass the complete result or provider to `setEvents()` |
 | `destroy()` | `destroy()` |
 
-Litefold navigation and data methods return `void`; `getState()` returns an immutable snapshot. Inclusive `minDate` and `maxDate` constraints apply to controls, keyboard movement, touch paging, the month/year picker, and public methods.
+Litefold Calendar navigation and data methods return `void`; `getState()` returns an immutable snapshot. Inclusive `minDate` and `maxDate` constraints apply to controls, keyboard movement, touch paging, the month/year picker, and public methods.
 
 ## Replace styling hooks
 
-Import the public stylesheet and override documented `--lfc-*` tokens from application CSS. Use `toolbarEnd` and `renderHooks` for application-owned nodes. Do not port selectors that depend on FullCalendar markup, and do not depend on Litefold's private `.lfc-*` or `data-lfc-*` implementation details.
+Import the public stylesheet and override documented `--lfc-*` tokens from application CSS. Use `toolbarEnd` and `renderHooks` for application-owned nodes. Do not port selectors that depend on FullCalendar markup, and do not depend on Litefold Calendar's private `.lfc-*` or `data-lfc-*` implementation details.
 
 ## Know when this migration is not a fit
 
-Choose a full scheduling suite when the application requires week/day/time-grid or resource views, recurrence expansion, date-range selection, drag-and-drop editing, resizing, built-in event creation, multiple independently managed feeds, or mutable event objects. Litefold deliberately focuses on a responsive month grid and selected-day agenda.
+Choose a full scheduling suite when the application requires week/day/time-grid or resource views, recurrence expansion, date-range selection, drag-and-drop editing, resizing, built-in event creation, multiple independently managed feeds, or mutable event objects. Litefold Calendar deliberately focuses on a responsive month grid and selected-day agenda.
 
-The [runnable migration example](../examples/fullcalendar-v6-migration/) demonstrates the adapter, abort-aware provider, callbacks, native links, and overlapping refetches. The [API reference](api.md) is the normative Litefold contract.
+The [runnable migration example](../examples/fullcalendar-v6-migration/) demonstrates the adapter, abort-aware provider, callbacks, native links, and overlapping refetches. The [API reference](api.md) is the normative Litefold Calendar contract.

@@ -9,28 +9,28 @@
 	<link rel="stylesheet" href="../example.css">
 </head>
 <body>
-	<main class="example-shell">
-		<header class="example-intro">
+	<main class="my-shell">
+		<header class="my-intro">
 			<h1>Rewrite a FullCalendar dayGridMonth view</h1>
-			<p>See a small adapter turn a common FullCalendar v6 event shape into a range-aware Litefold source with equivalent day and event callbacks.</p>
+			<p>See a small adapter turn a common FullCalendar v6 event shape into a range-aware Litefold Calendar source with equivalent day and event callbacks.</p>
 		</header>
 
-		<section class="example-panel" aria-labelledby="migration-request-title">
-			<h2 id="migration-request-title">Range-aware source</h2>
+		<section class="my-panel" aria-labelledby="my-migration-request-title">
+			<h2 id="my-migration-request-title">Range-aware source</h2>
 			<p>The button starts two refetches. The second aborts the first, so only the latest 42-day snapshot can render.</p>
-			<p data-example-range>Waiting for the first 42-day request.</p>
-			<div class="example-control-row">
-				<button class="example-button" type="button" data-example-refetch>Trigger overlapping refetches</button>
+			<p data-my-range>Waiting for the first 42-day request.</p>
+			<div class="my-control-row">
+				<button class="my-button" type="button" data-my-refetch>Trigger overlapping refetches</button>
 			</div>
 		</section>
 
-		<div class="example-calendar" data-example-calendar></div>
+		<div class="my-calendar" data-my-calendar></div>
 
-		<section class="example-panel" aria-labelledby="migration-result-title">
-			<h2 id="migration-result-title">Application callbacks</h2>
-			<p><strong>Day selection:</strong> <span data-example-selection>None</span></p>
-			<p><strong>Event activation:</strong> <span data-example-activation>None</span></p>
-			<p class="example-result" data-example-status role="status" aria-atomic="true">Loading adapted events.</p>
+		<section class="my-panel" aria-labelledby="my-migration-result-title">
+			<h2 id="my-migration-result-title">Application callbacks</h2>
+			<p><strong>Day selection:</strong> <span data-my-selection>None</span></p>
+			<p><strong>Event activation:</strong> <span data-my-activation>None</span></p>
+			<p class="my-result" data-my-status role="status" aria-atomic="true">Loading adapted events.</p>
 		</section>
 	</main>
 

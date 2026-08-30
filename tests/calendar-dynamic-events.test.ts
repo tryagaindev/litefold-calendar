@@ -333,11 +333,12 @@ void test("reentrant validation and callbacks keep the last accepted replacement
 	armStateReplacement = true;
 	calendar.setEvents(() => {
 		outerProviderCalls += 1;
-		return [event("state-outer", "State outer replacement")];
+		return Promise.resolve([event("state-outer", "State outer replacement")]);
 	});
 	await waitForReady(calendar);
-	assert.equal(outerProviderCalls, 0);
+	assert.equal(outerProviderCalls, 1, "The provider must run before publishing loading state.");
 	assert.match(host.textContent ?? "", /State callback replacement/u);
+	assert.doesNotMatch(host.textContent ?? "", /State outer replacement/u);
 
 	replaceFromError = true;
 	calendar.setEvents([{ id: "invalid", start: "invalid", title: "Invalid" }]);

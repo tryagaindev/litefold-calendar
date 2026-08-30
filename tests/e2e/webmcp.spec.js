@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 import { expectExampleReady } from "./helpers.js";
 
-const GET_EVENTS_TOOL_NAME = "litefold-advanced-get-events";
-const NAVIGATE_TOOL_NAME = "litefold-advanced-navigate";
+const GET_EVENTS_TOOL_NAME = "my-schedule-get-events";
+const NAVIGATE_TOOL_NAME = "my-schedule-navigate";
 
 test("advanced example registers and invokes WebMCP tools with a browser mock", async ({ page }) => {
 	await page.addInitScript(() => {
@@ -74,7 +74,7 @@ test("advanced example registers and invokes WebMCP tools with a browser mock", 
 	expect(invocation.getEventsHasSignal).toBe(true);
 	expect(invocation.navigateHasSignal).toBe(true);
 	expect(invocation.navigateResult).toMatchObject({ ok: true });
-	await expect(page.locator("[data-example-state-selected]")).toHaveText("2026-08-07");
+	await expect(page.locator("[data-my-state-selected]")).toHaveText("2026-08-07");
 	expect(invocation.rangeResult).toMatchObject({
 		date: null,
 		offset: 0,

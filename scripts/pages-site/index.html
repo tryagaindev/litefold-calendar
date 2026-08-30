@@ -9,67 +9,67 @@
 	<link rel="stylesheet" href="./site.css">
 </head>
 <body>
-	<a class="lfc-pages-skip-link" href="#lfc-pages-content">Skip to main content</a>
-	<header class="lfc-pages-site-header">
-		<nav class="lfc-pages-project-nav" aria-label="Project">
-			<a class="lfc-pages-wordmark" href="https://github.com/tryagaindev/litefold-calendar">
-				<img class="lfc-pages-mark" src="./litefold-calendar-mark.svg" alt="" width="48" height="48">
+	<a class="my-pages-skip-link" href="#my-pages-content">Skip to main content</a>
+	<header class="my-pages-site-header">
+		<nav class="my-pages-project-nav" aria-label="Project">
+			<a class="my-pages-wordmark" href="https://github.com/tryagaindev/litefold-calendar">
+				<img class="my-pages-mark" src="./litefold-calendar-mark.svg" alt="" width="48" height="48">
 				<span>Litefold Calendar</span>
 			</a>
 			<ul role="list">
-				<li><a id="api-link" href="https://github.com/tryagaindev/litefold-calendar/blob/main/docs/api.md">API</a></li>
-				<li><a id="integration-link" href="https://github.com/tryagaindev/litefold-calendar/blob/main/docs/integration-guide.md">Integration guide</a></li>
+				<li><a id="my-api-link" href="https://github.com/tryagaindev/litefold-calendar/blob/main/docs/api.md">API</a></li>
+				<li><a id="my-integration-link" href="https://github.com/tryagaindev/litefold-calendar/blob/main/docs/integration-guide.md">Integration guide</a></li>
 				<li><a href="https://github.com/tryagaindev/litefold-calendar">GitHub</a></li>
 			</ul>
 		</nav>
 
-		<div class="lfc-pages-hero">
-			<p class="lfc-pages-eyebrow">@tryagaindev/litefold-calendar</p>
+		<div class="my-pages-hero">
+			<p class="my-pages-eyebrow">@tryagaindev/litefold-calendar</p>
 			<h1>A focused month calendar for modern web apps</h1>
-			<p class="lfc-pages-lede">Dependency-free, framework-agnostic, and ready to explore through runnable integration recipes.</p>
-			<div class="lfc-pages-actions">
-				<a class="lfc-pages-action lfc-pages-action-primary" id="primary-run-link" href="./main/examples/basic/">Run basic example</a>
-				<a class="lfc-pages-action" id="primary-browse-link" href="./main/examples/">Browse all examples</a>
+			<p class="my-pages-lede">Dependency-free, framework-agnostic, and ready to explore through runnable integration recipes.</p>
+			<div class="my-pages-actions">
+				<a class="my-pages-action my-pages-action-primary" id="my-primary-run-link" href="./main/examples/basic/">Run basic example</a>
+				<a class="my-pages-action" id="my-primary-browse-link" href="./main/examples/">Browse all examples</a>
 			</div>
-			<p class="lfc-pages-deployment-summary" id="deployment-summary">Using the rolling main preview while release metadata loads.</p>
+			<p class="my-pages-deployment-summary" id="my-deployment-summary">Using the rolling main preview while release metadata loads.</p>
 		</div>
 	</header>
 
-	<main id="lfc-pages-content" tabindex="-1">
-		<section class="lfc-pages-section">
-			<div class="lfc-pages-section-heading">
-				<p class="lfc-pages-kicker">Quick start</p>
+	<main id="my-pages-content" tabindex="-1">
+		<section class="my-pages-section">
+			<div class="my-pages-section-heading">
+				<p class="my-pages-kicker">Quick start</p>
 				<h2>Install and render</h2>
 				<p>Install the selected package build, then import the package and stylesheet from your application's bundler entry module.</p>
 			</div>
 
-			<div class="lfc-pages-code-stack">
-				<div class="lfc-pages-code-block">
-					<div class="lfc-pages-code-toolbar">
+			<div class="my-pages-code-stack">
+				<div class="my-pages-code-block">
+					<div class="my-pages-code-toolbar">
 						<span>Terminal</span>
-						<button type="button" data-copy-label="Install command" data-copy-target="install-command" aria-label="Copy install command">Copy</button>
+						<button type="button" data-my-copy-label="Install command" data-my-copy-target="my-install-command" aria-label="Copy install command">Copy</button>
 					</div>
-					<pre tabindex="0" aria-label="Install command"><code id="install-command">npm install @tryagaindev/litefold-calendar@alpha</code></pre>
+					<pre tabindex="0" aria-label="Install command"><code id="my-install-command">npm install @tryagaindev/litefold-calendar@alpha</code></pre>
 				</div>
 
-				<div class="lfc-pages-code-block">
-					<div class="lfc-pages-code-toolbar">
+				<div class="my-pages-code-block">
+					<div class="my-pages-code-toolbar">
 						<span>Host HTML</span>
-						<button type="button" data-copy-label="Host HTML" data-copy-target="setup-html" aria-label="Copy host HTML">Copy</button>
+						<button type="button" data-my-copy-label="Host HTML" data-my-copy-target="my-setup-html" aria-label="Copy host HTML">Copy</button>
 					</div>
-					<pre tabindex="0" aria-label="Host HTML"><code id="setup-html">&lt;div data-calendar&gt;&lt;/div&gt;
+					<pre tabindex="0" aria-label="Host HTML"><code id="my-setup-html">&lt;div data-my-calendar&gt;&lt;/div&gt;
 &lt;script type="module" src="/src/main.js"&gt;&lt;/script&gt;</code></pre>
 				</div>
 
-				<div class="lfc-pages-code-block">
-					<div class="lfc-pages-code-toolbar">
+				<div class="my-pages-code-block">
+					<div class="my-pages-code-toolbar">
 						<span>Bundler entry module</span>
-						<button type="button" data-copy-label="Bundler entry module" data-copy-target="setup-code" aria-label="Copy bundler entry module">Copy</button>
+						<button type="button" data-my-copy-label="Bundler entry module" data-my-copy-target="my-setup-code" aria-label="Copy bundler entry module">Copy</button>
 					</div>
-					<pre tabindex="0" aria-label="Bundler entry module"><code id="setup-code">import { createCalendar } from "@tryagaindev/litefold-calendar";
+					<pre tabindex="0" aria-label="Bundler entry module"><code id="my-setup-code">import { createCalendar } from "@tryagaindev/litefold-calendar";
 import "@tryagaindev/litefold-calendar/styles.css";
 
-const host = document.querySelector("[data-calendar]");
+const host = document.querySelector("[data-my-calendar]");
 if (!(host instanceof HTMLElement)) {
 	throw new Error("Calendar host was not found.");
 }
@@ -83,33 +83,33 @@ calendar.render();</code></pre>
 				</div>
 			</div>
 
-			<ul class="lfc-pages-resource-links" role="list">
-				<li><a id="primary-source-link" href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/basic">Inspect the basic example source</a></li>
-				<li><a id="quick-start-link" href="https://github.com/tryagaindev/litefold-calendar/blob/main/README.md#quick-start">Read the complete quick start</a></li>
+			<ul class="my-pages-resource-links" role="list">
+				<li><a id="my-primary-source-link" href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/basic">Inspect the basic example source</a></li>
+				<li><a id="my-quick-start-link" href="https://github.com/tryagaindev/litefold-calendar/blob/main/README.md#quick-start">Read the complete quick start</a></li>
 			</ul>
 		</section>
 
-		<section class="lfc-pages-section">
-			<div class="lfc-pages-section-heading">
-				<p class="lfc-pages-kicker">Choose a build</p>
+		<section class="my-pages-section">
+			<div class="my-pages-section-heading">
+				<p class="my-pages-kicker">Choose a build</p>
 				<h2>Release demos and main preview</h2>
 				<p>Use an immutable release to reproduce published behavior. Use main to inspect the next change before release.</p>
 			</div>
 
-			<div class="lfc-pages-deployment-grid">
+			<div class="my-pages-deployment-grid">
 				<div>
 					<h3>Release history</h3>
-					<div id="release-history">
+					<div id="my-release-history">
 						<p>Release details load from this Pages snapshot. You can also <a href="https://github.com/tryagaindev/litefold-calendar/releases">browse GitHub releases</a>.</p>
 					</div>
 				</div>
 				<div>
 					<h3>Rolling main preview</h3>
-					<div class="lfc-pages-preview-card" id="main-preview">
+					<div class="my-pages-preview-card" id="my-main-preview">
 						<p>Preview the latest successful build from the default branch.</p>
-						<p class="lfc-pages-inline-links">
-							<a id="main-preview-link" href="./main/examples/">Browse main examples</a>
-							<a id="main-preview-source-link" href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples">View source</a>
+						<p class="my-pages-inline-links">
+							<a id="my-main-preview-link" href="./main/examples/">Browse main examples</a>
+							<a id="my-main-preview-source-link" href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples">View source</a>
 						</p>
 					</div>
 				</div>
@@ -117,32 +117,32 @@ calendar.render();</code></pre>
 		</section>
 
 		<noscript>
-			<p class="lfc-pages-notice">The statically selected deployment, documentation, examples, and repository links remain available without JavaScript.</p>
+			<p class="my-pages-notice">The statically selected deployment, documentation, examples, and repository links remain available without JavaScript.</p>
 		</noscript>
 	</main>
 
-	<footer class="lfc-pages-footer">
+	<footer class="my-pages-footer">
 		<div>
-			<p class="lfc-pages-kicker">Provenance</p>
+			<p class="my-pages-kicker">Provenance</p>
 			<h2>Currently selected build</h2>
 		</div>
 		<dl>
 			<div>
 				<dt>Version</dt>
-				<dd><code id="selected-version">alpha dist-tag</code></dd>
+				<dd><code id="my-selected-version">alpha dist-tag</code></dd>
 			</div>
 			<div>
 				<dt>Channel</dt>
-				<dd id="selected-channel">Rolling main preview</dd>
+				<dd id="my-selected-channel">Rolling main preview</dd>
 			</div>
 			<div>
 				<dt>Source</dt>
-				<dd><a id="selected-commit" href="https://github.com/tryagaindev/litefold-calendar/tree/main"><code>main branch</code></a></dd>
+				<dd><a id="my-selected-commit" href="https://github.com/tryagaindev/litefold-calendar/tree/main"><code>main branch</code></a></dd>
 			</div>
 		</dl>
 	</footer>
 
-	<p class="lfc-pages-visually-hidden" id="copy-status" aria-live="polite" aria-atomic="true"></p>
+	<p class="my-pages-visually-hidden" id="my-copy-status" aria-live="polite" aria-atomic="true"></p>
 	<script type="module" src="./site.js"></script>
 </body>
 </html>

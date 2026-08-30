@@ -19,8 +19,8 @@ export function requireElement(root, selector, constructor) {
 }
 
 export function findAgendaAction(root, eventId) {
-	return [...root.querySelectorAll('[data-example-event-surface="agenda"]')]
-		.find((action) => action.getAttribute("data-example-event-id") === eventId) ?? null;
+	return [...root.querySelectorAll('[data-test-event-surface="agenda"]')]
+		.find((action) => action.getAttribute("data-test-event-id") === eventId) ?? null;
 }
 
 export function requireAgendaAction(root, eventId) {
@@ -34,12 +34,12 @@ export function requireAgendaAction(root, eventId) {
 }
 
 export function getAgendaActions(root) {
-	return [...root.querySelectorAll('[data-example-event-surface="agenda"]')];
+	return [...root.querySelectorAll('[data-test-event-surface="agenda"]')];
 }
 
 export function findAgendaMoreButton(agenda) {
 	return [...agenda.querySelectorAll("button")]
-		.find((button) => !button.hasAttribute("data-example-event-id")) ?? null;
+		.find((button) => !button.hasAttribute("data-test-event-id")) ?? null;
 }
 
 export function requireSelectedDay(root) {
@@ -55,7 +55,7 @@ export function requireSelectedDay(root) {
 export function clickCommand(document, name) {
 	const button = requireElement(
 		document,
-		`[data-example-command="${name}"]`,
+		`[data-my-command="${name}"]`,
 		document.defaultView.HTMLButtonElement
 	);
 	button.click();

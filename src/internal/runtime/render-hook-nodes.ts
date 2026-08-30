@@ -5,9 +5,16 @@ import {
 import {
 	containsInteractiveContent, containsPresentationalContent, isAppendableNode, isSameDocumentNode
 } from "./safety.js";
+import {
+	assertRenderHookElementIntegrity,
+	captureRenderHookNodeValueIntegrity,
+	hasRenderHookNodeValueIntegrity,
+	type RenderHookNodeValueIntegritySnapshot
+} from "./render-hook-element-integrity.js";
 
 interface RenderHookNodeRendererOptions<TMetadata> {
 	readonly document: Document;
+	readonly enabled: boolean;
 	readonly host: HTMLElement;
 	readonly isInvocationCurrent: (
 		runtime: RenderHookRuntime<TMetadata>,
@@ -49,6 +56,7 @@ interface ResolvedRenderHookOutput {
 interface PackageSkeletonEntry {
 	readonly children: readonly Node[];
 	readonly parent: Node;
+	readonly valueIntegrity: Readonly<RenderHookNodeValueIntegritySnapshot>;
 }
 
 interface PackageSkeletonContributor<TMetadata> {
@@ -124,6 +132,9 @@ export class RenderHookNodeRenderer<TMetadata> {
 		expectedAncestors: readonly Node[],
 		ownerDepth: number
 	): void {
+		if (!this.options.enabled) {
+			return;
+		}
 		const ancestry = Object.freeze([region, ...expectedAncestors]);
 		if (ancestry.at(-1) !== this.options.host || !hasExpectedAncestry(ancestry)) {
 			throw new TypeError("A stable calendar render region was detached or reparented.");
@@ -176,6 +187,26 @@ export class RenderHookNodeRenderer<TMetadata> {
 				});
 			}
 		}
+		for (const fallback of runtime.eventOverflowFallbacks.values()) {
+			if (fallback.detachedPackageIntegrity === null) {
+				continue;
+			}
+			try {
+				assertRenderHookElementIntegrity(
+					fallback.detachedPackageIntegrity,
+					"renderEventOverflow"
+				);
+			} catch (cause: unknown) {
+				return Object.freeze({
+					cause: cause instanceof TypeError ? cause : new TypeError(
+						"Detached package-owned overflow content could not be validated.",
+						{ cause }
+					),
+					hookName: "renderEventOverflow",
+					surface: fallback.surface
+				});
+			}
+		}
 		return null;
 	}
 
@@ -194,12 +225,16 @@ export class RenderHookNodeRenderer<TMetadata> {
 		for (const skeleton of this.packageSkeletons) {
 			const ancestryChanged = !hasExpectedAncestry(skeleton.ancestry);
 			const childrenChanged = skeleton.entries.some((entry) => !hasExpectedChildren(entry));
-			if (!ancestryChanged && !childrenChanged) {
+			const valuesChanged = skeleton.entries.some((entry) =>
+				!hasRenderHookNodeValueIntegrity(entry.parent, entry.valueIntegrity));
+			if (!ancestryChanged && !childrenChanged && !valuesChanged) {
 				continue;
 			}
 			return Object.freeze({
-				cause: new TypeError(
-					"Render-hook output must not add, remove, or reparent package-owned render nodes."
+				cause: createPackageSkeletonMutationError(
+					ancestryChanged,
+					childrenChanged,
+					valuesChanged
 				),
 				contributors: Object.freeze([...skeleton.contributors.values()].map((contributor) =>
 					resolveSkeletonContributor(contributor))),
@@ -235,6 +270,9 @@ export class RenderHookNodeRenderer<TMetadata> {
 	public getMountedValidationFailures(
 		runtimes: readonly RenderHookRuntime<TMetadata>[]
 	): readonly Readonly<RenderHookValidationFailure<TMetadata>>[] {
+		if (!this.options.enabled) {
+			return Object.freeze([]);
+		}
 		const failures = new Map<RenderHookRuntime<TMetadata>, RenderHookValidationFailure<TMetadata>>();
 		for (const runtime of runtimes) {
 			if (runtime.quarantined) {
@@ -315,7 +353,11 @@ export class RenderHookNodeRenderer<TMetadata> {
 		contributors: Map<RenderHookRuntime<TMetadata>, PackageSkeletonContributor<TMetadata>>
 	): void {
 		const expectedChildren = Object.freeze([...children]);
-		entries.push(Object.freeze({ children: expectedChildren, parent }));
+		entries.push(Object.freeze({
+			children: expectedChildren,
+			parent,
+			valueIntegrity: captureRenderHookNodeValueIntegrity(parent)
+		}));
 		for (const child of expectedChildren) {
 			const runtime = this.nodeOwners.get(child);
 			const invocation = runtime?.nodeInvocations.get(child);
@@ -443,6 +485,26 @@ function hasExpectedChildren(entry: Readonly<PackageSkeletonEntry>): boolean {
 		return false;
 	}
 	return entry.children.every((child, index) => entry.parent.childNodes.item(index) === child);
+}
+
+function createPackageSkeletonMutationError(
+	ancestryChanged: boolean,
+	childrenChanged: boolean,
+	valuesChanged: boolean
+): TypeError {
+	if (valuesChanged && !ancestryChanged && !childrenChanged) {
+		return new TypeError(
+			"Render-hook output must not change package-owned render attributes or text when mounted."
+		);
+	}
+	if (!valuesChanged) {
+		return new TypeError(
+			"Render-hook output must not add, remove, or reparent package-owned render nodes."
+		);
+	}
+	return new TypeError(
+		"Render-hook output must not change package-owned render attributes, text, or topology when mounted."
+	);
 }
 
 function resolveSkeletonContributor<TMetadata>(

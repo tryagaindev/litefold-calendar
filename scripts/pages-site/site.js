@@ -92,7 +92,7 @@ function createLink(documentReference, label, href) {
 
 function createReleaseCard(documentReference, entry) {
 	const item = documentReference.createElement("li");
-	item.className = "lfc-pages-deployment-card";
+	item.className = "my-pages-deployment-card";
 
 	const heading = documentReference.createElement("h3");
 	heading.textContent = entry.version;
@@ -112,7 +112,7 @@ function createReleaseCard(documentReference, entry) {
 	}
 
 	const links = documentReference.createElement("p");
-	links.className = "lfc-pages-inline-links";
+	links.className = "my-pages-inline-links";
 	links.append(
 		createLink(documentReference, `Run ${entry.version} basic example`, `./${entry.path}basic/`),
 		createLink(documentReference, `Browse ${entry.version} examples`, `./${entry.path}`),
@@ -123,7 +123,7 @@ function createReleaseCard(documentReference, entry) {
 }
 
 function renderReleaseHistory(documentReference, releases) {
-	const container = documentReference.querySelector("#release-history");
+	const container = documentReference.querySelector("#my-release-history");
 	if (container === null) {
 		throw new Error("Release history container was not found.");
 	}
@@ -139,7 +139,7 @@ function renderReleaseHistory(documentReference, releases) {
 	}
 
 	const list = documentReference.createElement("ol");
-	list.className = "lfc-pages-deployment-list";
+	list.className = "my-pages-deployment-list";
 	list.setAttribute("role", "list");
 	for (const release of releases) {
 		list.append(createReleaseCard(documentReference, release));
@@ -148,7 +148,7 @@ function renderReleaseHistory(documentReference, releases) {
 }
 
 function renderMainPreview(documentReference, entry) {
-	const container = documentReference.querySelector("#main-preview");
+	const container = documentReference.querySelector("#my-main-preview");
 	if (container === null) {
 		throw new Error("Main preview container was not found.");
 	}
@@ -166,30 +166,30 @@ function renderMainPreview(documentReference, entry) {
 	const description = documentReference.createElement("p");
 	description.textContent = `Version ${entry.version} from commit ${entry.commit}.`;
 	const links = documentReference.createElement("p");
-	links.className = "lfc-pages-inline-links";
+	links.className = "my-pages-inline-links";
 	const previewLink = createLink(documentReference, "Browse main examples", `./${entry.path}`);
-	previewLink.id = "main-preview-link";
+	previewLink.id = "my-main-preview-link";
 	const sourceLink = createLink(documentReference, "View source", examplesSourceUrl(entry.commit));
-	sourceLink.id = "main-preview-source-link";
+	sourceLink.id = "my-main-preview-source-link";
 	links.append(previewLink, sourceLink);
 	container.replaceChildren(description, links);
 }
 
 function renderPrimaryDeployment(documentReference, entry) {
-	setLink(documentReference, "primary-run-link", `./${entry.path}basic/`);
-	setLink(documentReference, "primary-browse-link", `./${entry.path}`);
-	setText(documentReference, "primary-run-link", "Run basic example");
-	setText(documentReference, "primary-browse-link", "Browse all examples");
-	setLink(documentReference, "primary-source-link", examplesSourceUrl(entry.commit, "examples/basic"));
-	setLink(documentReference, "api-link", sourceUrl(entry.commit, "docs/api.md"));
-	setLink(documentReference, "integration-link", sourceUrl(entry.commit, "docs/integration-guide.md"));
-	setLink(documentReference, "quick-start-link", sourceUrl(entry.commit, "README.md#quick-start"));
-	setText(documentReference, "selected-version", entry.version);
-	setText(documentReference, "selected-channel", entry.channel === "release"
+	setLink(documentReference, "my-primary-run-link", `./${entry.path}basic/`);
+	setLink(documentReference, "my-primary-browse-link", `./${entry.path}`);
+	setText(documentReference, "my-primary-run-link", "Run basic example");
+	setText(documentReference, "my-primary-browse-link", "Browse all examples");
+	setLink(documentReference, "my-primary-source-link", examplesSourceUrl(entry.commit, "examples/basic"));
+	setLink(documentReference, "my-api-link", sourceUrl(entry.commit, "docs/api.md"));
+	setLink(documentReference, "my-integration-link", sourceUrl(entry.commit, "docs/integration-guide.md"));
+	setLink(documentReference, "my-quick-start-link", sourceUrl(entry.commit, "README.md#quick-start"));
+	setText(documentReference, "my-selected-version", entry.version);
+	setText(documentReference, "my-selected-channel", entry.channel === "release"
 		? "Immutable release"
 		: "Rolling main preview");
 
-	const commitLink = documentReference.querySelector("#selected-commit");
+	const commitLink = documentReference.querySelector("#my-selected-commit");
 	if (commitLink?.tagName === "A") {
 		commitLink.href = `${REPOSITORY_URL}/commit/${entry.commit}`;
 		const code = commitLink.querySelector("code");
@@ -199,9 +199,9 @@ function renderPrimaryDeployment(documentReference, entry) {
 	}
 
 	const isRelease = entry.channel === "release";
-	setText(documentReference, "install-command",
+	setText(documentReference, "my-install-command",
 		`npm install ${PACKAGE_NAME}@${isRelease ? entry.version : "alpha"}`);
-	setText(documentReference, "deployment-summary", isRelease
+	setText(documentReference, "my-deployment-summary", isRelease
 		? `Running immutable release ${entry.version}. Source links are pinned to its commit.`
 		: `Running main at ${entry.commit}. The install command follows npm's alpha dist-tag.`);
 }
@@ -209,8 +209,8 @@ function renderPrimaryDeployment(documentReference, entry) {
 function renderUnavailablePrimary(documentReference) {
 	const basicSource = examplesSourceUrl("main", "examples/basic");
 	const examplesSource = examplesSourceUrl("main");
-	const runLink = documentReference.querySelector("#primary-run-link");
-	const browseLink = documentReference.querySelector("#primary-browse-link");
+	const runLink = documentReference.querySelector("#my-primary-run-link");
+	const browseLink = documentReference.querySelector("#my-primary-browse-link");
 	if (runLink?.tagName === "A") {
 		runLink.href = basicSource;
 		runLink.textContent = "Browse basic source";
@@ -219,12 +219,12 @@ function renderUnavailablePrimary(documentReference) {
 		browseLink.href = examplesSource;
 		browseLink.textContent = "Browse examples source";
 	}
-	setText(documentReference, "deployment-summary",
+	setText(documentReference, "my-deployment-summary",
 		"No deployed build is listed yet. Repository and documentation links remain available.");
 }
 
 function announceCopyStatus(documentReference, message) {
-	const status = documentReference.querySelector("#copy-status");
+	const status = documentReference.querySelector("#my-copy-status");
 	if (status !== null) {
 		status.textContent = "";
 		status.textContent = message;
@@ -236,8 +236,8 @@ export async function copyCode(
 	documentReference = globalThis.document,
 	navigatorReference = globalThis.navigator
 ) {
-	const targetId = button.getAttribute("data-copy-target");
-	const label = button.getAttribute("data-copy-label") ?? "Code";
+	const targetId = button.getAttribute("data-my-copy-target");
+	const label = button.getAttribute("data-my-copy-label") ?? "Code";
 	const target = targetId === null ? null : documentReference.getElementById(targetId);
 	if (target === null) {
 		announceCopyStatus(documentReference, `${label} is unavailable.`);
@@ -292,7 +292,7 @@ export async function renderDeployments(documentReference = globalThis.document,
 }
 
 export function initializePage(documentReference = globalThis.document) {
-	for (const button of documentReference.querySelectorAll("[data-copy-target]")) {
+	for (const button of documentReference.querySelectorAll("[data-my-copy-target]")) {
 		button.addEventListener("click", () => {
 			void copyCode(button, documentReference);
 		});

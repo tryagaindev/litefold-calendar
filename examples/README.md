@@ -2,6 +2,8 @@
 
 Each example is a small, framework-free recipe built against the package's public API. Start with **Basic JavaScript**, then choose the example that matches the integration problem you are solving.
 
+Package consumers should use **Choose an example** to find an integration recipe. Repository contributors should also use **Run locally**, **Validate an example change**, and **Add or change an example**.
+
 ## Choose an example
 
 | Goal | Example |
@@ -31,6 +33,8 @@ import { createCalendar } from "@tryagaindev/litefold-calendar";
 import "@tryagaindev/litefold-calendar/styles.css";
 ```
 
+Source timing follows the value returned by each invocation. A direct event array commits terminal state before the initiating void method returns, with one full render and no loading or `aria-busy`. Any PromiseLike—including an already-fulfilled promise or an `async` function result—uses a loading render followed by a terminal render.
+
 ## Validate an example change
 
 Run the smallest relevant check first, then the full repository check before release:
@@ -54,7 +58,7 @@ Canonical screenshots support visual review, but supported-browser and assistive
 
 - Keep the example dependency-free, deterministic, and safe to publish as source.
 - Use public package APIs, documented CSS tokens, native HTML semantics, and sanitized fixture data.
-- Treat unprefixed `data-*` attributes as application-owned selectors, not package output.
+- Namespace application-owned classes, IDs, data attributes, CSS properties, and layers with `my-*`. Use `data-test-*` only for repository probes. Litefold Calendar output keeps the `litefold-calendar` and `lfc-*` namespaces.
 - Give each public option, method, hook, extension, or error path one clear example owner and focused executable coverage.
 - Update the relevant API or integration guide, tests, and changelog with the example.
 

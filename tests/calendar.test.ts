@@ -56,8 +56,7 @@ void test("construction rejects invalid configuration before committing generate
 	);
 	for (const hook of [
 		"renderEventMarker",
-		"renderGridOverflowContent",
-		"renderMultipleEventIndicator"
+		"renderEventOverflow"
 	] as const) {
 		const renderHooks = [
 			{ id: `first-${hook}`, [hook]: () => null },

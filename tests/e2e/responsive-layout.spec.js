@@ -7,11 +7,11 @@ import {
 
 const COMPACT_VIEWPORT_HEIGHT = 1_100;
 const COMPACT_ROW_MINIMUM = 60;
-const COMPACT_ROW_MAXIMUM = 96;
+const COMPACT_ROW_MAXIMUM = 112;
 const PRIMARY_TARGET_MINIMUM = 44;
 const GRID_TARGET_MINIMUM = 24;
 const REFLOW_ROOT_FONT_SIZE = 32;
-const RESPONSIVE_MULTIPLE_EVENT_FIXTURE = "#lfc-responsive-multiple-event-fixture";
+const RESPONSIVE_MULTIPLE_EVENT_FIXTURE = "#my-responsive-multiple-event-fixture";
 const SEPTEMBER_TITLE = "September 2026";
 const SEPTEMBER_COMPACT_TITLE = "Sep 2026";
 const SEPTEMBER_TITLE_BUTTON_LABEL =
@@ -37,7 +37,7 @@ test.use({ bypassCSP: true });
 
 async function expectNoHorizontalOverflow(page) {
 	const overflow = await page.evaluate(() => {
-		const host = document.querySelector("[data-example-calendar]");
+		const host = document.querySelector("[data-my-calendar]");
 		const toolbar = document.querySelector(".lfc-calendar-toolbar");
 		if (!(host instanceof HTMLElement) || !(toolbar instanceof HTMLElement)) {
 			throw new Error("Expected the rendered calendar and toolbar.");
@@ -58,9 +58,9 @@ async function setExactCalendarHostWidth(page, width) {
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
 	await expectExampleReady(page, "/examples/advanced/");
 	await page.addStyleTag({
-		content: `.advanced-example-calendar { inline-size: ${String(width)}px; justify-self: start; }`
+		content: `.my-calendar { inline-size: ${String(width)}px; justify-self: start; }`
 	});
-	const renderedWidth = await page.locator("[data-example-calendar]").evaluate((host) =>
+	const renderedWidth = await page.locator("[data-my-calendar]").evaluate((host) =>
 		host.getBoundingClientRect().width
 	);
 	expect(renderedWidth).toBe(width);
@@ -92,7 +92,7 @@ async function expectToolbarDomAndFocusOrder(page) {
 		page.locator(".lfc-calendar-nav-button-next"),
 		page.locator(".lfc-calendar-title-button"),
 		page.locator(".lfc-calendar-today-button"),
-		page.locator("[data-example-toolbar-end] input").first()
+		page.locator("[data-my-toolbar-end] input").first()
 	];
 	await controls[0].focus();
 	for (let index = 1; index < controls.length; index += 1) {
@@ -123,7 +123,7 @@ async function expectTargetMinimums(page) {
 
 async function showSeptember(page) {
 	await page.getByRole("button", { name: "Later month" }).click();
-	await expect(page.locator("[data-example-calendar]")).not.toHaveAttribute("aria-busy", "true");
+	await expect(page.locator("[data-my-calendar]")).not.toHaveAttribute("aria-busy", "true");
 	await expect(page.locator(".lfc-calendar-title-label-full")).toHaveText(SEPTEMBER_TITLE);
 	await expect(page.locator(".lfc-calendar-title-label-compact"))
 		.toHaveAttribute("data-lfc-compact-title", SEPTEMBER_COMPACT_TITLE);
@@ -272,22 +272,32 @@ async function expectCompactToolbarVisualLayout(page, layout) {
 
 async function mountResponsiveMultipleEventFixture(
 	page,
-	{ direction = "ltr", markerSize = "1.25rem", maxGridEventsPerDay = 2, width = 768 } = {}
+	{
+		compactDayMinBlockSize = null,
+		compactCustomSize = null,
+		customOverflow = true,
+		direction = "ltr",
+		eventCount = 4,
+		markerSize = "1.25rem",
+		maxGridEventsPerDay = 2,
+		renderMarker = true,
+		width = 768
+	} = {}
 ) {
 	await expectExampleReady(page, "/examples/advanced/");
 	await page.addStyleTag({
 		content: `
-			.lfc-responsive-test-marker {
+			.my-responsive-marker {
 				align-items: center;
-				block-size: var(--lfc-responsive-test-marker-size);
+				block-size: var(--my-responsive-marker-size);
 				border: 0.125rem solid currentcolor;
 				border-radius: 50%;
 				display: inline-grid;
-				inline-size: var(--lfc-responsive-test-marker-size);
+				inline-size: var(--my-responsive-marker-size);
 				justify-items: center;
 				position: relative;
 			}
-			.lfc-responsive-test-satellite {
+			.my-responsive-satellite {
 				background: currentcolor;
 				block-size: 0.375rem;
 				border-radius: 50%;
@@ -301,116 +311,333 @@ async function mountResponsiveMultipleEventFixture(
 	await page.evaluate(async (fixtureOptions) => {
 		const { createCalendar } = await import("/dist/index.js");
 		const fixture = document.createElement("section");
-		fixture.id = "lfc-responsive-multiple-event-fixture";
+		fixture.id = "my-responsive-multiple-event-fixture";
 		fixture.style.inlineSize = "fit-content";
 		const host = document.createElement("div");
-		host.dataset["responsiveMultipleEventHost"] = "";
+		host.dataset["testResponsiveMultipleEventHost"] = "";
 		host.dir = fixtureOptions.direction;
 		host.style.inlineSize = `${String(fixtureOptions.width)}px`;
-		host.style.setProperty("--lfc-responsive-test-marker-size", fixtureOptions.markerSize);
+		host.style.setProperty("--my-responsive-marker-size", fixtureOptions.markerSize);
+		if (fixtureOptions.compactDayMinBlockSize !== null) {
+			host.style.setProperty(
+				"--lfc-compact-day-min-block-size",
+				fixtureOptions.compactDayMinBlockSize
+			);
+		}
 		fixture.append(host);
 		document.body.prepend(fixture);
-		const observations = { gridOverflowCalls: 0, multipleEventCalls: 0 };
-		const events = Array.from({ length: 4 }, (_value, index) => Object.freeze({
-			id: `responsive-multiple-${String(index + 1)}`,
-			start: `2026-08-06T${String(9 + index).padStart(2, "0")}:00`,
-			title: `Responsive multiple event ${String(index + 1)}`
-		}));
+		const observations = {
+			compactCalls: 0,
+			contexts: [],
+			daySelectCalls: 0,
+			eventActivateCalls: 0,
+			markerCalls: 0,
+			wideCalls: 0
+		};
+		const events = Array.from({ length: fixtureOptions.eventCount }, (_value, index) => {
+			const hour = String(8 + (index % 12)).padStart(2, "0");
+			const minute = String(index % 60).padStart(2, "0");
+			return Object.freeze({
+				id: `responsive-multiple-${String(index + 1)}`,
+				start: `2026-08-06T${hour}:${minute}`,
+				title: `Responsive multiple event ${String(index + 1)}`
+			});
+		});
 		const calendar = createCalendar(host, {
 			events,
 			renderHooks: [{
-				id: "responsive-multiple-event-fixture",
-				renderGridOverflowContent: ({ document: ownerDocument, text }) => {
-					observations.gridOverflowCalls += 1;
+				id: "my-responsive-multiple-event-fixture",
+				renderEventOverflow: (context) => {
+					const {
+						document: ownerDocument,
+						eventCount: renderedEventCount,
+						overflowCount,
+						text,
+						variant,
+						visibleEventCount
+					} = context;
+					observations[`${variant}Calls`] += 1;
+					observations.contexts.push({
+						eventCount: renderedEventCount,
+						overflowCount,
+						text,
+						variant,
+						visibleEventCount
+					});
+					if (!fixtureOptions.customOverflow) {
+						return undefined;
+					}
 					const custom = ownerDocument.createElement("span");
-					custom.dataset["responsiveWideOverflow"] = "";
-					custom.textContent = `Wide ${text}`;
+					custom.dataset[`testResponsive${variant === "compact" ? "Compact" : "Wide"}Overflow`] = "";
+					custom.textContent = variant === "compact" ? text : `Wide ${text}`;
+					if (variant === "compact" && fixtureOptions.compactCustomSize !== null) {
+						custom.style.blockSize = fixtureOptions.compactCustomSize;
+						custom.style.display = "inline-grid";
+						custom.style.inlineSize = fixtureOptions.compactCustomSize;
+						custom.style.placeItems = "center";
+					}
 					return custom;
 				},
 				renderEventMarker: ({ document: ownerDocument }) => {
+					observations.markerCalls += 1;
+					if (!fixtureOptions.renderMarker) {
+						return null;
+					}
 					const marker = ownerDocument.createElement("span");
-					marker.className = "lfc-responsive-test-marker";
+					marker.className = "my-responsive-marker";
 					marker.setAttribute("aria-hidden", "true");
 					const satellite = ownerDocument.createElement("span");
-					satellite.className = "lfc-responsive-test-satellite";
+					satellite.className = "my-responsive-satellite";
 					marker.append(satellite);
 					return marker;
-				},
-				renderMultipleEventIndicator: () => {
-					observations.multipleEventCalls += 1;
-					return undefined;
 				}
 			}],
 			initialDate: "2026-08-06",
 			maxGridEventsPerDay: fixtureOptions.maxGridEventsPerDay,
-			onEventActivate: () => undefined
+			onDaySelect: () => {
+				observations.daySelectCalls += 1;
+			},
+			onEventActivate: () => {
+				observations.eventActivateCalls += 1;
+			}
 		});
 		calendar.render();
 		Object.defineProperty(window, "__lfcResponsiveMultipleEventFixture", {
 			configurable: true,
 			value: { calendar, fixture, host, observations }
 		});
-	}, { direction, markerSize, maxGridEventsPerDay, width });
+	}, {
+		compactDayMinBlockSize,
+		compactCustomSize,
+		customOverflow,
+		direction,
+		eventCount,
+		markerSize,
+		maxGridEventsPerDay,
+		renderMarker,
+		width
+	});
 	await expect.poll(() => page.evaluate(() =>
 		window.__lfcResponsiveMultipleEventFixture.calendar.getState().phase
 	)).toBe("ready");
 	return responsiveMultipleEventFixture(page);
 }
 
-async function getResponsiveMultipleEventGeometry(day) {
-	return day.evaluate((element) => {
-		const indicator = element.querySelector(".lfc-calendar-multiple-event-indicator");
-		const marker = element.querySelector(".lfc-responsive-test-marker");
-		const satellite = element.querySelector(".lfc-responsive-test-satellite");
-		if (!(indicator instanceof HTMLElement) || !(marker instanceof HTMLElement) ||
-			!(satellite instanceof HTMLElement)) {
-			throw new Error("Expected the compact multiple-event geometry probes.");
+async function getCompactOverflowLayoutGeometry(
+	day,
+	{
+		inspectPairedRoots = false,
+		targetSelector = ".lfc-calendar-event-overflow-cluster"
+	} = {}
+) {
+	return day.evaluate((element, options) => {
+		const summaries = element.querySelector(":scope > .lfc-calendar-day-summaries");
+		const target = summaries?.querySelector(`:scope > ${options.targetSelector}`);
+		if (!(summaries instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+			throw new Error("Expected the compact overflow placement probes.");
 		}
+		const compact = target.querySelector(
+			":scope > .lfc-calendar-event-overflow.lfc-is-compact"
+		);
+		const primary = target.querySelector(
+			":scope > .lfc-calendar-event-summary.lfc-is-compact-primary"
+		);
+		if (options.inspectPairedRoots &&
+			(!(compact instanceof HTMLElement) || !(primary instanceof HTMLElement))) {
+			throw new Error("Expected both package-owned compact overflow roots.");
+		}
+
 		const dayBox = element.getBoundingClientRect();
-		const indicatorBox = indicator.getBoundingClientRect();
+		const summariesBox = summaries.getBoundingClientRect();
+		const targetBox = target.getBoundingClientRect();
+		const summariesStyle = getComputedStyle(summaries);
+		const direction = summariesStyle.direction;
+		const paddingBlockEnd = Number.parseFloat(summariesStyle.paddingBlockEnd);
+		const paddedBlockEnd = summariesBox.bottom - paddingBlockEnd;
+		const centerBlock = (box) => box.top + (box.height / 2);
+		const centerInline = (box) => box.left + (box.width / 2);
+		const geometry = {
+			compactInlineCenterDelta: null,
+			direction,
+			paddingBlockEnd,
+			roots: null,
+			summariesBlockEndDelta: Math.abs(summariesBox.bottom - dayBox.bottom),
+			targetBlockEndDelta: Math.abs(targetBox.bottom - paddedBlockEnd),
+			targetContainedInDay: targetBox.left >= dayBox.left - 1 &&
+				targetBox.right <= dayBox.right + 1 &&
+				targetBox.top >= dayBox.top - 1 &&
+				targetBox.bottom <= dayBox.bottom + 1,
+			targetInlineCenterDelta: Math.abs(centerInline(targetBox) - centerInline(dayBox))
+		};
+		if (compact instanceof HTMLElement) {
+			const compactBox = compact.getBoundingClientRect();
+			geometry.compactInlineCenterDelta = Math.abs(
+				centerInline(compactBox) - centerInline(summariesBox)
+			);
+		}
+		if (!(compact instanceof HTMLElement) || !(primary instanceof HTMLElement)) {
+			return geometry;
+		}
+
+		const compactBox = compact.getBoundingClientRect();
+		const primaryBox = primary.getBoundingClientRect();
+		const sameRow = Math.abs(centerBlock(primaryBox) - centerBlock(compactBox)) <= 1;
+		const rootsIntersect = primaryBox.left < compactBox.right &&
+			primaryBox.right > compactBox.left &&
+			primaryBox.top < compactBox.bottom &&
+			primaryBox.bottom > compactBox.top;
+		const compactOnInlineEnd = sameRow
+			? direction === "rtl"
+				? compactBox.right <= primaryBox.left + 1
+				: compactBox.left >= primaryBox.right - 1
+			: null;
+		const inlineStartCenter = direction === "rtl"
+			? targetBox.right - (targetBox.width / 4)
+			: targetBox.left + (targetBox.width / 4);
+		const inlineEndCenter = direction === "rtl"
+			? targetBox.left + (targetBox.width / 4)
+			: targetBox.right - (targetBox.width / 4);
+		geometry.roots = {
+			blockCenterDelta: Math.abs(centerBlock(primaryBox) - centerBlock(compactBox)),
+			blockFillDelta: Math.abs(
+				(primaryBox.height + compactBox.height) - targetBox.height
+			),
+			blockSizeDelta: Math.abs(primaryBox.height - compactBox.height),
+			compactAtPaddedBlockEndDelta: Math.abs(compactBox.bottom - paddedBlockEnd),
+			compactOnInlineEnd,
+			containedInTarget: primaryBox.left >= targetBox.left - 1 &&
+				primaryBox.right <= targetBox.right + 1 &&
+				primaryBox.top >= targetBox.top - 1 &&
+				primaryBox.bottom <= targetBox.bottom + 1 &&
+				compactBox.left >= targetBox.left - 1 &&
+				compactBox.right <= targetBox.right + 1 &&
+				compactBox.top >= targetBox.top - 1 &&
+				compactBox.bottom <= targetBox.bottom + 1,
+			inlineCenterDelta: Math.abs(centerInline(primaryBox) - centerInline(compactBox)),
+			inlineFillDelta: Math.abs(
+				(primaryBox.width + compactBox.width) - targetBox.width
+			),
+			inlineSizeDelta: Math.abs(primaryBox.width - compactBox.width),
+			layout: sameRow ? "row" : "stack",
+			logicalQuarterCenterDelta: Math.max(
+				Math.abs(centerInline(primaryBox) - inlineStartCenter),
+				Math.abs(centerInline(compactBox) - inlineEndCenter)
+			),
+			primaryAtPaddedBlockEndDelta: Math.abs(primaryBox.bottom - paddedBlockEnd),
+			stackedQuarterCenterDelta: Math.max(
+				Math.abs(centerBlock(primaryBox) - (targetBox.top + (targetBox.height / 4))),
+				Math.abs(centerBlock(compactBox) - (targetBox.bottom - (targetBox.height / 4)))
+			),
+			rootsDoNotOverlap: !rootsIntersect
+		};
+		return geometry;
+	}, { inspectPairedRoots, targetSelector });
+}
+
+async function getCompactMarkerClearanceGeometry(day, { customOverflow }) {
+	return day.evaluate((element, options) => {
+		const marker = element.querySelector(".my-responsive-marker");
+		const overflowRoot = element.querySelector(
+			".lfc-calendar-event-overflow-cluster > " +
+				".lfc-calendar-event-overflow.lfc-is-compact"
+		);
+		const renderedContent = overflowRoot?.querySelector(options.customOverflow
+			? "[data-test-responsive-compact-overflow]"
+			: ".lfc-event-overflow-default-content");
+		if (!(marker instanceof HTMLElement) || !(overflowRoot instanceof HTMLElement) ||
+			!(renderedContent instanceof HTMLElement)) {
+			throw new Error("Expected the marker and rendered compact overflow probes.");
+		}
+		const contentBox = renderedContent.getBoundingClientRect();
 		const markerBox = marker.getBoundingClientRect();
-		const satelliteBox = satellite.getBoundingClientRect();
-		const computedDirection = getComputedStyle(element).direction;
+		const overflowBox = overflowRoot.getBoundingClientRect();
 		const intersects = (first, second) => first.left < second.right &&
 			first.right > second.left && first.top < second.bottom && first.bottom > second.top;
 		return {
-			containedInDay: indicatorBox.left >= dayBox.left - 1 &&
-				indicatorBox.right <= dayBox.right + 1 &&
-				indicatorBox.top >= dayBox.top - 1 &&
-				indicatorBox.bottom <= dayBox.bottom + 1,
-			direction: computedDirection,
-			indicatorOnRight: indicatorBox.left >= markerBox.right - 1,
-			intersectsMarker: intersects(indicatorBox, markerBox),
-			intersectsSatellite: intersects(indicatorBox, satelliteBox),
-			satelliteOnInlineEnd: computedDirection === "rtl"
-				? satelliteBox.left < markerBox.left
-				: satelliteBox.right > markerBox.right
+			contentBlockSize: contentBox.height,
+			contentContainedInRoot: contentBox.left >= overflowBox.left - 1 &&
+				contentBox.right <= overflowBox.right + 1 &&
+				contentBox.top >= overflowBox.top - 1 &&
+				contentBox.bottom <= overflowBox.bottom + 1,
+			contentHasArea: contentBox.width > 0 && contentBox.height > 0,
+			contentInlineSize: contentBox.width,
+			markerBlockSize: markerBox.height,
+			markerInlineSize: markerBox.width,
+			markerIntersectsContent: intersects(markerBox, contentBox),
+			markerIntersectsRoot: intersects(markerBox, overflowBox),
+			overflowHasArea: overflowBox.width > 0 && overflowBox.height > 0
 		};
-	});
+	}, { customOverflow });
+}
+
+function expectCompactOverflowAtBlockEnd(geometry) {
+	expect(geometry.paddingBlockEnd).toBeGreaterThan(0);
+	expect(geometry.summariesBlockEndDelta).toBeLessThanOrEqual(1);
+	expect(geometry.targetBlockEndDelta).toBeLessThanOrEqual(1);
+	expect(geometry.targetContainedInDay).toBe(true);
+}
+
+function expectPairedCompactOverflowLayout(geometry, { direction, layout }) {
+	expectCompactOverflowAtBlockEnd(geometry);
+	expect(geometry.direction).toBe(direction);
+	expect(geometry.roots).not.toBeNull();
+	expect(geometry.roots.layout).toBe(layout);
+	expect(geometry.roots.blockSizeDelta).toBeLessThanOrEqual(1);
+	expect(geometry.roots.containedInTarget).toBe(true);
+	expect(geometry.roots.inlineSizeDelta).toBeLessThanOrEqual(1);
+	expect(geometry.roots.rootsDoNotOverlap).toBe(true);
+	expect(geometry.targetInlineCenterDelta).toBeLessThanOrEqual(1);
+	if (layout === "row") {
+		expect(geometry.roots.blockCenterDelta).toBeLessThanOrEqual(1);
+		expect(geometry.roots.compactOnInlineEnd).toBe(true);
+		expect(geometry.roots.compactAtPaddedBlockEndDelta).toBeLessThanOrEqual(1);
+		expect(geometry.roots.inlineFillDelta).toBeLessThanOrEqual(1);
+		expect(geometry.roots.logicalQuarterCenterDelta).toBeLessThanOrEqual(1);
+		expect(geometry.roots.primaryAtPaddedBlockEndDelta).toBeLessThanOrEqual(1);
+		return;
+	}
+	expect(geometry.roots.blockFillDelta).toBeLessThanOrEqual(1);
+	expect(geometry.roots.inlineCenterDelta).toBeLessThanOrEqual(1);
+	expect(geometry.roots.compactAtPaddedBlockEndDelta).toBeLessThanOrEqual(1);
+	expect(geometry.roots.stackedQuarterCenterDelta).toBeLessThanOrEqual(1);
 }
 
 function responsiveMultipleEventFixture(page) {
 	const fixture = page.locator(RESPONSIVE_MULTIPLE_EVENT_FIXTURE);
-	const host = fixture.locator("[data-responsive-multiple-event-host]");
+	const host = fixture.locator("[data-test-responsive-multiple-event-host]");
 	const day = host.locator(
 		'.lfc-calendar-day:has(> .lfc-calendar-day-button[data-lfc-date="2026-08-06"])'
 	);
-	const indicator = day.locator(
-		":scope > .lfc-calendar-day-summaries > .lfc-calendar-multiple-event-indicator"
+	const cluster = day.locator(
+		":scope > .lfc-calendar-day-summaries > .lfc-calendar-event-overflow-cluster"
 	);
 	const overflow = day.locator(
 		":scope > .lfc-calendar-day-summaries > .lfc-calendar-grid-more"
 	);
+	const compactOverflow = day.locator(
+		".lfc-calendar-event-overflow.lfc-is-compact"
+	);
+	const wideOverflow = overflow.locator(
+		":scope > .lfc-calendar-event-overflow.lfc-is-wide"
+	);
 	return {
-		customOverflow: overflow.locator(":scope > .lfc-calendar-grid-more-custom-content"),
+		cluster,
+		compactContent: compactOverflow.locator(
+			":scope > .lfc-calendar-event-overflow-content"
+		),
+		compactCustom: compactOverflow.locator("[data-test-responsive-compact-overflow]"),
+		compactDefault: compactOverflow.locator(".lfc-event-overflow-default-content"),
+		compactOverflow,
 		day,
-		defaultOverflow: overflow.locator(":scope > .lfc-calendar-grid-more-default-content"),
 		fixture,
 		host,
-		indicator,
-		marker: day.locator(".lfc-calendar-event-summary.lfc-is-compact-primary .lfc-responsive-test-marker"),
+		marker: day.locator(".lfc-calendar-event-summary.lfc-is-compact-primary .my-responsive-marker"),
 		overflow,
-		satellite: day.locator(".lfc-calendar-event-summary.lfc-is-compact-primary .lfc-responsive-test-satellite")
+		satellite: day.locator(".lfc-calendar-event-summary.lfc-is-compact-primary .my-responsive-satellite"),
+		wideContent: wideOverflow.locator(":scope > .lfc-calendar-event-overflow-content"),
+		wideCustom: wideOverflow.locator("[data-test-responsive-wide-overflow]"),
+		wideDefault: wideOverflow.locator(".lfc-event-overflow-default-content"),
+		wideOverflow
 	};
 }
 
@@ -520,10 +747,10 @@ for (const width of [412, 390]) {
 		await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width });
 		await expectExampleReady(page, "/examples/advanced/");
 		await page.addStyleTag({
-			content: ".advanced-example-calendar { --lfc-day-min-block-size: 12rem; }"
+			content: ".my-calendar { --lfc-day-min-block-size: 12rem; }"
 		});
 
-		const hostWidth = await page.locator("[data-example-calendar]").evaluate((host) =>
+		const hostWidth = await page.locator("[data-my-calendar]").evaluate((host) =>
 			host.getBoundingClientRect().width
 		);
 		expect(hostWidth).toBeGreaterThan(20 * 16);
@@ -532,7 +759,7 @@ for (const width of [412, 390]) {
 		await expect(page.locator(".lfc-calendar-toolbar")).toHaveCSS("display", "grid");
 		await expectCompactToolbarVisualLayout(page, "two-row");
 
-		const customProperty = await page.locator("[data-example-calendar]").evaluate((host) =>
+		const customProperty = await page.locator("[data-my-calendar]").evaluate((host) =>
 			getComputedStyle(host).getPropertyValue("--lfc-day-min-block-size").trim()
 		);
 		expect(customProperty).toBe("12rem");
@@ -555,7 +782,7 @@ test("compact grid actions honor the public minimum block-size token", async ({ 
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 390 });
 	await expectExampleReady(page, "/examples/advanced/");
 	await page.addStyleTag({
-		content: ".advanced-example-calendar { --lfc-grid-event-min-block-size: 3rem; }"
+		content: ".my-calendar { --lfc-grid-event-min-block-size: 3rem; }"
 	});
 
 	const primaryAction = page.locator(
@@ -581,7 +808,7 @@ test("focused later compact actions retain a keyboard-operable target for minima
 	);
 	const dayButton = selectedCell.locator(":scope > .lfc-calendar-day-button");
 	const actions = selectedCell.locator(
-		":scope > .lfc-calendar-day-summaries > :is(a, button)"
+		":scope > .lfc-calendar-day-summaries :is(a, button)"
 	);
 	await expect(actions).toHaveCount(3);
 	const laterAction = actions.nth(1);
@@ -617,13 +844,13 @@ test("focused later compact actions retain a keyboard-operable target for minima
 	await expectNoHorizontalOverflow(page);
 
 	await laterAction.press("Enter");
-	await expect(page.locator("[data-example-event-dialog]")).toBeVisible();
+	await expect(page.locator("[data-my-event-dialog]")).toBeVisible();
 });
 
 test("compact layout applies the public day-padding token to day and event geometry", async ({ page }) => {
 	await setExactCalendarHostWidth(page, 375);
 	await page.addStyleTag({
-		content: ".advanced-example-calendar { --lfc-day-padding: 0.75rem; }"
+		content: ".my-calendar { --lfc-day-padding: 0.75rem; }"
 	});
 
 	const metrics = await page.locator(
@@ -644,13 +871,15 @@ test("compact layout applies the public day-padding token to day and event geome
 		const buttonStyle = getComputedStyle(button);
 		const summariesStyle = getComputedStyle(summaries);
 		return {
-			actionBlockInset: actionBox.top - cellBox.top,
+			actionBlockEndInset: cellBox.bottom - actionBox.bottom,
 			actionBlockSize: actionBox.height,
 			actionInlineSize: actionBox.width,
 			actionPadding: actionStyle.paddingBlockStart,
 			buttonBlockPadding: buttonStyle.paddingBlockStart,
 			buttonInlinePadding: buttonStyle.paddingInlineStart,
 			dayNumberBlockInset: dayNumberBox.top - cellBox.top,
+			summariesBlockEndInset: cellBox.bottom - summaries.getBoundingClientRect().bottom,
+			summariesBlockPadding: summariesStyle.paddingBlockEnd,
 			summariesInlinePadding: summariesStyle.paddingInlineStart,
 			summariesMargin: summariesStyle.marginBlockStart
 		};
@@ -659,12 +888,14 @@ test("compact layout applies the public day-padding token to day and event geome
 	expect(metrics.actionPadding).toBe("12px");
 	expect(metrics.buttonBlockPadding).toBe("12px");
 	expect(metrics.buttonInlinePadding).toBe("12px");
+	expect(metrics.summariesBlockPadding).toBe("12px");
 	expect(metrics.summariesInlinePadding).toBe("0px");
 	expect(metrics.summariesMargin).toBe("46px");
 	expect(Math.abs(metrics.dayNumberBlockInset - 12)).toBeLessThanOrEqual(1);
-	expect(Math.abs(metrics.actionBlockInset - 46)).toBeLessThanOrEqual(1);
-	expect(Math.abs(metrics.actionInlineSize - PRIMARY_TARGET_MINIMUM)).toBeLessThanOrEqual(1);
-	expect(Math.abs(metrics.actionBlockSize - PRIMARY_TARGET_MINIMUM)).toBeLessThanOrEqual(1);
+	expect(metrics.summariesBlockEndInset).toBeLessThanOrEqual(1);
+	expect(Math.abs(metrics.actionBlockEndInset - 12)).toBeLessThanOrEqual(1);
+	expect(metrics.actionInlineSize).toBeGreaterThanOrEqual(GRID_TARGET_MINIMUM);
+	expect(metrics.actionBlockSize).toBeGreaterThanOrEqual(GRID_TARGET_MINIMUM);
 	await expectNoHorizontalOverflow(page);
 });
 
@@ -672,7 +903,7 @@ test("sub-20rem calendar places title and direction controls before Today", asyn
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 320 });
 	await expectExampleReady(page, "/examples/advanced/");
 
-	const hostWidth = await page.locator("[data-example-calendar]").evaluate((host) =>
+	const hostWidth = await page.locator("[data-my-calendar]").evaluate((host) =>
 		host.getBoundingClientRect().width
 	);
 	expect(hostWidth).toBeLessThan(20 * 16);
@@ -687,10 +918,10 @@ test("sub-20rem calendar places title and direction controls before Today", asyn
 test("compact RTL layout reflows at 200% text size without changing focus order", async ({ page }) => {
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 390 });
 	await expectExampleReady(page, "/examples/advanced/");
-	await page.locator("[data-example-direction]").check();
+	await page.locator("[data-my-direction]").check();
 	await page.addStyleTag({ content: "html { font-size: 200%; }" });
 
-	const directionAndReflow = await page.locator("[data-example-calendar]").evaluate((host) => {
+	const directionAndReflow = await page.locator("[data-my-calendar]").evaluate((host) => {
 		const weekdays = [...host.querySelectorAll(".lfc-calendar-weekday")];
 		const firstWeekday = weekdays.at(0);
 		const lastWeekday = weekdays.at(-1);
@@ -760,14 +991,21 @@ for (const preference of [
 			const title = document.querySelector(".lfc-calendar-title-button");
 			const grid = document.querySelector(".lfc-calendar-grid");
 			const event = document.querySelector(".lfc-calendar-agenda-event");
+			const compactOverflow = document.querySelector(
+				".lfc-calendar-event-overflow.lfc-is-compact"
+			);
 			if (!(title instanceof HTMLElement) || !(grid instanceof HTMLElement) ||
-				!(event instanceof HTMLElement)) {
-				throw new Error("Expected the title, grid, and event boundary probes.");
+				!(event instanceof HTMLElement) || !(compactOverflow instanceof HTMLElement)) {
+				throw new Error("Expected the title, grid, event, and compact overflow probes.");
 			}
 			const titleStyle = getComputedStyle(title);
 			const gridStyle = getComputedStyle(grid);
 			const eventStyle = getComputedStyle(event);
+			const compactOverflowStyle = getComputedStyle(compactOverflow);
 			return {
+				compactOverflowColor: compactOverflowStyle.color,
+				compactOverflowDisplay: compactOverflowStyle.display,
+				compactOverflowPointerEvents: compactOverflowStyle.pointerEvents,
 				eventBoundaryColor: eventStyle.borderBlockStartColor,
 				eventBoundaryStyle: eventStyle.borderBlockStartStyle,
 				eventBoundaryWidth: Number.parseFloat(eventStyle.borderBlockStartWidth),
@@ -780,6 +1018,9 @@ for (const preference of [
 			};
 		});
 
+		expect(visuals.compactOverflowDisplay).not.toBe("none");
+		expect(visuals.compactOverflowPointerEvents).toBe("none");
+		expect(visuals.compactOverflowColor).not.toBe("rgba(0, 0, 0, 0)");
 		expect(visuals.focusStyle).toBe("solid");
 		expect(visuals.focusWidth).toBeGreaterThanOrEqual(preference.focusMinimum);
 		expect(visuals.focusColor).not.toBe("rgba(0, 0, 0, 0)");
@@ -800,7 +1041,7 @@ test("application toolbar disclosure toggles without runtime or focus churn", as
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 390 });
 	await expectExampleReady(page, "/examples/advanced/");
 	await page.evaluate(() => {
-		const host = document.querySelector("[data-example-calendar]");
+		const host = document.querySelector("[data-my-calendar]");
 		const toolbar = document.querySelector(".lfc-calendar-toolbar");
 		const toolbarEnd = document.querySelector(".lfc-calendar-toolbar-end");
 		const grid = document.querySelector(".lfc-calendar-grid");
@@ -810,12 +1051,12 @@ test("application toolbar disclosure toggles without runtime or focus churn", as
 		}
 
 		const disclosure = document.createElement("details");
-		disclosure.dataset["responsiveDisclosure"] = "";
+		disclosure.dataset["testResponsiveDisclosure"] = "";
 		disclosure.open = true;
 		const summary = document.createElement("summary");
 		summary.textContent = "Application options";
 		const content = document.createElement("span");
-		content.dataset["responsiveDisclosureContent"] = "";
+		content.dataset["testResponsiveDisclosureContent"] = "";
 		content.textContent = "Additional application controls";
 		disclosure.append(summary, content);
 		toolbarEnd.append(disclosure);
@@ -827,18 +1068,18 @@ test("application toolbar disclosure toggles without runtime or focus churn", as
 			nodes: [host, toolbar, toolbarEnd, disclosure, summary, content, grid],
 			sourceMutations: 0,
 			sourceObserver,
-			sourceRange: host.dataset["exampleSourceRange"]
+			sourceRange: host.dataset["testSourceRange"]
 		};
 		Object.defineProperty(window, "__lfcToolbarDisclosureSnapshot", { value: snapshot });
 		sourceObserver.observe(host, {
-			attributeFilter: ["data-example-source-range"],
+			attributeFilter: ["data-test-source-range"],
 			attributes: true
 		});
 	});
 
-	const disclosure = page.locator("[data-responsive-disclosure]");
+	const disclosure = page.locator("[data-test-responsive-disclosure]");
 	const summary = disclosure.locator("summary");
-	const content = disclosure.locator("[data-responsive-disclosure-content]");
+	const content = disclosure.locator("[data-test-responsive-disclosure-content]");
 	await expect(disclosure).toHaveAttribute("open", "");
 	await expect(content).toBeVisible();
 	await summary.focus();
@@ -861,12 +1102,12 @@ test("application toolbar disclosure toggles without runtime or focus churn", as
 	const stability = await page.evaluate(() => {
 		const snapshot = window.__lfcToolbarDisclosureSnapshot;
 		const currentNodes = [
-			document.querySelector("[data-example-calendar]"),
+			document.querySelector("[data-my-calendar]"),
 			document.querySelector(".lfc-calendar-toolbar"),
 			document.querySelector(".lfc-calendar-toolbar-end"),
-			document.querySelector("[data-responsive-disclosure]"),
-			document.querySelector("[data-responsive-disclosure] summary"),
-			document.querySelector("[data-responsive-disclosure-content]"),
+			document.querySelector("[data-test-responsive-disclosure]"),
+			document.querySelector("[data-test-responsive-disclosure] summary"),
+			document.querySelector("[data-test-responsive-disclosure-content]"),
 			document.querySelector(".lfc-calendar-grid")
 		];
 		snapshot.sourceObserver.disconnect();
@@ -874,8 +1115,8 @@ test("application toolbar disclosure toggles without runtime or focus churn", as
 			allNodesStable: snapshot.nodes.every((node, index) => node === currentNodes[index]),
 			sourceMutations: snapshot.sourceMutations,
 			sourceRangeStable: snapshot.sourceRange ===
-				document.querySelector("[data-example-calendar]")?.getAttribute(
-					"data-example-source-range"
+				document.querySelector("[data-my-calendar]")?.getAttribute(
+					"data-test-source-range"
 				)
 		};
 	});
@@ -892,13 +1133,13 @@ test("compact toolbar grows and wraps long application content without clipping"
 	await expectExampleReady(page, "/examples/advanced/");
 	await page.evaluate(() => {
 		const today = document.querySelector(".lfc-calendar-today-button");
-		const legend = document.querySelector("[data-example-toolbar-end] legend");
+		const legend = document.querySelector("[data-my-toolbar-end] legend");
 		if (!(today instanceof HTMLButtonElement) || !(legend instanceof HTMLElement)) {
 			throw new Error("Expected compact toolbar content.");
 		}
 		today.textContent = "Return to the current schedule date";
 		legend.textContent = "Choose the event categories shown in this calendar";
-		for (const label of document.querySelectorAll("[data-example-toolbar-end] label")) {
+		for (const label of document.querySelectorAll("[data-my-toolbar-end] label")) {
 			label.append(document.createTextNode(" with an intentionally long localized label"));
 		}
 	});
@@ -925,8 +1166,8 @@ test("compact marker render hooks can visibly overflow their marker slot", async
 	await expectExampleReady(page, "/examples/advanced/");
 	await page.addStyleTag({
 		content: `
-			.advanced-example-event-marker { position: relative; }
-			[data-example-overflow-probe] {
+			.my-event-marker { position: relative; }
+			[data-test-overflow-probe] {
 				background: currentcolor;
 				block-size: 0.5rem;
 				border-radius: 50%;
@@ -940,16 +1181,16 @@ test("compact marker render hooks can visibly overflow their marker slot", async
 	const action = gridEventActions(page, "milestone:3").first();
 	await expect(action).toBeVisible();
 	await action.scrollIntoViewIfNeeded();
-	await action.locator(".advanced-example-event-marker").evaluate((marker) => {
+	await action.locator(".my-event-marker").evaluate((marker) => {
 		const probe = document.createElement("span");
-		probe.setAttribute("data-example-overflow-probe", "");
+		probe.setAttribute("data-test-overflow-probe", "");
 		marker.append(probe);
 	});
 
 	const result = await action.evaluate((eventAction) => {
 		const packageMarker = eventAction.querySelector(".lfc-calendar-event-marker");
 		const leading = eventAction.querySelector(".lfc-calendar-event-leading");
-		const probe = eventAction.querySelector("[data-example-overflow-probe]");
+		const probe = eventAction.querySelector("[data-test-overflow-probe]");
 		if (!(packageMarker instanceof HTMLElement) || !(leading instanceof HTMLElement) ||
 			!(probe instanceof HTMLElement)) {
 			throw new Error("Expected the package marker, leading slot, and overflow probe.");
@@ -1090,11 +1331,11 @@ test("crossing the compact container boundary changes only CSS layout", async ({
 
 	await page.evaluate(() => {
 		const selectors = [
-			"[data-example-calendar]",
+			"[data-my-calendar]",
 			".lfc-calendar-toolbar",
 			".lfc-calendar-title-button",
 			".lfc-calendar-grid",
-			'[data-example-event-surface="grid-summary"]'
+			'[data-test-event-surface="grid-summary"]'
 		];
 		const nodes = selectors.map((selector) => document.querySelector(selector));
 		if (nodes.some((node) => node === null)) {
@@ -1108,14 +1349,14 @@ test("crossing the compact container boundary changes only CSS layout", async ({
 			counters.stateMutations += records.length;
 		});
 		sourceObserver.observe(nodes[0], {
-			attributeFilter: ["data-example-source-range"],
+			attributeFilter: ["data-test-source-range"],
 			attributes: true
 		});
 		stateObserver.observe(document.documentElement, {
-			attributeFilter: ["data-example-phase", "data-example-ready"],
+			attributeFilter: ["data-test-phase", "data-test-ready"],
 			attributes: true
 		});
-		for (const stateElement of document.querySelectorAll("[data-example-state-phase], [data-example-state-month], [data-example-state-selected], [data-example-state-range], [data-example-state-issues]")) {
+		for (const stateElement of document.querySelectorAll("[data-my-state-phase], [data-my-state-month], [data-my-state-selected], [data-my-state-range], [data-my-state-issues]")) {
 			stateObserver.observe(stateElement, { childList: true, subtree: true });
 		}
 		Object.defineProperty(window, "__lfcResponsiveSnapshot", {
@@ -1143,11 +1384,11 @@ test("crossing the compact container boundary changes only CSS layout", async ({
 	const stability = await page.evaluate(() => {
 		const snapshot = window.__lfcResponsiveSnapshot;
 		const currentNodes = [
-			document.querySelector("[data-example-calendar]"),
+			document.querySelector("[data-my-calendar]"),
 			document.querySelector(".lfc-calendar-toolbar"),
 			document.querySelector(".lfc-calendar-title-button"),
 			document.querySelector(".lfc-calendar-grid"),
-			document.querySelector('[data-example-event-surface="grid-summary"]')
+			document.querySelector('[data-test-event-surface="grid-summary"]')
 		];
 		const signals = window.__lfcResponsiveSignals;
 		return {
@@ -1167,27 +1408,44 @@ test("crossing the compact container boundary changes only CSS layout", async ({
 	});
 });
 
-test("multiple-event presentations cross compact widths without DOM or hook churn", async ({ page }) => {
+test("event-overflow variants and their custom marker cross compact widths without churn", async ({ page }) => {
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
 	const presentation = await mountResponsiveMultipleEventFixture(page);
-	await expect(presentation.indicator).toBeHidden();
-	await expect(presentation.customOverflow).toBeVisible();
-	await expect(presentation.customOverflow).toHaveAttribute("aria-hidden", "true");
-	await expect(presentation.customOverflow).toHaveText("Wide 2 more");
-	await expect(presentation.defaultOverflow).toBeHidden();
+	await expect(presentation.compactOverflow).toBeHidden();
+	await expect(presentation.wideOverflow).toBeVisible();
+	await expect(presentation.wideOverflow).toHaveAttribute("aria-hidden", "true");
+	await expect(presentation.wideCustom).toHaveText("Wide 2 more");
+	await expect(presentation.wideDefault).toBeHidden();
 	await expect(presentation.overflow).toHaveAccessibleName(/View 2 more events/u);
-	await page.evaluate(() => {
+	const initialCalls = await page.evaluate(() => {
 		const current = window.__lfcResponsiveMultipleEventFixture;
 		current.snapshot = {
-			calls: { ...current.observations },
+			calls: {
+				compactCalls: current.observations.compactCalls,
+				markerCalls: current.observations.markerCalls,
+				wideCalls: current.observations.wideCalls
+			},
 			nodes: [
-				current.host.querySelector(".lfc-calendar-multiple-event-indicator"),
+				current.host.querySelector(
+					".lfc-calendar-event-overflow.lfc-is-compact"
+				),
 				current.host.querySelector(".lfc-calendar-grid-more"),
-				current.host.querySelector(".lfc-calendar-grid-more-custom-content"),
-				current.host.querySelector(".lfc-calendar-grid-more-default-content")
+				current.host.querySelector(
+					".lfc-calendar-event-overflow.lfc-is-wide"
+				),
+				current.host.querySelector("[data-test-responsive-compact-overflow]"),
+				current.host.querySelector("[data-test-responsive-wide-overflow]"),
+				current.host.querySelector(
+					".lfc-calendar-event-summary.lfc-is-compact-primary " +
+						".my-responsive-marker"
+				)
 			]
 		};
+		return current.snapshot.calls;
 	});
+	expect(initialCalls.compactCalls).toBe(1);
+	expect(initialCalls.markerCalls).toBeGreaterThan(0);
+	expect(initialCalls.wideCalls).toBe(1);
 
 	await setResponsiveMultipleEventFixtureWidth(page, 412);
 	await presentation.day.locator(":scope > .lfc-calendar-day-button").focus();
@@ -1197,140 +1455,422 @@ test("multiple-event presentations cross compact widths without DOM or hook chur
 	await expect(presentation.overflow).toBeFocused();
 	for (const width of [412, 320, 280]) {
 		await setResponsiveMultipleEventFixtureWidth(page, width);
-		await expect(presentation.indicator).toBeVisible();
-		await expect(presentation.indicator).toHaveAttribute("aria-hidden", "true");
-		await expect(presentation.indicator).toHaveCSS("pointer-events", "none");
-		await expect(presentation.indicator.locator(
-			":scope > .lfc-calendar-multiple-event-indicator-icon"
-		)).toHaveCount(1);
-		await expect(presentation.customOverflow).toBeHidden();
-		await expect(presentation.defaultOverflow).toBeVisible();
+		await expect(presentation.compactOverflow).toBeVisible();
+		await expect(presentation.compactOverflow).toHaveAttribute("aria-hidden", "true");
+		await expect(presentation.compactOverflow).toHaveCSS("pointer-events", "none");
+		await expect(presentation.compactCustom).toHaveText("+3");
+		await expect(presentation.overflow).toBeFocused();
+		await expect(presentation.wideOverflow).toBeVisible();
+		await expect(presentation.wideCustom).toHaveText("Wide 2 more");
 		await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 	}
 
 	await setResponsiveMultipleEventFixtureWidth(page, 768);
 	await expect(presentation.overflow).toBeFocused();
-	await expect(presentation.customOverflow).toBeHidden();
-	await expect(presentation.defaultOverflow).toBeVisible();
-	await presentation.day.locator(":scope > .lfc-calendar-day-button").focus();
-	await expect(presentation.customOverflow).toBeVisible();
+	await expect(presentation.compactOverflow).toBeHidden();
+	await expect(presentation.wideCustom).toBeVisible();
 	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 	const stability = await page.evaluate(() => {
 		const current = window.__lfcResponsiveMultipleEventFixture;
 		const nodes = [
-			current.host.querySelector(".lfc-calendar-multiple-event-indicator"),
+			current.host.querySelector(
+				".lfc-calendar-event-overflow.lfc-is-compact"
+			),
 			current.host.querySelector(".lfc-calendar-grid-more"),
-			current.host.querySelector(".lfc-calendar-grid-more-custom-content"),
-			current.host.querySelector(".lfc-calendar-grid-more-default-content")
+			current.host.querySelector(
+				".lfc-calendar-event-overflow.lfc-is-wide"
+			),
+			current.host.querySelector("[data-test-responsive-compact-overflow]"),
+			current.host.querySelector("[data-test-responsive-wide-overflow]"),
+			current.host.querySelector(
+				".lfc-calendar-event-summary.lfc-is-compact-primary " +
+					".my-responsive-marker"
+			)
 		];
 		return {
-			calls: current.observations,
-			callsStable: Object.entries(current.snapshot.calls).every(
-				([name, count]) => current.observations[name] === count
-			),
+			calls: {
+				compactCalls: current.observations.compactCalls,
+				markerCalls: current.observations.markerCalls,
+				wideCalls: current.observations.wideCalls
+			},
+			contexts: current.observations.contexts,
+			callsStable: current.observations.compactCalls === current.snapshot.calls.compactCalls &&
+				current.observations.markerCalls === current.snapshot.calls.markerCalls &&
+				current.observations.wideCalls === current.snapshot.calls.wideCalls,
 			nodesStable: current.snapshot.nodes.every((node, index) => node === nodes[index])
 		};
 	});
 	expect(stability).toEqual({
-		calls: { gridOverflowCalls: 1, multipleEventCalls: 1 },
+		calls: initialCalls,
 		callsStable: true,
+		contexts: [
+			{
+				eventCount: 4,
+				overflowCount: 3,
+				text: "+3",
+				variant: "compact",
+				visibleEventCount: 1
+			},
+			{
+				eventCount: 4,
+				overflowCount: 2,
+				text: "2 more",
+				variant: "wide",
+				visibleEventCount: 2
+			}
+		],
 		nodesStable: true
 	});
 });
 
-test("the 320px host floor keeps the full fan before sub-floor compaction", async ({ page }) => {
+test("the built-in social counter stays bare and stable across the 320px host floor", async ({ page }) => {
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
-	const presentation = await mountResponsiveMultipleEventFixture(page, { width: 320 });
-	await expect(presentation.indicator).toHaveCSS("max-inline-size", "35%");
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		compactDayMinBlockSize: "10rem",
+		customOverflow: false,
+		width: 320
+	});
+	await expect(presentation.compactDefault).toBeVisible();
+	await expect(presentation.compactDefault).toHaveText("+3");
+	expectPairedCompactOverflowLayout(
+		await getCompactOverflowLayoutGeometry(presentation.day, {
+			inspectPairedRoots: true
+		}),
+		{ direction: "ltr", layout: "stack" }
+	);
+	const bareVisual = await presentation.compactDefault.evaluate((element) => {
+		const style = getComputedStyle(element);
+		return {
+			backgroundColor: style.backgroundColor,
+			boxShadow: style.boxShadow,
+			fontWeight: Number.parseInt(style.fontWeight, 10)
+		};
+	});
+	expect(bareVisual.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+	expect(bareVisual.boxShadow).toBe("none");
+	expect(bareVisual.fontWeight).toBeGreaterThanOrEqual(600);
 
 	await setResponsiveMultipleEventFixtureWidth(page, 319);
-	await expect(presentation.indicator).toHaveCSS("max-inline-size", "20%");
+	await expect(presentation.compactDefault).toHaveText("+3");
+	expectPairedCompactOverflowLayout(
+		await getCompactOverflowLayoutGeometry(presentation.day, {
+			inspectPairedRoots: true
+		}),
+		{ direction: "ltr", layout: "stack" }
+	);
 	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 
 	await setResponsiveMultipleEventFixtureWidth(page, 320);
 	await page.addStyleTag({ content: "html { font-size: 200%; }" });
-	await expect(presentation.indicator).toHaveCSS("max-inline-size", "35%");
-	expect(await getResponsiveMultipleEventGeometry(presentation.day)).toEqual({
-		containedInDay: true,
-		direction: "ltr",
-		indicatorOnRight: true,
-		intersectsMarker: false,
-		intersectsSatellite: false,
-		satelliteOnInlineEnd: true
-	});
+	await expect(presentation.compactDefault).toHaveText("+3");
+	expectPairedCompactOverflowLayout(
+		await getCompactOverflowLayoutGeometry(presentation.day, {
+			inspectPairedRoots: true
+		}),
+		{ direction: "ltr", layout: "stack" }
+	);
 	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 });
 
 for (const direction of ["ltr", "rtl"]) {
-	for (const markerSize of ["1.25rem", "2rem"]) {
-		test(`compact ${direction.toUpperCase()} keeps the default cue clear of a ${markerSize} marker and its inline-end satellite`, async ({ page }) => {
+	test(`compact ${direction.toUpperCase()} keeps paired overflow roots aligned while reflowing`, async ({ page }) => {
+		await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+		const presentation = await mountResponsiveMultipleEventFixture(page, {
+			compactDayMinBlockSize: "10rem",
+			customOverflow: false,
+			direction,
+			width: 660
+		});
+		for (const [width, layout] of [
+			[660, "row"],
+			[412, "stack"],
+			[390, "stack"],
+			[320, "stack"],
+			[280, "stack"]
+		]) {
+			await setResponsiveMultipleEventFixtureWidth(page, width);
+			await expect(presentation.compactOverflow).toBeVisible();
+			await expect(presentation.compactDefault).toHaveText("+3");
+			expectPairedCompactOverflowLayout(
+				await getCompactOverflowLayoutGeometry(presentation.day, {
+					inspectPairedRoots: true
+				}),
+				{ direction, layout }
+			);
+			await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+		}
+	});
+}
+
+for (const direction of ["ltr", "rtl"]) {
+	test(`compact ${direction.toUpperCase()} contains the social counter at 200% text size`, async ({ page }) => {
+		await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+		const presentation = await mountResponsiveMultipleEventFixture(page, {
+			compactDayMinBlockSize: "10rem",
+			customOverflow: false,
+			direction,
+			width: 390
+		});
+		await page.addStyleTag({ content: "html { font-size: 200%; }" });
+		await expect(presentation.compactOverflow).toBeVisible();
+		await expect.poll(() => page.evaluate(() =>
+			Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+		)).toBe(REFLOW_ROOT_FONT_SIZE);
+		expectPairedCompactOverflowLayout(
+			await getCompactOverflowLayoutGeometry(presentation.day, {
+				inspectPairedRoots: true
+			}),
+			{ direction, layout: "stack" }
+		);
+		await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+	});
+}
+
+test("the compact counter remains contained at 400% browser zoom", async ({ context, page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_280 });
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		compactDayMinBlockSize: "10rem",
+		customOverflow: false,
+		width: 320
+	});
+	const session = await context.newCDPSession(page);
+	try {
+		await session.send("Emulation.setPageScaleFactor", { pageScaleFactor: 4 });
+		await expect.poll(() => page.evaluate(() => visualViewport?.scale ?? 1)).toBe(4);
+		await expect(presentation.compactDefault).toHaveText("+3");
+		expectPairedCompactOverflowLayout(
+			await getCompactOverflowLayoutGeometry(presentation.day, {
+				inspectPairedRoots: true
+			}),
+			{ direction: "ltr", layout: "stack" }
+		);
+		await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+	} finally {
+		await session.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1 });
+	}
+});
+
+test("the built-in compact counter stays visible in dark color scheme", async ({ page }) => {
+	await page.emulateMedia({ colorScheme: "dark" });
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		customOverflow: false,
+		width: 390
+	});
+	const visual = await presentation.compactDefault.evaluate((element) => {
+		const style = getComputedStyle(element);
+		return {
+			color: style.color,
+			display: style.display
+		};
+	});
+	expect(await page.evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches)).toBe(true);
+	expect(visual.display).not.toBe("none");
+	expect(visual.color).not.toBe("rgba(0, 0, 0, 0)");
+	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+});
+
+for (const direction of ["ltr", "rtl"]) {
+	for (const customOverflow of [false, true]) {
+		const contentKind = customOverflow ? "custom" : "built-in";
+		test(`a 2rem ${direction.toUpperCase()} marker stays clear of ${contentKind} compact overflow`, async ({ page }) => {
 			await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
 			const presentation = await mountResponsiveMultipleEventFixture(page, {
+				compactDayMinBlockSize: "10rem",
+				compactCustomSize: customOverflow ? "2rem" : null,
+				customOverflow,
 				direction,
-				markerSize,
-				width: 412
+				markerSize: "2rem",
+				width: 660
 			});
-			for (const width of [412, 320, 280]) {
+			for (const [width, layout] of [[660, "row"], [412, "stack"], [390, "stack"]]) {
 				await setResponsiveMultipleEventFixtureWidth(page, width);
-				await expect(presentation.indicator).toBeVisible();
-				expect(await getResponsiveMultipleEventGeometry(presentation.day)).toEqual({
-					containedInDay: true,
-					direction,
-					indicatorOnRight: true,
-					intersectsMarker: false,
-					intersectsSatellite: false,
-					satelliteOnInlineEnd: true
-				});
+				await expect(presentation.compactOverflow).toBeVisible();
+				if (customOverflow) {
+					await expect(presentation.compactCustom).toHaveText("+3");
+				} else {
+					await expect(presentation.compactDefault).toHaveText("+3");
+				}
+				expectPairedCompactOverflowLayout(
+					await getCompactOverflowLayoutGeometry(presentation.day, {
+						inspectPairedRoots: true
+					}),
+					{ direction, layout }
+				);
+				const clearance = await getCompactMarkerClearanceGeometry(
+					presentation.day,
+					{ customOverflow }
+				);
+				expect(Math.abs(clearance.markerInlineSize - 32)).toBeLessThanOrEqual(1);
+				expect(Math.abs(clearance.markerBlockSize - 32)).toBeLessThanOrEqual(1);
+				expect(clearance.contentContainedInRoot).toBe(true);
+				expect(clearance.contentHasArea).toBe(true);
+				if (customOverflow) {
+					expect(Math.abs(clearance.contentInlineSize - 32)).toBeLessThanOrEqual(1);
+					expect(Math.abs(clearance.contentBlockSize - 32)).toBeLessThanOrEqual(1);
+				}
+				expect(clearance.markerIntersectsContent).toBe(false);
+				expect(clearance.markerIntersectsRoot).toBe(false);
+				expect(clearance.overflowHasArea).toBe(true);
 				await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 			}
 		});
 	}
 }
 
-for (const direction of ["ltr", "rtl"]) {
-	test(`compact ${direction.toUpperCase()} contains the multiple-event cue at 200% text size`, async ({ page }) => {
-		await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
-		const presentation = await mountResponsiveMultipleEventFixture(page, {
-			direction,
-			width: 390
-		});
-		await page.addStyleTag({ content: "html { font-size: 200%; }" });
-		await expect(presentation.indicator).toBeVisible();
-		await expect.poll(() => page.evaluate(() =>
-			Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
-		)).toBe(REFLOW_ROOT_FONT_SIZE);
-		expect(await getResponsiveMultipleEventGeometry(presentation.day)).toEqual({
-			containedInDay: true,
-			direction,
-			indicatorOnRight: true,
-			intersectsMarker: false,
-			intersectsSatellite: false,
-			satelliteOnInlineEnd: true
-		});
-		await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+test("a passive compact counter hit selects the day instead of activating the primary event", async ({ page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		customOverflow: false,
+		width: 390
 	});
-}
+	const cueBox = await presentation.compactOverflow.boundingBox();
+	expect(cueBox).not.toBeNull();
+	await page.mouse.click(
+		(cueBox?.x ?? 0) + ((cueBox?.width ?? 0) / 2),
+		(cueBox?.y ?? 0) + ((cueBox?.height ?? 0) / 2)
+	);
+	await expect.poll(() => page.evaluate(() => ({
+		daySelectCalls: window.__lfcResponsiveMultipleEventFixture.observations.daySelectCalls,
+		eventActivateCalls: window.__lfcResponsiveMultipleEventFixture.observations.eventActivateCalls
+	}))).toEqual({ daySelectCalls: 1, eventActivateCalls: 0 });
+});
+
+test("a missing primary marker produces a standalone unsigned total", async ({ page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		compactDayMinBlockSize: "10rem",
+		customOverflow: false,
+		eventCount: 1_250,
+		renderMarker: false,
+		width: 390
+	});
+	await expect(presentation.marker).toHaveCount(0);
+	await expect(presentation.compactDefault).toHaveText("1.3K");
+	await expect(presentation.day.locator(":scope > .lfc-calendar-day-button"))
+		.toHaveAccessibleName("Thursday, August 6, 2026, 1,250 events");
+	const standaloneGeometry = await getCompactOverflowLayoutGeometry(presentation.day);
+	expectCompactOverflowAtBlockEnd(standaloneGeometry);
+	expect(standaloneGeometry.targetInlineCenterDelta).toBeLessThanOrEqual(1);
+	expect(standaloneGeometry.compactInlineCenterDelta).toBeLessThanOrEqual(1);
+	await expect(presentation.cluster).not.toHaveClass(/lfc-has-compact-primary-visual/u);
+	const compactContext = await page.evaluate(() =>
+		window.__lfcResponsiveMultipleEventFixture.observations.contexts.find(
+			(context) => context.variant === "compact"
+		)
+	);
+	expect(compactContext).toEqual({
+		eventCount: 1_250,
+		overflowCount: 1_250,
+		text: "1.3K",
+		variant: "compact",
+		visibleEventCount: 0
+	});
+	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+});
+
+test("a single event renders no overflow variant", async ({ page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		customOverflow: false,
+		eventCount: 1,
+		width: 390
+	});
+	await expect(presentation.compactOverflow).toHaveCount(0);
+	await expect(presentation.wideOverflow).toHaveCount(0);
+	await expect(presentation.overflow).toHaveCount(0);
+	expect(await page.evaluate(() => ({
+		compactCalls: window.__lfcResponsiveMultipleEventFixture.observations.compactCalls,
+		wideCalls: window.__lfcResponsiveMultipleEventFixture.observations.wideCalls
+	}))).toEqual({ compactCalls: 0, wideCalls: 0 });
+});
 
 test("a zero grid-event cap uses the compact overflow action without a duplicate cue", async ({ page }) => {
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
 	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		compactDayMinBlockSize: "10rem",
 		maxGridEventsPerDay: 0,
 		width: 390
 	});
 	await expect(presentation.day.locator(".lfc-calendar-event-summary")).toHaveCount(0);
-	await expect(presentation.indicator).toBeHidden();
-	await expect(presentation.indicator.locator(
-		":scope > .lfc-calendar-multiple-event-indicator-icon"
-	)).toHaveCount(1);
+	await expect(presentation.day.locator(
+		":scope > .lfc-calendar-day-summaries > .lfc-calendar-event-overflow-cluster " +
+			".lfc-calendar-event-overflow.lfc-is-compact"
+	)).toHaveCount(0);
 	await expect(presentation.overflow).toHaveClass(/lfc-is-compact-primary/u);
 	await expect(presentation.overflow).toBeVisible();
-	await expect(presentation.customOverflow).toBeHidden();
-	await expect(presentation.defaultOverflow).toBeVisible();
+	await expect(presentation.compactOverflow).toHaveCount(1);
+	await expect(presentation.compactCustom).toBeVisible();
+	await expect(presentation.compactCustom).toHaveText("4");
+	await expect(presentation.wideOverflow).toBeHidden();
+	await expect(presentation.overflow).toHaveAccessibleName(/View 4 more events/u);
+	const compactActionGeometry = await getCompactOverflowLayoutGeometry(presentation.day, {
+		targetSelector: ".lfc-calendar-grid-more.lfc-is-compact-primary"
+	});
+	expectCompactOverflowAtBlockEnd(compactActionGeometry);
+	expect(compactActionGeometry.targetInlineCenterDelta).toBeLessThanOrEqual(1);
+	expect(compactActionGeometry.compactInlineCenterDelta).toBeLessThanOrEqual(1);
 	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+
+	const previousDay = presentation.host.locator(
+		'.lfc-calendar-day-button[data-lfc-date="2026-08-05"]'
+	);
+	await previousDay.click();
+	const selectionCalls = await page.evaluate(() =>
+		window.__lfcResponsiveMultipleEventFixture.observations.daySelectCalls
+	);
+	const compactBox = await presentation.compactOverflow.boundingBox();
+	expect(compactBox).not.toBeNull();
+	await page.mouse.click(
+		(compactBox?.x ?? 0) + ((compactBox?.width ?? 0) / 2),
+		(compactBox?.y ?? 0) + ((compactBox?.height ?? 0) / 2)
+	);
+	await expect(presentation.day).toHaveAttribute("aria-selected", "true");
+	await expect.poll(() => page.evaluate(() => {
+		const host = window.__lfcResponsiveMultipleEventFixture.host;
+		const agenda = host.querySelector(".lfc-calendar-agenda");
+		const headingId = agenda?.getAttribute("aria-labelledby");
+		return {
+			daySelectCalls: window.__lfcResponsiveMultipleEventFixture.observations.daySelectCalls,
+			focusedAgendaHeading: headingId !== null && document.activeElement ===
+				document.getElementById(headingId)
+		};
+	})).toEqual({ daySelectCalls: selectionCalls, focusedAgendaHeading: true });
+
+	for (const key of ["Enter", "Space"]) {
+		await previousDay.click();
+		const keyboardSelectionCalls = await page.evaluate(() =>
+			window.__lfcResponsiveMultipleEventFixture.observations.daySelectCalls
+		);
+		const targetDayButton = presentation.day.locator(
+			":scope > .lfc-calendar-day-button"
+		);
+		await targetDayButton.focus();
+		await page.keyboard.press("F2");
+		await expect(presentation.overflow).toBeFocused();
+		await page.keyboard.press(key);
+		await expect(presentation.day).toHaveAttribute("aria-selected", "true");
+		await expect.poll(() => page.evaluate(() => {
+			const current = window.__lfcResponsiveMultipleEventFixture;
+			const agenda = current.host.querySelector(".lfc-calendar-agenda");
+			const headingId = agenda?.getAttribute("aria-labelledby");
+			return {
+				daySelectCalls: current.observations.daySelectCalls,
+				eventActivateCalls: current.observations.eventActivateCalls,
+				focusedAgendaHeading: headingId !== null && document.activeElement ===
+					document.getElementById(headingId)
+			};
+		})).toEqual({
+			daySelectCalls: keyboardSelectionCalls,
+			eventActivateCalls: 0,
+			focusedAgendaHeading: true
+		});
+	}
 
 	await setResponsiveMultipleEventFixtureWidth(page, 768);
 	await expect(presentation.overflow).toBeVisible();
-	await expect(presentation.customOverflow).toBeHidden();
-	await expect(presentation.defaultOverflow).toBeVisible();
+	await expect(presentation.compactOverflow).toBeHidden();
+	await expect(presentation.wideCustom).toBeVisible();
+	await expect(presentation.wideCustom).toHaveText("Wide 4 more");
 	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 });

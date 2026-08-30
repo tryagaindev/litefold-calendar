@@ -1,6 +1,6 @@
 # Accessibility
 
-litefold-calendar is designed to support integration into WCAG 2.2 AA conforming pages when used according to this guidance. WCAG conformance applies to complete pages and processes, not an isolated component. Applications remain responsible for surrounding structure, content, contrast overrides, focus transitions outside the calendar, and end-to-end assistive-technology testing.
+Litefold Calendar is designed to support integration into WCAG 2.2 AA conforming pages when used according to this guidance. WCAG conformance applies to complete pages and processes, not an isolated component. Applications remain responsible for surrounding structure, content, contrast overrides, focus transitions outside the calendar, and end-to-end assistive-technology testing.
 
 Application developers can start with [Integration responsibilities](#integration-responsibilities) and run the relevant scenarios under [Testing](#testing). Contributors changing package interaction, semantics, layout, or announcements must also preserve the detailed contracts in the preceding sections.
 
@@ -35,7 +35,7 @@ Event representation follows native semantics:
 
 Direct event activation on either surface never selects the day or invokes `onDaySelect`. The selected-day agenda remains below the grid at every width and uses ordered-list markup.
 
-Grid overflow is a native action named from its date and hidden count; its default label is “View {count} more {eventLabel} for {date}”. A render hook may replace only the action's non-compact visual content. The custom slot is `aria-hidden`; the native button, canonical localized text, accessible label, activation, and agenda-focus transfer remain package-owned. Activating overflow selects the represented date, resets agenda expansion, focuses the agenda heading, and does not invoke `onDaySelect`.
+Grid overflow is a native action named from its date and hidden count; its default label is “View {count} more {eventLabel} for {date}”. `renderEventOverflow` may replace its pre-rendered compact and wide visual content, but each custom slot is `aria-hidden` and noninteractive. The native button, accessible label, activation, and agenda-focus transfer remain package-owned; `context.text` retains the package-formatted fallback value even when custom content replaces that fallback visually. Activating overflow selects the represented date, resets agenda expansion, focuses the agenda heading, and does not invoke `onDaySelect`.
 
 Replacing event input keeps package-owned focus on the same day or event occurrence when it still exists. If a focused event disappears, focus returns to its owning day; focus outside the calendar is not moved.
 
@@ -51,9 +51,9 @@ Optional WebMCP navigation uses the same programmatic navigation paths and never
 
 ## Loading, errors, and announcements
 
-- The calendar marks the affected region `aria-busy` during source work.
+- The calendar marks the host and grid `aria-busy` only when a source invocation returns a PromiseLike. A direct static array, array-returning provider, or immediate failure commits its terminal state without a busy phase.
 - Routine loading is not repeatedly announced.
-- Accepted event replacement uses the same busy, silent-loading, and current/degraded source-failure routes as refetching; usable same-range content stays available when a replacement fails.
+- Accepted event replacement and refetching follow each result's shape. PromiseLike work uses the silent busy/loading route; direct results commit immediately. Usable same-range content stays available when a replacement fails.
 - Persistent package errors appear between the toolbar and grid.
 - Failures that prevent continuation, and failed user-initiated actions requiring immediate attention, are assertive; degraded-data and render-hook warnings are polite. Registered-extension failures are diagnostic-only and silent.
 - The package does not move focus for ordinary asynchronous failures.
@@ -69,7 +69,7 @@ The component uses CSS container queries rather than viewport width or JavaScrip
 
 The [responsive design](DESIGN.md#responsive-model) exposes every capped event action in wide layouts and compacts the grid presentation when space is limited. The first actionable event remains fully named and later actions remain reachable when focused. Titles, times, and overflow information stay available in agenda rows, with visible/total progress for content beyond `agendaDomLimit`.
 
-At compact widths, every in-range day with more than one total event occurrence may show a three-layer event-slip fan. The fan is decorative, `aria-hidden`, and pointer-transparent; it never substitutes for the authoritative exact count in the day button's accessible name. It is independent of whether the events are static or actionable and of how many grid summaries fit under `maxGridEventsPerDay`. When the native overflow action is the compact-primary control, the fan is hidden to avoid a duplicate visual indication. These presentation choices do not change the first actionable event, F2 entry, action order, pointer activation, or agenda content.
+At compact widths, every in-range day with more than one total event occurrence may show a locale-aware social-style number. With a visible primary marker it reports the additional occurrences with a sign, such as `+1`; without a visible primary it reports the unsigned total, such as `2`. The package aligns a primary marker/action and passive count at the cell's block end in two equal, gap-free auto-fitting grid blocks. Their centers evenly divide the full area beneath the date when both compact-control-size tracks, 44 CSS pixels by default, fit; otherwise they stack as centered, equal full-width rows. They remain stacked through supported phone widths and share one row only near the compact ceiling; a markerless total remains one centered block. Consumer compact hook output must remain concise enough for its assigned block because the auto-fit threshold cannot account for arbitrary intrinsic content width. A passive day-level count is decorative, `aria-hidden`, pointer-transparent, unfocusable, and independent of how many grid summaries fit under `maxGridEventsPerDay`; tapping it selects the day rather than activating the first event. When the native overflow action is the compact-primary control, including with `maxGridEventsPerDay: 0`, its compact number remains inside that single package-owned action, whose canonical name and activation remain authoritative. Neither form substitutes for the exact total in the day button's accessible name or changes F2 entry, action order, pointer activation, or agenda content.
 
 Marker and leading slots allow visual overflow while text slots own clipping and ellipsis. Render hooks may add noninteractive marker details without having them cut off, but applications remain responsible for avoiding overlap with names, focus rings, and adjacent actions. Empty slots do not reserve space.
 
@@ -96,7 +96,7 @@ Applications must:
 - Give the calendar host a meaningful surrounding heading or region label in the page context.
 - Preserve visible focus indicators and sufficient text, control, focus-ring, selected-state, warning, and error contrast when overriding tokens.
 - Provide useful event titles. Do not rely on `accentColor` to convey category, status, or urgency.
-- Add visible type/status text through event render-hook nodes when the distinction matters. Use the non-null `elements.action` anchor/button supplied to `eventDidMount` to provide a matching accessible name when needed. Decorative day badges, the multiple-event cue, and static visual summaries cannot be the only status channel.
+- Add visible type/status text through event render-hook nodes when the distinction matters. Use the non-null `elements.action` anchor/button supplied to `eventDidMount` to provide a matching accessible name when needed. Decorative day badges, compact event-overflow cues, and static visual summaries cannot be the only status channel.
 - Keep render-hook output concise and noninteractive; nested controls do not belong inside event actions.
 - Return action promises so the package can surface rejection.
 - Keep `onAnnounce`, `onStateChange`, and `isEventContextMenuAvailable` synchronous. The availability predicate must return a boolean; a throw, non-boolean, or thenable fails closed and reports one recoverable integration issue.
@@ -122,7 +122,7 @@ The [DESIGN.md motion treatment](DESIGN.md#pager-direction-and-motion) is presen
 
 ## Testing
 
-Automated unit/DOM and pinned-Chromium checks cover semantics, native links/buttons, F2/Escape/Tab behavior, focus retention, the compact multiple-event cue, customizable wide overflow content, compact layout, RTL, reflow, normal and reduced selection feedback, native pager semantics and fallbacks, optional WebMCP navigation without focus or callback side effects, forced colors, error announcements, hostile content, and automated accessibility rules. These checks gate every release.
+Automated unit/DOM and pinned-Chromium checks cover semantics, native links/buttons, F2/Escape/Tab behavior, focus retention, compact and wide event-overflow customization, compact layout, RTL, reflow, normal and reduced selection feedback, native pager semantics and fallbacks, optional WebMCP navigation without focus or callback side effects, forced colors, error announcements, hostile content, and automated accessibility rules. These checks gate every release.
 
 Manual browser and assistive-technology evidence is risk-based. Repeat the affected procedure and matrix rows when a change can alter interaction, semantics, accessible names, focus, announcements, responsive behavior, visual preferences, browser support, or the surrounding developer demo. An unrelated alpha can reuse still-applicable dated evidence. Complete the full supported matrix before stable promotion and after a support-policy change that invalidates the prior baseline. Automated results are necessary but not sufficient for claims about real browser/assistive-technology combinations.
 
@@ -138,20 +138,21 @@ Manual test procedure (run the affected groups for a focused change and all grou
 3. **Selection, events, and replacement**
    - Select a different in-range day with pointer and keyboard activation. Confirm state, focus, and agenda update before the optional whole-cell color and date-number feedback, and confirm selection and focus outlines remain continuously visible through its final frame and cleanup. Repeat with reduced motion and confirm the settled state appears immediately.
    - Activate linked and callback-driven events directly from the grid without selecting the day, exercise overflow focus transfer, then reach the ordered agenda and repeat.
-   - For zero-, one-, and multiple-event days, confirm the compact cue remains decorative while the day button announces the exact total. Confirm a compact-primary overflow action suppresses the cue without changing F2, Arrow, Escape, Tab, pointer, or agenda behavior.
+   - For zero-, one-, and multiple-event days, confirm the compact cue is absent for zero and one, reports signed additional occurrences when paired with a primary marker, reports the unsigned total in one centered block when standalone, and remains decorative while the day button announces the exact total. Confirm `maxGridEventsPerDay: 0` keeps the compact fallback inside one package-owned overflow action without changing F2, Arrow, Escape, Tab, pointer, or agenda behavior.
    - Replace event input while a grid and agenda event owns focus. Confirm an existing occurrence keeps focus, a removed occurrence falls back to its day, and external focus is left alone.
 4. **Direct-input paging**
    - With touch, pen, and a horizontal precision-scrolling device, confirm taps still select, vertical scrolling and pinch zoom remain available, an uncommitted or boundary pull recenters without selecting a day, and a committed LTR or RTL pull changes exactly one month.
    - Confirm decorative lanes are absent from the accessibility tree, Tab does not enter the paging viewport, no adjacent provider request occurs before commit, Previous/Next remain usable, and `swipe: false` disables only the pull route.
    - Repeat with reduced motion. Direct tracking must remain available, CSS snap settling must be absent, and the terminal commit or recenter must use no authored interpolation.
 5. **Failures and announcements**
+	- Navigate, refetch, and replace events with a direct array result. Confirm one terminal render, no `loading` state, and no `aria-busy`. Repeat with a controlled PromiseLike and confirm one busy/loading render followed by one terminal render that clears busy.
    - Trigger an initial source failure, retained-data refresh failure, action rejection, render-hook failure, Retry failure, successful Retry, and registered-extension failure.
    - Confirm each presented message is spoken once with suitable urgency and no unexpected focus jump. Confirm the registered-extension failure reaches diagnostics only, with no visible status or announcement.
 6. **Responsive layout and visual preferences**
    - Repeat the preceding tasks at 320, 340, 360, 375, 390, 412, and 768 CSS pixels of component width; test LTR and RTL, light and dark color schemes, increased contrast, forced colors, reduced motion, 200% text size, 400% zoom, and portrait orientation as applicable.
    - Run 280 CSS pixels separately as a best-effort robustness stress check.
    - Confirm the month/year title stays on one line without horizontal overflow and retains its complete accessible text when visually ellipsized.
-   - With a generic `1.25rem` custom marker and a noninteractive inline-end satellite, confirm the compact fan does not intersect either element or introduce horizontal overflow.
+   - With an allowed `2rem` custom marker and a noninteractive inline-end satellite, confirm the primary/count blocks remain equally sized, gap-free, and aligned at the cell's block end; they stay in centered equal full-width rows throughout supported phone widths; their centers evenly divide the full area beneath the date when both compact-control-size tracks fit near the compact ceiling; and they introduce no intersection or horizontal overflow. Confirm custom compact overflow output is concise enough to remain within its assigned block.
 7. **Application integration**
    - Repeat affected tasks with application toolbar, progressive fallback, and render-hook content enabled.
 8. **WebMCP, when enabled**

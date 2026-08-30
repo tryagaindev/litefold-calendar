@@ -3,13 +3,13 @@ import { join } from "node:path";
 
 import { REPOSITORY_ROOT, runTsc } from "./lib/process.mjs";
 import { extractExtensionEntries, readPackageManifest } from "./lib/package-entries.mjs";
-import { composeStyles } from "./lib/styles.mjs";
+import { composeDistributedStyles } from "./lib/styles.mjs";
 
 const DIST_DIRECTORY = join(REPOSITORY_ROOT, "dist");
 const SOURCE_STYLE_TYPES = join(REPOSITORY_ROOT, "src", "styles.css.d.ts");
 const extensionEntries = extractExtensionEntries(await readPackageManifest());
 
-const packageStyles = await composeStyles();
+const packageStyles = await composeDistributedStyles();
 await rm(DIST_DIRECTORY, { force: true, recursive: true });
 await runTsc(["-p", "tsconfig.build.json", "--pretty", "false"]);
 await mkdir(DIST_DIRECTORY, { recursive: true });

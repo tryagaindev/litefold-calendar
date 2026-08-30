@@ -15,11 +15,11 @@ test("advanced example exposes semantic calendar structure without automated WCA
 	await expectOnlyOneGridTabStop(grid);
 	await expect(grid.locator("time[datetime]").first()).toBeVisible();
 
-	const agenda = page.locator("[data-example-calendar] ol");
+	const agenda = page.locator("[data-my-calendar] ol");
 	await expect(agenda).toHaveCount(1);
 	await expect(agenda.locator(":scope > li").first()).toBeVisible();
 	await expect(agenda.locator("time[datetime]").first()).toBeVisible();
-	const instructions = page.locator("[data-example-grid-instructions]");
+	const instructions = page.locator("[data-my-grid-instructions]");
 	await expect(instructions).not.toHaveText("");
 	const instructionId = await instructions.getAttribute("id");
 	expect(instructionId).not.toBeNull();
@@ -34,7 +34,7 @@ test("advanced example exposes semantic calendar structure without automated WCA
 test("migration recipe is operable and passes automated accessibility checks", async ({ page }, testInfo) => {
 	await expectExampleReady(page, "/examples/fullcalendar-v6-migration/");
 	await expect(page.getByRole("grid")).toBeVisible();
-	await expect(page.locator("[data-example-activation]")).toBeVisible();
+	await expect(page.locator("[data-my-activation]")).toBeVisible();
 	await expectNoAutomatedAccessibilityViolations(page, testInfo);
 });
 
@@ -49,13 +49,13 @@ test("progressive enhancement keeps useful semantic content without JavaScript",
 		const page = await context.newPage();
 		const response = await page.goto("/examples/progressive-enhancement/");
 		expect(response?.ok()).toBe(true);
-		const fallback = page.locator("[data-example-fallback]");
+		const fallback = page.locator("[data-my-fallback]");
 		await expect(fallback).toBeVisible();
 		await expect(fallback.locator("ol > li")).not.toHaveCount(0);
 		const eventLink = fallback.getByRole("link", { name: "Calendar design review" });
 		await expect(eventLink).toBeVisible();
 		await expect(fallback.locator("time[datetime]").first()).toBeVisible();
-		await expect(page.locator("[data-example-calendar]")).toBeEmpty();
+		await expect(page.locator("[data-my-calendar]")).toBeEmpty();
 
 		const [eventResponse] = await Promise.all([
 			page.waitForNavigation(),
@@ -65,8 +65,8 @@ test("progressive enhancement keeps useful semantic content without JavaScript",
 		const eventUrl = new URL(page.url());
 		expect(eventUrl.searchParams.get("event")).toBe("design-review");
 		expect(eventUrl.searchParams.get("from")).toBe("fallback");
-		expect(eventUrl.hash).toBe("#server-schedule");
-		await expect(page.locator("#server-schedule")).toBeVisible();
+		expect(eventUrl.hash).toBe("#my-server-schedule");
+		await expect(page.locator("#my-server-schedule")).toBeVisible();
 	} finally {
 		await context.close();
 	}
@@ -74,28 +74,28 @@ test("progressive enhancement keeps useful semantic content without JavaScript",
 
 test("progressive enhancement coordinates fallback with usable and unavailable states", async ({ page }, testInfo) => {
 	await expectExampleReady(page, "/examples/progressive-enhancement/");
-	const fallback = page.locator("[data-example-fallback]");
+	const fallback = page.locator("[data-my-fallback]");
 	await expect(fallback).toBeHidden();
 	await page.clock.install();
 	await page.clock.pauseAt(Date.now() + 1_000);
 
-	await page.locator('[data-example-rebuild="failure"]').click();
-	await expect(page.locator('html[data-example-phase="loading"]')).toHaveCount(1);
-	await expect(page.locator('html[data-example-ready="false"]')).toHaveCount(1);
+	await page.locator('[data-my-rebuild="failure"]').click();
+	await expect(page.locator('html[data-test-phase="loading"]')).toHaveCount(1);
+	await expect(page.locator('html[data-test-ready="false"]')).toHaveCount(1);
 	await expect(fallback).toBeVisible();
 	await page.clock.runFor(80);
-	await expect(page.locator('html[data-example-phase="unavailable"]')).toHaveCount(1);
+	await expect(page.locator('html[data-test-phase="unavailable"]')).toHaveCount(1);
 	await expect(fallback).toBeVisible();
-	await expect(page.locator("[data-example-announcer-assertive]")).not.toBeEmpty();
+	await expect(page.locator("[data-my-announcer-assertive]")).not.toBeEmpty();
 
-	await page.locator('[data-example-rebuild="success"]').click();
-	await expect(page.locator('html[data-example-phase="loading"]')).toHaveCount(1);
-	await expect(page.locator('html[data-example-ready="false"]')).toHaveCount(1);
+	await page.locator('[data-my-rebuild="success"]').click();
+	await expect(page.locator('html[data-test-phase="loading"]')).toHaveCount(1);
+	await expect(page.locator('html[data-test-ready="false"]')).toHaveCount(1);
 	await expect(fallback).toBeVisible();
 	await page.clock.runFor(80);
-	await expect(page.locator('html[data-example-ready="true"]')).toHaveCount(1);
+	await expect(page.locator('html[data-test-ready="true"]')).toHaveCount(1);
 	await expect(fallback).toBeHidden();
-	await expect(page.locator("[data-example-announcer-assertive]")).toBeEmpty();
+	await expect(page.locator("[data-my-announcer-assertive]")).toBeEmpty();
 	await page.clock.resume();
 	await expectNoAutomatedAccessibilityViolations(page, testInfo);
 });

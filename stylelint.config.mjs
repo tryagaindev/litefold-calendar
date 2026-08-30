@@ -3,18 +3,19 @@ const NON_SENTINEL_PIXEL_VALUE = /(?:^|[\s,(])(?!(?:-?1px)\b)-?(?:\d+(?:\.\d+)?|
 export default {
 	extends: ["stylelint-config-standard"],
 	ignoreFiles: ["dist/**"],
-	referenceFiles: ["src/**/*.css", "examples/**/*.css"],
+	referenceFiles: ["src/**/*.css", "examples/**/*.css", "scripts/pages-site/*.css"],
 	overrides: [
 		{
-			files: ["examples/**/*.css"],
+			files: ["examples/**/*.css", "scripts/pages-site/*.css"],
 			rules: {
-				"container-name-pattern": "^(?:(?:advanced-)?example|lfc)-[a-z0-9]+(?:-[a-z0-9]+)*$",
-				"custom-property-pattern": "^(?:advanced|example|lfc)-[a-z0-9]+(?:-[a-z0-9]+)*$",
+				"container-name-pattern": "^(?:my-[a-z0-9]+(?:-[a-z0-9]+)*|lfc-(?!(?:developer|pages|responsive-test|test)(?:-|$))[a-z0-9]+(?:-[a-z0-9]+)*)$",
+				"custom-property-pattern": "^(?:my-[a-z0-9]+(?:-[a-z0-9]+)*|lfc-(?!(?:developer|pages|responsive-test|test)(?:-|$))[a-z0-9]+(?:-[a-z0-9]+)*)$",
 				"font-family-name-quotes": null,
-				"keyframes-name-pattern": "^(?:(?:advanced-)?example|lfc)-[a-z0-9]+(?:-[a-z0-9]+)*$",
-				"layer-name-pattern": "^example(?:\\.[a-z0-9]+(?:-[a-z0-9]+)*)*$",
+				"keyframes-name-pattern": "^(?:my-[a-z0-9]+(?:-[a-z0-9]+)*|lfc-(?!(?:developer|pages|responsive-test|test)(?:-|$))[a-z0-9]+(?:-[a-z0-9]+)*)$",
+				"layer-name-pattern": "^(?:my(?:\\.[a-z0-9]+(?:-[a-z0-9]+)*)*|lfc)$",
 				"no-descending-specificity": null,
-				"selector-class-pattern": "^(?:litefold-calendar|(?:(?:advanced-)?example|lfc)-[a-z0-9]+(?:-[-a-z0-9]+)*)$"
+				"selector-class-pattern": "^(?:litefold-calendar|my-[a-z0-9]+(?:-[a-z0-9]+)*|lfc-(?!(?:developer|pages|responsive-test|test)(?:-|$))[a-z0-9]+(?:-[a-z0-9]+)*)$",
+				"selector-id-pattern": "^(?:my-[a-z0-9]+(?:-[a-z0-9]+)*|lfc-(?!(?:developer|pages|responsive-test|test)(?:-|$))[a-z0-9]+(?:-[a-z0-9]+)*)$"
 			}
 		}
 	],
