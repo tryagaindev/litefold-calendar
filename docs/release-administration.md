@@ -8,6 +8,13 @@ The steady-state process is deliberately short: run **Prepare alpha release**, r
 
 Verify these settings before enabling publication and after any owner, repository, workflow filename, environment, or package-ownership change.
 
+### GitHub organization
+
+- Organization owners use two-factor authentication, and the organization requires it for every member and outside collaborator. Keep at least two trusted owners when a second maintainer is available, but otherwise grant owner access sparingly.
+- Base repository permission is **None**. Repository access is explicit, and members cannot create or delete repositories, change repository visibility, create teams, or create Pages sites unless an owner deliberately changes that policy.
+- GitHub Actions permits GitHub-owned actions and reusable workflows only, requires full commit-SHA pinning, gives `GITHUB_TOKEN` read access by default, and does not let workflows create or approve pull requests.
+- Immutable releases and the organization security configuration apply to every repository and are the defaults for new public repositories.
+
 ### npm
 
 - The public repository identity exactly matches `package.json#repository`.
@@ -17,16 +24,18 @@ Verify these settings before enabling publication and after any owner, repositor
 
 ### GitHub repository and release
 
-- The GitHub `npm` environment requires release-maintainer approval, prevents an initiator from approving their own deployment when more than one maintainer is available, and has a deployment-branch policy that allows `main` only.
-- Required CI protects `main`.  A `v*` tag ruleset blocks deletion, force updates, and unauthorized creation while permitting the release automation to create an exact-SHA tag.
+- The GitHub `npm` environment requires release-maintainer approval, prevents an initiator from approving their own deployment when more than one maintainer is available, blocks administrator bypass, and has a deployment-branch policy that allows `main` only. Keep self-review available while there is only one maintainer; otherwise every release deadlocks.
+- The default branch requires a pull request, successful up-to-date **Build, test, and verify package** status, resolved review conversations, CodeQL merge protection, and linear history. It blocks deletion and force pushes. With one maintainer, require zero independent approvals; require an independent approval and code-owner review after a second maintainer is available.
+- A `v*` tag ruleset blocks creation, updates, deletion, and force updates. Only the GitHub Actions integration may bypass creation so the source-pinned publisher can create an exact-SHA release tag.
+- Only squash merging is enabled, using the pull-request title and description. Automatic merging and deletion of merged head branches are enabled.
 - [GitHub immutable releases](https://docs.github.com/en/enterprise-cloud@latest/code-security/concepts/supply-chain-security/immutable-releases) are enabled.  Release artifacts must be attached while the prerelease is still a draft because published immutable tags and assets cannot be replaced.
-- Secret scanning, push protection, private vulnerability reporting, and review of workflow changes are enabled.
+- The organization security configuration enables the dependency graph, Dependabot alerts and security updates, CodeQL default setup, secret scanning, push protection, validity checks, non-provider patterns, and private vulnerability reporting. Weekly npm and GitHub Actions version-update pull requests come from `.github/dependabot.yml`.
 
 ### GitHub Pages
 
 - Pages uses **GitHub Actions** as its publishing source.
-- The `github-pages` environment is protected independently from npm authority, and its deployment-branch policy allows `main` only.
-- Direct and force pushes to the retained `pages-content` branch are restricted. Maintainers do not edit that branch by hand.
+- The `github-pages` environment is protected independently from npm authority, blocks administrator bypass, and its deployment-branch policy allows `main` only.
+- The retained `pages-content` branch blocks deletion and non-fast-forward updates. Its workflow may advance the branch only from the verified retained head; maintainers do not edit that branch by hand.
 - Automatic and rollback Pages workflows share one non-canceling workflow-level concurrency group with the maximum built-in queue. This serializes retained-state validation, writes, packaging, and deployment across both workflows.
 
 Repository files and tests describe these requirements but cannot prove that hosted settings are enabled.  Verify them in GitHub and npm rather than inferring them from a successful local check.

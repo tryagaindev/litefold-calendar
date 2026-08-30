@@ -40,6 +40,7 @@ Start with the [project README](../README.md) for installation and a first rende
 | Follow the alpha release steps as an operator | [Alpha release operations runbook](release-operations.md) |
 | Understand alpha release policy and design | [Release process](releasing.md) |
 | Configure publishing or recover an exceptional release | [Release administration](release-administration.md) |
+| Audit GitHub organization, repository, ruleset, environment, and security controls | [Release administration hosted prerequisites](release-administration.md#one-time-hosted-prerequisites) |
 | Operate rolling and immutable example deployments | [Static example deployment](example-deployment.md) |
 | Review project changes and governance | [Changelog](../CHANGELOG.md), [maintainers](../MAINTAINERS.md), and [Code of Conduct](../CODE_OF_CONDUCT.md) |
 
