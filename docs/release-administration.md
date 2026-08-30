@@ -13,6 +13,8 @@ Verify these settings before enabling publication and after any owner, repositor
 - Organization owners use two-factor authentication, and the organization requires it for every member and outside collaborator. Keep at least two trusted owners when a second maintainer is available, but otherwise grant owner access sparingly.
 - Base repository permission is **None**. Repository access is explicit, and members cannot create or delete repositories, change repository visibility, create teams, or create Pages sites unless an owner deliberately changes that policy.
 - GitHub Actions permits GitHub-owned actions and reusable workflows only, requires full commit-SHA pinning, gives `GITHUB_TOKEN` read access by default, and does not let workflows create or approve pull requests.
+- Personal access tokens (classic) cannot access the organization. Fine-grained personal access tokens require owner approval and must expire within 90 days.
+- OAuth application access is restricted. Organization data is available only to applications an owner explicitly approves; review existing approvals before removing or replacing an integration.
 - Immutable releases apply to every repository. The enforced organization security configuration applies to every public repository and is the default for new public repositories.
 
 ### npm
