@@ -1,8 +1,8 @@
 "use strict";
 
-const host = document.querySelector("[data-calendar]");
-const result = document.querySelector("[data-result]");
-const startupError = document.querySelector("[data-startup-error]");
+const host = document.querySelector("[data-my-calendar]");
+const result = document.querySelector("[data-my-result]");
+const startupError = document.querySelector("[data-my-startup-error]");
 
 if (!(host instanceof HTMLElement) ||
 	!(result instanceof HTMLElement) ||
@@ -20,8 +20,8 @@ const EVENTS = [
 	{
 		id: "design-review",
 		title: "Calendar design review",
-		start: "2026-08-04T09:30",
-		end: "2026-08-04T10:15",
+		start: "2026-08-04T11:38",
+		end: "2026-08-04T12:23",
 		url: "/events/design-review?from=classic-script#details"
 	}
 ];

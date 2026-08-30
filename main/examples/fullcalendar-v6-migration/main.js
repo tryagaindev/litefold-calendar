@@ -44,12 +44,12 @@ function requireElement(selector) {
 	return element;
 }
 
-const host = requireElement("[data-example-calendar]");
-const rangeResult = requireElement("[data-example-range]");
-const selectionResult = requireElement("[data-example-selection]");
-const activationResult = requireElement("[data-example-activation]");
-const statusResult = requireElement("[data-example-status]");
-const refetchButton = requireElement("[data-example-refetch]");
+const host = requireElement("[data-my-calendar]");
+const rangeResult = requireElement("[data-my-range]");
+const selectionResult = requireElement("[data-my-selection]");
+const activationResult = requireElement("[data-my-activation]");
+const statusResult = requireElement("[data-my-status]");
+const refetchButton = requireElement("[data-my-refetch]");
 if (!(refetchButton instanceof HTMLButtonElement)) {
 	throw new Error("The migration refetch control must be a button.");
 }
@@ -66,10 +66,10 @@ const FULLCALENDAR_STYLE_RESPONSE = Object.freeze([
 	}),
 	Object.freeze({
 		borderColor: "#805FC0",
-		end: "2026-08-04T10:15",
+		end: "2026-08-04T12:23",
 		extendedProps: Object.freeze({ kind: "meeting", ownerLabel: "Design group" }),
 		id: "design-review",
-		start: "2026-08-04T09:30",
+		start: "2026-08-04T11:38",
 		title: "Calendar design review",
 		url: "/events/design-review?from=month&view=summary#agenda"
 	}),
@@ -83,7 +83,7 @@ const FULLCALENDAR_STYLE_RESPONSE = Object.freeze([
 ]);
 
 /**
- * Returns the first FullCalendar color that Litefold can use as a marker accent.
+ * Returns the first FullCalendar color that Litefold Calendar can use as a marker accent.
  * @param {Readonly<MigratableFullCalendarEvent>} event
  * @returns {string | undefined}
  */
@@ -99,7 +99,7 @@ function getMarkerAccent(event) {
 
 /**
  * Converts the common FullCalendar event fields used by a basic `dayGridMonth` view.
- * Litefold performs the authoritative public-event validation when the provider resolves.
+ * Litefold Calendar performs the authoritative public-event validation when the provider resolves.
  * @param {readonly Readonly<MigratableFullCalendarEvent>[]} events
  * @returns {readonly Readonly<MigratedEvent>[]}
  */
@@ -134,7 +134,7 @@ export function adaptFullCalendarSnapshot(events) {
 }
 
 /**
- * Converts FullCalendar's exclusive date-only upper bound to Litefold's inclusive bound.
+ * Converts FullCalendar's exclusive date-only upper bound to Litefold Calendar's inclusive bound.
  * @param {string} value
  * @returns {string}
  */
@@ -151,7 +151,7 @@ export function previousCivilDate(value) {
 	date.setUTCDate(date.getUTCDate() - 1);
 	const previous = date.toISOString().slice(0, 10);
 	if (previous.startsWith("0000-")) {
-		throw new RangeError("validRange.end has no preceding date supported by Litefold.");
+		throw new RangeError("validRange.end has no preceding date supported by Litefold Calendar.");
 	}
 	return previous;
 }
@@ -198,25 +198,25 @@ let abortedRequestCount = 0;
 async function loadMigratedEvents({ end, signal, start }) {
 	const dayCount = civilDayNumber(end) - civilDayNumber(start);
 	if (dayCount !== 42) {
-		throw new RangeError("Expected Litefold's fixed 42-day provider range.");
+		throw new RangeError("Expected Litefold Calendar's fixed 42-day provider range.");
 	}
 
 	requestSequence += 1;
 	const requestId = requestSequence;
 	rangeResult.textContent = `${start} to ${end} (exclusive): ${dayCount} days, request ${requestId}.`;
-	host.dataset["exampleRangeDays"] = String(dayCount);
-	host.dataset["exampleRequest"] = String(requestId);
+	host.dataset["testRangeDays"] = String(dayCount);
+	host.dataset["testRequest"] = String(requestId);
 	try {
 		await abortableDelay(requestId % 2 === 0 ? 15 : 45, signal);
 		signal.throwIfAborted();
 		const events = adaptFullCalendarSnapshot(FULLCALENDAR_STYLE_RESPONSE);
 		signal.throwIfAborted();
-		host.dataset["exampleReturnedRequest"] = String(requestId);
+		host.dataset["testReturnedRequest"] = String(requestId);
 		return events;
 	} catch (error) {
 		if (signal.aborted) {
 			abortedRequestCount += 1;
-			host.dataset["exampleAbortedRequests"] = String(abortedRequestCount);
+			host.dataset["testAbortedRequests"] = String(abortedRequestCount);
 		}
 		throw error;
 	}
@@ -242,9 +242,9 @@ const calendar = createCalendar(host, {
 		statusResult.textContent = message;
 	},
 	onStateChange: (state) => {
-		document.documentElement.dataset["examplePhase"] = state.phase;
+		document.documentElement.dataset["testPhase"] = state.phase;
 		if (state.phase === "ready") {
-			document.documentElement.dataset["exampleReady"] = "true";
+			document.documentElement.dataset["testReady"] = "true";
 			statusResult.textContent = "The latest validated response is rendered.";
 		}
 	}

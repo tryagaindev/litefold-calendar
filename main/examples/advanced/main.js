@@ -1,7 +1,9 @@
 import { createCalendar, LitefoldCalendarError } from "../../dist/index.js";
 import { webMcp } from "../../dist/extensions/webmcp/index.js";
 const OPAQUE_HEX_COLOR = /^#[0-9A-F]{6}$/u;
+const COMPLETE_GRID_DAY_COUNT = 42;
 const DAY_BADGE_RENDERED_DATES = new Set();
+const PHASE_HISTORY_LIMIT = 8;
 const TARGET_DATE_ERROR_MESSAGE = "Choose a date from July 15, 2026 through September 15, 2027.";
 const ITEM_TYPE_LABELS = Object.freeze({
     appointment: "Appointment",
@@ -60,7 +62,7 @@ const REPLACEMENT_EVENTS = Object.freeze([
         }),
         start: "2026-08-06T13:00",
         title: "Dynamically replaced schedule",
-        url: "./?event=dynamic-replacement&from=calendar#advanced-example-calendar-title"
+        url: "./?event=dynamic-replacement&from=calendar#my-calendar-title"
     })
 ]);
 //The first records demonstrate behavior; the generated records exercise overflow limits.
@@ -85,13 +87,13 @@ const FEATURE_SCHEDULE = Object.freeze([
     }),
     Object.freeze({
         accentCandidate: "#008577",
-        end: "2026-08-06T10:15",
+        end: "2026-08-06T12:23",
         id: 41,
         itemType: "appointment",
-        start: "2026-08-06T09:30",
+        start: "2026-08-06T11:38",
         statusLabel: "Confirmed",
         title: "Design review",
-        url: "./?event=design-review&from=calendar#advanced-example-calendar-title"
+        url: "./?event=design-review&from=calendar#my-calendar-title"
     }),
     Object.freeze({
         accentCandidate: "#805FC0",
@@ -101,7 +103,7 @@ const FEATURE_SCHEDULE = Object.freeze([
         start: "2026-08-06T10:00",
         statusLabel: null,
         title: "Launch checkpoint",
-        url: "./?event=launch-checkpoint&from=calendar#advanced-example-calendar-title"
+        url: "./?event=launch-checkpoint&from=calendar#my-calendar-title"
     }),
     Object.freeze({
         accentCandidate: "#008577",
@@ -181,34 +183,44 @@ function requireElement(selector, constructor) {
     }
     return element;
 }
-const host = requireElement("[data-example-calendar]", HTMLElement);
-const fallbackElement = requireElement("[data-example-fallback]", HTMLElement);
-const toolbarEnd = requireElement("[data-example-toolbar-end]", HTMLElement);
-const result = requireElement("[data-example-action-result]", HTMLElement);
-const targetDate = requireElement("[data-example-target-date]", HTMLInputElement);
-const targetDateError = requireElement("[data-example-target-date-error]", HTMLElement);
-const direction = requireElement("[data-example-direction]", HTMLInputElement);
-const themeControl = requireElement("[data-example-theme-control]", HTMLSelectElement);
-const colorSchemeMeta = requireElement("[data-example-color-scheme]", HTMLElement);
-const politeAnnouncer = requireElement("[data-example-announcer-polite]", HTMLElement);
-const assertiveAnnouncer = requireElement("[data-example-announcer-assertive]", HTMLElement);
-const statePhase = requireElement("[data-example-state-phase]", HTMLElement);
-const stateMonth = requireElement("[data-example-state-month]", HTMLElement);
-const stateSelected = requireElement("[data-example-state-selected]", HTMLElement);
-const stateRange = requireElement("[data-example-state-range]", HTMLElement);
-const stateIssues = requireElement("[data-example-state-issues]", HTMLElement);
-const eventDialog = requireElement("[data-example-event-dialog]", HTMLDialogElement);
-const eventDialogTitle = requireElement("[data-example-event-dialog-title]", HTMLElement);
-const eventDialogCategory = requireElement("[data-example-event-dialog-category]", HTMLElement);
-const eventDialogStatus = requireElement("[data-example-event-dialog-status]", HTMLElement);
-const eventDialogOccurrence = requireElement("[data-example-event-dialog-occurrence]", HTMLTimeElement);
-const eventDialogStart = requireElement("[data-example-event-dialog-start]", HTMLTimeElement);
-const eventDialogEnd = requireElement("[data-example-event-dialog-end]", HTMLTimeElement);
-const eventDialogNoEnd = requireElement("[data-example-event-dialog-no-end]", HTMLElement);
-const typeInputs = [...document.querySelectorAll("[data-example-type-filter]")];
-const commandButtons = [...document.querySelectorAll("[data-example-command]")];
+const host = requireElement("[data-my-calendar]", HTMLElement);
+const fallbackElement = requireElement("[data-my-fallback]", HTMLElement);
+const toolbarEnd = requireElement("[data-my-toolbar-end]", HTMLElement);
+const result = requireElement("[data-my-action-result]", HTMLElement);
+const targetDate = requireElement("[data-my-target-date]", HTMLInputElement);
+const targetDateError = requireElement("[data-my-target-date-error]", HTMLElement);
+const direction = requireElement("[data-my-direction]", HTMLInputElement);
+const themeControl = requireElement("[data-my-theme-control]", HTMLSelectElement);
+const sourceTimingControl = requireElement("[data-my-source-timing]", HTMLSelectElement);
+const completePendingButton = requireElement("[data-my-complete-pending]", HTMLButtonElement);
+const colorSchemeMeta = requireElement("[data-my-color-scheme]", HTMLElement);
+const politeAnnouncer = requireElement("[data-my-announcer-polite]", HTMLElement);
+const assertiveAnnouncer = requireElement("[data-my-announcer-assertive]", HTMLElement);
+const statePhase = requireElement("[data-my-state-phase]", HTMLElement);
+const statePhaseHistory = requireElement("[data-my-state-phase-history]", HTMLElement);
+const stateBusy = requireElement("[data-my-state-busy]", HTMLElement);
+const stateGridRenders = requireElement("[data-my-state-grid-renders]", HTMLElement);
+const stateMonth = requireElement("[data-my-state-month]", HTMLElement);
+const stateSelected = requireElement("[data-my-state-selected]", HTMLElement);
+const stateRange = requireElement("[data-my-state-range]", HTMLElement);
+const stateIssues = requireElement("[data-my-state-issues]", HTMLElement);
+const eventDialog = requireElement("[data-my-event-dialog]", HTMLDialogElement);
+const eventDialogTitle = requireElement("[data-my-event-dialog-title]", HTMLElement);
+const eventDialogCategory = requireElement("[data-my-event-dialog-category]", HTMLElement);
+const eventDialogStatus = requireElement("[data-my-event-dialog-status]", HTMLElement);
+const eventDialogOccurrence = requireElement("[data-my-event-dialog-occurrence]", HTMLTimeElement);
+const eventDialogStart = requireElement("[data-my-event-dialog-start]", HTMLTimeElement);
+const eventDialogEnd = requireElement("[data-my-event-dialog-end]", HTMLTimeElement);
+const eventDialogNoEnd = requireElement("[data-my-event-dialog-no-end]", HTMLElement);
+const typeInputs = [...document.querySelectorAll("[data-my-type-filter]")];
+const commandButtons = [...document.querySelectorAll("[data-my-command]")];
 //This cache belongs to the application, not to litefold-calendar.
 const rawRangeCache = new Map();
+const phaseHistory = [];
+let completedGridRenderCount = 0;
+let mountedDaysInCurrentGrid = 0;
+let pendingSourceRequest = null;
+let sourceTiming = "immediate";
 function toAccentColor(value) {
     if (value === null) {
         return undefined;
@@ -266,10 +278,7 @@ function formatStateDate(date) {
         String(date.day).padStart(2, "0")
     ].join("-");
 }
-function updateState(state) {
-    document.documentElement.dataset["examplePhase"] = state.phase;
-    document.documentElement.dataset["exampleReady"] =
-        state.phase === "ready" || state.phase === "degraded" ? "true" : "false";
+function displayState(state) {
     statePhase.textContent = state.phase;
     stateMonth.textContent = formatStateDate(state.displayedMonth);
     stateSelected.textContent = formatStateDate(state.selectedDate);
@@ -278,6 +287,21 @@ function updateState(state) {
         : `${state.range.start} to ${state.range.end} (exclusive)`;
     stateIssues.textContent = String(state.issues.length);
 }
+function updateState(state) {
+    document.documentElement.dataset["testPhase"] = state.phase;
+    document.documentElement.dataset["testReady"] =
+        state.phase === "ready" || state.phase === "degraded" ? "true" : "false";
+    phaseHistory.push(state.phase);
+    phaseHistory.splice(0, Math.max(0, phaseHistory.length - PHASE_HISTORY_LIMIT));
+    statePhaseHistory.textContent = phaseHistory.join(" → ");
+    displayState(state);
+}
+function updateBusyObservation() {
+    stateBusy.textContent = String(host.getAttribute("aria-busy") === "true");
+}
+const busyObserver = new MutationObserver(updateBusyObservation);
+busyObserver.observe(host, { attributeFilter: ["aria-busy"], attributes: true });
+updateBusyObservation();
 function announceExternally(announcement) {
     const target = announcement.politeness === "assertive" ? assertiveAnnouncer : politeAnnouncer;
     const other = announcement.politeness === "assertive" ? politeAnnouncer : assertiveAnnouncer;
@@ -314,32 +338,99 @@ function reportPublicMethodError(error) {
 }
 function createNavigationIcon(ownerDocument, text) {
     const icon = ownerDocument.createElement("span");
-    icon.className = "advanced-example-navigation-icon";
+    icon.className = "my-navigation-icon";
     icon.dir = "ltr";
     icon.setAttribute("aria-hidden", "true");
     icon.textContent = text;
     return icon;
 }
+function updatePendingControl() {
+    completePendingButton.disabled = pendingSourceRequest === null;
+}
+function createControlledSourceResult(events, signal) {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const releaseRequest = () => {
+            if (pendingSourceRequest === request) {
+                pendingSourceRequest = null;
+                updatePendingControl();
+            }
+        };
+        const abort = () => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            signal.removeEventListener("abort", abort);
+            releaseRequest();
+            try {
+                signal.throwIfAborted();
+            }
+            catch (error) {
+                reject(error instanceof Error
+                    ? error
+                    : new DOMException("The controlled source request was aborted.", "AbortError"));
+                return;
+            }
+            reject(new DOMException("The controlled source request was aborted.", "AbortError"));
+        };
+        const request = Object.freeze({
+            complete() {
+                if (settled) {
+                    return;
+                }
+                if (signal.aborted) {
+                    abort();
+                    return;
+                }
+                settled = true;
+                signal.removeEventListener("abort", abort);
+                releaseRequest();
+                resolve(events);
+            }
+        });
+        signal.addEventListener("abort", abort, { once: true });
+        if (signal.aborted) {
+            abort();
+            return;
+        }
+        pendingSourceRequest = request;
+        updatePendingControl();
+    });
+}
+function recordGridDayMount() {
+    mountedDaysInCurrentGrid += 1;
+    if (mountedDaysInCurrentGrid !== COMPLETE_GRID_DAY_COUNT) {
+        return;
+    }
+    mountedDaysInCurrentGrid = 0;
+    completedGridRenderCount += 1;
+    stateGridRenders.textContent = String(completedGridRenderCount);
+}
 /** Applies current application filters each time the calendar requests or refetches a range. */
 const loadEvents = ({ end, signal, start }) => {
-    host.dataset["exampleSourceRange"] = `${start} to ${end} (exclusive)`;
+    host.dataset["testSourceRange"] = `${start} to ${end} (exclusive)`;
     const raw = loadRawRange(start, end, signal);
     const enabled = getEnabledTypes();
-    return raw.filter((event) => event.metadata !== undefined && enabled.has(event.metadata.itemType));
+    const events = Object.freeze(raw.filter((event) => event.metadata !== undefined && enabled.has(event.metadata.itemType)));
+    return sourceTiming === "immediate"
+        ? events
+        : createControlledSourceResult(events, signal);
 };
 //Hook output is application-owned DOM; lifecycle hooks undo every mutation they make.
 const advancedRenderHooks = Object.freeze({
-    id: "advanced-example",
+    id: "my-advanced",
     dayDidMount: ({ dateString, elements, isCurrentMonth, isSelected, isToday }) => {
-        elements.cell.toggleAttribute("data-example-day-badge-rendered", DAY_BADGE_RENDERED_DATES.delete(dateString));
-        elements.cell.classList.toggle("advanced-example-current-month-hook", isCurrentMonth);
-        elements.cell.classList.toggle("advanced-example-outside-month-hook", !isCurrentMonth);
-        elements.cell.classList.toggle("advanced-example-selected-hook", isSelected);
-        elements.cell.classList.toggle("advanced-example-today-hook", isToday);
+        recordGridDayMount();
+        elements.cell.toggleAttribute("data-test-day-badge-rendered", DAY_BADGE_RENDERED_DATES.delete(dateString));
+        elements.cell.classList.toggle("my-current-month-hook", isCurrentMonth);
+        elements.cell.classList.toggle("my-outside-month-hook", !isCurrentMonth);
+        elements.cell.classList.toggle("my-selected-hook", isSelected);
+        elements.cell.classList.toggle("my-today-hook", isToday);
         return () => {
-            elements.cell.removeAttribute("data-example-day-badge-rendered");
-            elements.cell.classList.remove("advanced-example-current-month-hook", "advanced-example-outside-month-hook", "advanced-example-selected-hook");
-            elements.cell.classList.remove("advanced-example-today-hook");
+            elements.cell.removeAttribute("data-test-day-badge-rendered");
+            elements.cell.classList.remove("my-current-month-hook", "my-outside-month-hook", "my-selected-hook");
+            elements.cell.classList.remove("my-today-hook");
         };
     },
     eventDidMount: ({ elements, event, signal, surface, timeText }) => {
@@ -347,12 +438,12 @@ const advancedRenderHooks = Object.freeze({
         if (metadata === undefined) {
             return;
         }
-        const mountedClass = `advanced-example-event-${metadata.itemType}`;
+        const mountedClass = `my-event-${metadata.itemType}`;
         const previousLabel = elements.action?.getAttribute("aria-label") ?? null;
         elements.root.classList.add(mountedClass);
-        elements.root.setAttribute("data-example-event-id", event.id);
-        elements.root.setAttribute("data-example-event-surface", surface);
-        elements.root.setAttribute("data-example-time-text", timeText);
+        elements.root.setAttribute("data-test-event-id", event.id);
+        elements.root.setAttribute("data-test-event-surface", surface);
+        elements.root.setAttribute("data-test-time-text", timeText);
         if (surface === "agenda" && elements.action !== null) {
             const accessibleTime = timeText === "" ? "" : `${timeText}, `;
             elements.action.setAttribute("aria-label", `${accessibleTime}${metadata.accessibleLabel}. View details.`);
@@ -366,9 +457,9 @@ const advancedRenderHooks = Object.freeze({
             cleaned = true;
             signal.removeEventListener("abort", cleanup);
             elements.root.classList.remove(mountedClass);
-            elements.root.removeAttribute("data-example-event-id");
-            elements.root.removeAttribute("data-example-event-surface");
-            elements.root.removeAttribute("data-example-time-text");
+            elements.root.removeAttribute("data-test-event-id");
+            elements.root.removeAttribute("data-test-event-surface");
+            elements.root.removeAttribute("data-test-time-text");
             if (elements.action !== null) {
                 if (previousLabel === null) {
                     elements.action.removeAttribute("aria-label");
@@ -390,13 +481,13 @@ const advancedRenderHooks = Object.freeze({
             return null;
         }
         const status = ownerDocument.createElement("span");
-        status.className = "advanced-example-status";
+        status.className = "my-status";
         status.textContent = event.metadata.statusLabel;
         return status;
     },
     renderEventLeading: ({ document: ownerDocument, event }) => {
         const label = ownerDocument.createElement("span");
-        label.className = "advanced-example-item-type";
+        label.className = "my-item-type";
         label.textContent = event.metadata?.itemType ?? "item";
         return label;
     },
@@ -406,7 +497,7 @@ const advancedRenderHooks = Object.freeze({
             return null;
         }
         const marker = ownerDocument.createElement("span");
-        marker.className = `advanced-example-event-marker advanced-example-event-marker-${itemType}`;
+        marker.className = `my-event-marker my-event-marker-${itemType}`;
         marker.setAttribute("aria-hidden", "true");
         marker.textContent = ITEM_TYPE_MARKERS[itemType];
         return marker;
@@ -416,22 +507,35 @@ const advancedRenderHooks = Object.freeze({
             return null;
         }
         const actionHint = ownerDocument.createElement("span");
-        actionHint.className = "advanced-example-action-hint";
+        actionHint.className = "my-action-hint";
         actionHint.textContent = "View details";
         return actionHint;
     },
-    renderGridOverflowContent: ({ dateString, document: ownerDocument, eventCount, hiddenEventCount, surface, text }) => {
+    renderEventOverflow: ({ dateString, document: ownerDocument, elements, eventCount, overflowCount, surface, text, variant, visibleEventCount }) => {
         const content = ownerDocument.createElement("span");
-        content.className = "advanced-example-grid-overflow-content";
-        content.dataset["exampleDate"] = dateString;
-        content.dataset["exampleEventCount"] = String(eventCount);
-        content.dataset["exampleHiddenEventCount"] = String(hiddenEventCount);
-        content.dataset["exampleSurface"] = surface;
-        content.textContent = text;
+        content.className = `my-event-overflow-${variant}`;
+        content.dataset["testDate"] = dateString;
+        content.dataset["testEventCount"] = String(eventCount);
+        content.dataset["testOverflowCount"] = String(overflowCount);
+        content.dataset["testSurface"] = surface;
+        content.dataset["testVariant"] = variant;
+        content.dataset["testVisibleEventCount"] = String(visibleEventCount);
+        content.dataset["testActionBacked"] = String(elements.action !== null);
+        if (variant === "compact") {
+            //Reuse Litefold Calendar's locale-aware social number and apply only application styling.
+            content.textContent = text;
+            return content;
+        }
+        //The wide branch demonstrates structured DOM while retaining the localized package text.
+        const defaultText = ownerDocument.createElement("strong");
+        defaultText.className = "my-event-overflow-wide-count";
+        defaultText.textContent = text;
+        const destination = ownerDocument.createElement("span");
+        destination.className = "my-event-overflow-wide-destination";
+        destination.textContent = "in agenda";
+        content.append(defaultText, destination);
         return content;
-    },
-    //Returning undefined keeps the built-in multiple-event indicator.
-    renderMultipleEventIndicator: () => undefined
+    }
 });
 //EventData is inferred from the typed source and render hooks; `satisfies` keeps every option checked.
 const calendarOptions = {
@@ -439,7 +543,7 @@ const calendarOptions = {
     agendaPageSize: 10,
     events: loadEvents,
     eventTimeDisplay: "agenda",
-    extensions: [webMcp({ toolNamePrefix: "litefold-advanced" })],
+    extensions: [webMcp({ toolNamePrefix: "my-schedule" })],
     fallbackElement,
     firstDay: 1,
     headingLevel: 3,
@@ -526,7 +630,11 @@ const calendarMethods = {
     prev: () => { calendar.prev(); },
     refetchEvents: () => { calendar.refetchEvents(); },
     render: () => { calendar.render(); },
-    setEvents: () => { calendar.setEvents(REPLACEMENT_EVENTS); },
+    setEvents: () => {
+        sourceTiming = "immediate";
+        sourceTimingControl.value = sourceTiming;
+        calendar.setEvents(REPLACEMENT_EVENTS);
+    },
     today: () => { calendar.today(); }
 };
 function runCommand(command) {
@@ -543,7 +651,7 @@ function runCommand(command) {
     }
     if (command === "getState") {
         const state = calendarMethods.getState();
-        updateState(state);
+        displayState(state);
         reportAction(`Read ${state.phase} state for ${formatStateDate(state.selectedDate)}.`);
         return true;
     }
@@ -565,7 +673,7 @@ function runCommand(command) {
 }
 //Connect application controls only after the calendar and its immutable options exist.
 for (const button of commandButtons) {
-    const command = button.dataset["exampleCommand"];
+    const command = button.dataset["myCommand"];
     if (command === undefined) {
         throw new Error("An advanced example command is missing its name.");
     }
@@ -574,6 +682,24 @@ for (const button of commandButtons) {
     });
 }
 targetDate.addEventListener("input", clearTargetDateError);
+sourceTimingControl.addEventListener("change", () => {
+    if (sourceTimingControl.value !== "controlled" && sourceTimingControl.value !== "immediate") {
+        throw new Error(`Unknown source timing: ${sourceTimingControl.value}`);
+    }
+    sourceTiming = sourceTimingControl.value;
+    calendar.setEvents(loadEvents);
+    reportAction(sourceTiming === "immediate"
+        ? "Restored the provider with an immediate array result."
+        : "Started a controlled PromiseLike request.");
+});
+completePendingButton.addEventListener("click", () => {
+    const request = pendingSourceRequest;
+    if (request === null) {
+        return;
+    }
+    request.complete();
+    reportAction("Completed the controlled source request.");
+});
 for (const input of typeInputs) {
     input.addEventListener("change", () => {
         if (runCommand("refetchEvents")) {
@@ -588,11 +714,11 @@ direction.addEventListener("change", () => {
 themeControl.addEventListener("change", () => {
     const theme = themeControl.value;
     if (theme === "system") {
-        document.documentElement.removeAttribute("data-example-theme");
+        document.documentElement.removeAttribute("data-my-theme");
         colorSchemeMeta.setAttribute("content", "light dark");
     }
     else if (theme === "light" || theme === "dark") {
-        document.documentElement.setAttribute("data-example-theme", theme);
+        document.documentElement.setAttribute("data-my-theme", theme);
         colorSchemeMeta.setAttribute("content", theme);
     }
     else {
@@ -600,14 +726,14 @@ themeControl.addEventListener("change", () => {
     }
     reportAction(`Changed example theme to ${theme}.`);
 });
-//Rendering is explicit; non-cached page exit owns teardown for this standalone page.
+//Rendering is explicit; this standalone page owns teardown on a non-cached page exit.
 calendarMethods.render();
-updateState(calendarMethods.getState());
 window.addEventListener("pagehide", (event) => {
     if (!event.persisted) {
         if (eventDialog.open) {
             eventDialog.close();
         }
         calendarMethods.destroy();
+        busyObserver.disconnect();
     }
 });

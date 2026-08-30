@@ -5,18 +5,16 @@ const RENDER_HOOK_SCHEMA = Object.freeze({
     id: "id",
     renderDayBadge: "hook",
     renderEventDetails: "hook",
+    renderEventOverflow: "hook",
     renderEventLeading: "hook",
     renderEventMarker: "hook",
-    renderEventTrailing: "hook",
-    renderGridOverflowContent: "hook",
-    renderMultipleEventIndicator: "hook"
+    renderEventTrailing: "hook"
 });
 const RENDER_HOOK_NAMES = Object.freeze(Object.keys(RENDER_HOOK_SCHEMA).filter((key) => key !== "id"));
 const RENDER_HOOK_KEY_SET = new Set(["id", ...RENDER_HOOK_NAMES]);
 const SINGLETON_RENDER_HOOK_NAMES = Object.freeze([
     "renderEventMarker",
-    "renderGridOverflowContent",
-    "renderMultipleEventIndicator"
+    "renderEventOverflow"
 ]);
 /** Validates consumer-owned render hooks and creates their coordinator-owned runtime records. */
 export function createRenderHookRuntimes(renderHooks, AbortControllerConstructor) {
@@ -79,10 +77,9 @@ export function createRenderHookRuntimes(renderHooks, AbortControllerConstructor
             controller: createController(),
             createController,
             definition: frozenDefinition,
-            gridOverflowContentFallbacks: new Set(),
+            eventOverflowFallbacks: new Map(),
             leaseToken: {},
             markerFallbacks: new Map(),
-            multipleEventIndicatorFallbacks: new Set(),
             nodeInvocations: new WeakMap(),
             nodes: new Map(),
             quarantined: false

@@ -1,3 +1,39 @@
+import { LitefoldCalendarError } from "../../errors.js";
+/** Creates one typed package error from coordinator-owned internal values. */
+export function createInternalError(options) {
+    const phase = options.phase ?? phaseForCode(options.code);
+    const values = {
+        ...(options.cause === undefined ? {} : { cause: options.cause }),
+        code: options.code,
+        ...(options.eventIndex === undefined ? {} : { eventIndex: options.eventIndex }),
+        ...(options.extensionId === undefined ? {} : { extensionId: options.extensionId }),
+        ...(options.renderHookId === undefined ? {} : { renderHookId: options.renderHookId }),
+        ...(options.hook === undefined ? {} : { hook: options.hook }),
+        message: options.message ?? `${options.code} during ${phase}.`,
+        phase,
+        ...(options.range === undefined ? {} : { range: options.range }),
+        recoverable: options.recoverable,
+        severity: options.severity,
+        ...(options.stale === undefined ? {} : { stale: options.stale }),
+        ...(options.surface === undefined ? {} : { surface: options.surface }),
+        userMessage: options.userMessage,
+        userTitle: options.userTitle
+    };
+    return new LitefoldCalendarError(values);
+}
+/** Creates a typed error for a rejected public calendar method call. */
+export function createPublicMethodError(code, hook, message, messages, isLive, cause) {
+    return createInternalError({
+        ...(cause === undefined ? {} : { cause }),
+        code,
+        hook,
+        message,
+        recoverable: code === "invalid-argument" || isLive,
+        severity: "error",
+        userMessage: code === "invalid-argument" ? messages.actionErrorMessage : messages.internalErrorMessage,
+        userTitle: code === "invalid-argument" ? messages.actionErrorTitle : messages.internalErrorTitle
+    });
+}
 /** Creates an immutable public state snapshot. */
 export function createState(phase, range, issues, displayedMonth, selectedDate) {
     return Object.freeze({

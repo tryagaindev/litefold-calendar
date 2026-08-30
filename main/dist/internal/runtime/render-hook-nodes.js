@@ -1,5 +1,6 @@
 import { hasNodeLease, ownsNodeLease, releaseNodeLease, setNodeLease } from "./node-leases.js";
 import { containsInteractiveContent, containsPresentationalContent, isAppendableNode, isSameDocumentNode } from "./safety.js";
+import { assertRenderHookElementIntegrity, captureRenderHookNodeValueIntegrity, hasRenderHookNodeValueIntegrity } from "./render-hook-element-integrity.js";
 /** Owns render-hook node validation, leasing, append rollback, and mounted revalidation. */
 export class RenderHookNodeRenderer {
     nodeOwners = new WeakMap();
@@ -45,6 +46,9 @@ export class RenderHookNodeRenderer {
     }
     /** Seals prospective package children before their detached region is connected. */
     sealPackageSkeleton(region, expectedChildren, expectedAncestors, ownerDepth) {
+        if (!this.options.enabled) {
+            return;
+        }
         const ancestry = Object.freeze([region, ...expectedAncestors]);
         if (ancestry.at(-1) !== this.options.host || !hasExpectedAncestry(ancestry)) {
             throw new TypeError("A stable calendar render region was detached or reparented.");
@@ -89,6 +93,21 @@ export class RenderHookNodeRenderer {
                 });
             }
         }
+        for (const fallback of runtime.eventOverflowFallbacks.values()) {
+            if (fallback.detachedPackageIntegrity === null) {
+                continue;
+            }
+            try {
+                assertRenderHookElementIntegrity(fallback.detachedPackageIntegrity, "renderEventOverflow");
+            }
+            catch (cause) {
+                return Object.freeze({
+                    cause: cause instanceof TypeError ? cause : new TypeError("Detached package-owned overflow content could not be validated.", { cause }),
+                    hookName: "renderEventOverflow",
+                    surface: fallback.surface
+                });
+            }
+        }
         return null;
     }
     /** Returns the first sealed package tree changed during custom-element connection. */
@@ -105,11 +124,12 @@ export class RenderHookNodeRenderer {
         for (const skeleton of this.packageSkeletons) {
             const ancestryChanged = !hasExpectedAncestry(skeleton.ancestry);
             const childrenChanged = skeleton.entries.some((entry) => !hasExpectedChildren(entry));
-            if (!ancestryChanged && !childrenChanged) {
+            const valuesChanged = skeleton.entries.some((entry) => !hasRenderHookNodeValueIntegrity(entry.parent, entry.valueIntegrity));
+            if (!ancestryChanged && !childrenChanged && !valuesChanged) {
                 continue;
             }
             return Object.freeze({
-                cause: new TypeError("Render-hook output must not add, remove, or reparent package-owned render nodes."),
+                cause: createPackageSkeletonMutationError(ancestryChanged, childrenChanged, valuesChanged),
                 contributors: Object.freeze([...skeleton.contributors.values()].map((contributor) => resolveSkeletonContributor(contributor))),
                 stableShellCorrupted: skeleton.stableShell && ancestryChanged
             });
@@ -132,6 +152,9 @@ export class RenderHookNodeRenderer {
     }
     /** Collects every runtime implicated by leased-node or package-skeleton validation. */
     getMountedValidationFailures(runtimes) {
+        if (!this.options.enabled) {
+            return Object.freeze([]);
+        }
         const failures = new Map();
         for (const runtime of runtimes) {
             if (runtime.quarantined) {
@@ -200,7 +223,11 @@ export class RenderHookNodeRenderer {
     }
     capturePackageSkeleton(parent, children, entries, contributors) {
         const expectedChildren = Object.freeze([...children]);
-        entries.push(Object.freeze({ children: expectedChildren, parent }));
+        entries.push(Object.freeze({
+            children: expectedChildren,
+            parent,
+            valueIntegrity: captureRenderHookNodeValueIntegrity(parent)
+        }));
         for (const child of expectedChildren) {
             const runtime = this.nodeOwners.get(child);
             const invocation = runtime?.nodeInvocations.get(child);
@@ -296,6 +323,15 @@ function hasExpectedChildren(entry) {
         return false;
     }
     return entry.children.every((child, index) => entry.parent.childNodes.item(index) === child);
+}
+function createPackageSkeletonMutationError(ancestryChanged, childrenChanged, valuesChanged) {
+    if (valuesChanged && !ancestryChanged && !childrenChanged) {
+        return new TypeError("Render-hook output must not change package-owned render attributes or text when mounted.");
+    }
+    if (!valuesChanged) {
+        return new TypeError("Render-hook output must not add, remove, or reparent package-owned render nodes.");
+    }
+    return new TypeError("Render-hook output must not change package-owned render attributes, text, or topology when mounted.");
 }
 function resolveSkeletonContributor(contributor) {
     return Object.freeze({

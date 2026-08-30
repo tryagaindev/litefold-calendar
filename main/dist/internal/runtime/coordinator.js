@@ -1,35 +1,41 @@
 import { addCalendarDays, addCalendarMonths, compareCalendarDates, formatCalendarDate, getCalendarDateForTimeZone, parseCalendarDate, positiveModulo, toUtcDate } from "../domain/civil-date.js";
-import { indexCalendarEventsByDate, normalizeCalendarEvents } from "../domain/event-normalization.js";
+import { indexCalendarEventsByDate } from "../domain/event-normalization.js";
 import { getCalendarMonthRange, isRenderableMonth } from "../domain/grid.js";
 import { CalendarBounds } from "../domain/bounds.js";
-import { isAbortError, LitefoldCalendarError, reportCalendarError, toCalendarIssue } from "../../errors.js";
+import { isAbortError, reportCalendarError, toCalendarIssue } from "../../errors.js";
 import { createConfigurationError, getFallbackOption, normalizeIntegerOption, normalizeLocale, normalizeTimeZone, resolveFallbackElement, resolveFirstDay, resolveIconNodes, resolveToolbarEnd, snapshotCalendarOptions } from "./configuration.js";
 import { createDayContextMenu, createDaySelection, createEventActivation, createEventContextMenu, createEventContextMenuAvailability } from "./actions.js";
 import { createRenderHookRuntimes } from "./render-hooks.js";
-import { resolveCalendarEvents } from "./source.js";
-import { createState, isRenderHookSurface, isSourceIssue, phaseForCode, severityRank } from "./state.js";
+import { requestCalendarEvents, resolveCalendarEvents } from "./source.js";
+import { createInternalError, createPublicMethodError as createStatePublicMethodError, createState, isRenderHookSurface, isSourceIssue, severityRank } from "./state.js";
 import { CalendarAnnouncementPresenter } from "../dom/announcement.js";
 import { presentCalendarIssue } from "../dom/issue-region.js";
 import { createCalendarStructure } from "../dom/structure.js";
 import { CalendarMonthPickerController } from "../dom/month-picker.js";
 import { CalendarMonthTitleRenderer } from "../dom/month-title.js";
 import { createAgendaPresentation } from "../dom/agenda.js";
-import { installEventActionListeners as installNativeEventActionListeners, registerGridEventAction } from "../dom/event-structure.js";
+import { installEventActionListeners as installNativeEventActionListeners } from "../dom/event-structure.js";
 import { createEventRepresentation as createEventDomRepresentation } from "../dom/event-representation.js";
 import { CalendarEventText } from "../dom/event-text.js";
+import { createEventAccent } from "../dom/event-accent.js";
 import { resolveTextDirection } from "../dom/environment.js";
 import { captureCalendarFocus, enterGridActions, getEventActionKey, handleGridActionKeydown, getOwnedActiveElement, restoreCalendarFocus, wasOwnedFocusRemoved } from "../dom/grid-focus.js";
 import { createDayCellElements, renderMonthWeeks, renderWeekdayHeadings } from "../dom/month-grid.js";
+import { DayGridActionCollector, installGridOverflowActionListeners } from "./day-grid-actions.js";
 import { resolveCalendarIcons } from "./icon-configuration.js";
 import { IntegrationNodeController } from "./integration-nodes.js";
+import { createEventSourceErrorOptions, observeVisibleEventRequest, setVisibleEventBusyState } from "./event-source-lifecycle.js";
+import { CalendarEventOverflowPresenter } from "./event-overflow-presentation.js";
 import { releaseLeasedNodes } from "./node-leases.js";
 import { SwipeGestureController } from "./swipe.js";
 import { createRegisteredExtensionHost } from "./registered-extension-host.js";
 import { formatCalendarMessage } from "../../messages.js";
 import { resolveCalendarMessages } from "./message-configuration.js";
 import { RenderHookVisualRenderer } from "./render-hook-visuals.js";
+import { assertRenderHookElementIntegrity, captureRenderHookElementIntegrity, getEventRenderHookProtectedElements } from "./render-hook-element-integrity.js";
 import { RenderHookNodeRenderer } from "./render-hook-nodes.js";
-import { invokeForUnknownResult, isDateInstance, isHTMLElementLike, isLitefoldCalendarError, observeThenable } from "./safety.js";
+import { createEventMountContext } from "./render-hook-context.js";
+import { invokeForUnknownResult, isDateInstance, isHTMLElementLike, observeThenable } from "./safety.js";
 const AGENDA_DOM_LIMIT_DEFAULT = 200;
 const AGENDA_DOM_LIMIT_MAXIMUM = 500;
 const AGENDA_DOM_LIMIT_MINIMUM = 50;
@@ -61,8 +67,9 @@ export class MonthCalendar {
     dayFormatter;
     document;
     eventBaseUrl;
+    eventOverflowPresenter;
     eventText;
-    eventProvider;
+    eventSource;
     renderHooks;
     renderHookNodes;
     renderHookVisuals;
@@ -140,9 +147,7 @@ export class MonthCalendar {
         }
         this.fallbackElement = resolveFallbackElement(this.document, this.host, resolvedOptions.fallbackElement);
         this.abortControllerConstructor = this.window?.AbortController ?? globalThis.AbortController;
-        this.eventProvider = typeof events === "function"
-            ? events
-            : () => events;
+        this.eventSource = events;
         this.sourceEventLimit = normalizeIntegerOption(resolvedOptions.sourceEventLimit, SOURCE_EVENT_LIMIT_DEFAULT, SOURCE_EVENT_LIMIT_MINIMUM, SOURCE_EVENT_LIMIT_MAXIMUM, "sourceEventLimit");
         this.gridEventLimit = normalizeIntegerOption(resolvedOptions.maxGridEventsPerDay, GRID_EVENT_LIMIT_DEFAULT, GRID_EVENT_LIMIT_MINIMUM, GRID_EVENT_LIMIT_MAXIMUM, "maxGridEventsPerDay");
         this.agendaPageSize = normalizeIntegerOption(resolvedOptions.agendaPageSize, AGENDA_PAGE_SIZE_DEFAULT, AGENDA_PAGE_SIZE_MINIMUM, AGENDA_PAGE_SIZE_MAXIMUM, "agendaPageSize");
@@ -182,6 +187,7 @@ export class MonthCalendar {
         this.renderHooks = createRenderHookRuntimes(resolvedOptions.renderHooks, this.abortControllerConstructor);
         this.renderHookNodes = new RenderHookNodeRenderer({
             document: this.document,
+            enabled: this.renderHooks.length > 0,
             host: this.host,
             isInvocationCurrent: (runtime, controller) => this.isRenderHookInvocationCurrent(runtime, controller)
         });
@@ -211,7 +217,7 @@ export class MonthCalendar {
             ...(this.minDate === undefined ? {} : { minDate: this.minDate })
         });
         this.integrationNodes = new IntegrationNodeController({
-            createDetachError: (cause) => this.createError({
+            createDetachError: (cause) => createInternalError({
                 cause,
                 code: "host-integration-failed",
                 hook: "destroy",
@@ -260,8 +266,15 @@ export class MonthCalendar {
             weekday: "long",
             year: "numeric"
         });
-        this.eventText = new CalendarEventText(locale, this.fullDateFormatter, this.messages);
         this.numberFormatter = new Intl.NumberFormat(locale);
+        this.eventText = new CalendarEventText(locale, this.fullDateFormatter, this.messages, this.numberFormatter);
+        this.eventOverflowPresenter = new CalendarEventOverflowPresenter({
+            document: this.document,
+            gridEventLimit: this.gridEventLimit,
+            locale,
+            messages: this.messages,
+            numberFormatter: this.numberFormatter
+        });
         this.monthNameFormatter = new Intl.DateTimeFormat(locale, {
             calendar: "gregory",
             month: "long",
@@ -325,9 +338,10 @@ export class MonthCalendar {
             this.dom = this.createStructure();
             this.isRendered = true;
             this.integrationNodes.updateFallback(this.hasCurrentSnapshot, this.hasFatalError);
-            if (this.renderCalendar()) {
-                this.loadVisibleEvents(false);
-                this.registeredExtensions?.activate();
+            this.loadVisibleEvents(false);
+            this.registeredExtensions?.activate();
+            if (this.activeController === null) {
+                this.registeredExtensions?.notifyStateChanged();
             }
         }
         catch (cause) {
@@ -401,9 +415,7 @@ export class MonthCalendar {
             return;
         }
         this.latestAcceptedEventReplacement = replacementSequence;
-        this.eventProvider = typeof resolvedEvents === "function"
-            ? resolvedEvents
-            : () => resolvedEvents;
+        this.eventSource = resolvedEvents;
         this.swipeGesture.clear();
         this.loadVisibleEvents(false);
     }
@@ -576,7 +588,8 @@ export class MonthCalendar {
             const dayButtons = new Map(), gridMoreButtons = new Map();
             const eventActions = new Map();
             const gridActionsByDate = new Map();
-            const dayMounts = [], eventMounts = [];
+            const dayMounts = this.renderHooks.length === 0 ? null : [];
+            const eventMounts = dayMounts === null ? null : [];
             const days = getCalendarMonthRange(this.displayedMonth, this.firstDay).days;
             const renderedGrid = renderMonthWeeks(dom.weeks, days, (date) => this.createDayCell(date, today, dayButtons, eventActions, gridActionsByDate, gridMoreButtons, dayMounts, eventMounts, renderGeneration), () => !this.wasRenderInterrupted(dom, renderGeneration), (weeks) => {
                 this.renderHookNodes.sealPackageSkeleton(dom.weeks, weeks, [dom.grid, dom.swipeViewport, this.host], 2);
@@ -604,7 +617,9 @@ export class MonthCalendar {
             this.eventActions = eventActions;
             this.gridActionsByDate = gridActionsByDate;
             this.gridMoreButtons = gridMoreButtons;
-            this.runMountHooks(dayMounts, eventMounts);
+            if (dayMounts !== null && eventMounts !== null) {
+                this.runMountHooks(dayMounts, eventMounts);
+            }
             if (this.wasRenderInterrupted(dom, renderGeneration)) {
                 return;
             }
@@ -631,11 +646,12 @@ export class MonthCalendar {
         const isToday = today !== null && compareCalendarDates(date, today) === 0;
         const isFocused = isAllowed && compareCalendarDates(date, this.focusedDate) === 0;
         const dateString = formatCalendarDate(date);
-        const events = isAllowed ? this.getEventsForDate(date) : [];
+        const events = isAllowed ? this.currentEventsByDate.get(dateString) ?? [] : [];
+        const fullDateText = this.eventText.formatFullDate(date);
         const accessibleLabel = isAllowed
-            ? this.eventText.getDayAccessibleLabel(date, events.length)
-            : this.eventText.formatFullDate(date);
-        const { badge, button, cell, multipleEventIndicator, number, summaries } = createDayCellElements({
+            ? this.eventText.getDayAccessibleLabel(fullDateText, events.length)
+            : fullDateText;
+        const { badge, button, cell, number, summaries } = createDayCellElements({
             accessibleLabel,
             dateString,
             dayNumber: this.dayFormatter.format(toUtcDate(date)),
@@ -647,84 +663,72 @@ export class MonthCalendar {
             isToday,
             selectionEntryDate: this.selectionEntryDate
         });
+        const dayElements = Object.freeze({ badge, button, cell, number, summaries });
         this.renderHookSlot("renderDayBadge", badge, (signal) => ({
             date: { ...date },
             dateString,
             document: this.document,
-            elements: Object.freeze({ badge, button, cell, number, summaries }),
+            elements: dayElements,
             isCurrentMonth,
             isSelected,
             isToday,
             signal,
             surface: "day"
-        }));
+        }), Object.values(dayElements));
         if (!this.isRenderGenerationCurrent(renderGeneration)) {
             return cell;
         }
-        if (events.length > 1) {
-            this.renderHookVisuals.renderMultipleEventIndicator(multipleEventIndicator, date, dateString, events.length);
-            if (!this.isRenderGenerationCurrent(renderGeneration)) {
-                return cell;
-            }
-        }
-        const gridActions = [];
-        let compactPrimaryAssigned = false;
+        const gridActions = new DayGridActionCollector(eventActions);
         for (const event of events.slice(0, this.gridEventLimit)) {
-            const rendered = this.createEventRepresentation(event, date, "grid-summary", eventMounts, renderGeneration);
+            const rendered = this.createEventRepresentation(event, date, "grid-summary", eventMounts, fullDateText, renderGeneration);
             if (rendered === null) {
                 return cell;
             }
-            const { action, root } = rendered.elements;
-            compactPrimaryAssigned = registerGridEventAction(root, action, gridActions, eventActions, getEventActionKey("grid-summary", dateString, event.event.id), compactPrimaryAssigned);
-            summaries.append(root);
+            gridActions.registerEvent(getEventActionKey("grid-summary", dateString, event.event.id), rendered.elements);
+            summaries.append(rendered.elements.root);
         }
-        if (events.length > this.gridEventLimit) {
-            const more = this.document.createElement("button");
-            more.className = "lfc-calendar-more lfc-calendar-grid-more";
-            more.type = "button";
-            more.tabIndex = -1;
-            more.setAttribute("aria-keyshortcuts", "F2");
-            more.setAttribute("data-lfc-date", dateString);
-            if (!compactPrimaryAssigned) {
-                more.classList.add("lfc-is-compact-primary");
-            }
-            const hiddenCount = events.length - this.gridEventLimit;
-            const overflowText = formatCalendarMessage(this.messages.gridMore, {
-                count: this.numberFormatter.format(hiddenCount)
+        const eventOverflow = this.eventOverflowPresenter.prepareAndPlace({
+            compactPrimary: gridActions.compactPrimary,
+            date,
+            dateString,
+            eventCount: events.length,
+            fullDateText,
+            summaries
+        });
+        if (eventOverflow.grid !== null) {
+            const { button: gridMore } = eventOverflow.grid;
+            installGridOverflowActionListeners({
+                action: gridMore,
+                isCurrent: () => this.canUseRenderedAction(gridMore, renderGeneration),
+                onActivate: () => {
+                    this.selectDate(date, "gridMore");
+                    if (this.canContinueInteraction()) {
+                        this.dom?.agendaTitle.focus({ preventScroll: true });
+                    }
+                },
+                onKeydown: (event) => {
+                    this.handleRenderedGridActionKeydown(event, dateString, gridMore, renderGeneration);
+                }
             });
-            const customContent = this.document.createElement("span");
-            customContent.className = "lfc-calendar-grid-more-custom-content";
-            customContent.setAttribute("aria-hidden", "true");
-            const defaultContent = this.document.createElement("span");
-            defaultContent.className = "lfc-calendar-grid-more-default-content";
-            defaultContent.textContent = overflowText;
-            more.append(customContent, defaultContent);
-            more.setAttribute("aria-label", formatCalendarMessage(this.messages.gridMoreLabel, {
-                count: this.numberFormatter.format(hiddenCount),
-                date: this.eventText.formatFullDate(date),
-                eventLabel: hiddenCount === 1 ? this.messages.event : this.messages.events
-            }));
-            this.renderHookVisuals.renderGridOverflowContent(more, customContent, date, dateString, events.length, hiddenCount, overflowText);
+        }
+        if (eventOverflow.compact !== null) {
+            this.renderHookVisuals.renderEventOverflow(eventOverflow.compact);
             if (!this.isRenderGenerationCurrent(renderGeneration)) {
                 return cell;
             }
-            more.addEventListener("click", () => {
-                if (!this.canUseRenderedAction(more, renderGeneration)) {
-                    return;
-                }
-                this.selectDate(date, "gridMore");
-                if (this.canContinueInteraction()) {
-                    this.dom?.agendaTitle.focus({ preventScroll: true });
-                }
-            });
-            more.addEventListener("keydown", (event) => {
-                this.handleRenderedGridActionKeydown(event, dateString, more, renderGeneration);
-            });
-            gridActions.push(more);
-            gridMoreButtons.set(dateString, more);
-            summaries.append(more);
         }
-        gridActionsByDate.set(dateString, Object.freeze(gridActions));
+        if (eventOverflow.grid !== null) {
+            const { button: gridMore, wide } = eventOverflow.grid;
+            this.renderHookVisuals.renderEventOverflow(wide);
+            if (!this.isRenderGenerationCurrent(renderGeneration)) {
+                return cell;
+            }
+            gridActions.registerOverflow(gridMore);
+            gridMoreButtons.set(dateString, gridMore);
+            summaries.append(gridMore);
+        }
+        const gridActionSnapshot = gridActions.snapshot();
+        gridActionsByDate.set(dateString, gridActionSnapshot);
         button.addEventListener("click", (jsEvent) => {
             if (!this.canUseRenderedAction(button, renderGeneration) || !this.bounds.isDateAllowed(date) ||
                 !isRenderableMonth({ day: 1, month: date.month, year: date.year }, this.firstDay)) {
@@ -748,7 +752,7 @@ export class MonthCalendar {
             if (!this.canUseRenderedAction(button, renderGeneration)) {
                 return;
             }
-            if (event.key === "F2" && gridActions.length > 0) {
+            if (event.key === "F2" && gridActionSnapshot.length > 0) {
                 event.preventDefault();
                 enterGridActions(dateString, this.getGridFocusElements(), this.host);
                 return;
@@ -756,7 +760,7 @@ export class MonthCalendar {
             this.handleDayKeydown(event, date, button);
         });
         const dayShortcuts = [
-            ...(gridActions.length > 0 ? ["F2"] : []),
+            ...(gridActionSnapshot.length > 0 ? ["F2"] : []),
             ...(this.options.onDayContextMenu === undefined ? [] : ["Shift+F10"])
         ];
         if (dayShortcuts.length > 0) {
@@ -773,7 +777,7 @@ export class MonthCalendar {
             });
         }
         dayButtons.set(dateString, button);
-        dayMounts.push({
+        dayMounts?.push({
             context: Object.freeze({
                 date: Object.freeze({ ...date }),
                 dateString,
@@ -786,55 +790,65 @@ export class MonthCalendar {
         });
         return cell;
     }
-    createEventRepresentation(event, date, surface, eventMounts, renderGeneration) {
+    createEventRepresentation(event, date, surface, eventMounts, fullDateText, renderGeneration) {
         const hasContextAction = this.isEventContextMenuAvailable(event.event, date, surface);
         if (!this.isRenderGenerationCurrent(renderGeneration)) {
             return null;
         }
         const dateString = formatCalendarDate(date);
         const timeText = this.eventText.getEventTimeText(event, date);
+        const hasApplicationAction = this.options.onEventActivate !== undefined || hasContextAction;
         const representation = createEventDomRepresentation({
-            accessibleLabel: this.eventText.getGridEventAccessibleLabel(event, date),
+            accessibleLabel: surface === "grid-summary" &&
+                (event.event.url !== null || hasApplicationAction)
+                ? this.eventText.getEventAccessibleLabel(event, timeText, fullDateText)
+                : "",
             dateString,
             document: this.document,
             event,
-            hasApplicationAction: this.options.onEventActivate !== undefined || hasContextAction,
+            hasApplicationAction,
             surface,
             timeDisplay: this.options.eventTimeDisplay ?? "all",
             timeText
         });
         const { action, details, marker, trailing } = representation.elements;
-        const makeContext = (signal) => ({
-            date: Object.freeze({ ...date }),
-            dateString,
-            document: this.document,
-            elements: representation.elements,
-            event: event.event,
-            signal,
-            surface,
-            timeText
-        });
-        this.renderHookVisuals.renderEventMarker(marker, event.event.accentColor, makeContext);
-        if (!this.isRenderGenerationCurrent(renderGeneration)) {
-            return null;
+        if (this.renderHooks.length === 0) {
+            marker.append(createEventAccent(this.document, event.event.accentColor));
         }
-        this.renderHookSlot("renderEventLeading", representation.slots.leadingContent, makeContext);
-        if (!this.isRenderGenerationCurrent(renderGeneration)) {
-            return null;
+        else {
+            const protectedEventElements = getEventRenderHookProtectedElements(representation.elements);
+            const makeContext = (signal) => ({
+                date: Object.freeze({ ...date }),
+                dateString,
+                document: this.document,
+                elements: representation.elements,
+                event: event.event,
+                signal,
+                surface,
+                timeText
+            });
+            this.renderHookVisuals.renderEventMarker(marker, event.event.accentColor, protectedEventElements, makeContext);
+            if (!this.isRenderGenerationCurrent(renderGeneration)) {
+                return null;
+            }
+            this.renderHookSlot("renderEventLeading", representation.slots.leadingContent, makeContext, protectedEventElements);
+            if (!this.isRenderGenerationCurrent(renderGeneration)) {
+                return null;
+            }
+            this.renderHookSlot("renderEventDetails", details, makeContext, protectedEventElements);
+            if (!this.isRenderGenerationCurrent(renderGeneration)) {
+                return null;
+            }
+            this.renderHookSlot("renderEventTrailing", trailing, makeContext, protectedEventElements);
         }
-        this.renderHookSlot("renderEventDetails", details, makeContext);
-        if (!this.isRenderGenerationCurrent(renderGeneration)) {
-            return null;
-        }
-        this.renderHookSlot("renderEventTrailing", trailing, makeContext);
         if (!this.isRenderGenerationCurrent(renderGeneration)) {
             return null;
         }
         if (action !== null) {
             this.installEventActionListeners(action, event.event, date, surface, hasContextAction, renderGeneration);
         }
-        eventMounts.push({
-            context: this.createEventMountContext(representation.elements, date, dateString, event.event, surface, timeText)
+        eventMounts?.push({
+            context: createEventMountContext(representation.elements, date, dateString, event.event, surface, timeText)
         });
         return representation;
     }
@@ -895,16 +909,17 @@ export class MonthCalendar {
     renderAgenda(dom, eventActions, eventMounts, renderGeneration) {
         const { agendaFooter: footer, agendaList: list, agendaTitle: title } = dom;
         const selectedDateString = formatCalendarDate(this.selectedDate);
+        const fullDateText = this.eventText.formatFullDate(this.selectedDate);
         const titleText = formatCalendarMessage(this.messages.agendaTitle, {
-            date: this.eventText.formatFullDate(this.selectedDate)
+            date: fullDateText
         });
-        const events = this.getEventsForDate(this.selectedDate);
+        const events = this.currentEventsByDate.get(selectedDateString) ?? [];
         const visibleCount = this.hasCurrentSnapshot
             ? Math.min(events.length, this.agendaVisibleCount, this.agendaDomLimit)
             : 0;
         const entries = [];
         for (const event of this.hasCurrentSnapshot ? events.slice(0, visibleCount) : []) {
-            const rendered = this.createEventRepresentation(event, this.selectedDate, "agenda", eventMounts, renderGeneration);
+            const rendered = this.createEventRepresentation(event, this.selectedDate, "agenda", eventMounts, fullDateText, renderGeneration);
             if (rendered === null) {
                 return;
             }
@@ -974,23 +989,14 @@ export class MonthCalendar {
         }
         title.textContent = presentation.titleText;
         list.hidden = presentation.listHidden;
-        this.renderHookNodes.sealPackageSkeleton(list, presentation.listItems, [dom.agenda, this.host], 1);
+        if (eventMounts !== null) {
+            this.renderHookNodes.sealPackageSkeleton(list, presentation.listItems, [dom.agenda, this.host], 1);
+        }
         list.replaceChildren(...presentation.listItems);
         footer.replaceChildren(...presentation.footerChildren);
         this.agendaMoreButton = more;
     }
-    createEventMountContext(elements, date, dateString, event, surface, timeText) {
-        return Object.freeze({
-            date: Object.freeze({ ...date }),
-            dateString,
-            document: this.document,
-            elements,
-            event,
-            surface,
-            timeText
-        });
-    }
-    renderHookSlot(hookName, container, createContext) {
+    renderHookSlot(hookName, container, createContext, protectedElements) {
         for (const runtime of this.renderHooks) {
             if (this.wasRuntimeDestroyed()) {
                 return;
@@ -1006,6 +1012,7 @@ export class MonthCalendar {
             const context = Object.freeze(createContext(controller.signal));
             const surface = context["surface"];
             try {
+                const elementIntegrity = captureRenderHookElementIntegrity(protectedElements);
                 const result = hook(context);
                 const returnedThenable = observeThenable(result, (cause) => {
                     this.reportLateRenderHookFailure(runtime, hookName, cause, surface);
@@ -1016,6 +1023,7 @@ export class MonthCalendar {
                     }
                     return;
                 }
+                assertRenderHookElementIntegrity(elementIntegrity, hookName);
                 if (returnedThenable) {
                     throw new TypeError(`${hookName} must return a node synchronously.`);
                 }
@@ -1215,7 +1223,7 @@ export class MonthCalendar {
         const combinedCause = isolationErrors.length === 0
             ? cause
             : new AggregateError([cause, ...isolationErrors], "A render hook and its cleanup failed.");
-        const error = this.createError({
+        const error = createInternalError({
             cause: combinedCause,
             code: "render-hook-failed",
             renderHookId: runtime.definition.id,
@@ -1392,7 +1400,7 @@ export class MonthCalendar {
     isCurrentAction(name, generation) { return !this.isDestroyed && !this.hasFatalError && this.actionGenerations.get(name) === generation; }
     handleActionFailure(name, cause, generation) {
         const stale = !this.isCurrentAction(name, generation);
-        const error = this.createError({
+        const error = createInternalError({
             cause,
             code: "action-failed",
             hook: name,
@@ -1544,8 +1552,30 @@ export class MonthCalendar {
         }
     }
     loadVisibleEvents(userRetry) {
-        if (!this.isRendered || this.isDestroyed || this.dom === null) {
+        const request = this.beginVisibleEventRequest(userRetry);
+        if (request === null) {
             return;
+        }
+        let result;
+        try {
+            result = requestCalendarEvents(this.eventSource, Object.freeze({ ...request.bounds, signal: request.controller.signal }), this.sourceEventLimit, this.eventBaseUrl);
+        }
+        catch (cause) {
+            this.handleSourceRequestFailure(cause, request);
+            return;
+        }
+        if (result.timing === "synchronous") {
+            if (this.canApplyRequest(request.generation, request.controller)) {
+                this.commitSourceRequestSuccess(result.events, request);
+            }
+            return;
+        }
+        observeVisibleEventRequest(result.events, (values) => { this.commitSourceRequestSuccess(values, request); }, (cause) => { this.handleSourceRequestFailure(cause, request); }, (cause) => { this.handleFatalError(cause); });
+        this.publishSourceLoading(request);
+    }
+    beginVisibleEventRequest(userRetry) {
+        if (!this.isRendered || this.isDestroyed || this.dom === null) {
+            return null;
         }
         const range = getCalendarMonthRange(this.displayedMonth, this.firstDay);
         const bounds = Object.freeze({
@@ -1559,12 +1589,12 @@ export class MonthCalendar {
         this.activeController = null;
         previousController?.abort();
         if (!this.canPrepareRequest(generation)) {
-            return;
+            return null;
         }
         const controller = new this.abortControllerConstructor();
         if (!this.canPrepareRequest(generation)) {
             controller.abort();
-            return;
+            return null;
         }
         this.activeController = controller;
         this.currentRange = bounds;
@@ -1573,141 +1603,127 @@ export class MonthCalendar {
             this.currentEventsByDate = new Map();
             this.hasCurrentSnapshot = false;
             this.loadedRangeKey = null;
-            this.clearIssues(isSourceIssue, false);
+            this.removeIssues(isSourceIssue);
         }
         this.integrationNodes.updateFallback(this.hasCurrentSnapshot, this.hasFatalError);
         if (!this.canApplyRequest(generation, controller)) {
+            return null;
+        }
+        return Object.freeze({
+            bounds,
+            controller,
+            generation,
+            hasRetainedSnapshot,
+            rangeKey,
+            userRetry
+        });
+    }
+    publishSourceLoading(request) {
+        if (!this.canApplyRequest(request.generation, request.controller)) {
             return;
         }
         const dom = this.getDomAfterCallback();
         if (dom === null) {
             return;
         }
-        this.host.setAttribute("aria-busy", "true");
-        dom.grid.setAttribute("aria-busy", "true");
+        if (!setVisibleEventBusyState(this.host, dom.grid, true, () => this.canApplyRequest(request.generation, request.controller))) {
+            return;
+        }
         this.setState("loading");
-        if (!this.canApplyRequest(generation, controller)) {
+        if (!this.canApplyRequest(request.generation, request.controller)) {
             return;
         }
         if (!this.renderCalendar()) {
             return;
         }
-        if (!this.canApplyRequest(generation, controller)) {
+        if (!this.canApplyRequest(request.generation, request.controller)) {
             return;
         }
-        let request;
-        try {
-            request = this.resolveEventsForRequest(controller, bounds);
-        }
-        catch (cause) {
-            this.handleSourceRequestFailure(cause, generation, controller, bounds, hasRetainedSnapshot);
-            return;
-        }
-        void request.then((events) => {
-            if (!this.canApplyRequest(generation, controller)) {
-                return;
-            }
-            const retryHadFocus = this.dom?.retryButton === this.document.activeElement;
-            const removed = this.clearIssues(isSourceIssue, false);
-            if (!this.canApplyRequest(generation, controller)) {
-                return;
-            }
-            this.currentEventsByDate = indexCalendarEventsByDate(events, getCalendarMonthRange(this.displayedMonth, this.firstDay).days);
-            this.hasCurrentSnapshot = true;
-            this.loadedRangeKey = rangeKey;
-            this.activeController = null;
-            this.isRetrying = false;
-            this.clearBusyState();
-            this.setState(this.internalIssues.length > 0 ? "degraded" : "ready");
-            if (!this.canApplyRequest(generation, controller) || !this.renderCalendar()) {
-                return;
-            }
-            this.integrationNodes.updateFallback(this.hasCurrentSnapshot, this.hasFatalError);
-            if (userRetry && removed.some((entry) => !entry.handled)) {
-                this.announce({ message: this.messages.recovered, politeness: "polite" });
-            }
-            if (!this.isDestroyed && !this.hasFatalError && retryHadFocus) {
-                (this.dayButtons.get(formatCalendarDate(this.selectedDate)) ?? this.dom?.titleButton)?.focus({
-                    preventScroll: true
-                });
-            }
-        }, (cause) => {
-            this.handleSourceRequestFailure(cause, generation, controller, bounds, hasRetainedSnapshot);
-        });
     }
-    handleSourceRequestFailure(cause, generation, controller, bounds, hasRetainedSnapshot) {
-        if (isAbortError(cause) && controller.signal.aborted) {
+    commitSourceRequestSuccess(events, request) {
+        if (!this.canApplyRequest(request.generation, request.controller)) {
             return;
         }
-        if (!this.canApplyRequest(generation, controller)) {
-            this.reportStaleSourceFailure(cause, bounds, hasRetainedSnapshot);
+        const retryHadFocus = this.dom?.retryButton === this.document.activeElement;
+        const removed = this.removeIssues(isSourceIssue);
+        if (!this.canApplyRequest(request.generation, request.controller)) {
+            return;
+        }
+        this.currentEventsByDate = indexCalendarEventsByDate(events, getCalendarMonthRange(this.displayedMonth, this.firstDay).days);
+        this.hasCurrentSnapshot = true;
+        this.loadedRangeKey = request.rangeKey;
+        if (!this.commitSourceReadyState(request)) {
+            return;
+        }
+        if (!this.renderCalendar() ||
+            !this.canApplyRequest(request.generation, request.controller)) {
+            return;
+        }
+        this.integrationNodes.updateFallback(this.hasCurrentSnapshot, this.hasFatalError);
+        if (!this.canApplyRequest(request.generation, request.controller)) {
+            return;
+        }
+        if (request.userRetry && removed.some((entry) => !entry.handled)) {
+            this.announce({ message: this.messages.recovered, politeness: "polite" });
+            if (!this.canApplyRequest(request.generation, request.controller)) {
+                return;
+            }
+        }
+        if (!this.isDestroyed && !this.hasFatalError && retryHadFocus) {
+            (this.dayButtons.get(formatCalendarDate(this.selectedDate)) ?? this.dom?.titleButton)?.focus({
+                preventScroll: true
+            });
+        }
+    }
+    commitSourceReadyState(request) {
+        this.activeController = null;
+        this.isRetrying = false;
+        if (!setVisibleEventBusyState(this.host, this.dom?.grid ?? null, false, () => this.canApplyRequest(request.generation, request.controller))) {
+            return false;
+        }
+        this.setState(this.internalIssues.length > 0 ? "degraded" : "ready");
+        return this.canApplyRequest(request.generation, request.controller);
+    }
+    handleSourceRequestFailure(cause, request) {
+        if (isAbortError(cause) && request.controller.signal.aborted) {
+            return;
+        }
+        if (!this.canApplyRequest(request.generation, request.controller)) {
+            this.deliverError(this.createSourceError(cause, request.hasRetainedSnapshot, request.bounds, true));
             return;
         }
         this.activeController = null;
         this.isRetrying = false;
-        this.clearBusyState();
-        const error = this.createSourceError(cause, hasRetainedSnapshot, bounds, false);
-        this.acceptError(error, {
-            key: "event-source",
-            politeness: hasRetainedSnapshot ? "polite" : "assertive",
-            retryable: true
-        });
-        if (!this.canApplyRequest(generation, controller)) {
+        if (!setVisibleEventBusyState(this.host, this.dom?.grid ?? null, false, () => this.canApplyRequest(request.generation, request.controller))) {
             return;
         }
-        this.renderCalendar();
+        const error = this.createSourceError(cause, request.hasRetainedSnapshot, request.bounds, false);
+        this.acceptError(error, {
+            key: "event-source",
+            politeness: request.hasRetainedSnapshot ? "polite" : "assertive",
+            retryable: true
+        });
+        if (!this.canApplyRequest(request.generation, request.controller)) {
+            return;
+        }
+        if (!this.renderCalendar() ||
+            !this.canApplyRequest(request.generation, request.controller)) {
+            return;
+        }
         this.integrationNodes.updateFallback(this.hasCurrentSnapshot, this.hasFatalError);
-    }
-    resolveEventsForRequest(controller, bounds) {
-        const request = invokeForUnknownResult(this.eventProvider, [
-            Object.freeze({ ...bounds, signal: controller.signal })
-        ]);
-        try {
-            if (Array.isArray(request)) {
-                return Promise.resolve(normalizeCalendarEvents(request, this.sourceEventLimit, this.eventBaseUrl));
-            }
-        }
-        catch {
-            return Promise.resolve(normalizeCalendarEvents(request, this.sourceEventLimit, this.eventBaseUrl));
-        }
-        return Promise.resolve(request).then((values) => normalizeCalendarEvents(values, this.sourceEventLimit, this.eventBaseUrl));
     }
     canApplyRequest(generation, controller) { return !this.isDestroyed && generation === this.generation && !controller.signal.aborted; }
     canPrepareRequest(generation) { return this.isRendered && !this.isDestroyed && this.dom !== null && generation === this.generation; }
     getDomAfterCallback() { return this.dom; }
     isCallbackGenerationCurrent(generation) { return !this.isDestroyed && this.generation === generation; }
-    isLiveAfterCallback() { return !this.isDestroyed; }
     canContinueInteraction() { return this.isRendered && !this.isDestroyed && !this.hasFatalError; }
     wasRenderInterrupted(dom, renderGeneration) { return this.isDestroyed || this.dom !== dom || this.renderGeneration !== renderGeneration; }
     isRenderGenerationCurrent(renderGeneration) { return !this.isDestroyed && this.renderGeneration === renderGeneration; }
     canUseRenderedAction(element, renderGeneration) { return this.canContinueInteraction() && this.renderGeneration === renderGeneration && element.isConnected && this.host.contains(element) && HOST_OWNERS.get(this.host) === this; }
     wasRuntimeDestroyed() { return this.isDestroyed; }
     wasRenderHookQuarantined(runtime) { return runtime.quarantined; }
-    clearBusyState() {
-        this.host.removeAttribute("aria-busy");
-        this.dom?.grid.removeAttribute("aria-busy");
-    }
     createSourceError(cause, retained, range, stale) {
-        const validationError = isLitefoldCalendarError(cause) &&
-            (cause.code === "event-data-invalid" || cause.code === "event-limit-exceeded")
-            ? cause
-            : null;
-        return this.createError({
-            cause,
-            code: validationError?.code ?? "event-source-failed",
-            eventIndex: validationError?.eventIndex,
-            phase: validationError?.phase ?? "source",
-            range,
-            recoverable: true,
-            severity: retained ? "warning" : "error",
-            stale,
-            userMessage: retained ? this.messages.refreshErrorMessage : this.messages.loadErrorMessage,
-            userTitle: retained ? this.messages.refreshErrorTitle : this.messages.loadErrorTitle
-        });
-    }
-    reportStaleSourceFailure(cause, range, hasRetainedSnapshot) {
-        const error = this.createSourceError(cause, hasRetainedSnapshot, range, true);
-        this.deliverError(error);
+        return createInternalError(createEventSourceErrorOptions({ cause, messages: this.messages, range, retained, stale }));
     }
     handleRetry = () => {
         if (!this.canContinueInteraction() ||
@@ -1718,27 +1734,6 @@ export class MonthCalendar {
         this.renderIssues();
         this.loadVisibleEvents(true);
     };
-    createError(options) {
-        const phase = options.phase ?? phaseForCode(options.code);
-        const values = {
-            ...(options.cause === undefined ? {} : { cause: options.cause }),
-            code: options.code,
-            ...(options.eventIndex === undefined ? {} : { eventIndex: options.eventIndex }),
-            ...(options.extensionId === undefined ? {} : { extensionId: options.extensionId }),
-            ...(options.renderHookId === undefined ? {} : { renderHookId: options.renderHookId }),
-            ...(options.hook === undefined ? {} : { hook: options.hook }),
-            message: options.message ?? `${options.code} during ${phase}.`,
-            phase,
-            ...(options.range === undefined ? {} : { range: options.range }),
-            recoverable: options.recoverable,
-            severity: options.severity,
-            ...(options.stale === undefined ? {} : { stale: options.stale }),
-            ...(options.surface === undefined ? {} : { surface: options.surface }),
-            userMessage: options.userMessage,
-            userTitle: options.userTitle
-        };
-        return new LitefoldCalendarError(values);
-    }
     acceptError(error, presentation, notifyState = true, announcementMode = "default", isCurrent = () => true) {
         const generation = this.generation;
         const handled = this.deliverError(error);
@@ -1877,16 +1872,23 @@ export class MonthCalendar {
         }
     }
     clearIssues(predicate, render) {
+        const removed = this.removeIssues(predicate);
+        if (removed.length === 0) {
+            return removed;
+        }
+        this.setState(this.derivePhase());
+        if (render) {
+            this.renderIssues();
+        }
+        return removed;
+    }
+    removeIssues(predicate) {
         const removed = this.internalIssues.filter(predicate);
         if (removed.length === 0) {
             return removed;
         }
         this.internalIssues = Object.freeze(this.internalIssues.filter((entry) => !predicate(entry)));
         this.resetInternalAnnouncementForIssues(removed);
-        this.setState(this.derivePhase());
-        if (render) {
-            this.renderIssues();
-        }
         return removed;
     }
     derivePhase() {
@@ -1934,7 +1936,7 @@ export class MonthCalendar {
         this.registeredExtensions?.notifyStateChanged();
     }
     recordHostIntegrationFailure(hook, cause, notifyState, announcementMode) {
-        const error = this.createError({
+        const error = createInternalError({
             cause,
             code: "host-integration-failed",
             hook,
@@ -1950,7 +1952,7 @@ export class MonthCalendar {
         }, notifyState, announcementMode);
     }
     reportLateHostIntegrationFailure(hook, cause) {
-        const error = this.createError({
+        const error = createInternalError({
             cause,
             code: "host-integration-failed",
             hook,
@@ -1962,7 +1964,7 @@ export class MonthCalendar {
         this.deliverError(error);
     }
     reportRegisteredExtensionFailure(extensionId, hook, cause) {
-        const error = this.createError({
+        const error = createInternalError({
             cause,
             code: "extension-failed",
             extensionId,
@@ -1981,7 +1983,7 @@ export class MonthCalendar {
             return;
         }
         if (this.hasFatalError) {
-            this.deliverError(this.createError({
+            this.deliverError(createInternalError({
                 cause,
                 code: "internal-error",
                 recoverable: false,
@@ -1992,44 +1994,32 @@ export class MonthCalendar {
             return;
         }
         this.hasFatalError = true;
-        this.generation += 1;
-        this.registeredExtensions?.stop();
-        this.actionGenerations.clear();
-        const activeBeforeFallback = getOwnedActiveElement(this.document, this.host);
-        const focusWasInPicker = activeBeforeFallback !== null &&
-            this.dom?.monthPicker.contains(activeBeforeFallback) === true;
-        this.activeController?.abort();
-        this.activeController = null;
-        const ownsHost = HOST_OWNERS.get(this.host) === this;
-        this.swipeGesture.clear(ownsHost);
-        this.swipeGesture.disconnect(ownsHost);
-        if (ownsHost) {
-            this.host.removeAttribute("data-lfc-swipe-enabled");
+        const fatalGeneration = ++this.generation;
+        const fatalFocus = this.stopForFatalError(fatalGeneration);
+        if (fatalFocus === null || !this.releaseFatalRenderHooks(fatalGeneration)) {
+            return;
         }
-        this.clearBusyState();
-        for (const runtime of this.renderHooks) {
-            runtime.controller.abort();
-            const cleanupErrors = this.runRenderHookCleanups(runtime);
-            cleanupErrors.push(...releaseLeasedNodes(runtime.nodes, runtime.leaseToken));
-            cleanupErrors.push(...this.renderHookVisuals.clearFallbackTracking(runtime));
-            if (cleanupErrors.length > 0) {
-                this.reportRenderHookCleanupErrors(runtime, cleanupErrors, false);
-            }
-        }
+        const [activeBeforeFallback, focusWasInPicker] = fatalFocus;
         if (this.dom === null) {
             try {
                 this.dom = this.createStructure();
             }
             catch (fallbackFailure) {
+                if (!this.isFatalGenerationCurrent(fatalGeneration)) {
+                    return;
+                }
                 this.state = createState("unavailable", this.currentRange, [], this.displayedMonth, this.selectedDate);
                 reportCalendarError(new AggregateError([cause, fallbackFailure], "The calendar and its unavailable fallback both failed to render."));
                 this.integrationNodes.updateFallback(this.hasCurrentSnapshot, this.hasFatalError);
                 return;
             }
+            if (!this.isFatalGenerationCurrent(fatalGeneration)) {
+                return;
+            }
         }
         focusWasRemoved = focusWasRemoved || focusWasInPicker ||
             wasOwnedFocusRemoved(activeBeforeFallback, this.host);
-        const error = this.createError({
+        const error = createInternalError({
             cause,
             code: "internal-error",
             recoverable: false,
@@ -2042,37 +2032,92 @@ export class MonthCalendar {
             politeness: "assertive",
             retryable: false
         });
-        if (!this.isLiveAfterCallback()) {
+        if (!this.isFatalGenerationCurrent(fatalGeneration)) {
             return;
         }
         const dom = this.dom;
         this.monthPickerController.hide(false);
+        if (!this.isFatalGenerationCurrent(fatalGeneration)) {
+            return;
+        }
         dom.navigation.hidden = true;
         dom.titleButton.setAttribute("aria-disabled", "true");
         dom.grid.hidden = true;
         dom.agenda.hidden = true;
         dom.panel.setAttribute("data-lfc-unavailable", "true");
         this.integrationNodes.updateFallback(this.hasCurrentSnapshot, this.hasFatalError);
+        if (!this.isFatalGenerationCurrent(fatalGeneration)) {
+            return;
+        }
         dom.panelTitle.tabIndex = -1;
         if (focusWasRemoved) {
             (dom.panel.hasAttribute("hidden") ? dom.titleButton : dom.panelTitle).focus({ preventScroll: true });
         }
     }
+    stopForFatalError(generation) {
+        this.registeredExtensions?.stop();
+        if (!this.isFatalGenerationCurrent(generation)) {
+            return null;
+        }
+        this.actionGenerations.clear();
+        const activeBeforeFallback = getOwnedActiveElement(this.document, this.host);
+        const focusWasInPicker = activeBeforeFallback !== null &&
+            this.dom?.monthPicker.contains(activeBeforeFallback) === true;
+        this.activeController?.abort();
+        if (!this.isFatalGenerationCurrent(generation)) {
+            return null;
+        }
+        this.activeController = null;
+        const ownsHost = HOST_OWNERS.get(this.host) === this;
+        this.swipeGesture.clear(ownsHost);
+        if (!this.isFatalGenerationCurrent(generation)) {
+            return null;
+        }
+        this.swipeGesture.disconnect(ownsHost);
+        if (!this.isFatalGenerationCurrent(generation)) {
+            return null;
+        }
+        if (ownsHost) {
+            this.host.removeAttribute("data-lfc-swipe-enabled");
+            if (!this.isFatalGenerationCurrent(generation)) {
+                return null;
+            }
+        }
+        if (!setVisibleEventBusyState(this.host, this.dom?.grid ?? null, false, () => this.isFatalGenerationCurrent(generation))) {
+            return null;
+        }
+        return [activeBeforeFallback, focusWasInPicker];
+    }
+    releaseFatalRenderHooks(generation) {
+        for (const runtime of this.renderHooks) {
+            runtime.controller.abort();
+            if (!this.isFatalGenerationCurrent(generation)) {
+                return false;
+            }
+            const cleanupErrors = this.runRenderHookCleanups(runtime);
+            if (!this.isFatalGenerationCurrent(generation)) {
+                return false;
+            }
+            cleanupErrors.push(...releaseLeasedNodes(runtime.nodes, runtime.leaseToken));
+            if (!this.isFatalGenerationCurrent(generation)) {
+                return false;
+            }
+            cleanupErrors.push(...this.renderHookVisuals.clearFallbackTracking(runtime));
+            if (!this.isFatalGenerationCurrent(generation)) {
+                return false;
+            }
+            if (cleanupErrors.length > 0) {
+                this.reportRenderHookCleanupErrors(runtime, cleanupErrors, false);
+                if (!this.isFatalGenerationCurrent(generation)) {
+                    return false;
+                }
+            }
+        }
+        return this.isFatalGenerationCurrent(generation);
+    }
+    isFatalGenerationCurrent(generation) { return !this.isDestroyed && this.hasFatalError && this.generation === generation; }
     createPublicMethodError(code, hook, message, cause) {
-        return this.createError({
-            ...(cause === undefined ? {} : { cause }),
-            code,
-            hook,
-            message,
-            recoverable: code === "invalid-argument" || (!this.isDestroyed && !this.hasFatalError),
-            severity: "error",
-            userMessage: code === "invalid-argument"
-                ? this.messages.actionErrorMessage
-                : this.messages.internalErrorMessage,
-            userTitle: code === "invalid-argument"
-                ? this.messages.actionErrorTitle
-                : this.messages.internalErrorTitle
-        });
+        return createStatePublicMethodError(code, hook, message, this.messages, !this.isDestroyed && !this.hasFatalError, cause);
     }
     requireLive(hook) {
         if (!this.canContinueInteraction()) {
@@ -2165,14 +2210,8 @@ export class MonthCalendar {
             ? localDate
             : getCalendarDateForTimeZone(value, this.timeZone);
     }
-    getEventsForDate(date) {
-        if (!this.bounds.isDateAllowed(date)) {
-            return [];
-        }
-        return this.currentEventsByDate.get(formatCalendarDate(date)) ?? [];
-    }
     reportRenderHookCleanupErrors(runtime, causes, present) {
-        const error = this.createError({
+        const error = createInternalError({
             cause: causes.length === 1 ? causes[0] : new AggregateError(causes),
             code: "render-hook-failed",
             renderHookId: runtime.definition.id,
@@ -2194,7 +2233,7 @@ export class MonthCalendar {
         }
     }
     reportLateRenderHookFailure(runtime, hook, cause, surface) {
-        const error = this.createError({
+        const error = createInternalError({
             cause,
             code: "render-hook-failed",
             renderHookId: runtime.definition.id,

@@ -2,20 +2,16 @@ import { formatCalendarMessage } from "../../messages.js";
 import { compareCalendarDates, toUtcDate, toUtcDateTime } from "../domain/civil-date.js";
 /** Localized text and accessible names shared by native event representations. */
 export class CalendarEventText {
+    locale;
     fullDateFormatter;
     messages;
     numberFormatter;
-    timeFormatter;
-    constructor(locale, fullDateFormatter, messages) {
+    timeFormatter = null;
+    constructor(locale, fullDateFormatter, messages, numberFormatter) {
+        this.locale = locale;
         this.fullDateFormatter = fullDateFormatter;
         this.messages = messages;
-        this.numberFormatter = new Intl.NumberFormat(locale);
-        this.timeFormatter = new Intl.DateTimeFormat(locale, {
-            calendar: "gregory",
-            hour: "numeric",
-            minute: "2-digit",
-            timeZone: "UTC"
-        });
+        this.numberFormatter = numberFormatter;
     }
     formatFullDate(date) {
         return this.fullDateFormatter.format(toUtcDate(date));
@@ -25,21 +21,29 @@ export class CalendarEventText {
             return this.messages.allDay;
         }
         return compareCalendarDates(date, event.startDateTime) === 0
-            ? this.timeFormatter.format(toUtcDateTime(event.startDateTime))
+            ? this.getTimeFormatter().format(toUtcDateTime(event.startDateTime))
             : "";
     }
-    getDayAccessibleLabel(date, eventCount) {
+    getDayAccessibleLabel(fullDateText, eventCount) {
         return formatCalendarMessage(this.messages.dayLabel, {
             count: this.numberFormatter.format(eventCount),
-            date: this.formatFullDate(date),
+            date: fullDateText,
             eventLabel: eventCount === 1 ? this.messages.event : this.messages.events
         });
     }
-    getGridEventAccessibleLabel(event, date) {
-        const timeText = this.getEventTimeText(event, date);
-        return [event.event.title, timeText, this.formatFullDate(date)]
+    getEventAccessibleLabel(event, timeText, fullDateText) {
+        return [event.event.title, timeText, fullDateText]
             .filter((part) => part.length > 0)
             .join(", ");
+    }
+    getTimeFormatter() {
+        this.timeFormatter ??= new Intl.DateTimeFormat(this.locale, {
+            calendar: "gregory",
+            hour: "numeric",
+            minute: "2-digit",
+            timeZone: "UTC"
+        });
+        return this.timeFormatter;
     }
 }
 //# sourceMappingURL=event-text.js.map

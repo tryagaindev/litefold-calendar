@@ -1,13 +1,13 @@
 import { createCalendar } from "../../dist/index.js";
 
-const host = document.querySelector("[data-example-calendar]");
-const fallbackElement = document.querySelector("[data-example-fallback]");
-const controls = document.querySelector("[data-example-controls]");
-const result = document.querySelector("[data-example-result]");
-const politeAnnouncer = document.querySelector("[data-example-announcer-polite]");
-const assertiveAnnouncer = document.querySelector("[data-example-announcer-assertive]");
-const failureButton = document.querySelector('[data-example-rebuild="failure"]');
-const successButton = document.querySelector('[data-example-rebuild="success"]');
+const host = document.querySelector("[data-my-calendar]");
+const fallbackElement = document.querySelector("[data-my-fallback]");
+const controls = document.querySelector("[data-my-controls]");
+const result = document.querySelector("[data-my-result]");
+const politeAnnouncer = document.querySelector("[data-my-announcer-polite]");
+const assertiveAnnouncer = document.querySelector("[data-my-announcer-assertive]");
+const failureButton = document.querySelector('[data-my-rebuild="failure"]');
+const successButton = document.querySelector('[data-my-rebuild="success"]');
 
 if (!(host instanceof HTMLElement) ||
 	!(fallbackElement instanceof HTMLElement) ||
@@ -32,9 +32,9 @@ const EVENTS = [
 	{
 		id: "design-review",
 		title: "Calendar design review",
-		start: "2026-08-04T09:30",
-		end: "2026-08-04T10:15",
-		url: "./?event=design-review&from=calendar#server-schedule"
+		start: "2026-08-04T11:38",
+		end: "2026-08-04T12:23",
+		url: "./?event=design-review&from=calendar#my-server-schedule"
 	}
 ];
 
@@ -81,7 +81,7 @@ const reportResult = (message, politeness) => {
 const rebuildCalendar = (mode) => {
 	//Destroy restores the fallback before the replacement starts loading.
 	calendar?.destroy();
-	document.documentElement.dataset.exampleReady = "false";
+	document.documentElement.dataset.testReady = "false";
 	reportResult("Loading the enhanced calendar. The fallback remains available.", "polite");
 
 	calendar = createCalendar(host, {
@@ -106,9 +106,9 @@ const rebuildCalendar = (mode) => {
 			return "default";
 		},
 		onStateChange: (state) => {
-			document.documentElement.dataset.examplePhase = state.phase;
+			document.documentElement.dataset.testPhase = state.phase;
 			if (state.phase === "ready") {
-				document.documentElement.dataset.exampleReady = "true";
+				document.documentElement.dataset.testReady = "true";
 				reportResult("The usable calendar is ready, so the fallback is hidden.", "polite");
 			}
 		}

@@ -42,7 +42,9 @@ function normalizeCalendarEventResult(value, baseUrl) {
         (endDateTime !== null && compareDateTimes(endDateTime, startDateTime) <= 0)) {
         return { event: null, invalidField: null };
     }
-    return { event: Object.freeze({
+    return {
+        endDateTime,
+        event: Object.freeze({
             accentColor: normalizeAccentColor(accentColorValue),
             end,
             id,
@@ -51,7 +53,10 @@ function normalizeCalendarEventResult(value, baseUrl) {
             start,
             title,
             url
-        }), invalidField: null };
+        }),
+        invalidField: null,
+        startDateTime
+    };
 }
 /** Validates and normalizes an entire source snapshot. */
 export function normalizeCalendarEvents(values, maximum = MAX_SOURCE_EVENT_LIMIT, baseUrl) {
@@ -119,12 +124,11 @@ export function normalizeCalendarEvents(values, maximum = MAX_SOURCE_EVENT_LIMIT
             throw createEventDataError(`Event at index ${eventIndex.toString()} has a duplicate identifier.`, eventIndex);
         }
         identifiers.add(event.id);
-        const startDateTime = parseCalendarDateTime(event.start);
-        const endDateTime = event.end === null ? null : parseCalendarDateTime(event.end);
-        if (startDateTime === null || (event.end !== null && endDateTime === null)) {
-            throw createEventDataError(`Event at index ${eventIndex.toString()} is invalid.`, eventIndex);
-        }
-        normalizedEvents.push(Object.freeze({ endDateTime, event, startDateTime }));
+        normalizedEvents.push(Object.freeze({
+            endDateTime: normalization.endDateTime,
+            event,
+            startDateTime: normalization.startDateTime
+        }));
     }
     return Object.freeze(normalizedEvents);
 }
@@ -155,14 +159,126 @@ export function compareCalendarEvents(left, right) {
 }
 /** Indexes sorted event occurrences for a fixed rendered civil-date range. */
 export function indexCalendarEventsByDate(events, days) {
+    const dateEntries = days.map((date) => Object.freeze({
+        date,
+        dateString: formatCalendarDate(date)
+    }));
+    if (!areDatesStrictlyIncreasing(dateEntries)) {
+        return indexCalendarEventsByArbitraryDates(events, dateEntries);
+    }
+    const occurrencesByIndex = dateEntries.map(() => []);
+    const exactDateIndexes = new Map();
+    for (let index = 0; index < dateEntries.length; index += 1) {
+        const entry = dateEntries[index];
+        if (entry !== undefined) {
+            exactDateIndexes.set(toCalendarDateKey(entry.date), index);
+        }
+    }
+    const visibleSpans = [];
+    for (const event of events) {
+        if (event.endDateTime === null) {
+            const occurrenceIndex = exactDateIndexes.get(toCalendarDateKey(event.startDateTime));
+            if (occurrenceIndex !== undefined) {
+                visibleSpans.push({
+                    endIndex: occurrenceIndex + 1,
+                    event,
+                    startIndex: occurrenceIndex
+                });
+            }
+            continue;
+        }
+        const firstOccurrenceIndex = findCalendarDateInsertionIndex(dateEntries, event.startDateTime, false);
+        const includesEndDate = !event.event.isAllDay && !isParsedMidnight(event.endDateTime);
+        const endOccurrenceIndex = findCalendarDateInsertionIndex(dateEntries, event.endDateTime, includesEndDate);
+        const clampedEndIndex = Math.min(endOccurrenceIndex, dateEntries.length);
+        if (firstOccurrenceIndex < clampedEndIndex) {
+            visibleSpans.push({
+                endIndex: clampedEndIndex,
+                event,
+                startIndex: firstOccurrenceIndex
+            });
+        }
+    }
+    visibleSpans.sort((left, right) => compareNormalizedCalendarEvents(left.event, right.event));
+    for (const span of visibleSpans) {
+        for (let index = span.startIndex; index < span.endIndex; index += 1) {
+            occurrencesByIndex[index]?.push(span.event);
+        }
+    }
     const index = new Map();
-    for (const date of days) {
+    for (let dateIndex = 0; dateIndex < dateEntries.length; dateIndex += 1) {
+        const dateEntry = dateEntries[dateIndex];
+        const occurrences = occurrencesByIndex[dateIndex];
+        if (dateEntry !== undefined && occurrences !== undefined) {
+            index.set(dateEntry.dateString, Object.freeze(occurrences));
+        }
+    }
+    return index;
+}
+function areDatesStrictlyIncreasing(days) {
+    for (let index = 1; index < days.length; index += 1) {
+        const previous = days[index - 1];
+        const current = days[index];
+        if (previous === undefined || current === undefined ||
+            compareParsedCalendarDates(previous.date, current.date) >= 0) {
+            return false;
+        }
+    }
+    return true;
+}
+function indexCalendarEventsByArbitraryDates(events, days) {
+    const index = new Map();
+    for (const { date, dateString } of days) {
         const occurrences = events
             .filter((event) => calendarEventOccursOnDate(event, date))
             .sort(compareCalendarEvents);
-        index.set(formatCalendarDate(date), Object.freeze(occurrences));
+        index.set(dateString, Object.freeze(occurrences));
     }
     return index;
+}
+function findCalendarDateInsertionIndex(days, target, placeAfterEqual) {
+    let lower = 0;
+    let upper = days.length;
+    while (lower < upper) {
+        const middle = (lower + upper) >>> 1;
+        const candidate = days[middle];
+        if (candidate === undefined) {
+            break;
+        }
+        const comparison = compareParsedCalendarDates(candidate.date, target);
+        if (comparison < 0 || (placeAfterEqual && comparison === 0)) {
+            lower = middle + 1;
+        }
+        else {
+            upper = middle;
+        }
+    }
+    return lower;
+}
+function compareNormalizedCalendarEvents(left, right) {
+    if (left.event.isAllDay !== right.event.isAllDay) {
+        return left.event.isAllDay ? -1 : 1;
+    }
+    const timeDifference = compareParsedCalendarDateTimes(left.startDateTime, right.startDateTime);
+    return timeDifference !== 0
+        ? timeDifference
+        : compareStrings(left.event.title, right.event.title) || compareStrings(left.event.id, right.event.id);
+}
+function compareParsedCalendarDateTimes(left, right) {
+    return compareParsedCalendarDates(left, right) ||
+        left.hour - right.hour ||
+        left.minute - right.minute ||
+        left.second - right.second ||
+        left.fractionalSecond - right.fractionalSecond;
+}
+function compareParsedCalendarDates(left, right) {
+    return left.year - right.year || left.month - right.month || left.day - right.day;
+}
+function isParsedMidnight(value) {
+    return value.hour === 0 && value.minute === 0 && value.second === 0 && value.fractionalSecond === 0;
+}
+function toCalendarDateKey(value) {
+    return (((value.year * 12) + value.month - 1) * 31) + value.day;
 }
 function normalizeIdentifier(value) {
     return typeof value === "string" && value.trim().length > 0 && value.length <= MAX_EVENT_ID_CODE_UNITS
