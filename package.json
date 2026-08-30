@@ -1,6 +1,6 @@
 {
   "name": "@tryagaindev/litefold-calendar",
-  "version": "0.3.0-alpha.0",
+  "version": "0.4.0-alpha.0",
   "description": "A dependency-free, mobile-first, accessible calendar component.",
   "private": false,
   "type": "module",

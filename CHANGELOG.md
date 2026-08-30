@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+<!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
+
+## [0.4.0-alpha.0] - 2026-08-30
+
 ### Added
 
 - Added `npm run measure:workflows` for reproducible root-import, render, source-update, DOM-operation, and emitted-size diagnostics. Optional extensions remain excluded from root-load accounting, and timing results remain measurements rather than CI thresholds.
