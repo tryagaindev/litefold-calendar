@@ -83,10 +83,6 @@ const GET_EVENTS_ANNOTATIONS = Object.freeze({
 });
 const NAVIGATE_ANNOTATIONS = Object.freeze({ readOnlyHint: false });
 
-interface WebMcpExecuteOptions {
-	readonly signal: AbortSignal;
-}
-
 interface WebMcpRegistrationOptions {
 	readonly signal: AbortSignal;
 }
@@ -97,7 +93,7 @@ interface WebMcpTool {
 	readonly execute: (
 		this: void,
 		input: object,
-		options: Readonly<WebMcpExecuteOptions>
+		options?: unknown
 	) => Promise<unknown>;
 	readonly inputSchema: Readonly<Record<string, unknown>>;
 	readonly name: string;
@@ -307,8 +303,11 @@ class WebMcpController {
 			description: `Read up to ${EVENT_PAGE_SIZE.toString()} unique events from this calendar's currently loaded, allowed visible range. Omit date for the whole range, provide date to filter one day, and continue with nextCursor.`,
 			execute: (
 				input: object,
-				options: Readonly<WebMcpExecuteOptions>
-			) => this.executeGetEvents(input, options.signal),
+				options?: unknown
+			) => this.executeGetEvents(
+				input,
+				resolveExecutionSignal(options, this.options.signal)
+			),
 			inputSchema: GET_EVENTS_INPUT_SCHEMA,
 			name: `${this.options.toolNamePrefix}${GET_EVENTS_TOOL_SUFFIX}`,
 			title: "Get calendar events"
@@ -321,8 +320,11 @@ class WebMcpController {
 			description: "Change this calendar's visible and selected date without activating events or application actions.",
 			execute: (
 				input: object,
-				options: Readonly<WebMcpExecuteOptions>
-			) => this.executeNavigate(input, options.signal),
+				options?: unknown
+			) => this.executeNavigate(
+				input,
+				resolveExecutionSignal(options, this.options.signal)
+			),
 			inputSchema: NAVIGATE_INPUT_SCHEMA,
 			name: `${this.options.toolNamePrefix}${NAVIGATE_TOOL_SUFFIX}`,
 			title: "Navigate calendar"
@@ -931,6 +933,27 @@ function getModelContext(document: Document): WebMcpModelContext | null {
 
 function createAbortError(message: string): DOMException {
 	return new DOMException(message, "AbortError");
+}
+
+function resolveExecutionSignal(options: unknown, fallbackSignal: AbortSignal): AbortSignal {
+	try {
+		const signal: unknown = isRecord(options)
+			? Reflect.get(options, "signal")
+			: undefined;
+		return isAbortSignal(signal) ? signal : fallbackSignal;
+	} catch {
+		return fallbackSignal;
+	}
+}
+
+function isAbortSignal(value: unknown): value is AbortSignal {
+	try {
+		return isRecord(value) && typeof Reflect.get(value, "aborted") === "boolean" &&
+			typeof Reflect.get(value, "addEventListener") === "function" &&
+			typeof Reflect.get(value, "removeEventListener") === "function";
+	} catch {
+		return false;
+	}
 }
 
 function isExecutionCanceled(signal: AbortSignal): boolean {

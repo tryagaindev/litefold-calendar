@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 <!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
 
+### Fixed
+
+- Allowed WebMCP `get-events` and `navigate` callers to omit or provide malformed execution options by falling back to the extension lifecycle signal, while preserving caller-provided cancellation.
+
 ## [0.4.0-alpha.0] - 2026-08-30
 
 ### Added

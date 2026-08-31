@@ -225,6 +225,48 @@ void test("WebMCP registers the two stable tool contracts with one lifecycle sig
 	assert.equal(modelContext.activeTools.size, 0);
 });
 
+void test("WebMCP tools fall back to the lifecycle signal when execution options are omitted or malformed", async (context) => {
+	const modelContext = new TestModelContext();
+	const { host } = setupDom(context, modelContext);
+	const calendar = createCalendar(host, {
+		events: [{
+			id: "event",
+			start: "2026-07-14",
+			title: "Visible event"
+		}],
+		initialDate: "2026-07-14",
+		extensions: [webMcp({ toolNamePrefix: "fallback" })]
+	});
+	calendar.render();
+	await waitForPhase(calendar, "ready");
+	await waitForRegistrations(modelContext);
+	const getEvents = findTool(modelContext, "fallback-get-events");
+	const navigate = findTool(modelContext, "fallback-navigate");
+
+	const getEventsResult = requireRecord(await getEvents.execute({}, undefined));
+	assert.equal(getEventsResult["ok"], true);
+	assert.equal(getEventsResult["totalEvents"], 1);
+	const navigateResult = requireRecord(await navigate.execute({
+		date: "2026-07-14",
+		target: "date"
+	}, undefined));
+	assert.equal(navigateResult["ok"], true);
+	assert.equal(navigateResult["changed"], false);
+
+	assert.equal(requireRecord(await getEvents.execute({}, { signal: null }))["ok"], true);
+	assert.equal(requireRecord(await navigate.execute({
+		date: "2026-07-14",
+		target: "date"
+	}, null))["ok"], true);
+
+	const callerController = new AbortController();
+	callerController.abort();
+	await assert.rejects(
+		getEvents.execute({}, { signal: callerController.signal }),
+		isAbortError
+	);
+});
+
 void test("distinct calendar prefixes coexist while a duplicate prefix rolls back", async (context) => {
 	const modelContext = new TestModelContext(null, true);
 	const { dom, host } = setupDom(
@@ -825,7 +867,7 @@ void test("a later public focus navigation supersedes a pending tool call", asyn
 	assert.deepEqual(calendar.getState().selectedDate, { day: 20, month: 8, year: 2026 });
 });
 
-void test("destroy aborts registration and rejects a pending navigation", async (context) => {
+void test("destroy aborts registration and rejects a pending navigation using the fallback signal", async (context) => {
 	const modelContext = new TestModelContext();
 	const requests: SourceRequest[] = [];
 	const { host } = setupDom(context, modelContext);
@@ -843,9 +885,9 @@ void test("destroy aborts registration and rejects a pending navigation", async 
 	requests[0]?.pending.resolve([]);
 	await waitForPhase(calendar, "ready");
 	await waitForRegistrations(modelContext);
-	const navigation = executeTool(findTool(modelContext, "schedule-navigate"), {
+	const navigation = findTool(modelContext, "schedule-navigate").execute({
 		target: "next-month"
-	});
+	}, undefined);
 	await waitFor(() => requests.length === 2, "pending destination request");
 
 	calendar.destroy();
