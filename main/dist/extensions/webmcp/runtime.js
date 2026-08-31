@@ -1,4 +1,5 @@
 import { formatCalendarDate, parseCalendarDate } from "../../internal/domain/civil-date.js";
+import { createExecutionSignalResolver } from "./execution-signal.js";
 const DATE_INPUT_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const GET_EVENTS_TOOL_SUFFIX = "-get-events";
 const NAVIGATE_TOOL_SUFFIX = "-navigate";
@@ -99,6 +100,7 @@ export function activateWebMcp(context, toolNamePrefix) {
 /** Owns WebMCP tools and pending executions for one activated extension instance. */
 class WebMcpController {
     options;
+    resolveExecutionSignal;
     waiters = new Set();
     isDisposed = false;
     isStateNotificationPending = false;
@@ -106,6 +108,7 @@ class WebMcpController {
     navigationSequence = 0;
     constructor(options) {
         this.options = options;
+        this.resolveExecutionSignal = createExecutionSignalResolver(options.signal);
         this.lastState = options.state.getState();
     }
     register(document) {
@@ -169,7 +172,7 @@ class WebMcpController {
         return Object.freeze({
             annotations: GET_EVENTS_ANNOTATIONS,
             description: `Read up to ${EVENT_PAGE_SIZE.toString()} unique events from this calendar's currently loaded, allowed visible range. Omit date for the whole range, provide date to filter one day, and continue with nextCursor.`,
-            execute: (input, options) => this.executeGetEvents(input, options.signal),
+            execute: (input, options) => this.executeGetEvents(input, this.resolveExecutionSignal(options)),
             inputSchema: GET_EVENTS_INPUT_SCHEMA,
             name: `${this.options.toolNamePrefix}${GET_EVENTS_TOOL_SUFFIX}`,
             title: "Get calendar events"
@@ -179,7 +182,7 @@ class WebMcpController {
         return Object.freeze({
             annotations: NAVIGATE_ANNOTATIONS,
             description: "Change this calendar's visible and selected date without activating events or application actions.",
-            execute: (input, options) => this.executeNavigate(input, options.signal),
+            execute: (input, options) => this.executeNavigate(input, this.resolveExecutionSignal(options)),
             inputSchema: NAVIGATE_INPUT_SCHEMA,
             name: `${this.options.toolNamePrefix}${NAVIGATE_TOOL_SUFFIX}`,
             title: "Navigate calendar"
@@ -294,7 +297,7 @@ class WebMcpController {
         if (!this.isLive()) {
             return Promise.resolve(this.createFailure("calendar-unavailable", "The calendar is no longer available."));
         }
-        if (signal.aborted) {
+        if (signal.isAborted()) {
             return Promise.reject(createAbortError("The WebMCP tool execution was canceled."));
         }
         const previousNavigationSequence = this.navigationSequence;
@@ -322,7 +325,7 @@ class WebMcpController {
         return this.waitForNavigation(commit, navigationSequence, signal);
     }
     waitForNavigation(commit, navigationSequence, signal) {
-        if (signal.aborted) {
+        if (signal.isAborted()) {
             return Promise.reject(createAbortError("The WebMCP tool execution was canceled."));
         }
         if (!this.isLive()) {
@@ -365,11 +368,11 @@ class WebMcpController {
                 resolve,
                 signal
             };
-            if (signal.aborted) {
+            if (signal.isAborted()) {
                 reject(createAbortError("The WebMCP tool execution was canceled."));
                 return;
             }
-            signal.addEventListener("abort", onAbort, { once: true });
+            signal.addAbortListener(onAbort);
             this.waiters.add(waiter);
             this.settleWaiter(waiter);
         });
@@ -405,7 +408,7 @@ class WebMcpController {
     }
     removeWaiter(waiter) {
         this.waiters.delete(waiter);
-        waiter.signal.removeEventListener("abort", waiter.onAbort);
+        waiter.signal.removeAbortListener(waiter.onAbort);
     }
     createFailure(code, message) {
         return Object.freeze({
@@ -670,7 +673,7 @@ function createAbortError(message) {
     return new DOMException(message, "AbortError");
 }
 function isExecutionCanceled(signal) {
-    return signal.aborted;
+    return signal.isAborted();
 }
 function isRecord(value) {
     return typeof value === "object" && value !== null;
