@@ -7,7 +7,7 @@
     "playwright": "1.62.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "5d24550519b0096ea798cfe297d8af7daff34700c3399df572c36a66539527ad",
+  "sourceFingerprint": "4b2c242a1aafc5011f425de3e7f051af1b5338df338090d70a21c9260327ead5",
   "scenes": [
     {
       "id": "desktop-month-grid",

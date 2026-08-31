@@ -10,6 +10,10 @@ import type {
 	RegisteredExtensionStateCapability
 } from "../../internal/runtime/registered-extension-contract.js";
 import type { CalendarDate, CalendarState } from "../../types.js";
+import {
+	createExecutionSignalResolver,
+	type WebMcpExecutionSignal
+} from "./execution-signal.js";
 
 const DATE_INPUT_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const GET_EVENTS_TOOL_SUFFIX = "-get-events";
@@ -185,7 +189,7 @@ interface NavigationWaiter {
 		this: void,
 		result: Readonly<WebMcpFailure | WebMcpNavigationSuccess>
 	) => void;
-	readonly signal: AbortSignal;
+	readonly signal: Readonly<WebMcpExecutionSignal>;
 }
 
 /** Activates WebMCP against the exact capabilities declared by its extension definition. */
@@ -222,6 +226,7 @@ export function activateWebMcp(
 /** Owns WebMCP tools and pending executions for one activated extension instance. */
 class WebMcpController {
 	private readonly options: Readonly<WebMcpControllerOptions>;
+	private readonly resolveExecutionSignal: ReturnType<typeof createExecutionSignalResolver>;
 	private readonly waiters = new Set<NavigationWaiter>();
 	private isDisposed = false;
 	private isStateNotificationPending = false;
@@ -230,6 +235,7 @@ class WebMcpController {
 
 	public constructor(options: Readonly<WebMcpControllerOptions>) {
 		this.options = options;
+		this.resolveExecutionSignal = createExecutionSignalResolver(options.signal);
 		this.lastState = options.state.getState();
 	}
 
@@ -297,10 +303,8 @@ class WebMcpController {
 		return Object.freeze({
 			annotations: GET_EVENTS_ANNOTATIONS,
 			description: `Read up to ${EVENT_PAGE_SIZE.toString()} unique events from this calendar's currently loaded, allowed visible range. Omit date for the whole range, provide date to filter one day, and continue with nextCursor.`,
-			execute: (input: object, options?: unknown) => this.executeGetEvents(
-				input,
-				resolveExecutionSignal(options, this.options.signal)
-			),
+			execute: (input: object, options?: unknown) =>
+				this.executeGetEvents(input, this.resolveExecutionSignal(options)),
 			inputSchema: GET_EVENTS_INPUT_SCHEMA,
 			name: `${this.options.toolNamePrefix}${GET_EVENTS_TOOL_SUFFIX}`,
 			title: "Get calendar events"
@@ -311,17 +315,18 @@ class WebMcpController {
 		return Object.freeze({
 			annotations: NAVIGATE_ANNOTATIONS,
 			description: "Change this calendar's visible and selected date without activating events or application actions.",
-			execute: (input: object, options?: unknown) => this.executeNavigate(
-				input,
-				resolveExecutionSignal(options, this.options.signal)
-			),
+			execute: (input: object, options?: unknown) =>
+				this.executeNavigate(input, this.resolveExecutionSignal(options)),
 			inputSchema: NAVIGATE_INPUT_SCHEMA,
 			name: `${this.options.toolNamePrefix}${NAVIGATE_TOOL_SUFFIX}`,
 			title: "Navigate calendar"
 		});
 	}
 
-	private executeGetEvents(input: object, signal: AbortSignal): Promise<unknown> {
+	private executeGetEvents(
+		input: object,
+		signal: Readonly<WebMcpExecutionSignal>
+	): Promise<unknown> {
 		if (isExecutionCanceled(signal)) {
 			return Promise.reject(createAbortError("The WebMCP tool execution was canceled."));
 		}
@@ -476,7 +481,7 @@ class WebMcpController {
 		);
 	}
 
-	private executeNavigate(input: object, signal: AbortSignal): Promise<unknown> {
+	private executeNavigate(input: object, signal: Readonly<WebMcpExecutionSignal>): Promise<unknown> {
 		if (isExecutionCanceled(signal)) {
 			return Promise.reject(createAbortError("The WebMCP tool execution was canceled."));
 		}
@@ -493,7 +498,7 @@ class WebMcpController {
 				"The calendar is no longer available."
 			));
 		}
-		if (signal.aborted) {
+		if (signal.isAborted()) {
 			return Promise.reject(createAbortError("The WebMCP tool execution was canceled."));
 		}
 
@@ -527,9 +532,9 @@ class WebMcpController {
 	private waitForNavigation(
 		commit: Readonly<RegisteredExtensionNavigationCommit>,
 		navigationSequence: number,
-		signal: AbortSignal
+		signal: Readonly<WebMcpExecutionSignal>
 	): Promise<Readonly<WebMcpFailure | WebMcpNavigationSuccess>> {
-		if (signal.aborted) {
+		if (signal.isAborted()) {
 			return Promise.reject(createAbortError("The WebMCP tool execution was canceled."));
 		}
 		if (!this.isLive()) {
@@ -578,11 +583,11 @@ class WebMcpController {
 				resolve,
 				signal
 			};
-			if (signal.aborted) {
+			if (signal.isAborted()) {
 				reject(createAbortError("The WebMCP tool execution was canceled."));
 				return;
 			}
-			signal.addEventListener("abort", onAbort, { once: true });
+			signal.addAbortListener(onAbort);
 			this.waiters.add(waiter);
 			this.settleWaiter(waiter);
 		});
@@ -624,7 +629,7 @@ class WebMcpController {
 
 	private removeWaiter(waiter: NavigationWaiter): void {
 		this.waiters.delete(waiter);
-		waiter.signal.removeEventListener("abort", waiter.onAbort);
+		waiter.signal.removeAbortListener(waiter.onAbort);
 	}
 
 	private createFailure(code: WebMcpError["code"], message: string): Readonly<WebMcpFailure> {
@@ -925,40 +930,8 @@ function createAbortError(message: string): DOMException {
 	return new DOMException(message, "AbortError");
 }
 
-function resolveExecutionSignal(options: unknown, fallbackSignal: AbortSignal): AbortSignal {
-	try {
-		const signal: unknown = isRecord(options)
-			? Reflect.get(options, "signal")
-			: undefined;
-		return isAbortSignal(signal, fallbackSignal) ? signal : fallbackSignal;
-	} catch {
-		return fallbackSignal;
-	}
-}
-
-function isAbortSignal(value: unknown, referenceSignal: AbortSignal): value is AbortSignal {
-	if (!isRecord(value)) { return false; }
-	try {
-		const prototype = Object.getPrototypeOf(referenceSignal) as object | null;
-		const descriptor = prototype === null ? undefined :
-			Object.getOwnPropertyDescriptor(prototype, "aborted");
-		const addEventListener: unknown = Reflect.get(value, "addEventListener");
-		const removeEventListener: unknown = Reflect.get(value, "removeEventListener");
-		if (descriptor?.get === undefined || typeof descriptor.get.call(value) !== "boolean" ||
-			typeof addEventListener !== "function" || typeof removeEventListener !== "function") {
-			return false;
-		}
-		const listener = (): undefined => undefined;
-		Reflect.apply(addEventListener, value, ["abort", listener, { once: true }]);
-		Reflect.apply(removeEventListener, value, ["abort", listener]);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function isExecutionCanceled(signal: AbortSignal): boolean {
-	return signal.aborted;
+function isExecutionCanceled(signal: Readonly<WebMcpExecutionSignal>): boolean {
+	return signal.isAborted();
 }
 
 function isRecord(value: unknown): value is Record<PropertyKey, unknown> {

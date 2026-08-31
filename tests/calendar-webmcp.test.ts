@@ -261,6 +261,11 @@ void test("WebMCP tools fall back to the lifecycle signal when execution options
 
 	const callerController = new AbortController();
 	callerController.abort();
+	Object.defineProperty(callerController.signal, "aborted", {
+		configurable: true,
+		value: false
+	});
+	assert.equal(callerController.signal.aborted, false);
 	await assert.rejects(
 		getEvents.execute({}, { signal: callerController.signal }),
 		isAbortError
