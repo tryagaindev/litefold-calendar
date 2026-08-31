@@ -90,11 +90,7 @@ interface WebMcpRegistrationOptions {
 interface WebMcpTool {
 	readonly annotations: Readonly<Record<string, boolean>>;
 	readonly description: string;
-	readonly execute: (
-		this: void,
-		input: object,
-		options?: unknown
-	) => Promise<unknown>;
+	readonly execute: (this: void, input: object, options?: unknown) => Promise<unknown>;
 	readonly inputSchema: Readonly<Record<string, unknown>>;
 	readonly name: string;
 	readonly title: string;
@@ -934,20 +930,27 @@ function resolveExecutionSignal(options: unknown, fallbackSignal: AbortSignal): 
 		const signal: unknown = isRecord(options)
 			? Reflect.get(options, "signal")
 			: undefined;
-		return isAbortSignal(signal) ? signal : fallbackSignal;
+		return isAbortSignal(signal, fallbackSignal) ? signal : fallbackSignal;
 	} catch {
 		return fallbackSignal;
 	}
 }
 
-function isAbortSignal(value: unknown): value is AbortSignal {
+function isAbortSignal(value: unknown, referenceSignal: AbortSignal): value is AbortSignal {
+	if (!isRecord(value)) { return false; }
 	try {
-		if (!(value instanceof AbortSignal)) {
+		const prototype = Object.getPrototypeOf(referenceSignal) as object | null;
+		const descriptor = prototype === null ? undefined :
+			Object.getOwnPropertyDescriptor(prototype, "aborted");
+		const addEventListener: unknown = Reflect.get(value, "addEventListener");
+		const removeEventListener: unknown = Reflect.get(value, "removeEventListener");
+		if (descriptor?.get === undefined || typeof descriptor.get.call(value) !== "boolean" ||
+			typeof addEventListener !== "function" || typeof removeEventListener !== "function") {
 			return false;
 		}
 		const listener = (): undefined => undefined;
-		value.addEventListener("abort", listener, { once: true });
-		value.removeEventListener("abort", listener);
+		Reflect.apply(addEventListener, value, ["abort", listener, { once: true }]);
+		Reflect.apply(removeEventListener, value, ["abort", listener]);
 		return true;
 	} catch {
 		return false;

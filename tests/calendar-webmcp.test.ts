@@ -836,7 +836,7 @@ void test("navigate and get-events return unavailable envelopes when a destinati
 void test("navigate cancellation rejects promptly without rolling back a committed destination", async (context) => {
 	const modelContext = new TestModelContext();
 	const requests: SourceRequest[] = [];
-	const { host } = setupDom(context, modelContext);
+	const { dom, host } = setupDom(context, modelContext);
 	const calendar = createCalendar(host, {
 		events: ({ signal }) => {
 			const pending = deferred<readonly CalendarEventInput[]>();
@@ -852,7 +852,17 @@ void test("navigate cancellation rejects promptly without rolling back a committ
 	await waitForPhase(calendar, "ready");
 	await waitForRegistrations(modelContext);
 
-	const controller = new AbortController();
+	const frame = dom.window.document.createElement("iframe");
+	dom.window.document.body.append(frame);
+	const frameWindow = frame.contentWindow;
+	assert.ok(frameWindow);
+	assert.notEqual(
+		Reflect.get(frameWindow, "AbortSignal"),
+		Reflect.get(dom.window, "AbortSignal")
+	);
+	const FrameAbortController: unknown = Reflect.get(frameWindow, "AbortController");
+	assert.equal(typeof FrameAbortController, "function");
+	const controller = new (FrameAbortController as typeof AbortController)();
 	const navigation = executeTool(
 		findTool(modelContext, "schedule-navigate"),
 		{ target: "next-month" },
