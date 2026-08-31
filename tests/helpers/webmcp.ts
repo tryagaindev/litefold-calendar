@@ -15,7 +15,7 @@ export interface CapturedTool {
 	readonly execute: (
 		this: void,
 		input: unknown,
-		options: Readonly<{ readonly signal: AbortSignal }>
+		options?: unknown
 	) => Promise<unknown>;
 	readonly inputSchema?: unknown;
 	readonly name: string;

@@ -86,7 +86,7 @@ Every handled failure is a stable `{ ok: false, error: { code, message }, state 
 | `navigation-superseded` | A later WebMCP or ordinary calendar navigation became authoritative before this navigation settled. |
 | `pagination-stale` | A well-formed continuation belongs to another instance, range, scope, or event snapshot, or names a page that cannot exist. Restart `get-events` without a cursor. |
 
-Canceling an execution rejects it with `AbortError` and stops waiting. Cancellation does not undo navigation that already committed. Destroy or fatal teardown aborts the shared registration signal and any pending navigation wait, including teardown that occurs synchronously inside the navigation call before a waiter can be installed.
+Canceling an execution rejects it with `AbortError` and stops waiting. A usable caller-provided `ToolExecuteCallbackOptions.signal` is authoritative. As a defensive interoperability fallback, an omitted or malformed execution-options value uses the extension lifecycle signal instead, so destroy or fatal teardown still cancels the operation. Cancellation does not undo navigation that already committed. Teardown also aborts any pending navigation wait, including teardown that occurs synchronously inside the navigation call before a waiter can be installed.
 
 Neither tool activates an event, selects an application command, follows a link, invokes `onDaySelect`, invokes an event or context-action callback, edits data, or bypasses application authorization. Ordinary state observation and event-source lifecycle callbacks still run for a committed navigation, just as they do for the equivalent public method. Tool results omit event identifiers, URLs, metadata, raw errors, and render-hook content. They expose only the bounded normalized fields required to understand the visible schedule.
 
@@ -134,7 +134,7 @@ To exercise a deployed page, use one of these experimental routes:
 For application verification:
 
 1. Verify the ordinary calendar still works when the extension is omitted and when `document.modelContext` is absent.
-2. With a controlled model-context fixture, verify unique tool names, registration, first-page and cursor requests, rejected malformed input, and cleanup after `destroy()`.
+2. With a controlled model-context fixture, verify unique tool names, registration, first-page and cursor requests, rejected malformed input, execution with omitted callback options, caller-signal precedence, and cleanup after `destroy()`.
 3. Confirm `get-events` never changes calendar state, exposes no IDs, URLs, metadata, old snapshot data, or raw errors, and returns `pagination-stale` after its bound snapshot changes.
 4. Confirm `navigate` changes only the requested calendar view, preserves normal loading and error UI, never invokes application activation callbacks, and aborts pending execution on teardown.
 5. Exercise the deployed page in an enabled ChatGPT desktop browser or origin trial; an experimental flag is not the package's general compatibility baseline.

@@ -4,6 +4,7 @@ import { JSDOM } from "jsdom";
 
 const EXPOSED_GLOBALS = [
 	"AbortController",
+	"AbortSignal",
 	"CustomEvent",
 	"DOMException",
 	"Element",

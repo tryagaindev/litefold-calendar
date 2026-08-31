@@ -163,6 +163,7 @@ The root runtime resolves only package-issued opaque `CalendarExtension` values 
 | `src/internal/runtime/navigation-revision.ts` | Neutral navigation ordering across public and extension requests |
 | `src/extensions/webmcp/index.ts` | Pure public `webMcp()` facade |
 | `src/extensions/webmcp/configuration.ts` | Extension-specific synchronous option validation and defaults |
+| `src/extensions/webmcp/execution-signal.ts` | Cross-realm execution cancellation validation and lifecycle fallback |
 | `src/extensions/webmcp/runtime.ts` | WebMCP schemas, capability use, registration, tool execution, and disposal |
 
 Each first-party extension factory validates and snapshots configuration synchronously, returns an immutable reusable value, and defers document access until activation. Extension IDs are stable and unique per calendar; duplicate IDs fail before host mutation. Distinct IDs always coexist, activation and state delivery follow caller order, and teardown reverses it. There is no dependency, priority, precedence, conflict, discovery, or global-registration mechanism.
