@@ -267,6 +267,39 @@ void test("WebMCP tools fall back to the lifecycle signal when execution options
 	);
 });
 
+void test("WebMCP falls back before navigation when a signal lookalike has unusable listeners", async (context) => {
+	const modelContext = new TestModelContext();
+	const requests: SourceRequest[] = [];
+	const { host } = setupDom(context, modelContext);
+	const calendar = createCalendar(host, {
+		events: createDeferredEventSource(requests),
+		initialDate: "2026-07-14",
+		extensions: [webMcp({ toolNamePrefix: "hostile-signal" })]
+	});
+	calendar.render();
+	await waitFor(() => requests.length === 1, "initial event request");
+	requests[0]?.pending.resolve([]);
+	await waitForPhase(calendar, "ready");
+	await waitForRegistrations(modelContext);
+
+	const navigation = findTool(modelContext, "hostile-signal-navigate").execute({
+		target: "next-month"
+	}, {
+		signal: {
+			aborted: false,
+			addEventListener: () => { throw new Error("Listener installation failed."); },
+			removeEventListener: () => undefined
+		}
+	});
+	void navigation.catch(() => undefined);
+	await waitFor(() => requests.length === 2, "destination event request");
+	requests[1]?.pending.resolve([]);
+
+	const result = requireRecord(await navigation);
+	assert.equal(result["ok"], true);
+	assert.equal(result["changed"], true);
+});
+
 void test("distinct calendar prefixes coexist while a duplicate prefix rolls back", async (context) => {
 	const modelContext = new TestModelContext(null, true);
 	const { dom, host } = setupDom(

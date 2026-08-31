@@ -301,10 +301,7 @@ class WebMcpController {
 		return Object.freeze({
 			annotations: GET_EVENTS_ANNOTATIONS,
 			description: `Read up to ${EVENT_PAGE_SIZE.toString()} unique events from this calendar's currently loaded, allowed visible range. Omit date for the whole range, provide date to filter one day, and continue with nextCursor.`,
-			execute: (
-				input: object,
-				options?: unknown
-			) => this.executeGetEvents(
+			execute: (input: object, options?: unknown) => this.executeGetEvents(
 				input,
 				resolveExecutionSignal(options, this.options.signal)
 			),
@@ -318,10 +315,7 @@ class WebMcpController {
 		return Object.freeze({
 			annotations: NAVIGATE_ANNOTATIONS,
 			description: "Change this calendar's visible and selected date without activating events or application actions.",
-			execute: (
-				input: object,
-				options?: unknown
-			) => this.executeNavigate(
+			execute: (input: object, options?: unknown) => this.executeNavigate(
 				input,
 				resolveExecutionSignal(options, this.options.signal)
 			),
@@ -948,9 +942,13 @@ function resolveExecutionSignal(options: unknown, fallbackSignal: AbortSignal): 
 
 function isAbortSignal(value: unknown): value is AbortSignal {
 	try {
-		return isRecord(value) && typeof Reflect.get(value, "aborted") === "boolean" &&
-			typeof Reflect.get(value, "addEventListener") === "function" &&
-			typeof Reflect.get(value, "removeEventListener") === "function";
+		if (!(value instanceof AbortSignal)) {
+			return false;
+		}
+		const listener = (): undefined => undefined;
+		value.addEventListener("abort", listener, { once: true });
+		value.removeEventListener("abort", listener);
+		return true;
 	} catch {
 		return false;
 	}
