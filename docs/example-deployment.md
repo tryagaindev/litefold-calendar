@@ -116,6 +116,6 @@ Rerun the original publisher-linked **Deploy static examples** run only when all
 
 ## Verification
 
-`npm run check` is the complete repository gate. Tooling covers metadata and manifest validation, release ordering, static fallbacks, commit-pinned links, asset filtering, remote-resource rejection, exact CSP enforcement, retained-path immutability, idempotent retries, monotonic preview ancestry, workflow permissions, shared workflow-level queuing, authenticated writer-side rollback reconstruction, and rollback selection. Browser tests cover every published example route plus keyboard/focus behavior, narrow full-SHA reflow, dark mode, forced colors, reduced motion, and automated accessibility rules.
+`npm run check` is the complete repository gate. Tooling covers metadata and manifest validation, release ordering, static fallbacks, commit-pinned links, asset filtering, remote-resource rejection, exact CSP enforcement, retained-path immutability, idempotent retries, monotonic preview ancestry, workflow permissions, shared workflow-level queuing, authenticated writer-side rollback reconstruction, and rollback selection. Browser tests run in Chromium, Firefox, and WebKit and cover every published example route plus keyboard/focus behavior, narrow full-SHA reflow, dark mode, forced colors, reduced motion, automated accessibility rules, Playwright-computed ARIA structure, and live-region/focus behavior.
 
 [Back to the documentation hub](README.md)

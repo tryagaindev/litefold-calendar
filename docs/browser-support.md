@@ -16,6 +16,14 @@ The current and immediately previous stable major versions are supported:
 
 This policy defines where the project accepts compatibility defects. Automated coverage gates every release; dated browser, device, and assistive-technology results are tracked in the [accessibility test record](../ACCESSIBILITY.md#assistive-technology-record) and repeated when relevant behavior changes.
 
+## Automated engine matrix
+
+The Playwright release gate runs the end-to-end suite in Chromium (`Desktop Chrome`), Firefox (`Desktop Firefox`), and WebKit (`Desktop Safari`) projects. Browser-neutral interaction, layout, accessibility-rule, and Playwright-computed ARIA scenarios are expected to pass in all three engines. The project descriptors provide deterministic engine coverage; the WebKit project does not replace testing branded Safari on macOS, iOS, or iPadOS, and none of the projects substitutes for testing with an actual screen reader or inspecting a native platform accessibility tree.
+
+A small capability-specific subset remains Chromium-only because it requires Playwright's Chrome DevTools Protocol session: trusted synthetic touch/pen injection and programmatic 400% browser zoom. Portable wheel, keyboard, disabled-pager, responsive, and accessibility outcomes continue to run in every engine. This protocol boundary is a test-tool limitation, not an exclusion from the support policy.
+
+Use `npm run test:browser` for the complete matrix or `npm run test:browser:chromium`, `npm run test:browser:firefox`, and `npm run test:browser:webkit` while diagnosing one engine. When running separate engine processes concurrently, follow the [concurrent browser-check guidance](../CONTRIBUTOR_COMMANDS.md#run-browser-checks-concurrently) so each process has its own port and output directory. The supported-browser, device, and assistive-technology matrix remains a required manual release activity according to the [accessibility testing policy](../ACCESSIBILITY.md#testing).
+
 ## Required platform
 
 The package relies directly on these modern platform capabilities:

@@ -1,9 +1,11 @@
 import { startRepositoryServer } from "../../scripts/serve-repository.mjs";
 
 export default async function globalSetup(config) {
-	const baseURL = config.projects[0]?.use?.baseURL;
+	const baseURL = config.projects.find((project) =>
+		typeof project.use.baseURL === "string"
+	)?.use.baseURL;
 	if (typeof baseURL !== "string") {
-		throw new Error("The Chromium project must provide a string baseURL.");
+		throw new Error("At least one Playwright project must provide a string baseURL.");
 	}
 	const parsed = new URL(baseURL);
 	const port = Number(parsed.port);

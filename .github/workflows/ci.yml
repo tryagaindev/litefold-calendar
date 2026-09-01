@@ -22,7 +22,7 @@ jobs:
   verify:
     name: Build, test, and verify package
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Check out source without persisted credentials
@@ -49,8 +49,8 @@ jobs:
       - name: Install locked development tooling
         run: npm ci --ignore-scripts
 
-      - name: Install pinned Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install pinned Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Run the complete local quality gate
         run: npm run check

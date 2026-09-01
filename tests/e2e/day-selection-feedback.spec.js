@@ -191,6 +191,10 @@ test.describe("when motion is allowed", () => {
 
 test.describe("with trusted touch input", () => {
 	test.use({ hasTouch: true, reducedMotion: "no-preference" });
+	test.skip(
+		({ browserName }) => browserName !== "chromium",
+		"Trusted touch injection uses Chromium CDP, which Playwright does not expose for Firefox or WebKit."
+	);
 
 	test("a tap hands off pressed-day feedback to the selection transition", async ({ page }) => {
 		await expectExampleReady(page, "/examples/advanced/");

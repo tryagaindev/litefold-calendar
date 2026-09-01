@@ -6,6 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import playwrightConfiguration from "../../playwright.config.mjs";
 import { REPOSITORY_ROOT } from "../lib/process.mjs";
 
 const WORKFLOW_DIRECTORY = join(REPOSITORY_ROOT, ".github", "workflows");
@@ -565,12 +566,52 @@ void test("CI rejects high-severity dependency regressions on pull requests", as
 	assert.doesNotMatch(source, /pull-requests: write|issues: write/u);
 });
 
+void test("release gates and Playwright retain the complete browser-engine matrix", async () => {
+	const [ciSource, publishSource, packageSource] = await Promise.all([
+		workflow("ci.yml"),
+		workflow("publish-alpha.yml"),
+		readFile(join(REPOSITORY_ROOT, "package.json"), "utf8")
+	]);
+	const packageManifest = JSON.parse(packageSource);
+	const ciVerify = job(ciSource, "verify");
+	const publishVerify = job(publishSource, "verify");
+	assert.match(ciVerify, /timeout-minutes: 45/u);
+	for (const verify of [ciVerify, publishVerify]) {
+		assert.match(
+			verify,
+			/name: Install pinned Playwright browsers[\s\S]*?npx playwright install --with-deps chromium firefox webkit/u
+		);
+	}
+	assert.deepEqual(
+		playwrightConfiguration.projects?.map(({ name, use }) => ({
+			browserType: use?.defaultBrowserType,
+			name
+		})),
+		[
+			{ browserType: "chromium", name: "chromium" },
+			{ browserType: "firefox", name: "firefox" },
+			{ browserType: "webkit", name: "webkit" }
+		]
+	);
+	assert.equal(
+		packageManifest.scripts["test:browser:install"],
+		"playwright install chromium firefox webkit"
+	);
+	assert.equal(packageManifest.scripts["test:browser:built"], "playwright test");
+	for (const project of ["chromium", "firefox", "webkit"]) {
+		assert.equal(
+			packageManifest.scripts[`test:browser:${project}`],
+			`npm run build && playwright test --project=${project}`
+		);
+	}
+});
+
 void test("workflow artifacts use bounded purpose-specific retention", async () => {
 	const expectations = new Map([
 		["ci.yml", [7]],
 		["deploy-examples.yml", [1, 1]],
 		["prepare-alpha.yml", [1]],
-		["publish-alpha.yml", [30, 30]],
+		["publish-alpha.yml", [7, 30, 30]],
 		["rollback-examples.yml", [1]]
 	]);
 	for (const [name, expected] of expectations) {
