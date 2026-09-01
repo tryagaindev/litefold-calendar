@@ -8,6 +8,7 @@ const CALENDAR_OPTION_SCHEMA = Object.freeze({
     eventTimeDisplay: "value",
     events: "value",
     extensions: "value",
+    gridEventPlacement: "value",
     renderHooks: "value",
     fallbackElement: "value",
     firstDay: "value",
@@ -31,7 +32,8 @@ const CALENDAR_OPTION_SCHEMA = Object.freeze({
     sourceEventLimit: "value",
     swipe: "value",
     timeZone: "value",
-    toolbarEnd: "value"
+    toolbarEnd: "value",
+    weekRowSizing: "value"
 });
 const CALENDAR_OPTION_KEYS = Object.freeze(Object.keys(CALENDAR_OPTION_SCHEMA));
 const CALENDAR_OPTION_KEY_SET = new Set(CALENDAR_OPTION_KEYS);
@@ -114,6 +116,8 @@ export function snapshotCalendarOptions(options) {
         }
     }
     normalizeEventTimeDisplay(snapshot["eventTimeDisplay"]);
+    snapshot["gridEventPlacement"] = normalizeGridEventPlacement(snapshot["gridEventPlacement"]);
+    snapshot["weekRowSizing"] = normalizeWeekRowSizing(snapshot["weekRowSizing"]);
     return Object.freeze(snapshot);
 }
 export function normalizeIntegerOption(value, defaultValue, minimum, maximum, name) {
@@ -132,6 +136,26 @@ export function normalizeEventTimeDisplay(value) {
     }
     if (value !== "all" && value !== "grid" && value !== "agenda" && value !== "none") {
         throw createConfigurationError('eventTimeDisplay must be "all", "grid", "agenda", or "none".');
+    }
+    return value;
+}
+/** Resolves vertical placement of the complete event stack within each month-grid day cell. */
+export function normalizeGridEventPlacement(value) {
+    if (value === undefined) {
+        return "top";
+    }
+    if (value !== "top" && value !== "center" && value !== "bottom") {
+        throw createConfigurationError('gridEventPlacement must be "top", "center", or "bottom".');
+    }
+    return value;
+}
+/** Resolves whether month-grid week rows share one intrinsic height or size independently. */
+export function normalizeWeekRowSizing(value) {
+    if (value === undefined) {
+        return "equal";
+    }
+    if (value !== "equal" && value !== "content") {
+        throw createConfigurationError('weekRowSizing must be "equal" or "content".');
     }
     return value;
 }

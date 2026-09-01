@@ -24,6 +24,10 @@ export class CalendarMonthTitleRenderer {
     formatFull(month) {
         return this.fullFormatter.format(toUtcDate(month));
     }
+    /** Returns the abbreviated localized month and complete numeric year used by compact visuals. */
+    formatCompact(month) {
+        return this.compactFormatter.format(toUtcDate(month));
+    }
     /** Updates the title only when a value changed, avoiding redundant live-region announcements. */
     render(elements, month) {
         const date = toUtcDate(month);

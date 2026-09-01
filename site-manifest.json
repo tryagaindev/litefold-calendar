@@ -2,7 +2,7 @@
 	"schemaVersion": 1,
 	"main": {
 		"channel": "main",
-		"commit": "54b98e2196247809fe6cecdfe7197e8741b4e98a",
+		"commit": "45c703fdcca3600fd6ba0ab09595702dee7f3387",
 		"version": "0.4.0-alpha.0",
 		"path": "main/examples/"
 	},

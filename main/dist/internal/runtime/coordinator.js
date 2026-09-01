@@ -510,7 +510,7 @@ export class MonthCalendar {
     isNavigationCurrent(navigationRevision) { return this.registeredExtensions?.isNavigationCurrent(navigationRevision) ?? true; }
     canCompleteNavigation(navigationRevision) { return this.canContinueInteraction() && this.isNavigationCurrent(navigationRevision); }
     createStructure() {
-        const dom = createCalendarStructure({
+        const dom = createCalendarStructure(this.options, {
             document: this.document,
             headingLevel: this.headingLevel,
             host: this.host,
@@ -2139,8 +2139,8 @@ export class MonthCalendar {
         const nextTarget = this.bounds.resolveShiftTarget(this.displayedMonth, this.selectedDate.day, 1);
         this.setControlAvailability(dom.previousButton, previousTarget !== null);
         this.setControlAvailability(dom.nextButton, nextTarget !== null);
-        this.setPagingLane(dom.previousLane, dom.previousLaneLabel, previousTarget);
-        this.setPagingLane(dom.nextLane, dom.nextLaneLabel, nextTarget);
+        this.setPagingLane(dom.previousLane, dom.previousLaneLabelFull, dom.previousLaneLabelCompact, previousTarget);
+        this.setPagingLane(dom.nextLane, dom.nextLaneLabelFull, dom.nextLaneLabelCompact, nextTarget);
         this.setControlAvailability(dom.todayButton, today !== null && this.bounds.isDateAllowed(today) &&
             isRenderableMonth({ day: 1, month: today.month, year: today.year }, this.firstDay));
     }
@@ -2152,18 +2152,17 @@ export class MonthCalendar {
             button.setAttribute("aria-disabled", "true");
         }
     }
-    setPagingLane(lane, label, target) {
+    setPagingLane(lane, fullLabel, compactLabel, target) {
         if (!this.swipeEnabled || target === null) {
             lane.removeAttribute("data-lfc-page-available");
-            label.textContent = "";
+            fullLabel.textContent = "";
+            compactLabel.textContent = "";
             return;
         }
         lane.setAttribute("data-lfc-page-available", "");
-        label.textContent = this.monthTitleRenderer.formatFull({
-            day: 1,
-            month: target.month,
-            year: target.year
-        });
+        const month = { day: 1, month: target.month, year: target.year };
+        fullLabel.textContent = this.monthTitleRenderer.formatFull(month);
+        compactLabel.textContent = this.monthTitleRenderer.formatCompact(month);
     }
     getTodayDateForConstruction() {
         let instant;

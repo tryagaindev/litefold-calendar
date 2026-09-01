@@ -546,6 +546,7 @@ const calendarOptions = {
     extensions: [webMcp({ toolNamePrefix: "my-schedule" })],
     fallbackElement,
     firstDay: 1,
+    gridEventPlacement: "bottom",
     headingLevel: 3,
     icons: {
         next: (ownerDocument) => createNavigationIcon(ownerDocument, "\u2192"),
@@ -615,7 +616,8 @@ const calendarOptions = {
     sourceEventLimit: 100,
     swipe: true,
     timeZone: "America/Los_Angeles",
-    toolbarEnd
+    toolbarEnd,
+    weekRowSizing: "content"
 };
 const calendar = createCalendar(host, calendarOptions);
 //This exhaustive map doubles as the UI command dispatcher and public-method coverage check.

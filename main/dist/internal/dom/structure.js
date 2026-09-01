@@ -1,6 +1,6 @@
 import { createCalendarMonthPicker } from "./month-picker.js";
 /** Creates the stable toolbar, status, grid, and agenda structure. */
-export function createCalendarStructure(options) {
+export function createCalendarStructure(layoutOptions, options) {
     options.integrationParents.clear();
     const toolbar = options.document.createElement("div");
     toolbar.className = "lfc-calendar-toolbar";
@@ -71,6 +71,8 @@ export function createCalendarStructure(options) {
     weekdays.setAttribute("role", "row");
     const weeks = options.document.createElement("div");
     weeks.className = "lfc-calendar-weeks";
+    weeks.setAttribute("data-lfc-grid-event-placement", layoutOptions.gridEventPlacement);
+    weeks.setAttribute("data-lfc-week-row-sizing", layoutOptions.weekRowSizing);
     weeks.setAttribute("role", "rowgroup");
     const grid = options.document.createElement("div");
     grid.className = "lfc-calendar-grid";
@@ -81,8 +83,8 @@ export function createCalendarStructure(options) {
         .filter((identifier) => identifier.length > 0) ?? [];
     grid.setAttribute("aria-describedby", [...new Set([...describedBy, gridInstructions.id])].join(" "));
     grid.append(weekdays, weeks);
-    const { lane: previousLane, label: previousLaneLabel } = createPagingLane(options.document, "previous");
-    const { lane: nextLane, label: nextLaneLabel } = createPagingLane(options.document, "next");
+    const { lane: previousLane, label: previousLaneLabel, labelCompact: previousLaneLabelCompact, labelFull: previousLaneLabelFull } = createPagingLane(options.document, "previous");
+    const { lane: nextLane, label: nextLaneLabel, labelCompact: nextLaneLabelCompact, labelFull: nextLaneLabelFull } = createPagingLane(options.document, "next");
     const swipeViewport = options.document.createElement("div");
     swipeViewport.className = "lfc-calendar-swipe-viewport";
     swipeViewport.tabIndex = -1;
@@ -114,6 +116,8 @@ export function createCalendarStructure(options) {
         navigation,
         nextLane,
         nextLaneLabel,
+        nextLaneLabelCompact,
+        nextLaneLabelFull,
         nextButton,
         panel,
         panelActions,
@@ -123,6 +127,8 @@ export function createCalendarStructure(options) {
         politeLive,
         previousLane,
         previousLaneLabel,
+        previousLaneLabelCompact,
+        previousLaneLabelFull,
         previousButton,
         retryButton,
         statusArea,
@@ -145,9 +151,14 @@ function createPagingLane(document, direction) {
     icon.textContent = direction === "previous" ? "\u2039" : "\u203a";
     const label = document.createElement("span");
     label.className = "lfc-calendar-swipe-lane-label";
+    const labelFull = document.createElement("span");
+    labelFull.className = "lfc-calendar-swipe-lane-label-full";
+    const labelCompact = document.createElement("span");
+    labelCompact.className = "lfc-calendar-swipe-lane-label-compact";
+    label.append(labelFull, labelCompact);
     content.append(icon, label);
     lane.append(content);
-    return Object.freeze({ label, lane });
+    return Object.freeze({ label, labelCompact, labelFull, lane });
 }
 function createNavigationButton(options, direction) {
     const button = options.document.createElement("button");
