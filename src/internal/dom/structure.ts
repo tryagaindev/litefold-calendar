@@ -3,6 +3,7 @@ import {
 	type CalendarMonthPickerElements
 } from "./month-picker.js";
 import type { CalendarMessages } from "../../messages.js";
+import type { CalendarOptions } from "../../types.js";
 
 /** Package-owned DOM references used by the calendar renderer. */
 export interface CalendarDom extends CalendarMonthPickerElements {
@@ -17,6 +18,8 @@ export interface CalendarDom extends CalendarMonthPickerElements {
 	readonly navigation: HTMLDivElement;
 	readonly nextLane: HTMLDivElement;
 	readonly nextLaneLabel: HTMLSpanElement;
+	readonly nextLaneLabelCompact: HTMLSpanElement;
+	readonly nextLaneLabelFull: HTMLSpanElement;
 	readonly nextButton: HTMLButtonElement;
 	readonly panel: HTMLDivElement;
 	readonly panelActions: HTMLDivElement;
@@ -26,6 +29,8 @@ export interface CalendarDom extends CalendarMonthPickerElements {
 	readonly politeLive: HTMLParagraphElement;
 	readonly previousLane: HTMLDivElement;
 	readonly previousLaneLabel: HTMLSpanElement;
+	readonly previousLaneLabelCompact: HTMLSpanElement;
+	readonly previousLaneLabelFull: HTMLSpanElement;
 	readonly previousButton: HTMLButtonElement;
 	readonly retryButton: HTMLButtonElement;
 	readonly statusArea: HTMLDivElement;
@@ -59,8 +64,16 @@ interface CalendarStructureOptions {
 	readonly toolbarEnd: HTMLElement | null;
 }
 
+type CalendarGridLayoutOptions = Readonly<Required<Pick<
+	CalendarOptions,
+	"gridEventPlacement" | "weekRowSizing"
+>>>;
+
 /** Creates the stable toolbar, status, grid, and agenda structure. */
-export function createCalendarStructure(options: Readonly<CalendarStructureOptions>): Readonly<CalendarDom> {
+export function createCalendarStructure(
+	layoutOptions: CalendarGridLayoutOptions,
+	options: Readonly<CalendarStructureOptions>
+): Readonly<CalendarDom> {
 	options.integrationParents.clear();
 	const toolbar = options.document.createElement("div");
 	toolbar.className = "lfc-calendar-toolbar";
@@ -134,6 +147,8 @@ export function createCalendarStructure(options: Readonly<CalendarStructureOptio
 	weekdays.setAttribute("role", "row");
 	const weeks = options.document.createElement("div");
 	weeks.className = "lfc-calendar-weeks";
+	weeks.setAttribute("data-lfc-grid-event-placement", layoutOptions.gridEventPlacement);
+	weeks.setAttribute("data-lfc-week-row-sizing", layoutOptions.weekRowSizing);
 	weeks.setAttribute("role", "rowgroup");
 	const grid = options.document.createElement("div");
 	grid.className = "lfc-calendar-grid";
@@ -144,11 +159,18 @@ export function createCalendarStructure(options: Readonly<CalendarStructureOptio
 		.filter((identifier) => identifier.length > 0) ?? [];
 	grid.setAttribute("aria-describedby", [...new Set([...describedBy, gridInstructions.id])].join(" "));
 	grid.append(weekdays, weeks);
-	const { lane: previousLane, label: previousLaneLabel } = createPagingLane(
-		options.document,
-		"previous"
-	);
-	const { lane: nextLane, label: nextLaneLabel } = createPagingLane(options.document, "next");
+	const {
+		lane: previousLane,
+		label: previousLaneLabel,
+		labelCompact: previousLaneLabelCompact,
+		labelFull: previousLaneLabelFull
+	} = createPagingLane(options.document, "previous");
+	const {
+		lane: nextLane,
+		label: nextLaneLabel,
+		labelCompact: nextLaneLabelCompact,
+		labelFull: nextLaneLabelFull
+	} = createPagingLane(options.document, "next");
 	const swipeViewport = options.document.createElement("div");
 	swipeViewport.className = "lfc-calendar-swipe-viewport";
 	swipeViewport.tabIndex = -1;
@@ -182,6 +204,8 @@ export function createCalendarStructure(options: Readonly<CalendarStructureOptio
 		navigation,
 		nextLane,
 		nextLaneLabel,
+		nextLaneLabelCompact,
+		nextLaneLabelFull,
 		nextButton,
 		panel,
 		panelActions,
@@ -191,6 +215,8 @@ export function createCalendarStructure(options: Readonly<CalendarStructureOptio
 		politeLive,
 		previousLane,
 		previousLaneLabel,
+		previousLaneLabelCompact,
+		previousLaneLabelFull,
 		previousButton,
 		retryButton,
 		statusArea,
@@ -205,7 +231,12 @@ export function createCalendarStructure(options: Readonly<CalendarStructureOptio
 function createPagingLane(
 	document: Document,
 	direction: "next" | "previous"
-): Readonly<{ lane: HTMLDivElement; label: HTMLSpanElement }> {
+): Readonly<{
+	lane: HTMLDivElement;
+	label: HTMLSpanElement;
+	labelCompact: HTMLSpanElement;
+	labelFull: HTMLSpanElement;
+}> {
 	const lane = document.createElement("div");
 	lane.className = `lfc-calendar-swipe-lane lfc-calendar-swipe-lane-${direction}`;
 	lane.setAttribute("aria-hidden", "true");
@@ -217,9 +248,14 @@ function createPagingLane(
 	icon.textContent = direction === "previous" ? "\u2039" : "\u203a";
 	const label = document.createElement("span");
 	label.className = "lfc-calendar-swipe-lane-label";
+	const labelFull = document.createElement("span");
+	labelFull.className = "lfc-calendar-swipe-lane-label-full";
+	const labelCompact = document.createElement("span");
+	labelCompact.className = "lfc-calendar-swipe-lane-label-compact";
+	label.append(labelFull, labelCompact);
 	content.append(icon, label);
 	lane.append(content);
-	return Object.freeze({ label, lane });
+	return Object.freeze({ label, labelCompact, labelFull, lane });
 }
 
 function createNavigationButton(

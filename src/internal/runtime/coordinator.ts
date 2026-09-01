@@ -155,7 +155,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private readonly monthTitleRenderer: CalendarMonthTitleRenderer;
 	private readonly now: () => Date;
 	private readonly numberFormatter: Intl.NumberFormat;
-	private readonly options: Readonly<CalendarOptions<TMetadata>>;
+	private readonly options: ReturnType<typeof snapshotCalendarOptions<TMetadata>>;
 	private readonly registeredExtensions: RegisteredExtensionHost<TMetadata> | null;
 	private readonly sourceEventLimit: number;
 	private readonly swipeEnabled: boolean;
@@ -659,7 +659,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private canCompleteNavigation(navigationRevision: number): boolean { return this.canContinueInteraction() && this.isNavigationCurrent(navigationRevision); }
 
 	private createStructure(): CalendarDom {
-		const dom = createCalendarStructure({
+		const dom = createCalendarStructure(this.options, {
 			document: this.document,
 			headingLevel: this.headingLevel,
 			host: this.host,
@@ -2603,8 +2603,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			dom.nextButton,
 			nextTarget !== null
 		);
-		this.setPagingLane(dom.previousLane, dom.previousLaneLabel, previousTarget);
-		this.setPagingLane(dom.nextLane, dom.nextLaneLabel, nextTarget);
+		this.setPagingLane(dom.previousLane, dom.previousLaneLabelFull, dom.previousLaneLabelCompact, previousTarget);
+		this.setPagingLane(dom.nextLane, dom.nextLaneLabelFull, dom.nextLaneLabelCompact, nextTarget);
 		this.setControlAvailability(
 			dom.todayButton,
 			today !== null && this.bounds.isDateAllowed(today) &&
@@ -2622,20 +2622,20 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 
 	private setPagingLane(
 		lane: HTMLElement,
-		label: HTMLElement,
+		fullLabel: HTMLElement,
+		compactLabel: HTMLElement,
 		target: CalendarDate | null
 	): void {
 		if (!this.swipeEnabled || target === null) {
 			lane.removeAttribute("data-lfc-page-available");
-			label.textContent = "";
+			fullLabel.textContent = "";
+			compactLabel.textContent = "";
 			return;
 		}
 		lane.setAttribute("data-lfc-page-available", "");
-		label.textContent = this.monthTitleRenderer.formatFull({
-			day: 1,
-			month: target.month,
-			year: target.year
-		});
+		const month = { day: 1, month: target.month, year: target.year };
+		fullLabel.textContent = this.monthTitleRenderer.formatFull(month);
+		compactLabel.textContent = this.monthTitleRenderer.formatCompact(month);
 	}
 
 	private getTodayDateForConstruction(): CalendarDate {

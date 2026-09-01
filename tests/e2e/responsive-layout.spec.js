@@ -12,8 +12,11 @@ const PRIMARY_TARGET_MINIMUM = 44;
 const GRID_TARGET_MINIMUM = 24;
 const REFLOW_ROOT_FONT_SIZE = 32;
 const RESPONSIVE_MULTIPLE_EVENT_FIXTURE = "#my-responsive-multiple-event-fixture";
+const RESPONSIVE_SINGLETON_EVENT_DATE = "2026-08-05";
+const WEEK_LAYOUT_ANCHOR_DATE = "2026-08-04";
+const WEEK_LAYOUT_FIXTURE = "#my-week-layout-fixture";
+const WEEK_LAYOUT_TARGET_DATE = "2026-08-06";
 const SEPTEMBER_TITLE = "September 2026";
-const SEPTEMBER_COMPACT_TITLE = "Sep 2026";
 const SEPTEMBER_TITLE_BUTTON_LABEL =
 	"Choose schedule month and year, currently September 2026";
 const LONG_MONTH_TITLE =
@@ -23,14 +26,15 @@ const LONG_COMPACT_MONTH_TITLE =
 const LONG_MONTH_TITLE_BUTTON_LABEL =
 	`Choose schedule month and year, currently ${LONG_MONTH_TITLE}`;
 const EXACT_HOST_WIDTH_CASES = Object.freeze([
-	{ agendaReflows: true, compact: true, narrowWeekdays: true, toolbarLayout: "three-row", width: 280 },
-	{ agendaReflows: true, compact: true, narrowWeekdays: true, toolbarLayout: "three-row", width: 320 },
-	{ agendaReflows: true, compact: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 340 },
-	{ agendaReflows: true, compact: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 360 },
-	{ agendaReflows: true, compact: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 375 },
-	{ agendaReflows: false, compact: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 390 },
-	{ agendaReflows: false, compact: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 412 },
-	{ agendaReflows: false, compact: false, narrowWeekdays: false, toolbarLayout: "wide", width: 768 }
+	{ abbreviatedMonthLabels: true, agendaReflows: true, compactEvents: true, narrowWeekdays: true, toolbarLayout: "three-row", width: 280 },
+	{ abbreviatedMonthLabels: true, agendaReflows: true, compactEvents: true, narrowWeekdays: true, toolbarLayout: "three-row", width: 320 },
+	{ abbreviatedMonthLabels: true, agendaReflows: true, compactEvents: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 328 },
+	{ abbreviatedMonthLabels: true, agendaReflows: true, compactEvents: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 340 },
+	{ abbreviatedMonthLabels: true, agendaReflows: true, compactEvents: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 360 },
+	{ abbreviatedMonthLabels: true, agendaReflows: true, compactEvents: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 375 },
+	{ abbreviatedMonthLabels: false, agendaReflows: false, compactEvents: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 390 },
+	{ abbreviatedMonthLabels: false, agendaReflows: false, compactEvents: true, narrowWeekdays: false, toolbarLayout: "two-row", width: 412 },
+	{ abbreviatedMonthLabels: false, agendaReflows: false, compactEvents: false, narrowWeekdays: false, toolbarLayout: "wide", width: 768 }
 ]);
 
 test.use({ bypassCSP: true });
@@ -84,6 +88,42 @@ async function setExactCalendarHostWidth(page, width) {
 		host.getBoundingClientRect().width
 	);
 	expect(renderedWidth).toBe(width);
+}
+
+async function setExactCalendarContentWidth(host, width) {
+	const metrics = await host.evaluate(async (element, targetWidth) => {
+		const initialStyle = getComputedStyle(element);
+		const inlineInsets = [
+			initialStyle.borderLeftWidth,
+			initialStyle.borderRightWidth,
+			initialStyle.paddingLeft,
+			initialStyle.paddingRight
+		].reduce((total, value) => total + Number.parseFloat(value), 0);
+		element.style.inlineSize = `${String(
+			initialStyle.boxSizing === "border-box" ? targetWidth + inlineInsets : targetWidth
+		)}px`;
+		await new Promise((resolve) => {
+			requestAnimationFrame(() => { requestAnimationFrame(resolve); });
+		});
+		const renderedStyle = getComputedStyle(element);
+		const renderedInsets = [
+			renderedStyle.borderLeftWidth,
+			renderedStyle.borderRightWidth,
+			renderedStyle.paddingLeft,
+			renderedStyle.paddingRight
+		].reduce((total, value) => total + Number.parseFloat(value), 0);
+		return {
+			borderBoxWidth: element.getBoundingClientRect().width,
+			boxSizing: renderedStyle.boxSizing,
+			contentWidth: element.getBoundingClientRect().width - renderedInsets,
+			inlineInsets: renderedInsets
+		};
+	}, width);
+	expect(metrics.boxSizing).toBe("border-box");
+	expect(metrics.inlineInsets).toBeGreaterThan(0);
+	expect(Math.abs(metrics.contentWidth - width)).toBeLessThanOrEqual(0.1);
+	expect(Math.abs(metrics.borderBoxWidth - (width + metrics.inlineInsets)))
+		.toBeLessThanOrEqual(0.1);
 }
 
 async function expectToolbarDomAndFocusOrder(page) {
@@ -141,29 +181,157 @@ async function expectTargetMinimums(page) {
 	expect(eventBox?.width ?? 0).toBeGreaterThanOrEqual(GRID_TARGET_MINIMUM);
 }
 
+async function formatBrowserMonthTitle(
+	page,
+	{
+		locale = "en-US",
+		month = "short",
+		monthIndex = 8,
+		year = 2026
+	} = {}
+) {
+	return page.evaluate((options) => new Intl.DateTimeFormat(options.locale, {
+		calendar: "gregory",
+		month: options.month,
+		timeZone: "UTC",
+		year: "numeric"
+	}).format(new Date(Date.UTC(options.year, options.monthIndex, 1))), {
+		locale,
+		month,
+		monthIndex,
+		year
+	});
+}
+
+async function expectResponsiveMonthLabels(
+	page,
+	host,
+	{
+		abbreviated,
+		locale = "en-US",
+		monthIndex = 7,
+		year = 2026
+	}
+) {
+	const titleFull = host.locator(".lfc-calendar-title-label-full");
+	const titleCompact = host.locator(".lfc-calendar-title-label-compact");
+	const expectedTitleFull = await formatBrowserMonthTitle(page, {
+		locale,
+		month: "long",
+		monthIndex,
+		year
+	});
+	const expectedTitleCompact = await formatBrowserMonthTitle(page, {
+		locale,
+		monthIndex,
+		year
+	});
+	await expect(titleFull).toHaveText(expectedTitleFull);
+	await expect(titleCompact).toHaveAttribute("aria-hidden", "true");
+	await expect(titleCompact).toHaveAttribute(
+		"data-lfc-compact-title",
+		expectedTitleCompact
+	);
+	const titleButton = host.locator(".lfc-calendar-title-button");
+	const titleButtonLabel = await titleButton.getAttribute("aria-label");
+	expect(titleButtonLabel).not.toBeNull();
+	expect(titleButtonLabel).toContain(expectedTitleFull);
+	await expect(host.getByRole("grid")).toHaveAccessibleName(expectedTitleFull);
+
+	if (abbreviated) {
+		await expect(titleFull).toHaveCSS("position", "absolute");
+		await expect(titleFull).toHaveCSS("clip-path", "inset(50%)");
+		await expect(titleCompact).toBeVisible();
+	} else {
+		await expect(titleFull).toBeVisible();
+		await expect(titleFull).toHaveCSS("position", "static");
+		await expect(titleCompact).toBeHidden();
+	}
+
+	for (const { direction, targetMonthIndex } of [
+		{ direction: "previous", targetMonthIndex: monthIndex - 1 },
+		{ direction: "next", targetMonthIndex: monthIndex + 1 }
+	]) {
+		const lane = host.locator(`.lfc-calendar-swipe-lane-${direction}`);
+		const laneFull = lane.locator(".lfc-calendar-swipe-lane-label-full");
+		const laneCompact = lane.locator(".lfc-calendar-swipe-lane-label-compact");
+		const expectedFull = await formatBrowserMonthTitle(page, {
+			locale,
+			month: "long",
+			monthIndex: targetMonthIndex,
+			year
+		});
+		const expectedCompact = await formatBrowserMonthTitle(page, {
+			locale,
+			monthIndex: targetMonthIndex,
+			year
+		});
+		await expect(lane).toHaveAttribute("aria-hidden", "true");
+		await expect(laneFull).toHaveText(expectedFull);
+		await expect(laneCompact).toHaveText(expectedCompact);
+		await expect(laneFull).toHaveCount(1);
+		await expect(laneCompact).toHaveCount(1);
+		if (abbreviated) {
+			await expect(laneFull).toBeHidden();
+			await expect(laneCompact).toBeVisible();
+		} else {
+			await expect(laneFull).toBeVisible();
+			await expect(laneCompact).toBeHidden();
+		}
+	}
+}
+
 async function showSeptember(page) {
+	const compactTitle = await formatBrowserMonthTitle(page);
 	await page.getByRole("button", { name: "Later month" }).click();
 	await expect(page.locator("[data-my-calendar]")).not.toHaveAttribute("aria-busy", "true");
 	await expect(page.locator(".lfc-calendar-title-label-full")).toHaveText(SEPTEMBER_TITLE);
 	await expect(page.locator(".lfc-calendar-title-label-compact"))
-		.toHaveAttribute("data-lfc-compact-title", SEPTEMBER_COMPACT_TITLE);
+		.toHaveAttribute("data-lfc-compact-title", compactTitle);
+}
+
+async function expectActiveMonthTitleNotToOverflow(host) {
+	const metrics = await host.locator(".lfc-calendar-title-label").evaluate((wrapper) => {
+		const full = wrapper.querySelector(".lfc-calendar-title-label-full");
+		const compact = wrapper.querySelector(".lfc-calendar-title-label-compact");
+		if (!(full instanceof HTMLElement) || !(compact instanceof HTMLElement)) {
+			throw new Error("Expected stable full and compact title labels.");
+		}
+		const active = getComputedStyle(compact).display === "none" ? full : compact;
+		const style = getComputedStyle(active);
+		return {
+			clientWidth: active.clientWidth,
+			height: active.getBoundingClientRect().height,
+			lineHeight: Number.parseFloat(style.lineHeight),
+			scrollWidth: active.scrollWidth,
+			whiteSpace: style.whiteSpace
+		};
+	});
+	expect(metrics.clientWidth).toBeGreaterThan(0);
+	expect(metrics.scrollWidth - metrics.clientWidth).toBeLessThanOrEqual(1);
+	expect(metrics.height).toBeLessThanOrEqual(metrics.lineHeight + 1);
+	expect(metrics.whiteSpace).toBe("nowrap");
 }
 
 async function expectSingleLineMonthTitle(
 	page,
 	{
 		buttonLabel = SEPTEMBER_TITLE_BUTTON_LABEL,
-		compactTitle = SEPTEMBER_COMPACT_TITLE,
+		compactTitle,
 		overflowExpected = false,
 		title = SEPTEMBER_TITLE
 	} = {}
 ) {
+	const expectedCompactTitle = compactTitle ?? await formatBrowserMonthTitle(page);
 	const titleLabelFull = page.locator(".lfc-calendar-title-label-full");
 	const titleLabelCompact = page.locator(".lfc-calendar-title-label-compact");
 	await expect(titleLabelFull).toHaveText(title);
 	await expect(titleLabelCompact).toHaveText("");
 	await expect(titleLabelCompact).toHaveAttribute("aria-hidden", "true");
-	await expect(titleLabelCompact).toHaveAttribute("data-lfc-compact-title", compactTitle);
+	await expect(titleLabelCompact).toHaveAttribute(
+		"data-lfc-compact-title",
+		expectedCompactTitle
+	);
 
 	await expect(page.locator(".lfc-calendar-title-button")).toHaveAttribute(
 		"aria-label",
@@ -203,7 +371,7 @@ async function expectSingleLineMonthTitle(
 			whiteSpace: style.whiteSpace
 		};
 	});
-	expect(metrics.activeText).toBe(metrics.compactVisible ? compactTitle : title);
+	expect(metrics.activeText).toBe(metrics.compactVisible ? expectedCompactTitle : title);
 	expect(metrics.clientWidth).toBeGreaterThan(0);
 	expect(metrics.lineHeight).toBeGreaterThan(0);
 	expect(metrics.height).toBeLessThanOrEqual(metrics.lineHeight + 1);
@@ -211,7 +379,7 @@ async function expectSingleLineMonthTitle(
 	expect(metrics.whiteSpace).toBe("nowrap");
 	if (metrics.compactVisible) {
 		expect(
-			metrics.pseudoContent.includes(compactTitle) ||
+			metrics.pseudoContent.includes(expectedCompactTitle) ||
 			metrics.pseudoContent === "attr(data-lfc-compact-title)"
 		).toBe(true);
 	}
@@ -293,6 +461,259 @@ async function expectCompactToolbarVisualLayout(page, layout) {
 	);
 }
 
+async function prepareWeekLayoutFixturePage(page) {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	await expectExampleReady(page, "/examples/advanced/");
+}
+
+async function mountWeekLayoutFixture(
+	page,
+	{
+		gridEventPlacement = null,
+		weekRowSizing = null,
+		width = 768
+	} = {}
+) {
+	await page.evaluate(async (fixtureOptions) => {
+		const current = window.__lfcWeekLayoutFixture;
+		current?.calendar.destroy();
+		current?.fixture.remove();
+
+		const { createCalendar } = await import("/dist/index.js");
+		const fixture = document.createElement("section");
+		fixture.id = "my-week-layout-fixture";
+		fixture.style.inlineSize = "fit-content";
+		const host = document.createElement("div");
+		host.dataset["testWeekLayoutHost"] = "";
+		host.style.inlineSize = `${String(fixtureOptions.width)}px`;
+		fixture.append(host);
+		document.body.prepend(fixture);
+
+		const targetEvents = Array.from({ length: 4 }, (_value, index) => ({
+			id: `week-layout-target-${String(index + 1)}`,
+			start: `2026-08-06T${String(9 + index).padStart(2, "0")}:00`,
+			title: `Week layout target ${String(index + 1)}`
+		}));
+		const options = {
+			events: [{
+				id: "week-layout-anchor",
+				start: "2026-08-04T08:00",
+				title: "Tall intrinsic layout anchor"
+			}, ...targetEvents],
+			initialDate: fixtureOptions.targetDate,
+			maxGridEventsPerDay: 2,
+			onDaySelect: () => {},
+			onEventActivate: () => {},
+			renderHooks: [{
+				id: "my-week-layout-fixture",
+				dayDidMount: (context) => {
+					if (context.dateString === fixtureOptions.anchorDate) {
+						context.elements.cell.style.setProperty(
+							"--lfc-grid-event-min-block-size",
+							"9rem"
+						);
+					}
+				},
+				renderEventMarker: (context) => {
+					const marker = context.document.createElement("span");
+					marker.setAttribute("aria-hidden", "true");
+					marker.style.background = "currentcolor";
+					marker.style.borderRadius = "999px";
+					marker.style.display = "block";
+					marker.style.inlineSize = "0.75rem";
+					marker.style.blockSize = context.surface === "grid-summary" &&
+						context.event.id === "week-layout-anchor" ? "8rem" : "0.75rem";
+					if (context.surface === "grid-summary" &&
+						context.event.id === "week-layout-anchor") {
+						marker.className = "my-week-layout-anchor";
+					}
+					return marker;
+				},
+				renderDayBadge: (context) => {
+					if (context.dateString !== fixtureOptions.targetDate) {
+						return undefined;
+					}
+					const badge = context.document.createElement("span");
+					badge.dataset["testWeekLayoutBadge"] = "";
+					badge.textContent = "Target badge";
+					return badge;
+				}
+			}]
+		};
+		if (fixtureOptions.gridEventPlacement !== null) {
+			options.gridEventPlacement = fixtureOptions.gridEventPlacement;
+		}
+		if (fixtureOptions.weekRowSizing !== null) {
+			options.weekRowSizing = fixtureOptions.weekRowSizing;
+		}
+
+		const calendar = createCalendar(host, options);
+		calendar.render();
+		Object.defineProperty(window, "__lfcWeekLayoutFixture", {
+			configurable: true,
+			value: { calendar, fixture, host }
+		});
+	}, {
+		anchorDate: WEEK_LAYOUT_ANCHOR_DATE,
+		gridEventPlacement,
+		targetDate: WEEK_LAYOUT_TARGET_DATE,
+		weekRowSizing,
+		width
+	});
+	await expect.poll(() => page.evaluate(() =>
+		window.__lfcWeekLayoutFixture.calendar.getState().phase
+	)).toBe("ready");
+	return weekLayoutFixture(page);
+}
+
+function weekLayoutFixture(page) {
+	const fixture = page.locator(WEEK_LAYOUT_FIXTURE);
+	const host = fixture.locator("[data-test-week-layout-host]");
+	return {
+		anchorDay: host.locator(
+			`.lfc-calendar-day:has(> .lfc-calendar-day-button[data-lfc-date="${WEEK_LAYOUT_ANCHOR_DATE}"])`
+		),
+		fixture,
+		host,
+		targetDay: host.locator(
+			`.lfc-calendar-day:has(> .lfc-calendar-day-button[data-lfc-date="${WEEK_LAYOUT_TARGET_DATE}"])`
+		),
+		weeks: host.locator(".lfc-calendar-weeks")
+	};
+}
+
+async function setWeekLayoutFixtureWidth(page, width) {
+	const { host } = weekLayoutFixture(page);
+	await host.evaluate((element, nextWidth) => {
+		element.style.inlineSize = `${String(nextWidth)}px`;
+	}, width);
+	await page.evaluate(async () => new Promise((resolve) => {
+		requestAnimationFrame(() => { requestAnimationFrame(resolve); });
+	}));
+}
+
+async function getWeekLayoutGeometry(host) {
+	return host.evaluate((element, dates) => {
+		const weeksElement = element.querySelector(".lfc-calendar-weeks");
+		const weeks = [...element.querySelectorAll(".lfc-calendar-week")];
+		const targetButton = element.querySelector(
+			`.lfc-calendar-day-button[data-lfc-date="${dates.target}"]`
+		);
+		const anchorButton = element.querySelector(
+			`.lfc-calendar-day-button[data-lfc-date="${dates.anchor}"]`
+		);
+		const targetDay = targetButton?.closest(".lfc-calendar-day");
+		const anchorDay = anchorButton?.closest(".lfc-calendar-day");
+		const dateNumber = targetDay?.querySelector(".lfc-calendar-day-number");
+		const badge = targetDay?.querySelector(".lfc-calendar-day-badge");
+		const summaries = targetDay?.querySelector(".lfc-calendar-day-summaries");
+		const anchorMarker = anchorDay?.querySelector(".my-week-layout-anchor");
+		const anchorSummary = anchorMarker?.closest(".lfc-calendar-event-summary");
+		if (!(weeksElement instanceof HTMLElement) ||
+			!(targetDay instanceof HTMLElement) || !(anchorDay instanceof HTMLElement) ||
+			!(dateNumber instanceof HTMLElement) || !(badge instanceof HTMLElement) ||
+			!(summaries instanceof HTMLElement) || !(anchorSummary instanceof HTMLElement)) {
+			throw new Error("Expected the complete week-layout fixture.");
+		}
+
+		const rootCandidates = [...summaries.children].flatMap((child) =>
+			child instanceof HTMLElement && getComputedStyle(child).display === "contents"
+				? [...child.children]
+				: [child]
+		);
+		const visibleRoots = rootCandidates.filter((child) => {
+			if (!(child instanceof HTMLElement)) {
+				return false;
+			}
+			const style = getComputedStyle(child);
+			const box = child.getBoundingClientRect();
+			return style.display !== "none" && style.visibility !== "hidden" &&
+				style.position !== "absolute" && box.width > 1 && box.height > 1;
+		});
+		if (visibleRoots.length === 0) {
+			throw new Error("Expected a visible event and overflow stack.");
+		}
+		const rootBoxes = visibleRoots.map((root) => root.getBoundingClientRect());
+		const stackBox = {
+			bottom: Math.max(...rootBoxes.map((box) => box.bottom)),
+			height: 0,
+			top: Math.min(...rootBoxes.map((box) => box.top))
+		};
+		stackBox.height = stackBox.bottom - stackBox.top;
+		const dayBox = targetDay.getBoundingClientRect();
+		const dateBox = dateNumber.getBoundingClientRect();
+		const badgeBox = badge.getBoundingClientRect();
+		const badgeStyle = getComputedStyle(badge);
+		const summariesBox = summaries.getBoundingClientRect();
+		const summariesStyle = getComputedStyle(summaries);
+		const paddingBlockStart = Number.parseFloat(summariesStyle.paddingBlockStart);
+		const paddingBlockEnd = Number.parseFloat(summariesStyle.paddingBlockEnd);
+		const usableTop = summariesBox.top + paddingBlockStart;
+		const usableBottom = summariesBox.bottom - paddingBlockEnd;
+		const anchorDayBox = anchorDay.getBoundingClientRect();
+		const anchorMarkerBox = anchorMarker.getBoundingClientRect();
+		const anchorSummaryBox = anchorSummary.getBoundingClientRect();
+		const targetWeekIndex = weeks.indexOf(targetDay.parentElement);
+		return {
+			anchorMarkerBlockSize: anchorMarkerBox.height,
+			anchorSummaryBlockSize: anchorSummaryBox.height,
+			anchorSummaryContained: anchorSummaryBox.top >= anchorDayBox.top - 1 &&
+				anchorSummaryBox.bottom <= anchorDayBox.bottom + 1,
+			badgeBlockInset: badgeBox.top - dayBox.top,
+			badgeBlockSize: badgeBox.height,
+			badgeVisible: badgeStyle.display !== "none" && badgeBox.width > 0 && badgeBox.height > 0,
+			calendarBlockSize: weeksElement.getBoundingClientRect().height,
+			containsEvent: visibleRoots.some((root) =>
+				root.matches(".lfc-calendar-event-summary") ||
+				root.querySelector(".lfc-calendar-event-summary") !== null
+			),
+			containsOverflow: visibleRoots.some((root) =>
+				root.matches(".lfc-calendar-grid-more") ||
+				root.querySelector(".lfc-calendar-event-overflow") !== null
+			),
+			dateBlockInset: dateBox.top - dayBox.top,
+			dateBlockSize: dateBox.height,
+			domSignature: [...summaries.children].map((child) =>
+				`${child.tagName}.${child.className}`
+			),
+			gridEventPlacement: weeksElement.getAttribute("data-lfc-grid-event-placement"),
+			hostOverflow: element.scrollWidth - element.clientWidth,
+			stackBlockEndGap: usableBottom - stackBox.bottom,
+			stackBlockSize: stackBox.height,
+			stackCenterDelta: Math.abs(
+				(stackBox.top + (stackBox.height / 2)) -
+				(usableTop + ((usableBottom - usableTop) / 2))
+			),
+			stackContained: stackBox.top >= dayBox.top - 1 &&
+				stackBox.bottom <= dayBox.bottom + 1 &&
+				stackBox.top >= usableTop - 1 && stackBox.bottom <= usableBottom + 1,
+			stackTop: stackBox.top - dayBox.top,
+			stackBlockStartGap: stackBox.top - usableTop,
+			summariesBlockEndInset: dayBox.bottom - summariesBox.bottom,
+			targetWeekIndex,
+			visibleRootCount: visibleRoots.length,
+			weekHeights: weeks.map((week) => week.getBoundingClientRect().height),
+			weekRowSizing: weeksElement.getAttribute("data-lfc-week-row-sizing")
+		};
+	}, { anchor: WEEK_LAYOUT_ANCHOR_DATE, target: WEEK_LAYOUT_TARGET_DATE });
+}
+
+function expectEqualWeekHeights(geometry) {
+	expect(geometry.weekHeights).toHaveLength(6);
+	expect(Math.max(...geometry.weekHeights) - Math.min(...geometry.weekHeights))
+		.toBeLessThanOrEqual(1);
+}
+
+function expectWeekLayoutContained(geometry) {
+	expect(geometry.anchorSummaryBlockSize).toBeGreaterThanOrEqual(128);
+	expect(geometry.anchorSummaryContained).toBe(true);
+	expect(geometry.containsEvent).toBe(true);
+	expect(geometry.containsOverflow).toBe(true);
+	expect(geometry.hostOverflow).toBeLessThanOrEqual(1);
+	expect(geometry.stackContained).toBe(true);
+	expect(geometry.summariesBlockEndInset).toBeLessThanOrEqual(1);
+}
+
 async function mountResponsiveMultipleEventFixture(
 	page,
 	{
@@ -301,9 +722,14 @@ async function mountResponsiveMultipleEventFixture(
 		customOverflow = true,
 		direction = "ltr",
 		eventCount = 4,
+		gridEventPlacement = "bottom",
+		includeSingleton = false,
+		locale = null,
 		markerSize = "1.25rem",
 		maxGridEventsPerDay = 2,
 		renderMarker = true,
+		useEventProvider = false,
+		weekRowSizing = null,
 		width = 768
 	} = {}
 ) {
@@ -332,6 +758,10 @@ async function mountResponsiveMultipleEventFixture(
 		`
 	});
 	await page.evaluate(async (fixtureOptions) => {
+		const current = window.__lfcResponsiveMultipleEventFixture;
+		current?.calendar.destroy();
+		current?.fixture.remove();
+
 		const { createCalendar } = await import("/dist/index.js");
 		const fixture = document.createElement("section");
 		fixture.id = "my-responsive-multiple-event-fixture";
@@ -355,9 +785,10 @@ async function mountResponsiveMultipleEventFixture(
 			daySelectCalls: 0,
 			eventActivateCalls: 0,
 			markerCalls: 0,
+			providerCalls: 0,
 			wideCalls: 0
 		};
-		const events = Array.from({ length: fixtureOptions.eventCount }, (_value, index) => {
+		const multipleEvents = Array.from({ length: fixtureOptions.eventCount }, (_value, index) => {
 			const hour = String(8 + (index % 12)).padStart(2, "0");
 			const minute = String(index % 60).padStart(2, "0");
 			return Object.freeze({
@@ -366,55 +797,68 @@ async function mountResponsiveMultipleEventFixture(
 				title: `Responsive multiple event ${String(index + 1)}`
 			});
 		});
-		const calendar = createCalendar(host, {
-			events,
-			renderHooks: [{
-				id: "my-responsive-multiple-event-fixture",
-				renderEventOverflow: (context) => {
-					const {
-						document: ownerDocument,
-						eventCount: renderedEventCount,
-						overflowCount,
-						text,
-						variant,
-						visibleEventCount
-					} = context;
-					observations[`${variant}Calls`] += 1;
-					observations.contexts.push({
-						eventCount: renderedEventCount,
-						overflowCount,
-						text,
-						variant,
-						visibleEventCount
-					});
-					if (!fixtureOptions.customOverflow) {
-						return undefined;
-					}
-					const custom = ownerDocument.createElement("span");
-					custom.dataset[`testResponsive${variant === "compact" ? "Compact" : "Wide"}Overflow`] = "";
-					custom.textContent = variant === "compact" ? text : `Wide ${text}`;
-					if (variant === "compact" && fixtureOptions.compactCustomSize !== null) {
-						custom.style.blockSize = fixtureOptions.compactCustomSize;
-						custom.style.display = "inline-grid";
-						custom.style.inlineSize = fixtureOptions.compactCustomSize;
-						custom.style.placeItems = "center";
-					}
-					return custom;
-				},
-				renderEventMarker: ({ document: ownerDocument }) => {
-					observations.markerCalls += 1;
-					if (!fixtureOptions.renderMarker) {
-						return null;
-					}
-					const marker = ownerDocument.createElement("span");
-					marker.className = "my-responsive-marker";
-					marker.setAttribute("aria-hidden", "true");
-					const satellite = ownerDocument.createElement("span");
-					satellite.className = "my-responsive-satellite";
-					marker.append(satellite);
-					return marker;
+		const events = fixtureOptions.includeSingleton
+			? [Object.freeze({
+				id: "responsive-singleton",
+				start: `${fixtureOptions.singletonDate}T07:30`,
+				title: "Responsive singleton event"
+			}), ...multipleEvents]
+			: multipleEvents;
+		const renderHook = {
+			id: "my-responsive-multiple-event-fixture",
+			renderEventOverflow: (context) => {
+				const {
+					document: ownerDocument,
+					eventCount: renderedEventCount,
+					overflowCount,
+					text,
+					variant,
+					visibleEventCount
+				} = context;
+				observations[`${variant}Calls`] += 1;
+				observations.contexts.push({
+					eventCount: renderedEventCount,
+					overflowCount,
+					text,
+					variant,
+					visibleEventCount
+				});
+				if (!fixtureOptions.customOverflow) {
+					return undefined;
 				}
-			}],
+				const custom = ownerDocument.createElement("span");
+				custom.dataset[`testResponsive${variant === "compact" ? "Compact" : "Wide"}Overflow`] = "";
+				custom.textContent = variant === "compact" ? text : `Wide ${text}`;
+				if (variant === "compact" && fixtureOptions.compactCustomSize !== null) {
+					custom.style.blockSize = fixtureOptions.compactCustomSize;
+					custom.style.display = "inline-grid";
+					custom.style.inlineSize = fixtureOptions.compactCustomSize;
+					custom.style.placeItems = "center";
+				}
+				return custom;
+			}
+		};
+		if (fixtureOptions.renderMarker !== null) {
+			renderHook.renderEventMarker = ({ document: ownerDocument }) => {
+				observations.markerCalls += 1;
+				if (!fixtureOptions.renderMarker) {
+					return null;
+				}
+				const marker = ownerDocument.createElement("span");
+				marker.className = "my-responsive-marker";
+				marker.setAttribute("aria-hidden", "true");
+				const satellite = ownerDocument.createElement("span");
+				satellite.className = "my-responsive-satellite";
+				marker.append(satellite);
+				return marker;
+			};
+		}
+		const options = {
+			events: fixtureOptions.useEventProvider ? () => {
+				observations.providerCalls += 1;
+				return events;
+			} : events,
+			renderHooks: [renderHook],
 			initialDate: "2026-08-06",
 			maxGridEventsPerDay: fixtureOptions.maxGridEventsPerDay,
 			onDaySelect: () => {
@@ -423,7 +867,17 @@ async function mountResponsiveMultipleEventFixture(
 			onEventActivate: () => {
 				observations.eventActivateCalls += 1;
 			}
-		});
+		};
+		if (fixtureOptions.gridEventPlacement !== null) {
+			options.gridEventPlacement = fixtureOptions.gridEventPlacement;
+		}
+		if (fixtureOptions.locale !== null) {
+			options.locale = fixtureOptions.locale;
+		}
+		if (fixtureOptions.weekRowSizing !== null) {
+			options.weekRowSizing = fixtureOptions.weekRowSizing;
+		}
+		const calendar = createCalendar(host, options);
 		calendar.render();
 		Object.defineProperty(window, "__lfcResponsiveMultipleEventFixture", {
 			configurable: true,
@@ -435,9 +889,15 @@ async function mountResponsiveMultipleEventFixture(
 		customOverflow,
 		direction,
 		eventCount,
+		gridEventPlacement,
+		includeSingleton,
+		locale,
 		markerSize,
 		maxGridEventsPerDay,
 		renderMarker,
+		singletonDate: RESPONSIVE_SINGLETON_EVENT_DATE,
+		useEventProvider,
+		weekRowSizing,
 		width
 	});
 	await expect.poll(() => page.evaluate(() =>
@@ -471,11 +931,14 @@ async function getCompactOverflowLayoutGeometry(
 		}
 
 		const dayBox = element.getBoundingClientRect();
+		const weeks = element.closest(".lfc-calendar-weeks");
 		const summariesBox = summaries.getBoundingClientRect();
 		const targetBox = target.getBoundingClientRect();
 		const summariesStyle = getComputedStyle(summaries);
 		const direction = summariesStyle.direction;
+		const paddingBlockStart = Number.parseFloat(summariesStyle.paddingBlockStart);
 		const paddingBlockEnd = Number.parseFloat(summariesStyle.paddingBlockEnd);
+		const paddedBlockStart = summariesBox.top + paddingBlockStart;
 		const paddedBlockEnd = summariesBox.bottom - paddingBlockEnd;
 		const centerBlock = (box) => box.top + (box.height / 2);
 		const centerInline = (box) => box.left + (box.width / 2);
@@ -483,14 +946,17 @@ async function getCompactOverflowLayoutGeometry(
 			compactInlineCenterDelta: null,
 			direction,
 			paddingBlockEnd,
+			paddingBlockStart,
 			roots: null,
 			summariesBlockEndDelta: Math.abs(summariesBox.bottom - dayBox.bottom),
 			targetBlockEndDelta: Math.abs(targetBox.bottom - paddedBlockEnd),
+			targetBlockStartDelta: Math.abs(targetBox.top - paddedBlockStart),
 			targetContainedInDay: targetBox.left >= dayBox.left - 1 &&
 				targetBox.right <= dayBox.right + 1 &&
 				targetBox.top >= dayBox.top - 1 &&
 				targetBox.bottom <= dayBox.bottom + 1,
-			targetInlineCenterDelta: Math.abs(centerInline(targetBox) - centerInline(dayBox))
+			targetInlineCenterDelta: Math.abs(centerInline(targetBox) - centerInline(dayBox)),
+			weekRowSizing: weeks?.getAttribute("data-lfc-week-row-sizing") ?? null
 		};
 		if (compact instanceof HTMLElement) {
 			const compactBox = compact.getBoundingClientRect();
@@ -527,6 +993,8 @@ async function getCompactOverflowLayoutGeometry(
 				(primaryBox.height + compactBox.height) - targetBox.height
 			),
 			blockSizeDelta: Math.abs(primaryBox.height - compactBox.height),
+			compactBlockSize: compactBox.height,
+			compactInlineSize: compactBox.width,
 			compactAtPaddedBlockEndDelta: Math.abs(compactBox.bottom - paddedBlockEnd),
 			compactOnInlineEnd,
 			containedInTarget: primaryBox.left >= targetBox.left - 1 &&
@@ -547,6 +1015,8 @@ async function getCompactOverflowLayoutGeometry(
 				Math.abs(centerInline(primaryBox) - inlineStartCenter),
 				Math.abs(centerInline(compactBox) - inlineEndCenter)
 			),
+			primaryBlockSize: primaryBox.height,
+			primaryInlineSize: primaryBox.width,
 			primaryAtPaddedBlockEndDelta: Math.abs(primaryBox.bottom - paddedBlockEnd),
 			overlapDepth,
 			stackedQuarterCenterDelta: Math.max(
@@ -556,6 +1026,52 @@ async function getCompactOverflowLayoutGeometry(
 		};
 		return geometry;
 	}, { inspectPairedRoots, targetSelector });
+}
+
+async function getCompactPrimaryGeometry(day) {
+	return day.evaluate((element) => {
+		const primary = element.querySelector(
+			".lfc-calendar-event-summary.lfc-is-compact-primary"
+		);
+		if (!(primary instanceof HTMLElement)) {
+			throw new Error("Expected a compact primary event root.");
+		}
+		const dayBox = element.getBoundingClientRect();
+		const primaryBox = primary.getBoundingClientRect();
+		const style = getComputedStyle(primary);
+		return {
+			aspectRatio: style.aspectRatio,
+			blockSize: primaryBox.height,
+			containedInDay: primaryBox.left >= dayBox.left - 1 &&
+				primaryBox.right <= dayBox.right + 1 &&
+				primaryBox.top >= dayBox.top - 1 &&
+				primaryBox.bottom <= dayBox.bottom + 1,
+			inlineSize: primaryBox.width,
+			minBlockSize: Number.parseFloat(style.minBlockSize)
+		};
+	});
+}
+
+async function expectEqualCompactSlotSizing(presentation, geometry) {
+	expect(geometry.roots).not.toBeNull();
+	const singleton = await getCompactPrimaryGeometry(presentation.singletonDay);
+	expect(singleton.containedInDay).toBe(true);
+	expect(Math.abs(singleton.blockSize - geometry.roots.primaryBlockSize))
+		.toBeLessThanOrEqual(1);
+	expect(Math.abs(singleton.blockSize - geometry.roots.compactBlockSize))
+		.toBeLessThanOrEqual(1);
+	expect(Math.abs(singleton.inlineSize - geometry.roots.primaryInlineSize))
+		.toBeLessThanOrEqual(1);
+	expect(Math.abs(singleton.inlineSize - geometry.roots.compactInlineSize))
+		.toBeLessThanOrEqual(1);
+	return singleton;
+}
+
+async function expectDefaultCompactSlotSize(locator) {
+	const box = await locator.boundingBox();
+	expect(box).not.toBeNull();
+	expect(Math.abs((box?.height ?? 0) - PRIMARY_TARGET_MINIMUM)).toBeLessThanOrEqual(1);
+	expect(Math.abs((box?.width ?? 0) - PRIMARY_TARGET_MINIMUM)).toBeLessThanOrEqual(1);
 }
 
 async function getCompactMarkerClearanceGeometry(day, { customOverflow }) {
@@ -601,6 +1117,13 @@ function expectCompactOverflowAtBlockEnd(geometry) {
 	expect(geometry.targetContainedInDay).toBe(true);
 }
 
+function expectCompactOverflowAtBlockStart(geometry) {
+	expect(geometry.paddingBlockStart).toBe(0);
+	expect(geometry.summariesBlockEndDelta).toBeLessThanOrEqual(1);
+	expect(geometry.targetBlockStartDelta).toBeLessThanOrEqual(1);
+	expect(geometry.targetContainedInDay).toBe(true);
+}
+
 function expectPairedCompactOverflowLayout(geometry, { direction, layout }) {
 	expectCompactOverflowAtBlockEnd(geometry);
 	expect(geometry.direction).toBe(direction);
@@ -615,14 +1138,18 @@ function expectPairedCompactOverflowLayout(geometry, { direction, layout }) {
 		expect(geometry.roots.blockCenterDelta).toBeLessThanOrEqual(1);
 		expect(geometry.roots.compactOnInlineEnd).toBe(true);
 		expect(geometry.roots.compactAtPaddedBlockEndDelta).toBeLessThanOrEqual(1);
-		expect(geometry.roots.inlineFillDelta).toBeLessThanOrEqual(1);
+		if (geometry.weekRowSizing === "content") {
+			expect(geometry.roots.inlineFillDelta).toBeLessThanOrEqual(1);
+		}
 		expect(geometry.roots.logicalQuarterCenterDelta).toBeLessThanOrEqual(1);
 		expect(geometry.roots.primaryAtPaddedBlockEndDelta).toBeLessThanOrEqual(1);
 		return;
 	}
-	expect(geometry.roots.blockFillDelta).toBeLessThanOrEqual(1);
+	if (geometry.weekRowSizing === "content") {
+		expect(geometry.roots.blockFillDelta).toBeLessThanOrEqual(1);
+		expect(geometry.roots.compactAtPaddedBlockEndDelta).toBeLessThanOrEqual(1);
+	}
 	expect(geometry.roots.inlineCenterDelta).toBeLessThanOrEqual(1);
-	expect(geometry.roots.compactAtPaddedBlockEndDelta).toBeLessThanOrEqual(1);
 	expect(geometry.roots.stackedQuarterCenterDelta).toBeLessThanOrEqual(1);
 }
 
@@ -644,6 +1171,9 @@ function responsiveMultipleEventFixture(page) {
 	const wideOverflow = overflow.locator(
 		":scope > .lfc-calendar-event-overflow.lfc-is-wide"
 	);
+	const singletonDay = host.locator(
+		`.lfc-calendar-day:has(> .lfc-calendar-day-button[data-lfc-date="${RESPONSIVE_SINGLETON_EVENT_DATE}"])`
+	);
 	return {
 		cluster,
 		compactContent: compactOverflow.locator(
@@ -658,6 +1188,10 @@ function responsiveMultipleEventFixture(page) {
 		marker: day.locator(".lfc-calendar-event-summary.lfc-is-compact-primary .my-responsive-marker"),
 		overflow,
 		satellite: day.locator(".lfc-calendar-event-summary.lfc-is-compact-primary .my-responsive-satellite"),
+		singletonDay,
+		singletonPrimary: singletonDay.locator(
+			".lfc-calendar-event-summary.lfc-is-compact-primary"
+		),
 		wideContent: wideOverflow.locator(":scope > .lfc-calendar-event-overflow-content"),
 		wideCustom: wideOverflow.locator("[data-test-responsive-wide-overflow]"),
 		wideDefault: wideOverflow.locator(".lfc-event-overflow-default-content"),
@@ -690,7 +1224,10 @@ for (const widthCase of EXACT_HOST_WIDTH_CASES) {
 		await setExactCalendarHostWidth(page, widthCase.width);
 
 		const toolbar = page.locator(".lfc-calendar-toolbar");
-		await expect(toolbar).toHaveCSS("display", widthCase.compact ? "grid" : "flex");
+		await expect(toolbar).toHaveCSS(
+			"display",
+			widthCase.compactEvents ? "grid" : "flex"
+		);
 		if (widthCase.toolbarLayout !== "wide") {
 			await expectCompactToolbarVisualLayout(page, widthCase.toolbarLayout);
 		}
@@ -726,7 +1263,7 @@ for (const widthCase of EXACT_HOST_WIDTH_CASES) {
 				width: actionBox.width
 			};
 		});
-		if (widthCase.compact) {
+		if (widthCase.compactEvents) {
 			const expectedTargetSize = Math.min(PRIMARY_TARGET_MINIMUM, sizing.cellWidth);
 			expect(sizing.aspectRatio).toBe("1 / 1");
 			expect(sizing.width).toBeGreaterThanOrEqual(GRID_TARGET_MINIMUM);
@@ -742,18 +1279,10 @@ for (const widthCase of EXACT_HOST_WIDTH_CASES) {
 		await expectToolbarDomAndFocusOrder(page);
 		await expectTargetMinimums(page);
 		await showSeptember(page);
-		if (widthCase.width <= 20 * 16) {
-			await expect(page.locator(".lfc-calendar-title-label-full"))
-				.toHaveCSS("position", "absolute");
-			await expect(page.locator(".lfc-calendar-title-label-full"))
-				.toHaveCSS("clip-path", "inset(50%)");
-			await expect(page.locator(".lfc-calendar-title-label-compact")).toBeVisible();
-		} else {
-			await expect(page.locator(".lfc-calendar-title-label-full")).toBeVisible();
-			await expect(page.locator(".lfc-calendar-title-label-full"))
-				.toHaveCSS("position", "static");
-			await expect(page.locator(".lfc-calendar-title-label-compact")).toBeHidden();
-		}
+		await expectResponsiveMonthLabels(page, page.locator("[data-my-calendar]"), {
+			abbreviated: widthCase.abbreviatedMonthLabels,
+			monthIndex: 8
+		});
 		await expectSingleLineMonthTitle(page);
 		await setLongMonthTitle(page);
 		await expectSingleLineMonthTitle(page, {
@@ -766,8 +1295,280 @@ for (const widthCase of EXACT_HOST_WIDTH_CASES) {
 	});
 }
 
+test("short month labels use the strict 24rem content-box boundary without runtime churn", async ({ page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	const locale = "de-DE";
+	const { host } = await mountResponsiveMultipleEventFixture(page, {
+		locale,
+		useEventProvider: true,
+		width: 387
+	});
+	await setExactCalendarContentWidth(host, 385);
+	await host.locator(".lfc-calendar-title-button").focus();
+	await page.evaluate(() => {
+		const current = window.__lfcResponsiveMultipleEventFixture;
+		const selectors = [
+			".lfc-calendar-title-button",
+			".lfc-calendar-title-label-full",
+			".lfc-calendar-title-label-compact",
+			".lfc-calendar-swipe-lane-previous .lfc-calendar-swipe-lane-label",
+			".lfc-calendar-swipe-lane-previous .lfc-calendar-swipe-lane-label-full",
+			".lfc-calendar-swipe-lane-previous .lfc-calendar-swipe-lane-label-compact",
+			".lfc-calendar-swipe-lane-next .lfc-calendar-swipe-lane-label",
+			".lfc-calendar-swipe-lane-next .lfc-calendar-swipe-lane-label-full",
+			".lfc-calendar-swipe-lane-next .lfc-calendar-swipe-lane-label-compact",
+			".lfc-calendar-grid",
+			".lfc-calendar-event-summary"
+		];
+		const nodes = selectors.map((selector) => current.host.querySelector(selector));
+		if (nodes.some((node) => node === null)) {
+			throw new Error("Expected stable responsive month-label nodes.");
+		}
+		current.monthLabelSnapshot = {
+			calls: {
+				compact: current.observations.compactCalls,
+				marker: current.observations.markerCalls,
+				provider: current.observations.providerCalls,
+				wide: current.observations.wideCalls
+			},
+			nodes,
+			selectors
+		};
+	});
+
+	const localizedCompact = await formatBrowserMonthTitle(page, {
+		locale,
+		monthIndex: 7
+	});
+	const englishCompact = await formatBrowserMonthTitle(page, { monthIndex: 7 });
+	expect(localizedCompact).not.toBe(englishCompact);
+
+	for (const widthCase of [
+		{ abbreviated: true, contentWidth: 383 },
+		{ abbreviated: false, contentWidth: 384 },
+		{ abbreviated: false, contentWidth: 385 }
+	]) {
+		await setExactCalendarContentWidth(host, widthCase.contentWidth);
+		await expectResponsiveMonthLabels(page, host, {
+			abbreviated: widthCase.abbreviated,
+			locale
+		});
+		await expect(host.locator(".lfc-calendar-title-button")).toBeFocused();
+		if (widthCase.abbreviated) {
+			await expectActiveMonthTitleNotToOverflow(host);
+		}
+	}
+
+	const stability = await page.evaluate(() => {
+		const current = window.__lfcResponsiveMultipleEventFixture;
+		const snapshot = current.monthLabelSnapshot;
+		return {
+			callsStable: snapshot.calls.compact === current.observations.compactCalls &&
+				snapshot.calls.marker === current.observations.markerCalls &&
+				snapshot.calls.provider === current.observations.providerCalls &&
+				snapshot.calls.wide === current.observations.wideCalls,
+			providerCalls: current.observations.providerCalls,
+			nodesStable: snapshot.nodes.every((node, index) =>
+				node === current.host.querySelector(snapshot.selectors[index])
+			)
+		};
+	});
+	expect(stability).toEqual({ callsStable: true, nodesStable: true, providerCalls: 1 });
+});
+
+test("default equal rows grow intrinsically and remain stable across responsive layout", async ({ page }) => {
+	await prepareWeekLayoutFixturePage(page);
+	const { host } = await mountWeekLayoutFixture(page);
+	const initial = await getWeekLayoutGeometry(host);
+	expect(initial.weekRowSizing).toBe("equal");
+	expect(initial.gridEventPlacement).toBe("top");
+	expectEqualWeekHeights(initial);
+	expectWeekLayoutContained(initial);
+	expect(initial.stackBlockStartGap).toBeLessThanOrEqual(1);
+	expect(initial.stackBlockEndGap).toBeGreaterThan(8);
+
+	await page.evaluate(() => {
+		const current = window.__lfcWeekLayoutFixture;
+		current.snapshot = {
+			days: [...current.host.querySelectorAll(".lfc-calendar-day")],
+			weeks: [...current.host.querySelectorAll(".lfc-calendar-week")]
+		};
+		const anchorButton = current.host.querySelector(
+			'.lfc-calendar-day-button[data-lfc-date="2026-08-04"]'
+		);
+		const anchorDay = anchorButton?.closest(".lfc-calendar-day");
+		if (!(anchorDay instanceof HTMLElement)) {
+			throw new Error("Expected the tall intrinsic day.");
+		}
+		const marker = anchorDay.querySelector(".my-week-layout-anchor");
+		if (!(marker instanceof HTMLElement)) {
+			throw new Error("Expected the tall render-hook marker.");
+		}
+		marker.style.blockSize = "12rem";
+		anchorDay.style.setProperty("--lfc-grid-event-min-block-size", "13rem");
+	});
+	const grown = await getWeekLayoutGeometry(host);
+	expect(initial.anchorMarkerBlockSize).toBeGreaterThanOrEqual(128);
+	expect(grown.anchorMarkerBlockSize).toBeGreaterThanOrEqual(192);
+	expectEqualWeekHeights(grown);
+	expectWeekLayoutContained(grown);
+	expect(Math.min(...grown.weekHeights) - Math.max(...initial.weekHeights))
+		.toBeGreaterThan(48);
+	expect(grown.calendarBlockSize - initial.calendarBlockSize).toBeGreaterThan(6 * 48);
+
+	for (const width of [390, 768]) {
+		await setWeekLayoutFixtureWidth(page, width);
+		const resized = await getWeekLayoutGeometry(host);
+		expect(resized.weekRowSizing).toBe("equal");
+		expect(resized.gridEventPlacement).toBe("top");
+		expectEqualWeekHeights(resized);
+		expectWeekLayoutContained(resized);
+		expect(resized.stackBlockStartGap).toBeLessThanOrEqual(1);
+	}
+
+	const stability = await page.evaluate(() => {
+		const current = window.__lfcWeekLayoutFixture;
+		const days = [...current.host.querySelectorAll(".lfc-calendar-day")];
+		const weeks = [...current.host.querySelectorAll(".lfc-calendar-week")];
+		return {
+			allDaysStable: current.snapshot.days.every((day, index) => day === days[index]),
+			allWeeksStable: current.snapshot.weeks.every((week, index) => week === weeks[index]),
+			dayCount: days.length,
+			weekCount: weeks.length
+		};
+	});
+	expect(stability).toEqual({
+		allDaysStable: true,
+		allWeeksStable: true,
+		dayCount: 42,
+		weekCount: 6
+	});
+});
+
+test("content-sized rows preserve independent intrinsic week heights", async ({ page }) => {
+	await prepareWeekLayoutFixturePage(page);
+	const { host } = await mountWeekLayoutFixture(page, {
+		weekRowSizing: "content"
+	});
+
+	for (const width of [768, 390]) {
+		await setWeekLayoutFixtureWidth(page, width);
+		const geometry = await getWeekLayoutGeometry(host);
+		expect(geometry.weekRowSizing).toBe("content");
+		expect(geometry.gridEventPlacement).toBe("top");
+		expect(geometry.weekHeights).toHaveLength(6);
+		expect(geometry.targetWeekIndex).toBeGreaterThanOrEqual(0);
+		const sparseHeight = Math.min(...geometry.weekHeights);
+		expect(geometry.weekHeights[geometry.targetWeekIndex] - sparseHeight)
+			.toBeGreaterThan(48);
+		expectWeekLayoutContained(geometry);
+		expect(geometry.stackBlockStartGap).toBeLessThanOrEqual(1);
+	}
+});
+
+for (const width of [768, 390]) {
+	test(`event stacks honor top, center, and bottom placement at ${String(width)}px`, async ({ page }) => {
+		await prepareWeekLayoutFixturePage(page);
+		const geometries = {};
+		for (const placement of ["top", "center", "bottom"]) {
+			const { host } = await mountWeekLayoutFixture(page, {
+				gridEventPlacement: placement,
+				weekRowSizing: "equal",
+				width
+			});
+			const geometry = await getWeekLayoutGeometry(host);
+			expect(geometry.gridEventPlacement).toBe(placement);
+			expect(geometry.weekRowSizing).toBe("equal");
+			expectEqualWeekHeights(geometry);
+			expectWeekLayoutContained(geometry);
+			geometries[placement] = geometry;
+		}
+
+		expect(geometries.top.stackBlockStartGap).toBeLessThanOrEqual(1);
+		expect(geometries.center.stackCenterDelta).toBeLessThanOrEqual(1);
+		expect(geometries.bottom.stackBlockEndGap).toBeLessThanOrEqual(1);
+		expect(geometries.center.stackTop - geometries.top.stackTop).toBeGreaterThan(8);
+		expect(geometries.bottom.stackTop - geometries.center.stackTop).toBeGreaterThan(8);
+
+		for (const placement of ["center", "bottom"]) {
+			expect(Math.abs(
+				geometries[placement].calendarBlockSize - geometries.top.calendarBlockSize
+			)).toBeLessThanOrEqual(1);
+			expect(Math.abs(
+				geometries[placement].dateBlockInset - geometries.top.dateBlockInset
+			)).toBeLessThanOrEqual(1);
+			expect(Math.abs(
+				geometries[placement].dateBlockSize - geometries.top.dateBlockSize
+			)).toBeLessThanOrEqual(1);
+			expect(Math.abs(
+				geometries[placement].stackBlockSize - geometries.top.stackBlockSize
+			)).toBeLessThanOrEqual(1);
+			expect(geometries[placement].domSignature).toEqual(geometries.top.domSignature);
+			expect(geometries[placement].visibleRootCount)
+				.toBe(geometries.top.visibleRootCount);
+			for (const [index, height] of geometries[placement].weekHeights.entries()) {
+				expect(Math.abs(height - geometries.top.weekHeights[index]))
+					.toBeLessThanOrEqual(1);
+			}
+		}
+		if (width === 768) {
+			expect(geometries.top.badgeVisible).toBe(true);
+			for (const placement of ["center", "bottom"]) {
+				expect(geometries[placement].badgeVisible).toBe(true);
+				expect(Math.abs(
+					geometries[placement].badgeBlockInset - geometries.top.badgeBlockInset
+				)).toBeLessThanOrEqual(1);
+				expect(Math.abs(
+					geometries[placement].badgeBlockSize - geometries.top.badgeBlockSize
+				)).toBeLessThanOrEqual(1);
+			}
+		}
+	});
+}
+
+test("omitted placement keeps compact overflow branches at the top", async ({ page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	const mountDefaultTop = async (options = {}) => {
+		const presentation = await mountResponsiveMultipleEventFixture(page, {
+			compactDayMinBlockSize: "10rem",
+			gridEventPlacement: null,
+			width: 390,
+			...options
+		});
+		await expect(presentation.host.locator(".lfc-calendar-weeks"))
+			.toHaveAttribute("data-lfc-grid-event-placement", "top");
+		return presentation;
+	};
+
+	let presentation = await mountDefaultTop();
+	await expect(presentation.compactCustom).toBeVisible();
+	await expect(presentation.compactCustom).toHaveText("+3");
+	expectCompactOverflowAtBlockStart(
+		await getCompactOverflowLayoutGeometry(presentation.day)
+	);
+
+	presentation = await mountDefaultTop({ customOverflow: false, renderMarker: false });
+	await expect(presentation.marker).toHaveCount(0);
+	await expect(presentation.compactDefault).toBeVisible();
+	await expect(presentation.compactDefault).toHaveText("4");
+	expectCompactOverflowAtBlockStart(
+		await getCompactOverflowLayoutGeometry(presentation.day)
+	);
+
+	presentation = await mountDefaultTop({ maxGridEventsPerDay: 0 });
+	await expect(presentation.overflow).toHaveClass(/lfc-is-compact-primary/u);
+	await expect(presentation.compactCustom).toBeVisible();
+	await expect(presentation.compactCustom).toHaveText("4");
+	expectCompactOverflowAtBlockStart(
+		await getCompactOverflowLayoutGeometry(presentation.day, {
+			targetSelector: ".lfc-calendar-grid-more.lfc-is-compact-primary"
+		})
+	);
+	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+});
+
 for (const width of [412, 390]) {
-	test(`compact ${String(width)}px layout grows rows intrinsically and matches DOM focus order`, async ({ page }) => {
+	test(`advanced content-sized ${String(width)}px layout grows rows independently and matches DOM focus order`, async ({ page }) => {
 		await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width });
 		await expectExampleReady(page, "/examples/advanced/");
 		await page.addStyleTag({
@@ -790,7 +1591,12 @@ for (const width of [412, 390]) {
 		const weekHeights = await page.locator(".lfc-calendar-week").evaluateAll((weeks) =>
 			weeks.map((week) => week.getBoundingClientRect().height)
 		);
+		await expect(page.locator(".lfc-calendar-weeks"))
+			.toHaveAttribute("data-lfc-week-row-sizing", "content");
+		await expect(page.locator(".lfc-calendar-weeks"))
+			.toHaveAttribute("data-lfc-grid-event-placement", "bottom");
 		expect(weekHeights).toHaveLength(6);
+		expect(Math.max(...weekHeights) - Math.min(...weekHeights)).toBeGreaterThan(1);
 		for (const height of weekHeights) {
 			expect(height).toBeGreaterThanOrEqual(COMPACT_ROW_MINIMUM);
 			expect(height).toBeLessThanOrEqual(COMPACT_ROW_MAXIMUM);
@@ -821,6 +1627,29 @@ test("compact grid actions honor the public minimum block-size token", async ({ 
 	expect(sizing.token).toBe("3rem");
 	expect(sizing.minimum).toBe("48px");
 	expect(sizing.blockSize).toBeGreaterThanOrEqual(48);
+});
+
+test("equal compact slots honor the existing public control and event size tokens", async ({ page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		compactDayMinBlockSize: "10rem",
+		customOverflow: false,
+		includeSingleton: true,
+		renderMarker: null,
+		width: 390
+	});
+	await presentation.host.evaluate((host) => {
+		host.style.setProperty("--lfc-control-min-size", "3rem");
+		host.style.setProperty("--lfc-grid-event-min-block-size", "3rem");
+	});
+	await setResponsiveMultipleEventFixtureWidth(page, 390);
+	const geometry = await getCompactOverflowLayoutGeometry(presentation.day, {
+		inspectPairedRoots: true
+	});
+	expectPairedCompactOverflowLayout(geometry, { direction: "ltr", layout: "stack" });
+	const singleton = await expectEqualCompactSlotSizing(presentation, geometry);
+	expect(singleton.blockSize).toBeGreaterThanOrEqual(48);
+	expect(singleton.inlineSize).toBeGreaterThanOrEqual(48);
 });
 
 test("focused later compact actions retain a keyboard-operable target for minimal content", async ({ page }) => {
@@ -865,6 +1694,16 @@ test("focused later compact actions retain a keyboard-operable target for minima
 	expect(box).not.toBeNull();
 	expect(box?.width ?? 0).toBeGreaterThanOrEqual(GRID_TARGET_MINIMUM);
 	expect(box?.height ?? 0).toBeGreaterThanOrEqual(GRID_TARGET_MINIMUM);
+	const intrinsicSizing = await laterAction.evaluate((action) => ({
+		aspectRatio: getComputedStyle(action).aspectRatio,
+		compactPrimary: action.classList.contains("lfc-is-compact-primary"),
+		minBlockSize: getComputedStyle(action).minBlockSize
+	}));
+	expect(intrinsicSizing).toEqual({
+		aspectRatio: "auto",
+		compactPrimary: false,
+		minBlockSize: `${String(GRID_TARGET_MINIMUM)}px`
+	});
 	await expectNoHorizontalOverflow(page);
 
 	await laterAction.press("Enter");
@@ -1460,14 +2299,16 @@ test("crossing the compact container boundary changes only CSS layout", async ({
 
 test("event-overflow variants and their custom marker cross compact widths without churn", async ({ page }) => {
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
-	const presentation = await mountResponsiveMultipleEventFixture(page);
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		includeSingleton: true
+	});
 	await expect(presentation.compactOverflow).toBeHidden();
 	await expect(presentation.wideOverflow).toBeVisible();
 	await expect(presentation.wideOverflow).toHaveAttribute("aria-hidden", "true");
 	await expect(presentation.wideCustom).toHaveText("Wide 2 more");
 	await expect(presentation.wideDefault).toBeHidden();
 	await expect(presentation.overflow).toHaveAccessibleName(/View 2 more events/u);
-	const initialCalls = await page.evaluate(() => {
+	const initialCalls = await page.evaluate((singletonDate) => {
 		const current = window.__lfcResponsiveMultipleEventFixture;
 		current.snapshot = {
 			calls: {
@@ -1475,6 +2316,7 @@ test("event-overflow variants and their custom marker cross compact widths witho
 				markerCalls: current.observations.markerCalls,
 				wideCalls: current.observations.wideCalls
 			},
+			days: [...current.host.querySelectorAll(".lfc-calendar-day")],
 			nodes: [
 				current.host.querySelector(
 					".lfc-calendar-event-overflow.lfc-is-compact"
@@ -1486,13 +2328,17 @@ test("event-overflow variants and their custom marker cross compact widths witho
 				current.host.querySelector("[data-test-responsive-compact-overflow]"),
 				current.host.querySelector("[data-test-responsive-wide-overflow]"),
 				current.host.querySelector(
-					".lfc-calendar-event-summary.lfc-is-compact-primary " +
+					'.lfc-calendar-event-summary[data-lfc-date="2026-08-06"] ' +
 						".my-responsive-marker"
+				),
+				current.host.querySelector(
+					`.lfc-calendar-event-summary[data-lfc-date="${singletonDate}"]`
 				)
-			]
+			],
+			weeks: [...current.host.querySelectorAll(".lfc-calendar-week")]
 		};
 		return current.snapshot.calls;
-	});
+	}, RESPONSIVE_SINGLETON_EVENT_DATE);
 	expect(initialCalls.compactCalls).toBe(1);
 	expect(initialCalls.markerCalls).toBeGreaterThan(0);
 	expect(initialCalls.wideCalls).toBe(1);
@@ -1503,7 +2349,7 @@ test("event-overflow variants and their custom marker cross compact widths witho
 	await page.keyboard.press("ArrowDown");
 	await page.keyboard.press("ArrowDown");
 	await expect(presentation.overflow).toBeFocused();
-	for (const width of [412, 320, 280]) {
+	for (const width of [660, 412, 390, 320, 280, 660]) {
 		await setResponsiveMultipleEventFixtureWidth(page, width);
 		await expect(presentation.compactOverflow).toBeVisible();
 		await expect(presentation.compactOverflow).toHaveAttribute("aria-hidden", "true");
@@ -1512,6 +2358,12 @@ test("event-overflow variants and their custom marker cross compact widths witho
 		await expect(presentation.overflow).toBeFocused();
 		await expect(presentation.wideOverflow).toBeVisible();
 		await expect(presentation.wideCustom).toHaveText("Wide 2 more");
+		if (width >= 320) {
+			const geometry = await getCompactOverflowLayoutGeometry(presentation.day, {
+				inspectPairedRoots: true
+			});
+			await expectEqualCompactSlotSizing(presentation, geometry);
+		}
 		await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 	}
 
@@ -1520,7 +2372,7 @@ test("event-overflow variants and their custom marker cross compact widths witho
 	await expect(presentation.compactOverflow).toBeHidden();
 	await expect(presentation.wideCustom).toBeVisible();
 	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
-	const stability = await page.evaluate(() => {
+	const stability = await page.evaluate((singletonDate) => {
 		const current = window.__lfcResponsiveMultipleEventFixture;
 		const nodes = [
 			current.host.querySelector(
@@ -1533,11 +2385,18 @@ test("event-overflow variants and their custom marker cross compact widths witho
 			current.host.querySelector("[data-test-responsive-compact-overflow]"),
 			current.host.querySelector("[data-test-responsive-wide-overflow]"),
 			current.host.querySelector(
-				".lfc-calendar-event-summary.lfc-is-compact-primary " +
+				'.lfc-calendar-event-summary[data-lfc-date="2026-08-06"] ' +
 					".my-responsive-marker"
+			),
+			current.host.querySelector(
+				`.lfc-calendar-event-summary[data-lfc-date="${singletonDate}"]`
 			)
 		];
+		const days = [...current.host.querySelectorAll(".lfc-calendar-day")];
+		const weeks = [...current.host.querySelectorAll(".lfc-calendar-week")];
 		return {
+			allDaysStable: current.snapshot.days.every((day, index) => day === days[index]),
+			allWeeksStable: current.snapshot.weeks.every((week, index) => week === weeks[index]),
 			calls: {
 				compactCalls: current.observations.compactCalls,
 				markerCalls: current.observations.markerCalls,
@@ -1547,10 +2406,14 @@ test("event-overflow variants and their custom marker cross compact widths witho
 			callsStable: current.observations.compactCalls === current.snapshot.calls.compactCalls &&
 				current.observations.markerCalls === current.snapshot.calls.markerCalls &&
 				current.observations.wideCalls === current.snapshot.calls.wideCalls,
-			nodesStable: current.snapshot.nodes.every((node, index) => node === nodes[index])
+			dayCount: days.length,
+			nodesStable: current.snapshot.nodes.every((node, index) => node === nodes[index]),
+			weekCount: weeks.length
 		};
-	});
+	}, RESPONSIVE_SINGLETON_EVENT_DATE);
 	expect(stability).toEqual({
+		allDaysStable: true,
+		allWeeksStable: true,
 		calls: initialCalls,
 		callsStable: true,
 		contexts: [
@@ -1569,8 +2432,76 @@ test("event-overflow variants and their custom marker cross compact widths witho
 				visibleEventCount: 2
 			}
 		],
-		nodesStable: true
+		dayCount: 42,
+		nodesStable: true,
+		weekCount: 6
 	});
+});
+
+test("event replacement reestablishes equal compact slots without duplicate grid nodes", async ({ page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		compactDayMinBlockSize: "10rem",
+		customOverflow: false,
+		includeSingleton: true,
+		renderMarker: null,
+		width: 390
+	});
+	const dayButton = presentation.day.locator(":scope > .lfc-calendar-day-button");
+	await dayButton.focus();
+	await dayButton.press("F2");
+	const primary = presentation.day.locator(
+		'.lfc-calendar-event-summary[data-lfc-event-id="responsive-multiple-1"]'
+	);
+	await expect(primary).toBeFocused();
+
+	await page.evaluate(() => {
+		const current = window.__lfcResponsiveMultipleEventFixture;
+		current.calendar.setEvents([
+			{
+				id: "responsive-singleton",
+				start: "2026-08-05T07:30",
+				title: "Replacement singleton event"
+			},
+			...Array.from({ length: 5 }, (_value, index) => ({
+				id: `responsive-multiple-${String(index + 1)}`,
+				start: `2026-08-06T${String(8 + index).padStart(2, "0")}:00`,
+				title: `Replacement multiple event ${String(index + 1)}`
+			}))
+		]);
+	});
+	await expect.poll(() => page.evaluate(() =>
+		window.__lfcResponsiveMultipleEventFixture.calendar.getState().phase
+	)).toBe("ready");
+	await expect(primary).toBeFocused();
+	await expect(presentation.compactDefault).toHaveText("+4");
+	const geometry = await getCompactOverflowLayoutGeometry(presentation.day, {
+		inspectPairedRoots: true
+	});
+	expectPairedCompactOverflowLayout(geometry, { direction: "ltr", layout: "stack" });
+	await expectEqualCompactSlotSizing(presentation, geometry);
+
+	const replacementState = await presentation.host.evaluate((host) => {
+		const actions = [...host.querySelectorAll(
+			'.lfc-calendar-day:has(> .lfc-calendar-day-button[data-lfc-date="2026-08-06"]) ' +
+				".lfc-calendar-day-summaries :is(a, button)"
+		)];
+		return {
+			actionOrder: actions.map((action) =>
+				action.classList.contains("lfc-calendar-grid-more")
+					? "more"
+					: action.getAttribute("data-lfc-event-id")
+			),
+			dayCount: host.querySelectorAll(".lfc-calendar-day").length,
+			weekCount: host.querySelectorAll(".lfc-calendar-week").length
+		};
+	});
+	expect(replacementState).toEqual({
+		actionOrder: ["responsive-multiple-1", "responsive-multiple-2", "more"],
+		dayCount: 42,
+		weekCount: 6
+	});
+	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 });
 
 test("the built-in social counter stays bare and stable across the 320px host floor", async ({ page }) => {
@@ -1578,6 +2509,8 @@ test("the built-in social counter stays bare and stable across the 320px host fl
 	const presentation = await mountResponsiveMultipleEventFixture(page, {
 		compactDayMinBlockSize: "10rem",
 		customOverflow: false,
+		includeSingleton: true,
+		renderMarker: null,
 		width: 320
 	});
 	await expect(presentation.compactDefault).toBeVisible();
@@ -1623,34 +2556,66 @@ test("the built-in social counter stays bare and stable across the 320px host fl
 });
 
 for (const direction of ["ltr", "rtl"]) {
-	test(`compact ${direction.toUpperCase()} keeps paired overflow roots aligned while reflowing`, async ({ page }) => {
+	test(`compact ${direction.toUpperCase()} equal rows synchronize singleton and paired slots while reflowing`, async ({ page }) => {
 		await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
-		const presentation = await mountResponsiveMultipleEventFixture(page, {
-			compactDayMinBlockSize: "10rem",
-			customOverflow: false,
-			direction,
-			width: 660
-		});
-		for (const [width, layout] of [
-			[660, "row"],
-			[412, "stack"],
-			[390, "stack"],
-			[320, "stack"],
-			[280, "stack"]
-		]) {
-			await setResponsiveMultipleEventFixtureWidth(page, width);
-			await expect(presentation.compactOverflow).toBeVisible();
-			await expect(presentation.compactDefault).toHaveText("+3");
-			expectPairedCompactOverflowLayout(
-				await getCompactOverflowLayoutGeometry(presentation.day, {
+		for (const weekRowSizing of [null, "equal"]) {
+			const presentation = await mountResponsiveMultipleEventFixture(page, {
+				compactDayMinBlockSize: "10rem",
+				customOverflow: false,
+				direction,
+				includeSingleton: true,
+				renderMarker: null,
+				weekRowSizing,
+				width: 660
+			});
+			await expect(presentation.host.locator(".lfc-calendar-weeks"))
+				.toHaveAttribute("data-lfc-week-row-sizing", "equal");
+			for (const [width, layout] of [
+				[660, "row"],
+				[412, "stack"],
+				[390, "stack"],
+				[320, "stack"],
+				[280, "stack"]
+			]) {
+				await setResponsiveMultipleEventFixtureWidth(page, width);
+				await expect(presentation.singletonPrimary).toBeVisible();
+				await expect(presentation.compactOverflow).toBeVisible();
+				await expect(presentation.compactDefault).toHaveText("+3");
+				const geometry = await getCompactOverflowLayoutGeometry(presentation.day, {
 					inspectPairedRoots: true
-				}),
-				{ direction, layout }
-			);
-			await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+				});
+				expectPairedCompactOverflowLayout(geometry, { direction, layout });
+				if (width >= 320) {
+					await expectEqualCompactSlotSizing(presentation, geometry);
+				}
+				await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+			}
 		}
 	});
 }
+
+test("content-sized compact rows retain independent singleton and paired sizing", async ({ page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
+	const presentation = await mountResponsiveMultipleEventFixture(page, {
+		compactDayMinBlockSize: "10rem",
+		customOverflow: false,
+		includeSingleton: true,
+		renderMarker: null,
+		weekRowSizing: "content",
+		width: 390
+	});
+	await expect(presentation.host.locator(".lfc-calendar-weeks"))
+		.toHaveAttribute("data-lfc-week-row-sizing", "content");
+	await expect(presentation.host.locator(".lfc-calendar-weeks"))
+		.toHaveAttribute("data-lfc-grid-event-placement", "bottom");
+	const geometry = await getCompactOverflowLayoutGeometry(presentation.day, {
+		inspectPairedRoots: true
+	});
+	expectPairedCompactOverflowLayout(geometry, { direction: "ltr", layout: "stack" });
+	const singleton = await getCompactPrimaryGeometry(presentation.singletonDay);
+	expect(geometry.roots.primaryInlineSize - singleton.inlineSize).toBeGreaterThan(1);
+	await expectResponsiveMultipleEventFixtureNotToOverflow(page);
+});
 
 for (const direction of ["ltr", "rtl"]) {
 	test(`compact ${direction.toUpperCase()} contains the social counter at 200% text size`, async ({ page }) => {
@@ -1659,6 +2624,8 @@ for (const direction of ["ltr", "rtl"]) {
 			compactDayMinBlockSize: "10rem",
 			customOverflow: false,
 			direction,
+			includeSingleton: true,
+			renderMarker: null,
 			width: 390
 		});
 		await page.addStyleTag({ content: "html { font-size: 200%; }" });
@@ -1666,12 +2633,11 @@ for (const direction of ["ltr", "rtl"]) {
 		await expect.poll(() => page.evaluate(() =>
 			Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
 		)).toBe(REFLOW_ROOT_FONT_SIZE);
-		expectPairedCompactOverflowLayout(
-			await getCompactOverflowLayoutGeometry(presentation.day, {
-				inspectPairedRoots: true
-			}),
-			{ direction, layout: "stack" }
-		);
+		const geometry = await getCompactOverflowLayoutGeometry(presentation.day, {
+			inspectPairedRoots: true
+		});
+		expectPairedCompactOverflowLayout(geometry, { direction, layout: "stack" });
+		await expectEqualCompactSlotSizing(presentation, geometry);
 		await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 	});
 }
@@ -1685,6 +2651,8 @@ test("the compact counter remains contained at 400% browser zoom", async ({ brow
 	const presentation = await mountResponsiveMultipleEventFixture(page, {
 		compactDayMinBlockSize: "10rem",
 		customOverflow: false,
+		includeSingleton: true,
+		renderMarker: null,
 		width: 320
 	});
 	const session = await context.newCDPSession(page);
@@ -1692,12 +2660,11 @@ test("the compact counter remains contained at 400% browser zoom", async ({ brow
 		await session.send("Emulation.setPageScaleFactor", { pageScaleFactor: 4 });
 		await expect.poll(() => page.evaluate(() => visualViewport?.scale ?? 1)).toBe(4);
 		await expect(presentation.compactDefault).toHaveText("+3");
-		expectPairedCompactOverflowLayout(
-			await getCompactOverflowLayoutGeometry(presentation.day, {
-				inspectPairedRoots: true
-			}),
-			{ direction: "ltr", layout: "stack" }
-		);
+		const geometry = await getCompactOverflowLayoutGeometry(presentation.day, {
+			inspectPairedRoots: true
+		});
+		expectPairedCompactOverflowLayout(geometry, { direction: "ltr", layout: "stack" });
+		await expectEqualCompactSlotSizing(presentation, geometry);
 		await expectResponsiveMultipleEventFixtureNotToOverflow(page);
 	} finally {
 		await session.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1 });
@@ -1734,6 +2701,7 @@ for (const direction of ["ltr", "rtl"]) {
 				compactCustomSize: customOverflow ? "2rem" : null,
 				customOverflow,
 				direction,
+				includeSingleton: true,
 				markerSize: "2rem",
 				width: 660
 			});
@@ -1745,12 +2713,11 @@ for (const direction of ["ltr", "rtl"]) {
 				} else {
 					await expect(presentation.compactDefault).toHaveText("+3");
 				}
-				expectPairedCompactOverflowLayout(
-					await getCompactOverflowLayoutGeometry(presentation.day, {
-						inspectPairedRoots: true
-					}),
-					{ direction, layout }
-				);
+				const geometry = await getCompactOverflowLayoutGeometry(presentation.day, {
+					inspectPairedRoots: true
+				});
+				expectPairedCompactOverflowLayout(geometry, { direction, layout });
+				await expectEqualCompactSlotSizing(presentation, geometry);
 				const clearance = await getCompactMarkerClearanceGeometry(
 					presentation.day,
 					{ customOverflow }
@@ -1801,6 +2768,7 @@ test("a missing primary marker produces a standalone unsigned total", async ({ p
 	});
 	await expect(presentation.marker).toHaveCount(0);
 	await expect(presentation.compactDefault).toHaveText("1.3K");
+	await expectDefaultCompactSlotSize(presentation.compactOverflow);
 	await expect(presentation.day.locator(":scope > .lfc-calendar-day-button"))
 		.toHaveAccessibleName("Thursday, August 6, 2026, 1,250 events");
 	const standaloneGeometry = await getCompactOverflowLayoutGeometry(presentation.day);
@@ -1833,6 +2801,9 @@ test("a single event renders no overflow variant", async ({ page }) => {
 	await expect(presentation.compactOverflow).toHaveCount(0);
 	await expect(presentation.wideOverflow).toHaveCount(0);
 	await expect(presentation.overflow).toHaveCount(0);
+	await expectDefaultCompactSlotSize(presentation.day.locator(
+		".lfc-calendar-event-summary.lfc-is-compact-primary"
+	));
 	expect(await page.evaluate(() => ({
 		compactCalls: window.__lfcResponsiveMultipleEventFixture.observations.compactCalls,
 		wideCalls: window.__lfcResponsiveMultipleEventFixture.observations.wideCalls
@@ -1853,6 +2824,7 @@ test("a zero grid-event cap uses the compact overflow action without a duplicate
 	)).toHaveCount(0);
 	await expect(presentation.overflow).toHaveClass(/lfc-is-compact-primary/u);
 	await expect(presentation.overflow).toBeVisible();
+	await expectDefaultCompactSlotSize(presentation.overflow);
 	await expect(presentation.compactOverflow).toHaveCount(1);
 	await expect(presentation.compactCustom).toBeVisible();
 	await expect(presentation.compactCustom).toHaveText("4");

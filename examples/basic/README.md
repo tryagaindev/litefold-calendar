@@ -19,6 +19,8 @@ Try the following:
 - An omitted `initialDate`, so the calendar opens on the date supplied by its default clock.
 - `onEventActivate` receiving the normalized event, native event, rendered element, and the activating `surface`.
 - Optional `url` and `accentColor` event fields.
+- Omitted month-grid layout options, demonstrating equal week rows, common full slots for normally visible compact primary/count/overflow roots, and top-aligned event/overflow stacks.
+- Package-owned container CSS automatically abbreviating visible toolbar and decorative pager month/year text below a `24rem` calendar content width, without integration-side measurement or private descendant styling.
 - A small documented `--lfc-*` CSS-token override in the shared example stylesheet.
 - Application-owned cleanup: this standalone example explicitly calls `destroy()` on a non-cached `pagehide` while preserving the instance in the browser's back/forward cache. Litefold Calendar does not register that handler automatically.
 

@@ -183,7 +183,7 @@ See the [WebMCP site-tool guide](webmcp.md) for exact tool schemas, lifecycle, c
 
 ## Native pull/snap paging
 
-Leave `swipe` enabled unless the host context must disable direct-input paging. Do not intercept package touch, pointer, wheel, or scroll events, and do not query or mutate private pager descendants. The [API option](api.md#data-date-and-layout-options) owns public behavior, the [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior) owns input and verification requirements, and [DESIGN.md](../DESIGN.md#pager-direction-and-motion) owns exact presentation.
+Leave `swipe` enabled unless the host context must disable direct-input paging. Below a `24rem` calendar content width, package container CSS shows the locale's abbreviated month with a numeric year in both the toolbar and decorative pager lanes; exactly `24rem` and above uses the full month. Complete accessible month naming is unchanged, and the lanes remain entirely decorative. Do not measure the viewport or host to select this state, intercept package touch, pointer, wheel, or scroll events, or query or mutate private toolbar and pager descendants. The [API option](api.md#data-date-and-layout-options) owns public behavior, the [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior) owns input and verification requirements, and [DESIGN.md](../DESIGN.md#pager-direction-and-motion) owns exact presentation.
 
 ## Choose visual time surfaces
 
@@ -197,6 +197,30 @@ const calendar = createCalendar(host, {
 ```
 
 Choose among `"all"`, `"grid"`, `"agenda"`, and `"none"` through the public option rather than hiding internal time slots. The [API option](api.md#data-date-and-layout-options) and [accessibility semantics](../ACCESSIBILITY.md#interaction-model) own the observable contract; use public tokens for density.
+
+## Choose month-grid layout
+
+The defaults give all six weeks the intrinsic height required by the tallest
+week and align each complete event/overflow stack to the top of the available
+space below its date:
+
+```ts
+const calendar = createCalendar(host, {
+	events,
+	weekRowSizing: "equal",
+	gridEventPlacement: "top"
+});
+```
+
+In compact layout, `"equal"` also gives package-owned, normally visible
+primary-event, count, and compact-primary overflow roots one common full slot;
+later summaries exposed only on focus remain intrinsic. Choose `"content"` when
+each week and its compact roots should follow intrinsic sizing. Choose `"center"`
+or `"bottom"` when the complete event/overflow stack should use that alignment at
+every width. Center and bottom safely fall back toward the top when the stack
+cannot fit; the date remains top-aligned. Equal week rows may make the grid taller
+because no content is clipped or constrained to a fixed height. Both options are
+construction-time configuration, so recreate the calendar to change them.
 
 ## Application-owned cache and filters
 
@@ -354,9 +378,12 @@ The package owns the responsive placement and gives each compact visual an
 assigned block. A markerless total uses one centered block, and
 `maxGridEventsPerDay: 0` keeps the fallback inside one package-owned overflow
 action. The hook replaces only visual content; no public overflow-layout
-selector or CSS token overrides placement. Keep returned compact content
-concise. [DESIGN.md](../DESIGN.md#responsive-model) owns the exact geometry and
-width transitions.
+selector or CSS token overrides placement. Fit returned compact content within
+its assigned slot to preserve equal sizing. If it needs more space, increase
+`--lfc-control-min-size` and `--lfc-grid-event-min-block-size` on the calendar
+root so normal package-owned roots grow together. Oversized output remains
+unclipped but opts out of equal visual sizing. [DESIGN.md](../DESIGN.md#responsive-model)
+owns the exact geometry and width transitions.
 
 Container resizing changes CSS visibility only; it does not invoke the hook again or replace either returned node. A failure in either branch quarantines the complete hook set and restores both compact and wide defaults. See the [render-hook API](api.md#customize-rendering-calendarrenderhooks) for every context field and return rule.
 

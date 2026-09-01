@@ -39,10 +39,28 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-weeks {
+    --lfc-internal-grid-event-block-alignment: start;
+
     background: var(--lfc-internal-grid-border-color);
     display: grid;
     gap: var(--lfc-internal-cell-gap);
+    grid-auto-rows: 1fr;
     min-inline-size: 0;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-weeks[data-lfc-week-row-sizing="content"] {
+    grid-auto-rows: auto;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-weeks[data-lfc-grid-event-placement="center"] {
+    --lfc-internal-grid-event-block-alignment: safe center;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-weeks[data-lfc-grid-event-placement="bottom"] {
+    --lfc-internal-grid-event-block-alignment: safe end;
   }
 
   :where(.litefold-calendar) .lfc-calendar-week {
@@ -179,7 +197,9 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-day-summaries {
-    align-self: start;
+    align-content: var(--lfc-internal-grid-event-block-alignment);
+    align-items: var(--lfc-internal-grid-event-block-alignment);
+    align-self: stretch;
     display: grid;
     gap: var(--lfc-grid-event-gap);
     grid-area: cell;

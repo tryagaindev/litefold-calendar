@@ -59,7 +59,7 @@ Application-prefixed variables are not package API. The per-event **event marker
 
 Token combinations are not validated at runtime. An integrating application must preserve the distinctions, contrast, sizing, reflow, direction, motion, and operating-system preference behavior in the [DESIGN.md guardrails](../DESIGN.md#dos-and-donts) and [accessibility integration responsibilities](../ACCESSIBILITY.md#integration-responsibilities).
 
-In particular, do not reduce `--lfc-control-min-size` or `--lfc-grid-event-min-block-size` below the documented target-size floor. Long fonts, large text, translations, render-hook content, extension output, and application toolbar content may require larger layout values.
+In particular, do not reduce `--lfc-control-min-size` or `--lfc-grid-event-min-block-size` below the documented target-size floor. Increase these existing tokens when custom compact visuals need a larger equal slot; package-owned normal compact roots then grow together. Oversized hook output remains unclipped but opts out of equal visual sizing. Long fonts, large text, translations, render-hook content, extension output, and application toolbar content may require larger layout values.
 
 ## Direction and responsive integration
 

@@ -33,7 +33,8 @@ void test("native pager exposes hidden labeled lanes around one live 42-cell gri
 			requests.push({ end, start });
 			return [];
 		},
-		initialDate: "2026-08-06"
+		initialDate: "2026-08-06",
+		locale: "en-US"
 	});
 	calendar.render();
 	await waitForReady(calendar);
@@ -57,8 +58,12 @@ void test("native pager exposes hidden labeled lanes around one live 42-cell gri
 	assert.equal(pager.nextLane.querySelector("[role='grid']"), null);
 	assert.equal(pager.previousLane.hasAttribute("data-lfc-page-available"), true);
 	assert.equal(pager.nextLane.hasAttribute("data-lfc-page-available"), true);
-	assert.match(requireLaneLabel(pager.previousLane).textContent ?? "", /July 2026/u);
-	assert.match(requireLaneLabel(pager.nextLane).textContent ?? "", /September 2026/u);
+	const previousLabels = requireLaneLabels(pager.previousLane);
+	const nextLabels = requireLaneLabels(pager.nextLane);
+	assert.equal(previousLabels.full.textContent, "July 2026");
+	assert.equal(previousLabels.compact.textContent, "Jul 2026");
+	assert.equal(nextLabels.full.textContent, "September 2026");
+	assert.equal(nextLabels.compact.textContent, "Sep 2026");
 	assert.equal(requests.length, 1, "Side lanes must not prefetch adjacent grids or data.");
 	assert.equal(rangeLength(requests[0]), 42);
 	assert.equal(host.matches("[style]") || host.querySelector("[style]") !== null, false);
@@ -213,6 +218,7 @@ void test("pager maps RTL lanes, excludes bounded lanes, and disables paging wit
 			return [];
 		},
 		initialDate: "2026-08-06",
+		locale: "en-US",
 		maxDate: "2026-09-30",
 		minDate: "2026-08-01"
 	});
@@ -223,15 +229,34 @@ void test("pager maps RTL lanes, excludes bounded lanes, and disables paging wit
 		boundedPager.viewport, boundedPager.previousLane, boundedPager.grid, boundedPager.nextLane
 	);
 	boundedPager.viewport.scrollLeft = boundedGeometry.centerOffset;
+	const boundedPreviousLabels = requireLaneLabels(boundedPager.previousLane);
+	const boundedNextLabels = requireLaneLabels(boundedPager.nextLane);
+	assert.equal(boundedPager.previousLane.getAttribute("aria-hidden"), "true");
+	assert.equal(boundedPager.nextLane.getAttribute("aria-hidden"), "true");
 	assert.equal(boundedPager.previousLane.hasAttribute("data-lfc-page-available"), false);
-	assert.equal(requireLaneLabel(boundedPager.previousLane).textContent, "");
+	assert.equal(boundedPager.nextLane.hasAttribute("data-lfc-page-available"), true);
+	assert.equal(boundedPreviousLabels.full.textContent, "");
+	assert.equal(boundedPreviousLabels.compact.textContent, "");
+	assert.equal(boundedNextLabels.full.textContent, "September 2026");
+	assert.equal(boundedNextLabels.compact.textContent, "Sep 2026");
+	assert.equal(boundedRequests, 1, "Populating bounded lane labels must not prefetch data.");
 	setPagerScroll(dom, boundedPager.viewport, boundedGeometry.previousOffset, true);
 	assert.equal(boundedCalendar.getState().displayedMonth.month, 8);
 	assert.equal(boundedRequests, 1);
 	assert.equal(boundedPager.viewport.scrollLeft, boundedGeometry.centerOffset);
 	setPagerScroll(dom, boundedPager.viewport, boundedGeometry.nextOffset, true);
+	await waitForReady(boundedCalendar);
 	assert.equal(boundedCalendar.getState().displayedMonth.month, 9);
 	assert.equal(boundedRequests, 2);
+	assert.equal(boundedPager.previousLane.getAttribute("aria-hidden"), "true");
+	assert.equal(boundedPager.nextLane.getAttribute("aria-hidden"), "true");
+	assert.equal(boundedPager.previousLane.hasAttribute("data-lfc-page-available"), true);
+	assert.equal(boundedPager.nextLane.hasAttribute("data-lfc-page-available"), false);
+	assert.equal(boundedPreviousLabels.full.textContent, "August 2026");
+	assert.equal(boundedPreviousLabels.compact.textContent, "Aug 2026");
+	assert.equal(boundedNextLabels.full.textContent, "");
+	assert.equal(boundedNextLabels.compact.textContent, "");
+	assert.equal(boundedRequests, 2, "Updating bounded lane labels must not prefetch data.");
 
 	const disabledHost = requireHost(dom, "#disabled");
 	let disabledResizeObservations = 0;
@@ -580,10 +605,19 @@ function requireHost(dom: ReturnType<typeof createDom>, selector: string): HTMLE
 	return host;
 }
 
-function requireLaneLabel(lane: HTMLElement): HTMLElement {
-	const label = lane.querySelector<HTMLElement>(".lfc-calendar-swipe-lane-label");
-	assert.ok(label);
-	return label;
+function requireLaneLabels(lane: HTMLElement): Readonly<{
+	compact: HTMLElement;
+	full: HTMLElement;
+	wrapper: HTMLElement;
+}> {
+	const wrapper = lane.querySelector<HTMLElement>(".lfc-calendar-swipe-lane-label");
+	const full = wrapper?.querySelector<HTMLElement>(".lfc-calendar-swipe-lane-label-full");
+	const compact = wrapper?.querySelector<HTMLElement>(".lfc-calendar-swipe-lane-label-compact");
+	assert.ok(wrapper);
+	assert.ok(full);
+	assert.ok(compact);
+	assert.deepEqual([...wrapper.children], [full, compact]);
+	return { compact, full, wrapper };
 }
 
 function setPagerScroll(

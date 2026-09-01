@@ -10,8 +10,8 @@ The manifest covers exactly these PNG files:
 |---|---|---|
 | `desktop-month-grid-1440x900.png` | Wide advanced month grid with direct event actions and overflow | 1440 × 900 |
 | `month-year-jump-1280x800.png` | Open native month-and-year chooser at a bounded month | 1280 × 800 |
-| `mobile-month-agenda-dark-390x844.png` | Compact dark navigation, month grid event summaries, and selected-day agenda | 390 × 844 |
-| `mobile-month-swipe-pull-390x844.png` | Held native touch pull revealing the decorative adjacent-month lane | 390 × 844 |
+| `mobile-month-agenda-dark-390x844.png` | Compact dark navigation with the abbreviated `Aug 2026` title, month-grid event summaries, and selected-day agenda | 390 × 844 |
+| `mobile-month-swipe-pull-390x844.png` | Held native touch pull with the abbreviated `Aug 2026` toolbar and decorative `Sep 2026` adjacent-month lane | 390 × 844 |
 | `event-details-dark-1280x800.png` | Application-owned event details dialog opened from the agenda | 1280 × 800 |
 | `grid-event-keyboard-focus-1440x900.png` | Visible keyboard focus on a wide-layout grid event action after F2 | 1440 × 900 |
 
@@ -68,15 +68,15 @@ On a fresh Linux machine, add `--with-deps` to the Playwright install command wh
 
 `screenshots:update` builds the package and advanced example, starts the repository-owned local server, fixes locale, time zone, color scheme, reduced motion, clock/data fixtures, viewport, and interaction state, and rewrites every canonical capture and manifest record. It does not build unrelated example routes or deployment metadata. Do not hand-edit or recompress the PNGs.
 
-Five scenes capture settled states. The held-pull scene intentionally captures direct manipulation before release so the decorative adjacent-month lane can be reviewed; selection timing and post-release browser physics remain browser-test and supported-device concerns.
+Five scenes capture settled states. The held-pull scene intentionally captures direct manipulation before release so the decorative adjacent-month/year lane can be reviewed; selection timing and post-release browser physics remain browser-test and supported-device concerns. Regenerate and review all six canonical scenes after an intentional source-layout change, even when only the two mobile scenes are expected to gain responsive label differences.
 
 ## Review checklist
 
 Review each image at native dimensions and compare it with the intended change and [`DESIGN.md`](../../DESIGN.md):
 
 - Confirm each scene-specific focus, selection, Today, overflow, navigation, month title, event marker, agenda, dialog, or month-picker state.
-- In the settled mobile scene, confirm compact navigation, marker/count presentation, and agenda match the [responsive design](../../DESIGN.md#responsive-model), with no pager lane, offset, motion residue, clipping, or horizontal scrollbar.
-- In the held-pull scene, confirm there is one live grid and the exposed lane shows the correct arrow and localized adjacent month without event content.
+- In the settled mobile scene, confirm the title is `Aug 2026` and compact navigation, marker/count presentation, and agenda match the [responsive design](../../DESIGN.md#responsive-model), with no pager lane, offset, motion residue, clipping, or horizontal scrollbar.
+- In the held-pull scene, confirm the toolbar is `Aug 2026`, there is one live grid, and the exposed lane shows the correct arrow and localized `Sep 2026` without event content.
 - Treat captures as evidence only for their listed viewport and state. Use the browser and accessibility checks for uncaptured widths, text and page zoom, direction, contrast modes, and alternative marker or overflow combinations.
 - Check for system-font drift, unexpected network content, and personal or secret data.
 

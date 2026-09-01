@@ -17,6 +17,8 @@ but it does not change their public names or ownership.
 | Selected day | The gridcell whose date drives the agenda directly below the grid. | Read `isSelected` in day render contexts and use documented selection callbacks or methods; the package owns selection semantics and focus. |
 | Selected-day agenda | The ordered event list for the selected date. | Event hooks receive `surface: "agenda"` for its rows. Litefold Calendar owns list ordering, disclosure, empty/loading states, and focus transfer. |
 
+The month-title trigger contains stable full and abbreviated visual text. At exactly a `24rem` calendar content width and above, CSS exposes the full month and numeric year; below it, CSS exposes the locale's `month: "short", year: "numeric"` form. The abbreviated text is `aria-hidden`, while the trigger name, grid name, and live text remain complete. Decorative pager lanes use the same visible formatting boundary and are entirely `aria-hidden`. These descendants and their container-query state remain private; applications must not measure or rewrite them.
+
 ## Day cell
 
 A day cell has two main areas:
@@ -37,7 +39,14 @@ day cell (`elements.cell`)
 | Day button | The native control that selects the date. | Inspect through `elements.button`. Selection behavior remains package-owned. |
 | Day number | The localized number inside a native `<time>` element. | Inspect through `elements.number`. Today is shown by styling this number; it is not the day badge slot. |
 | Day badge slot | Optional decorative content beside the day number on wide layouts. It is hidden at compact widths. | Return content from `renderDayBadge`; inspect its container through `elements.badge`. |
-| Summaries area | Package-owned placement for event summaries and overflow. | Inspect through `elements.summaries`. Customize events and overflow through their specific hooks instead of moving this container. |
+| Summaries area | Package-owned placement for the complete event-summary and overflow stack. | Inspect through `elements.summaries`; choose its vertical alignment with `gridEventPlacement`. Customize events and overflow through their specific hooks instead of moving this container. |
+
+The date number and badge remain at the top of the cell. `gridEventPlacement`
+aligns the summaries area at the top, center, or bottom of the available space at
+every width; the default is top. Center and bottom safely fall back toward the
+top when the stack cannot fit. `weekRowSizing` controls whether the six week
+tracks share the tallest intrinsic height or size independently; it does not
+change this DOM structure.
 
 The phrase **day badge** means the `renderDayBadge` slot. Use **Today
 indicator** for the circular treatment applied to today's day number, and use
@@ -93,10 +102,13 @@ event representation and from the day badge.
 
 Both applicable variants are created during a render. Container CSS chooses
 which one is visible; resizing does not rerun `renderEventOverflow`. In compact
-layout, a visible primary event visual and passive overflow cue occupy
-package-owned, equal blocks beneath the day number. Those blocks may share a row
-or stack while remaining aligned. A markerless total or action-backed fallback
-uses one centered block.
+layout with equal week rows, package-owned, normally visible primary-event,
+count, and compact-primary overflow roots use one common full slot. Paired roots
+may share a row or stack while retaining that size. Content-sized weeks keep
+compact roots intrinsic, and later event summaries exposed only on focus remain
+intrinsic in either mode. A markerless total or action-backed fallback uses one
+centered block. The configured `gridEventPlacement` moves the complete summaries
+area, not either compact block independently.
 
 Every overflow context exposes:
 
@@ -110,8 +122,10 @@ Every overflow context exposes:
 
 Return a detached, noninteractive node from `renderEventOverflow` to customize
 the content. The package retains placement, target geometry, accessible naming,
-activation, and focus behavior. Keep compact output concise enough for its
-assigned block.
+activation, and focus behavior. Fit compact output within its assigned slot, or
+increase `--lfc-control-min-size` and `--lfc-grid-event-min-block-size` so normal
+package-owned roots grow together. Oversized output remains unclipped but opts
+out of equal visual sizing.
 
 ## Three color roles that sound similar
 

@@ -32,7 +32,7 @@ The root module exports exactly the following symbols. Entries in the Types colu
 
 | Area | Runtime values | Types |
 |---|---|---|
-| Construction | `createCalendar` | `Calendar`, `CalendarOptions`, `CalendarEventTimeDisplay` |
+| Construction | `createCalendar` | `Calendar`, `CalendarGridEventPlacement`, `CalendarOptions`, `CalendarEventTimeDisplay`, `CalendarWeekRowSizing` |
 | Dates and events | — | `CalendarDate`, `CalendarDateInput`, `CalendarEvent`, `CalendarEventInput`, `CalendarEvents`, `CalendarEventSource`, `CalendarRange`, `CalendarRangeBounds` |
 | Actions | — | `CalendarAction`, `CalendarDayContextMenu`, `CalendarDaySelection`, `CalendarEventActionElement`, `CalendarEventActivation`, `CalendarEventContextMenu`, `CalendarEventContextMenuAvailability`, `CalendarEventSurface` |
 | State and announcements | — | `CalendarAnnouncement`, `CalendarIssue`, `CalendarPhase`, `CalendarState` |
@@ -151,6 +151,8 @@ When replacement data commits, the calendar preserves the displayed month, selec
 ### Built-in month-and-year jump
 
 The configured `h1` through `h6` month heading contains a native button showing the localized displayed month and year. Activating it with pointer, Enter, or Space opens a package-owned `popover="auto"` with dialog semantics and focuses its month `<select>`. The required year input follows configured bounds, and changing it disables months that do not intersect those bounds.
+
+At exactly a `24rem` calendar content width and above, the visible title uses the locale's full month and numeric year. Below `24rem`, package CSS exposes its already-rendered `month: "short", year: "numeric"` form; decorative pull-pager lanes follow the same visual rule. The trigger name, grid name, and live text remain complete, and the compact title and pager lanes are excluded from accessibility. This is package-owned presentation: applications must not measure the viewport or calendar to select a label, or target private title and pager descendants.
 
 Jumping preserves the selected day where possible and otherwise clamps it to the target month and configured range. It never invokes `onDaySelect`. Invalid form input keeps the picker open. Jump, Cancel, and Escape close it and restore focus to the month-title trigger; pointer light-dismiss closes it without moving focus.
 
@@ -322,6 +324,8 @@ interface CalendarOptions<TMetadata = unknown> {
 	readonly timeZone?: string;
 	readonly firstDay?: CalendarFirstDay;
 	readonly headingLevel?: CalendarHeadingLevel;
+	readonly weekRowSizing?: CalendarWeekRowSizing;
+	readonly gridEventPlacement?: CalendarGridEventPlacement;
 	readonly now?: (this: void) => Date;
 	readonly sourceEventLimit?: number;
 	readonly maxGridEventsPerDay?: number;
@@ -360,6 +364,8 @@ interface CalendarOptions<TMetadata = unknown> {
 type CalendarFirstDay = "locale" | 0 | 1 | 2 | 3 | 4 | 5 | 6;
 type CalendarHeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 type CalendarEventTimeDisplay = "all" | "grid" | "agenda" | "none";
+type CalendarWeekRowSizing = "equal" | "content";
+type CalendarGridEventPlacement = "top" | "center" | "bottom";
 ```
 
 The options snapshot is immutable for the life of an instance. `setEvents()` is the one narrow replacement API; mutating `options.events` or the original options object has no effect. Recreate the calendar to change locale, time zone, date bounds, callbacks, extensions, render hooks, messages, icons, limits, integration nodes, or other construction-time configuration. External filter or cache state may change independently; call `refetchEvents()` after changing it. Unknown own string keys on the top-level options object, `messages`, `icons`, or a render-hook definition are rejected as `invalid-configuration`, so misspelled configuration does not fail silently; own symbol keys are ignored. Extension factories validate and snapshot their own options before the calendar mutates its host.
@@ -376,10 +382,12 @@ The [advanced TypeScript example](../examples/advanced/) demonstrates every opti
 | `minDate` | No configured lower bound | Sets the earliest selectable date, inclusive. A boundary may fall within a month; earlier grid dates remain visible but disabled. `Date` values use the configured time-zone projection. | An invalid or unprojectable value, or a value later than `maxDate`, is `invalid-configuration`. Absolute supported-date and complete-grid renderability limits still apply. |
 | `maxDate` | No configured upper bound | Sets the latest selectable date, inclusive. A boundary may fall within a month; later grid dates remain visible but disabled. `Date` values use the configured time-zone projection. | An invalid or unprojectable value, or a value earlier than `minDate`, is `invalid-configuration`. Absolute supported-date and complete-grid renderability limits still apply. |
 | `initialDate` | Nearest in-range date in a renderable month, starting from `now` | Selects the initial day and displayed month from a `CalendarDate`, strict string, or `Date` without moving DOM focus. | An invalid, unprojectable, or unrenderable explicit value, or an explicit value outside the configured inclusive range, is `invalid-configuration`. |
-| `locale` | Browser-resolved locale | Controls `Intl` month, short/narrow weekday, full accessible date, and time labels. | An empty or invalid BCP 47 language tag is `invalid-configuration`. |
+| `locale` | Browser-resolved locale | Controls `Intl` full and abbreviated visual months, short/narrow weekdays, full accessible dates and month names, and time labels. | An empty or invalid BCP 47 language tag is `invalid-configuration`. |
 | `timeZone` | None; `Date` inputs use device-local fields | Projects supplied `Date` instants into an IANA zone. It never changes event strings. | An empty or invalid zone identifier is `invalid-configuration`. |
 | `firstDay` | `"locale"` | Uses the locale week convention from either the platform's `Intl.Locale#getWeekInfo()` method or `Intl.Locale#weekInfo` accessor, or accepts explicit `0 = Sunday` through `6 = Saturday`. | Any other value is `invalid-configuration`; locale mode falls back to Sunday when neither platform form yields a valid `firstDay`. |
 | `headingLevel` | `2` | Chooses the native `h1` through `h6` month-title level. Its native title button opens the built-in month-and-year popover. The agenda, popover, and status-panel headings use the next level, capped at `h6`. | A non-integer or value outside `1` through `6` is `invalid-configuration`. |
+| `weekRowSizing` | `"equal"` | Controls the six week tracks and normal compact slots. `"equal"` gives every week the intrinsic size required by the tallest week and gives package-owned, normally visible compact primary-event, count, and compact-primary overflow roots one common full slot. Focus-only later summaries remain intrinsic. `"content"` sizes each week independently and keeps compact roots intrinsic. Neither mode fixes the calendar height or clips taller content; equal rows can increase the grid's vertical space. | Any other value is `invalid-configuration`; the diagnostic identifies `weekRowSizing`. |
+| `gridEventPlacement` | `"top"` | Aligns the complete event-summary and overflow stack within the available block space below the top-aligned date at every width. `"center"` and `"bottom"` safely fall back toward the top when the stack cannot fit. It does not affect agenda rows, DOM order, or focus order. | Any other value is `invalid-configuration`; the diagnostic identifies `gridEventPlacement`. |
 | `now` | `() => new Date()` | Supplies the current instant during construction, every grid render, and Today actions. It may run more than once during one public operation, so keep it synchronous and free of observable side effects. | A construction-time throw/invalid date is `invalid-configuration`; a later failure enters fatal `internal-error`. |
 | `sourceEventLimit` | `10,000` | Caps one complete source snapshot. Allowed range: `1` through `10,000`. | An invalid setting is `invalid-configuration`; an oversized result is `event-limit-exceeded`. |
 | `maxGridEventsPerDay` | `3` | Caps direct event representations in a day cell. Allowed range: `0` through `10`; `0` suppresses individual representations while retaining the accessible day count, agenda events, and native overflow action. Compact presentation follows the [responsive design](../DESIGN.md#responsive-model); the first actionable event remains named and later actions remain available when focused. | An invalid setting is `invalid-configuration`. |
@@ -784,9 +792,12 @@ accessibility tree; the day label retains the exact event total. A passive
 compact cue is pointer-transparent, so activating that area selects the day
 instead of activating the first event. The package owns responsive placement;
 no public overflow-layout selector or CSS token is exposed. Consumers must keep
-compact output concise enough for its assigned block. Returned wide content
-replaces only visual content inside the native overflow button and cannot alter
-its behavior.
+compact output within its assigned block to preserve equal sizing. When more
+space is required, increase `--lfc-control-min-size` and
+`--lfc-grid-event-min-block-size` on the calendar root so package-owned normal
+compact roots grow together. Oversized output remains unclipped but is outside
+the equal-sizing guarantee. Returned wide content replaces only visual content
+inside the native overflow button and cannot alter its behavior.
 
 Each applicable variant is created during the calendar render. Compact and
 wide variants coexist, and the container styles select the presentation defined
