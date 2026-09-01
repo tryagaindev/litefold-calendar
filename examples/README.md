@@ -1,65 +1,83 @@
 # Examples
 
-Each example is a small, framework-free recipe built against the package's public API. Start with **Basic JavaScript**, then choose the example that matches the integration problem you are solving.
+Use this page to choose, run, and validate the repository examples. Each recipe is framework-free and uses only published package surfaces.
 
-Package consumers should use **Choose an example** to find an integration recipe. Repository contributors should also use **Run locally**, **Validate an example change**, and **Add or change an example**.
+## Choose by audience and scenario
 
-## Choose an example
+| Audience | Scenario | Start here |
+| --- | --- | --- |
+| Package user — getting started | Render a static event array and handle activation | [Basic JavaScript](basic/) |
+| Package user — getting started | Preserve useful server-rendered content until the calendar is ready | [Progressive enhancement](progressive-enhancement/) |
+| Package user — getting started | Load the ESM build from an existing classic-script entry point | [Classic-script loader](classic-script/) |
+| Package user — integration and API | Integrate a range-aware source, typed metadata, application controls, hooks, state, and WebMCP | [Advanced TypeScript](advanced/) |
+| Package user — integration and API | Own source, action, and render-hook failure presentation | [Async errors](async-errors/) |
+| Package user — integration and API | Rewrite a FullCalendar v6 `dayGridMonth` source shape | [FullCalendar v6 migration](fullcalendar-v6-migration/) |
+| Contributor | Exercise public declarations, browser behavior, accessibility, and package output | [Contributor fixture and validation notes](#contributors) |
+| Maintainer | Inspect generated deployment provenance and operate static snapshots | [Maintainer notes](#maintainers) |
 
-| Goal | Example |
+## Package users
+
+### Getting started
+
+Start with [Basic JavaScript](basic/). Add [Progressive enhancement](progressive-enhancement/) when the page must remain useful without JavaScript or before the first usable snapshot. Use [Classic-script loader](classic-script/) only when an existing classic entry point cannot be converted to a module script.
+
+To integrate the package rather than run this repository, begin with the root [installation](../README.md#install) and [first render](../README.md#first-render).
+
+The examples use repository-relative files so they can test the exact build output. Installed applications use package imports instead:
+
+| Repository fixture reference | Installed application reference |
 | --- | --- |
-| Render a static event array | [Basic JavaScript](basic/) |
-| Integrate an async provider, typed metadata, actions, render hooks, state, and WebMCP | [Advanced TypeScript](advanced/) |
-| Handle source, action, and render-hook failures | [Async errors](async-errors/) |
-| Load the ESM package from an existing classic script | [Classic-script loader](classic-script/) |
-| Replace a FullCalendar v6 `dayGridMonth` integration | [FullCalendar migration](fullcalendar-v6-migration/) |
-| Keep server-rendered fallback content until the calendar is ready | [Progressive enhancement](progressive-enhancement/) |
+| `../../dist/index.js` | `@tryagaindev/litefold-calendar` |
+| `../../dist/styles.css` | `@tryagaindev/litefold-calendar/styles.css` |
+| `../../dist/extensions/webmcp/index.js` | `@tryagaindev/litefold-calendar/extensions/webmcp` |
 
-## Run locally
-
-From the repository root:
-
-```sh
-npm ci --ignore-scripts
-npm run demo
-```
-
-Open the printed `/examples/` URL. `npm run demo` builds the package and all generated example assets before starting the local loopback HTTP server. After a successful `npm run build`, use `npm run serve:repository` to restart that server without rebuilding; `dist/` alone is not enough because the advanced bundle and deployment metadata are also generated.
-
-The repository examples import files such as `../../dist/index.js` and `../../dist/styles.css`. Those paths deliberately exercise the package output that will be published. In an installed application, use package imports instead:
+For example, an application processed by a package-aware build tool can use:
 
 ```js
 import { createCalendar } from "@tryagaindev/litefold-calendar";
 import "@tryagaindev/litefold-calendar/styles.css";
 ```
 
-Source timing follows the value returned by each invocation. A direct event array commits terminal state before the initiating void method returns, with one full render and no loading or `aria-busy`. Any PromiseLike—including an already-fulfilled promise or an `async` function result—uses a loading render followed by a terminal render.
+A browser cannot resolve those bare package specifiers without a build tool or import map. The [classic-script recipe](classic-script/) shows the deployed-URL form.
 
-## Validate an example change
+### Integration and API
 
-Run the smallest relevant check first, then the full repository check before release:
+Use [Advanced TypeScript](advanced/) for reusable integration patterns such as range loading, cancellation, typed metadata, render hooks, external controls, fallback ownership, and optional extensions. Use [Async errors](async-errors/) when deciding whether the package or application owns visible recovery UI. The [FullCalendar v6 migration](fullcalendar-v6-migration/) is a bounded adapter example for that source API shape, not a compatibility layer.
+
+Exact public signatures, defaults, and timing belong in the [API reference](../docs/api.md). Application ownership and composition recipes belong in the [integration guide](../docs/integration-guide.md).
+
+## Run locally
+
+Use the repository-selected Node and npm toolchain described in [Set up the repository](../CONTRIBUTOR_COMMANDS.md#set-up-the-repository). From a fresh clone at the repository root:
 
 ```sh
-npm run typecheck:examples
-npm run test:examples
-npm run test:browser
+npm ci --ignore-scripts
+npm run demo
 ```
 
-- `typecheck:examples` builds the package, then verifies the advanced TypeScript example against the public declarations. The full example build also runs `checkJs` validation for the FullCalendar migration recipe.
-- `test:examples` builds the package and runs deterministic JSDOM integration recipes.
-- `test:browser` builds the package and covers real browser, keyboard, pointer, responsive, and accessibility behavior.
-- `npm run check` runs the complete repository gate.
+Open the printed `/examples/` URL. `npm run demo` builds the package and generated example assets, then starts a loopback HTTP server. After a successful `npm run build`, use `npm run serve:repository` to restart the server without rebuilding.
 
-When `dist/` is already current, the corresponding `*:built` scripts skip the build. Packaging work should also run `npm run check:tarball` against a clean packed-package consumer.
+The build generates `examples/advanced/main.js` and `examples/metadata.json`. Both are ignored build output: do not edit or commit them. `metadata.json` records the package version, exact source commit when one can be proven, and deployment channel so a rendered example can identify its provenance.
 
-Canonical screenshots support visual review, but supported-browser and assistive-technology checks still require manual testing.
+## Contributors
 
-## Add or change an example
+Use the contributor command reference to [choose focused validation](../CONTRIBUTOR_COMMANDS.md#choose-focused-validation) while iterating. It routes example changes through public-declaration, `checkJs`, JSDOM, and real-browser coverage as applicable. Before submission, follow the [final gate](../CONTRIBUTOR_COMMANDS.md#run-the-final-gate), including its committed, clean-worktree prerequisite and packed-consumer checks.
 
-- Keep the example dependency-free, deterministic, and safe to publish as source.
+The advanced recipe is deliberately exhaustive where it serves repository coverage: complete option, hook, and method inventories expose missing public-surface coverage during typechecking; boundary fixtures exercise range, overflow, and DOM limits; and `data-test-*` attributes provide repository synchronization probes. Consumer code should copy the documented integration patterns, not those coverage mechanics. Exact responsive geometry belongs in [DESIGN.md](../DESIGN.md).
+
+When adding or changing an example:
+
+- Keep it dependency-free, deterministic, and safe to publish as source.
 - Use public package APIs, documented CSS tokens, native HTML semantics, and sanitized fixture data.
-- Namespace application-owned classes, IDs, data attributes, CSS properties, and layers with `my-*`. Use `data-test-*` only for repository probes. Litefold Calendar output keeps the `litefold-calendar` and `lfc-*` namespaces.
-- Give each public option, method, hook, extension, or error path one clear example owner and focused executable coverage.
-- Update the relevant API or integration guide, tests, and changelog with the example.
+- Namespace application-owned classes, IDs, data attributes, CSS properties, and layers with `my-*`. Reserve `data-test-*` for repository probes.
+- Give each public option, method, hook, extension, or failure path one clear example owner and focused executable coverage.
+- Update the canonical API or integration documentation, relevant tests, and changelog with the example.
 
-GitHub Pages hosts a rolling `main` preview and immutable release demos. See the [static deployment guide](../docs/example-deployment.md) for versioning, rollback, and deep-link behavior.
+## Maintainers
+
+`examples/metadata.json` is generated provenance, not configuration or a release record. Deployment tooling regenerates it from the package version, exact source commit, and channel; never edit or commit it.
+
+GitHub Pages hosts a rolling `main` preview and immutable release snapshots. The
+[static example deployment guide](../docs/example-deployment.md) owns deployment
+prerequisites, verification, recovery, and rollback, including the specific
+GitHub permissions required for each operation.

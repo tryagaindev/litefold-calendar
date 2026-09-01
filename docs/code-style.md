@@ -6,6 +6,12 @@ This document defines required repository conventions for TypeScript and JavaScr
 
 Do not duplicate exact package or runtime patch versions in prose. Name the supported major or release line and point readers to the authoritative manifest, lockfile, generated metadata, or executable configuration. Supported ranges and major selectors belong in repository configuration; exact resolved versions belong in lockfiles, generated receipts, capture metadata, and commands where the value is a required input.
 
+## Documentation scope and history
+
+Write evergreen guidance around current situations, invariants, decisions, and reusable recovery actions. Do not use a past event, tag, commit hash, or individual outcome as the reason for a standing rule. Record shipped product changes in `CHANGELOG.md`; keep event-specific chronology and sensitive operational evidence in the relevant issue, private release record, or postmortem.
+
+Each fact has one canonical owner. Shorter guides should summarize the decision a reader must make and link to that owner instead of copying its command sequence, signature inventory, responsive geometry, or recovery matrix.
+
 ## Documentation diagrams
 
 Use diagrams when they make a relationship materially easier to understand, while keeping the surrounding prose or table as the complete text equivalent and canonical contract.
@@ -26,10 +32,12 @@ Use diagrams when they make a relationship materially easier to understand, whil
 ## Module and package boundaries
 
 - Follow the dependency direction in the [internal architecture guide](architecture.md). Runtime may depend on DOM and domain, DOM may depend on domain, and domain remains independent. `calendar.ts` is the intentional root composition edge. Do not add internal barrels.
-- Consumer-facing documentation and copyable snippets import the core API from the package root, selected first-party components from documented `/extensions/<id>` entries, and CSS from the stylesheet export. Never direct consumers to internal or `dist/` paths. Repository runnable examples intentionally use the [documented relative `dist/` wiring](../examples/README.md#run-locally) to exercise freshly built package output.
+- Package-user-facing documentation and copyable snippets import the core API from the package root, WebMCP from the documented `@tryagaindev/litefold-calendar/extensions/webmcp` subpath when needed, and CSS from the stylesheet export. Never direct package users to internal or `dist/` paths. Repository runnable examples intentionally use the [documented relative `dist/` wiring](../examples/README.md#run-locally) to exercise freshly built package output.
 - Every new public extension subpath must provide an independently useful, tree-shakeable component and package-artifact verification.
 - Keep extension entry modules pure and SSR-safe. Factories validate and snapshot options synchronously; module evaluation must not read browser globals, register tools, discover calendars, or mutate global state.
-- Do not re-export extension factories from the root or import one optional extension from another. Follow the [first-party authoring checklist](first-party-extensions.md#first-party-authoring-checklist).
+- Do not re-export extension factories from the root or import one optional
+  extension from another. Follow the
+  [official extension checklist](architecture.md#author-an-official-extension).
 
 ## JavaScript and repository scripts
 
@@ -79,12 +87,9 @@ When code owns both producer and consumer, return a typed interface containing t
 
 ## Validate a change
 
-Run the focused checks while iterating:
-
-```shell
-npm run lint
-npm run typecheck
-npm run test:unit
-```
-
-Add `npm run check:docs` for documentation or export changes and `npm run check:design` for `DESIGN.md`. After committing the intended changes and returning to a clean tree, run the complete `npm run check` gate described in [CONTRIBUTING.md](../CONTRIBUTING.md#development).
+Use the [focused validation matrix](../CONTRIBUTOR_COMMANDS.md#choose-focused-validation)
+for copyable commands. Changes to this guide or the conventions it describes
+must exercise the affected lint, type, unit, documentation, design, example, or
+package-policy checks. After committing the intended change and returning to a
+clean tree, use the
+[final repository gate](../CONTRIBUTOR_COMMANDS.md#run-the-final-gate).

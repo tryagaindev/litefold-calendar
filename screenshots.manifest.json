@@ -24,7 +24,8 @@
       ],
       "alt": "Desktop advanced calendar example",
       "references": [
-        "README.md"
+        "README.md",
+        "docs/screenshots/README.md"
       ],
       "sha256": "36a47c79d26e3b16cddc57de3b2bed8fed7c8263bc959038df4690e8083dfebd"
     },
@@ -44,7 +45,7 @@
       ],
       "alt": "Month and year picker",
       "references": [
-        "README.md"
+        "docs/screenshots/README.md"
       ],
       "sha256": "02a300884f1459d00be0b627f1aa906382b7a7cecc403cde26066657199db364"
     },
@@ -64,7 +65,8 @@
       ],
       "alt": "Mobile dark-theme calendar example",
       "references": [
-        "README.md"
+        "README.md",
+        "docs/screenshots/README.md"
       ],
       "sha256": "ee341e7c306bbcc9077c8d6616906b60732792ce2f40ec119182a6cb0e256a11"
     },
@@ -84,7 +86,7 @@
       ],
       "alt": "Mobile calendar touch paging",
       "references": [
-        "README.md"
+        "docs/screenshots/README.md"
       ],
       "sha256": "a26acd7a0a3932706acdf9b3ea8d356c56e2a0545dbec050188b5a2b2a1bc17f"
     },
@@ -104,7 +106,7 @@
       ],
       "alt": "Event details dialog",
       "references": [
-        "README.md"
+        "docs/screenshots/README.md"
       ],
       "sha256": "4905e43d8985d88ebc22a12c7181c3c0f34e9082b3d517eda984dd1797b0375a"
     },
@@ -125,7 +127,7 @@
       ],
       "alt": "Keyboard focus on an event action",
       "references": [
-        "README.md"
+        "docs/screenshots/README.md"
       ],
       "sha256": "8872f478112779c5b6c1ec1352976f677d2beb06b1a156da4d666d999566222d"
     }

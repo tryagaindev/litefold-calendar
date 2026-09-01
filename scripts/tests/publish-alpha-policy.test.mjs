@@ -107,7 +107,6 @@ void test("the prerelease channel policy converges alpha and latest on the candi
 	const versions = ["0.1.0-alpha.0", "0.2.0-alpha.0"];
 
 	for (const metadata of [
-		{ "dist-tags": {}, versions: [] },
 		{
 			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.2.0-alpha.0" },
 			versions
@@ -125,6 +124,7 @@ void test("the prerelease channel policy converges alpha and latest on the candi
 	}
 
 	for (const metadata of [
+		{ "dist-tags": {}, versions: [] },
 		{ "dist-tags": { alpha: "0.2.0-alpha.0" }, versions },
 		{
 			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.1.0-alpha.0" },

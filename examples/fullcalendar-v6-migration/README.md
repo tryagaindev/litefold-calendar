@@ -1,19 +1,16 @@
 # FullCalendar v6 `dayGridMonth` migration example
 
-This runnable example is the smallest useful companion to the [migration guide](../../docs/fullcalendar-v6-migration.md). It rewrites a basic FullCalendar month view; it is not a compatibility layer.
+This runnable example is the smallest useful companion to the [migration guide](../../docs/fullcalendar-v6-migration.md). It rewrites the source shape of a basic FullCalendar v6 month view; the version label defines that compatibility boundary and does not make this a compatibility layer.
 
 ## Run it
 
-From the repository root:
+Follow the shared [local run instructions](../README.md#run-locally), then choose **Rewrite a dayGridMonth view**.
 
-```sh
-npm ci --ignore-scripts
-npm run demo
-```
+[`main.js`](main.js) is committed source, not generated output. The full example build checks it with TypeScript `checkJs`; `typecheck:examples` checks the advanced TypeScript recipe only. [`index.html`](index.html) provides the page structure, and [`../example.css`](../example.css) supplies shared example styles.
 
-Open the printed `/examples/` URL and choose **Rewrite a dayGridMonth view**.
+## Choose a package version
 
-[`main.js`](main.js) is committed source, not generated output. TypeScript checks it through `checkJs`; [`index.html`](index.html) provides the page structure, and [`../example.css`](../example.css) supplies shared example styles.
+Use `npm install @tryagaindev/litefold-calendar@alpha` only for evaluation against the moving prerelease channel. After selecting a version for migration or production-like validation, install that exact prerelease version and commit the resulting lockfile so later channel movement cannot change the tested package.
 
 ## Follow the migration flow
 

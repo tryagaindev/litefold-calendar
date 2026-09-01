@@ -7,13 +7,13 @@ Litefold Calendar separates failures into two paths:
 
 ## Choose an integration path
 
-| Goal | Use | Who presents the error? |
-|---|---|---|
-| Use the built-in error panel and announcements | Omit `onError`, or return `undefined` / `"default"` | Litefold Calendar |
-| Add telemetry while keeping the built-in UI | Log in `onError`, then return `"default"` | Litefold Calendar |
-| Replace the built-in error UI | Synchronously render equivalent UI in `onError`, then return the exact string `"handled"` | Application |
-| Route all package announcements through a shared announcer | `onAnnounce` | Unchanged for visible UI; application owns announcements |
-| Observe presentation-safe state | `getState()` or `onStateChange` | Unchanged |
+| Goal | Use | Visible UI and announcements | Diagnostic sink |
+|---|---|---|---|
+| Use the built-in presentation without a callback | Omit `onError` | Litefold Calendar | Browser global error channel |
+| Add telemetry while keeping the built-in presentation | Log in `onError`, then return `undefined` or `"default"` | Litefold Calendar | Configured `onError` only |
+| Replace the built-in presentation | Synchronously render equivalent UI in `onError`, then return the exact string `"handled"` | Application | Configured `onError` only |
+| Route announcements through a shared announcer | Configure `onAnnounce` separately | Visible UI is unchanged; application owns announcements | Unchanged |
+| Observe presentation-safe state | `getState()` or `onStateChange` | Unchanged | Unchanged |
 
 `onError` does not receive programmer errors thrown by construction or public method calls. Catch those separately.
 
@@ -110,7 +110,7 @@ const calendar = createCalendar(host, {
 			code: error.code,
 			phase: error.phase,
 			recoverable: error.recoverable,
-			cause: error.cause
+			stale: error.stale
 		});
 
 		return "default";
@@ -120,7 +120,7 @@ const calendar = createCalendar(host, {
 calendar.render();
 ```
 
-`cause` can contain private network or application data; send it only to trusted diagnostics.
+`cause` can contain private network or application data. Add it only inside a trusted diagnostic boundary; do not include it in default client telemetry.
 
 The callback is synchronous so ownership is decided before presentation. A returned promise/thenable cannot suppress package UI. It is observed to prevent an unhandled rejection; when it settles, one `AggregateError` containing the original error plus the unsupported callback result or rejection is sent to the global error channel.
 
@@ -187,7 +187,7 @@ const calendar = createCalendar(host, {
 calendar.render();
 ```
 
-The page must create the empty `#application-status` (`role="status"`, `aria-live="polite"`) and `#application-assertive` (`role="alert"`, `aria-live="assertive"`) regions before the calendar runs, with `aria-atomic="true"` on both. The helper clears both routes synchronously, then schedules the selected region's text update before returning `"handled"`. The visible `#application-alert` panel itself should not duplicate that announcement route. A handled warning uses the polite region; a blocking or action failure uses the assertive region. See the [runnable async-errors example](../examples/async-errors/) for source-error ownership with Retry and recovery.
+The page must create the empty `#my-application-status` (`role="status"`, `aria-live="polite"`) and `#my-application-assertive` (`role="alert"`, `aria-live="assertive"`) regions before the calendar runs, with `aria-atomic="true"` on both. The helper clears both routes synchronously, then schedules the selected region's text update before returning `"handled"`. The visible `#my-application-alert` panel itself should not duplicate that announcement route. A handled warning uses the polite region; a blocking or action failure uses the assertive region. See the [runnable async-errors example](../examples/async-errors/) for source-error ownership with Retry and recovery.
 
 When the application returns `"handled"` for a current error, the package still updates state and diagnostics, but it suppresses its visible panel and live announcement for that error. The application also owns retry/recovery presentation for the handed-off error.
 

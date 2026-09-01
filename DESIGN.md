@@ -392,7 +392,20 @@ Today is a primary-filled circular number with its own border. Selection colors 
 
 ### Events and agenda
 
-Grid events are compact lavender slips with a violet outline, magenta logical-leading rule, preserved marker slot, and ellipsized text slots. At compact widths the first action uses a marker-only presentation within the full compact target. The package groups that compact-primary action and a separate day-level overflow cue as siblings in two equal, gap-free auto-fit grid blocks aligned to the cell's block end; it does not nest the cue inside the event action. Each block uses the compact-control-size floor, 44 CSS pixels by default and bounded by the cell, as its private minimum track size. This layout threshold is distinct from the 24 by 24 CSS-pixel minimum interactive target requirement and reserves enough room for supported `2rem` marker output without entering the count's block. When both compact-control-size tracks fit, their centers evenly divide the full area beneath the date; otherwise they stack into centered, equal full-width rows. Auto-fit cannot use arbitrary returned hook content's intrinsic width as its repeat threshold, so applications must keep compact output concise enough for its assigned block; oversized application output can overflow and remains the consumer's responsibility. The cue is a bare semibold locale-aware compact number with no pill, background, border, or shadow: it shows the signed additional count when the primary visual represents one event and the unsigned total when no primary visual exists. A markerless standalone total occupies one centered block. When the native overflow action becomes the compact-primary control, including with `maxGridEventsPerDay: 0`, its own compact slot carries the number as one package-owned action instead of adding a duplicate day-level cue. The package owns this placement; no overflow-layout selector or CSS token is public, and render hooks replace only the visual content within the assigned block. Accessible naming and focus behavior follow the [interaction model](ACCESSIBILITY.md#interaction-model).
+Grid events are compact lavender slips with a violet outline, magenta
+logical-leading rule, preserved marker slot, and ellipsized text slots. At
+compact widths the first action uses a marker-only presentation within the full
+compact target. Its relationship to the day-level overflow cue, track sizing,
+stacking, markerless total, and `maxGridEventsPerDay: 0` fallback is defined
+once in the [responsive model](#responsive-model).
+
+The compact cue is a bare semibold locale-aware number with no pill, background,
+border, or shadow. It shows the signed additional count when the primary visual
+represents one event and the unsigned total when no primary visual exists. The
+package owns placement; no overflow-layout selector or CSS token is public, and
+render hooks replace only visual content within the assigned block. Accessible
+naming and focus behavior follow the
+[interaction model](ACCESSIBILITY.md#interaction-model).
 
 Wide grid overflow remains an explicit native count/action rather than silently dropping events. `renderEventOverflow` may replace applicable pre-rendered compact and wide visual content through one discriminated hook; `context.text` supplies the package-formatted visual fallback, and mandatory native-action variants retain that fallback for `null` or invalid output. Custom content cannot replace the action, accessible label, target geometry, or agenda-focus behavior.
 
@@ -467,7 +480,11 @@ The following package custom properties are the stable bridge from an applicatio
 - **Do** keep Today, selection, focus, hover, disabled, warning, and error visually and semantically distinct in light, dark, increased-contrast, and forced-colors modes.
 - **Do** keep one live 42-day grid with the selected-day agenda directly below it at every width.
 - **Do** use native buttons, links, form controls, popover behavior, scrolling, and system typography wherever the browser already supplies the required semantics.
-- **Do** test theme overrides at narrow widths, 200% text size, 400% zoom, RTL, reduced motion, increased contrast, and forced colors. Include an allowed `2rem` custom event marker with a noninteractive inline-end satellite; verify the primary/count blocks remain equal, gap-free, and block-end aligned, stay stacked throughout supported phone widths, evenly divide the full area beneath the date when both compact-control-size tracks fit near the compact ceiling, and cause no intersection or horizontal overflow. Also verify consumer compact output is concise enough to fit its assigned block.
+- **Do** test theme overrides across the complete
+  [responsive model](#responsive-model) at 200% text size, 400% zoom, RTL,
+  reduced motion, increased contrast, and forced colors. Include the maximum
+  supported custom marker and representative compact hook content; verify no
+  intersection or horizontal overflow.
 - **Don't** add shadows, gradients, glass, glow, illustration, remote assets, icon fonts, or promotional display typography to package-owned UI.
 - **Don't** use primary green as general decoration or violet focus color for selection; their scarcity preserves state clarity.
 - **Don't** hide event meaning, warning/error meaning, selection, or Today through color alone.

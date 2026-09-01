@@ -4,25 +4,30 @@ Use this pattern when an existing page has a classic JavaScript entry point but 
 
 ## Run it
 
-From the repository root, run `npm run demo`, then choose **Load ESM from a classic script** from the examples landing page. Select August 4, 2026 and activate an event to confirm that the dynamically loaded calendar behaves like the module-script examples.
+Follow the shared [local run instructions](../README.md#run-locally), then choose **Load ESM from a classic script** from the examples landing page. Select August 4, 2026 and activate an event to confirm that the dynamically loaded calendar behaves like the module-script examples.
 
 ## How it works
 
-The page loads one deferred classic script:
+In a deployed application, load the package stylesheet and the existing classic entry script from URLs owned by that application:
 
 ```html
+<link rel="stylesheet" href="/assets/litefold-calendar/styles.css">
 <script defer src="./main.js"></script>
 ```
 
-`main.js` has no static `import` or `export`. Instead, it uses the standard `import()` expression available to classic scripts:
+`main.js` has no static `import` or `export`. Instead, it uses the standard `import()` expression with the deployed ESM entry URL:
 
 ```js
-void import("../../dist/index.js")
+void import("/assets/litefold-calendar/index.js")
 	.then(({ createCalendar }) => {
 		//Create and render the calendar here.
 	})
 	.catch(reportStartupFailure);
 ```
+
+The application build or deployment must copy the package's complete ESM output tree and stylesheet to those URLs while preserving relative module paths. Choose paths that match the application's asset pipeline; `/assets/litefold-calendar/` is only an illustrative deployment location.
+
+The runnable repository fixture deliberately uses `../../dist/index.js` and `../../dist/styles.css` instead. Those are repository-only paths that test the package build output and should not be copied into application code. See the [canonical import mapping](../README.md#getting-started) for package-aware build tools.
 
 `import()` resolves to the package module namespace; it does not create a global package object. The persistent alert in the page reports failures that occur before package-owned error handling is available.
 

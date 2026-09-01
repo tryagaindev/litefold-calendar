@@ -12,8 +12,8 @@ body:
     id: version
     attributes:
       label: Package version or commit
-      description: Provide the exact npm version or source commit.
-      placeholder: 0.x.y-alpha.N or source commit
+      description: Provide the exact npm version or source commit and the SHA-256 when testing a tarball or generated artifact.
+      placeholder: Exact npm version; full source commit; artifact SHA-256 when relevant
     validations:
       required: true
   - type: textarea
@@ -30,12 +30,14 @@ body:
       description: Include a minimal dependency-free example, relevant configuration, and sanitized output when practical.
     validations:
       required: true
-  - type: input
+  - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: Include the browser, operating system, framework, relevant assistive technology, and browser-agent workspace/model context when applicable.
+      description: Include browser and operating-system versions, input device, framework, and relevant assistive technology. For WebMCP, also provide sanitized host version, embedding and permission-policy context, feature-detection result, configured tool prefix, expected tool name, and the failed operation; exclude account, workspace, conversation, tenant, and organization identifiers.
       placeholder: Current Chrome on Windows; plain TypeScript
+    validations:
+      required: true
   - type: checkboxes
     id: confirmation
     attributes:

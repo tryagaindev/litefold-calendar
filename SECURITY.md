@@ -28,7 +28,7 @@ Include:
 
 Remove credentials, production event data, private URLs, and unrelated personal information before submitting.
 
-If private vulnerability reporting is unexpectedly unavailable, submit only the [reporting-channel unavailable form](https://github.com/tryagaindev/litefold-calendar/issues/new?template=private_security_reporting_unavailable.yml). Do not include vulnerability facts, screenshots, links, logs, or attachments in that public issue. Wait for a maintainer to establish a private channel.
+If private vulnerability reporting is unexpectedly unavailable, submit only the [reporting-channel unavailable form](https://github.com/tryagaindev/litefold-calendar/issues/new?template=private_security_reporting_unavailable.yml). Do not include vulnerability facts, screenshots, links, logs, or attachments in that public issue. Wait for someone with GitHub `Admin` access to the repository or the organization `security manager` role to establish a private channel.
 
 The project aims to acknowledge a complete report within three business days and provide an initial assessment or request for more information within ten business days.  Remediation and coordinated disclosure timing depend on severity and release risk.
 

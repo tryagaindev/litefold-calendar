@@ -65,7 +65,7 @@ In particular, do not reduce `--lfc-control-min-size` or `--lfc-grid-event-min-b
 
 Set `dir="rtl"` on the calendar or an ancestor. The stylesheet uses logical properties and inherits direction, including the Previous/Next pager mapping. Do not reverse private flex/grid structures, pull lanes, or scroll positions with physical overrides.
 
-Give the host a border-box inline size of at least **320 CSS pixels**, the minimum supported design width, and let the package's inline-size container queries apply the [responsive model](../DESIGN.md#responsive-model). Narrower hosts receive best-effort graceful degradation only.
+Give the host at least the [minimum supported design width](../DESIGN.md#responsive-model), then let the package's inline-size container queries apply that responsive model. Hosts below the documented floor receive best-effort graceful degradation only.
 
 Do not add viewport listeners, `ResizeObserver`, layout measurement, responsive option changes, DOM movement, or private display overrides. Container resizing changes presentation without refetching events, replacing owned nodes, or moving focus.
 

@@ -18,30 +18,22 @@ This guide is the quickest way to determine whether Litefold Calendar fits a pro
 | Styling | Scoped CSS, documented `--lfc-*` tokens, container-query responsiveness, preference-aware themes, and an optional validated event marker color | [Calendar anatomy](component-anatomy.md), [design system](../DESIGN.md), [CSS tokens](css-tokens.md) |
 | State and recovery | Immutable month, selection, range, phase, and issue snapshots; persistent error/Retry UI; application error and announcement bridges | `getState()`, `onStateChange`, `onError`, `onAnnounce` |
 | Progressive fallback | Coordination of application-owned no-JavaScript markup, hidden only after a usable snapshot commits | `fallbackElement` |
-| Optional components | Explicit, tree-shakeable first-party extension subpaths; WebMCP is experimental and becomes a no-op when its browser API is unavailable | `extensions`, [first-party extensions](first-party-extensions.md) |
-| Packaging | Pure ESM, declarations, DOM-free module evaluation, no remote assets, and no runtime, peer, optional, or bundled dependencies | Root, `./styles.css`, and `/extensions/<id>` exports |
+| Optional components | WebMCP is available from an explicit first-party subpath and becomes a no-op when its browser API is unavailable | `extensions`, `@tryagaindev/litefold-calendar/extensions/webmcp` |
+| Packaging | Pure ESM, declarations, DOM-free module evaluation, no remote assets, and no runtime, peer, optional, or bundled dependencies | Package root, `./styles.css`, and `./extensions/webmcp` exports |
 
 ## Choose an example
 
-| Need | Runnable example |
-| --- | --- |
-| First render with JavaScript | [Basic example](../examples/basic/) |
-| Complete TypeScript integration, including hooks, bounds, methods, and WebMCP | [Advanced example](../examples/advanced/) |
-| Loading, failure, Retry, and recovery | [Async-errors example](../examples/async-errors/) |
-| Server-authored fallback and native event links | [Progressive-enhancement example](../examples/progressive-enhancement/) |
-| Rewrite a FullCalendar v6 `dayGridMonth` integration | [FullCalendar migration example](../examples/fullcalendar-v6-migration/) |
-
-The [examples guide](../examples/) maps common integration tasks to executable recipes and explains which fixtures own broader coverage.
+Start with the [basic example](../examples/basic/) for a first render. The [examples guide](../examples/README.md) owns the audience and scenario matrix for asynchronous errors, progressive enhancement, migration, advanced integration, and repository coverage.
 
 ## Calendar display
 
-The package presents one fixed six-week Gregorian month grid plus the selected day's agenda. It supports adjacent-month filler dates, bounded navigation, native event representations, grid overflow, paged agenda rows, and visual time-display choices. Its minimum supported design width is a 320 CSS-pixel calendar host border box; narrower hosts receive best-effort graceful degradation.
+The package presents one fixed six-week Gregorian month grid plus the selected day's agenda. It supports adjacent-month filler dates, bounded navigation, native event representations, grid overflow, paged agenda rows, and visual time-display choices. Applications must provide the [minimum supported calendar host width](../DESIGN.md#responsive-model); hosts below that floor receive best-effort graceful degradation.
 
 The [API reference](api.md) owns exact grid, occupancy, sorting, limit, and agenda behavior. [DESIGN.md](../DESIGN.md) owns visual composition and responsive behavior; the [accessibility guide](../ACCESSIBILITY.md) owns semantics, naming, targets, keyboard behavior, and focus.
 
 ## Events and event fetching
 
-The typed `events` option accepts a local snapshot or an application-owned, abort-aware provider. A static array or provider-returned array commits synchronously with one full render and no loading or `aria-busy` state. Any promise-like result—including an already-fulfilled promise, an `async` function result, or a custom thenable—uses a loading render followed by a terminal render. Classification happens for every invocation, so one provider can return cached arrays and promise-like cache misses. The same metadata generic flows through normalized events, actions, render hooks, and complete `setEvents()` replacements. Transport, authorization, aggregation, filtering, and caching remain application responsibilities.
+The typed `events` option accepts a local snapshot or an application-owned, abort-aware provider. The same metadata generic flows through normalized events, actions, render hooks, and complete `setEvents()` replacements. Transport, authorization, aggregation, filtering, and caching remain application responsibilities.
 
 The [event and source contracts](api.md#supply-events-calendarevents-and-calendareventsource) own exact input grammar, URL validation, ranges, cancellation, atomic admission, replacement, reentrancy, retained-data behavior, and normalized output. Use the [integration guide](integration-guide.md#typed-source-adapter) for adapter and caching recipes.
 
@@ -59,7 +51,7 @@ The [API configuration contract](api.md#configure-behavior-calendaroptions) owns
 
 ## Custom toolbar, rendering, and styling
 
-Application-owned toolbar content, directional icons, day badges, event content, compact and wide event-overflow visuals, and mount behavior are available through public render hooks. Content hooks return synchronous, detached, same-document, noninteractive nodes. `renderEventOverflow` pre-renders each applicable responsive variant through one discriminated context, and container resizing only changes which existing variant CSS exposes. At compact widths, the package keeps a primary marker/action and passive count in equal, gap-free blocks at the cell's block end. Its auto-fit grid uses the compact-control-size track floor, 44 CSS pixels by default, so the blocks stay in centered equal full-width rows through supported phone widths and their centers evenly divide the full area beneath the date only near the compact ceiling. Markerless and action-backed compact fallbacks remain one centered block/action. Render hooks replace the contents of those blocks, not their placement; no overflow-layout selector or CSS token is public. Because the repeat threshold cannot use arbitrary hook content's intrinsic width, consumers keep compact output concise enough for its assigned block and own any oversized overflow. `dayDidMount` and `eventDidMount` mutate supplied live elements and may return a synchronous cleanup function instead of a node. Litefold Calendar isolates a failing hook set and restores package defaults for every singleton slot it owned.
+Application-owned toolbar content, directional icons, day badges, event content, overflow visuals, and mount behavior are available through public render hooks. Hooks customize documented content slots without transferring ownership of responsive placement or private package DOM. Litefold Calendar isolates a failing hook set and restores package defaults for the slots it owned.
 
 The [render-hook API](api.md#customize-rendering-calendarrenderhooks) defines every input, return value, cleanup rule, and failure behavior. The [typed integration recipe](integration-guide.md#add-metadata-driven-visuals-without-private-selectors) shows how to map application metadata to owned classes and nodes.
 
@@ -67,13 +59,19 @@ Import `@tryagaindev/litefold-calendar/styles.css`, follow [DESIGN.md](../DESIGN
 
 ## Optional first-party extensions
 
-Complete package-owned components use opaque `CalendarExtension` values in `CalendarOptions.extensions`. Import each factory from its explicit `/extensions/<id>` subpath; the root entry does not re-export extension implementations. On initial direct-array work, extensions activate and receive one queued terminal state delivery. On initial promise-like work, they activate after loading is published and do not receive a retroactive loading delivery. Omitting the WebMCP subpath import keeps its implementation outside the application's import graph, while merely placing a statically imported factory behind a runtime condition does not guarantee bundle removal.
+Complete package-owned components use opaque `CalendarExtension` values in `CalendarOptions.extensions`. The current optional component is imported from `@tryagaindev/litefold-calendar/extensions/webmcp`; the root entry does not re-export it. Omitting that subpath import keeps WebMCP outside the application's import graph, while a runtime condition around a static import controls activation rather than bundle inclusion.
 
 Extensions may be headless and own more than one coordinated lifecycle behavior. They are distinct from application-owned `CalendarRenderHooks`. See [first-party extensions](first-party-extensions.md) for composition, ordering, teardown, isolation, bundle behavior, and the intentionally future-facing status of third-party authoring.
 
 ## Errors, state, and recovery
 
-The observable state distinguishes promise-like loading, usable empty data, retained-data degradation, current failures, partial render-hook failures, and fatal unavailability. Direct arrays reach their terminal state before the initiating method returns; promise-like results retain the loading lifecycle. Registered-extension failures remain diagnostic-only and do not alter ordinary state. The [error guide](errors.md) owns classification, presentation transfer, announcements, diagnostics, and recovery; the [API reference](api.md#observe-state-calendarstate) owns state and callback shapes.
+The observable state distinguishes loading, usable empty data, retained-data
+degradation, current failures, partial render-hook failures, and fatal
+unavailability. Registered-extension failures remain diagnostic-only and do not
+alter ordinary state. The [error guide](errors.md) owns classification,
+presentation transfer, announcements, diagnostics, and recovery; the
+[API reference](api.md#observe-state-calendarstate) owns state, source timing,
+and callback shapes.
 
 `fallbackElement` can coordinate application-authored no-JavaScript content. The [API reference owns its exact lifecycle](api.md#application-integration-options); the [progressive-enhancement guide](seo-and-progressive-enhancement.md) owns the server-content, crawlability, metadata, privacy, and verification recipe.
 

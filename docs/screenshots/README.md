@@ -1,6 +1,6 @@
 # Screenshot contract
 
-Use this procedure when a change intentionally affects a canonical visual state. Screenshots are deterministic release artifacts generated from repository-owned examples with pinned Chromium. They document public behavior; they do not replace browser assertions, accessibility automation, or manual assistive-technology testing.
+Use this procedure when a change intentionally affects a canonical visual state. Screenshots are deterministic visual evidence generated from repository-owned examples with pinned Chromium. They document public behavior; they do not replace browser assertions, accessibility automation, or manual assistive-technology testing.
 
 ## Canonical scenes
 
@@ -10,12 +10,46 @@ The manifest covers exactly these PNG files:
 |---|---|---|
 | `desktop-month-grid-1440x900.png` | Wide advanced month grid with direct event actions and overflow | 1440 × 900 |
 | `month-year-jump-1280x800.png` | Open native month-and-year chooser at a bounded month | 1280 × 800 |
-| `mobile-month-agenda-dark-390x844.png` | Compact dark navigation, month grid with bottom-aligned marker/count blocks, and selected-day agenda | 390 × 844 |
+| `mobile-month-agenda-dark-390x844.png` | Compact dark navigation, month grid event summaries, and selected-day agenda | 390 × 844 |
 | `mobile-month-swipe-pull-390x844.png` | Held native touch pull revealing the decorative adjacent-month lane | 390 × 844 |
 | `event-details-dark-1280x800.png` | Application-owned event details dialog opened from the agenda | 1280 × 800 |
 | `grid-event-keyboard-focus-1440x900.png` | Visible keyboard focus on a wide-layout grid event action after F2 | 1440 × 900 |
 
-JPEG predecessors are obsolete. Do not add alternate crops, renamed duplicates, consumer branding, private data, or externally supplied reference images to this directory.
+Only the manifest-listed PNGs belong in this directory. Do not add alternate crops, renamed duplicates, consumer branding, private data, or externally supplied reference images.
+
+## README and package policy
+
+The root README embeds only the desktop month grid and mobile dark-theme agenda. Together they show the responsive and theme range without turning the GitHub and npm package landing pages into the complete six-scene review gallery.
+
+npm always includes the root `README.md`, while the package `files` allowlist deliberately keeps `docs/screenshots/**` outside the tarball. The previews therefore add no installed package bytes. They use repository-relative Markdown images for same-branch GitHub rendering and npm's GitHub-backed README rendering. An offline renderer opened from an installed package cannot load the excluded PNGs; the hosted GitHub and npm READMEs are the intended preview surfaces. The manifest hashes remain the version-specific visual evidence; the README previews are a current product overview.
+
+Because npm refreshes a package README only when a new version is published, release verification includes a package-page rendering check. Keep every embedded image repository-relative, use the manifest's exact descriptive alt text, and update manifest references whenever documentation adds or removes a capture.
+
+## Reference gallery
+
+### Desktop month grid
+
+![Desktop advanced calendar example](desktop-month-grid-1440x900.png)
+
+### Month and year picker
+
+![Month and year picker](month-year-jump-1280x800.png)
+
+### Mobile dark-theme agenda
+
+![Mobile dark-theme calendar example](mobile-month-agenda-dark-390x844.png)
+
+### Mobile touch paging
+
+![Mobile calendar touch paging](mobile-month-swipe-pull-390x844.png)
+
+### Event details dialog
+
+![Event details dialog](event-details-dark-1280x800.png)
+
+### Keyboard focus
+
+![Keyboard focus on an event action](grid-event-keyboard-focus-1440x900.png)
 
 ## Update captures
 
@@ -40,10 +74,10 @@ Five scenes capture settled states. The held-pull scene intentionally captures d
 
 Review each image at native dimensions and compare it with the intended change and [`DESIGN.md`](../../DESIGN.md):
 
-- Confirm the scene-specific focus, selection, Today, overflow, navigation, month title, event marker, agenda, dialog, or month-picker state.
-- In the settled 390px scene, confirm controls share one compact row above application toolbar content; the social-style count and custom `1.25rem` marker occupy centered, equal, gap-free stacked rows aligned to the day cell's block end without intersection; and no pager lane, offset, motion residue, clipping, or horizontal scrollbar remains.
-- Review paired blocks stacked throughout supported phone widths and sharing a row, with centers evenly dividing the full area beneath the date, only when both compact-control-size tracks fit near the compact ceiling. Check markerless single-block and `maxGridEventsPerDay: 0` single-action states, both text directions, dark mode, forced colors, and increased contrast. Browser coverage remains responsible for an allowed `2rem` marker with an inline-end satellite, compact hook content that fits its assigned block, 200% text, and 400% zoom.
+- Confirm each scene-specific focus, selection, Today, overflow, navigation, month title, event marker, agenda, dialog, or month-picker state.
+- In the settled mobile scene, confirm compact navigation, marker/count presentation, and agenda match the [responsive design](../../DESIGN.md#responsive-model), with no pager lane, offset, motion residue, clipping, or horizontal scrollbar.
 - In the held-pull scene, confirm there is one live grid and the exposed lane shows the correct arrow and localized adjacent month without event content.
+- Treat captures as evidence only for their listed viewport and state. Use the browser and accessibility checks for uncaptured widths, text and page zoom, direction, contrast modes, and alternative marker or overflow combinations.
 - Check for system-font drift, unexpected network content, and personal or secret data.
 
 ## Manifest and validation

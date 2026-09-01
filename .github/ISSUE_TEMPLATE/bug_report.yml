@@ -13,7 +13,7 @@ body:
     attributes:
       label: Package version or commit
       description: Provide the exact npm version or source commit and the tarball SHA-256 when applicable.
-      placeholder: 0.x.y-alpha.N; source commit; tarball SHA-256
+      placeholder: Exact npm version; full source commit; tarball SHA-256
     validations:
       required: true
   - type: input
@@ -52,7 +52,7 @@ body:
     id: context
     attributes:
       label: Additional context
-      description: Note frequency, regressions, workarounds, mobile/zoom behavior, and anything else relevant. For WebMCP, include the feature-detection result, ChatGPT workspace/model context when applicable, configured prefix, tool name, operation, and teardown behavior without pasting confidential tool output.
+      description: Note frequency, regressions, workarounds, mobile/zoom behavior, and anything else relevant. For WebMCP, include the sanitized context listed in the support policy without pasting confidential tool output.
   - type: checkboxes
     id: confirmation
     attributes:

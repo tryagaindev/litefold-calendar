@@ -7,7 +7,7 @@ body:
       value: |
         Use this public form only when GitHub private vulnerability reporting is unavailable.
 
-        Do not include vulnerability details, affected components, reproduction steps, impact, links, screenshots, attachments, logs, credentials, event data, or other sensitive information. A maintainer will restore or establish a private channel before requesting details.
+        Do not include vulnerability details, affected components, reproduction steps, impact, links, screenshots, attachments, logs, credentials, event data, or other sensitive information. Someone with GitHub `Admin` access to the repository or the organization `security manager` role will restore or establish a private channel before requesting details.
   - type: checkboxes
     id: no-public-details
     attributes:

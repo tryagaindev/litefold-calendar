@@ -4,7 +4,7 @@ This is the smallest complete integration: a calendar host, the package styleshe
 
 ## Run it
 
-From the repository root, run `npm run demo`, then choose **Render static events** from the examples landing page.
+Follow the shared [local run instructions](../README.md#run-locally), then choose **Render static events** from the examples landing page.
 
 Try the following:
 
@@ -25,5 +25,10 @@ Try the following:
 Because `events` is a static array, `render()` validates the snapshot and completes its single terminal DOM render before returning. This recipe never enters loading state or sets `aria-busy`.
 
 The example intentionally avoids providers, metadata, bounds, render hooks, extensions, and framework code. Its `data-my-*` attributes are application-owned selectors; Litefold Calendar output uses the package namespaces.
+
+The committed fixture imports repository build output through `../../dist/`.
+Installed applications should use the package imports in the
+[canonical mapping](../README.md#getting-started), not copy that repository-only
+path.
 
 Browse the [JavaScript](main.js), [HTML](index.html), and [shared example CSS](../example.css). For exact contracts, continue to the [API reference](../../docs/api.md); for a larger application integration, see [Advanced TypeScript](../advanced/).

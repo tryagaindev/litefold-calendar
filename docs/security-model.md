@@ -10,7 +10,7 @@ Litefold Calendar has three primary risk centers:
 
 Runtime controls emphasize atomic validation, non-executable rendering, restricted links, bounded work, asynchronous generation guards, lifecycle isolation, and visible failures. WebMCP remains an explicit optional extension, bounded, same-origin, and tied to render/destroy ownership. Supply-chain controls preserve exact-source verification, immutable artifacts, isolated publication authority, provenance, and post-publication identity checks.
 
-Application developers should focus on the assumptions, runtime trust boundaries, and TM-001 through TM-008. Maintainers changing build, release, or Pages workflows should also review TM-009 through TM-012, the path ownership table, and the validation matrix. These abuse cases are review targets, not confirmed vulnerabilities.
+Package users should focus on the assumptions, runtime trust boundaries, and TM-001 through TM-008. Maintainers changing build, release, or Pages workflows should also review TM-009 through TM-012, the path ownership table, and the validation matrix. These abuse cases are review targets, not confirmed vulnerabilities.
 
 ## Scope and assumptions
 
@@ -87,7 +87,7 @@ flowchart LR
 
 An attacker may control one or more event fields, provider timing or rejection, duplicate or oversized results, metadata objects, ordinary browser input, or arguments sent through an enabled site tool. Event titles returned by `get-events` remain untrusted model content. A malicious contributor may submit source or workflow changes intended to add a dependency, lifecycle hook, unsafe sink, stale registration, or privileged pull-request path. An external actor may attempt package-name confusion or account compromise.
 
-The attacker is not assumed to already control host application code, trusted render hooks, package extension code, the application origin, GitHub administrators, npm maintainers, or the browser platform. Those compromises cross a different trust boundary.
+The attacker is not assumed to already control host application code, trusted render hooks, package extension code, the application origin, people with GitHub `Admin` access, npm package maintainers, or the browser platform. Those compromises cross a different trust boundary.
 
 ## Abuse cases and controls
 
@@ -151,7 +151,11 @@ Match the change to the relevant verification groups; security-sensitive changes
 | Package or example output | Root-graph exclusion; package policy; clean-consumer import; self-contained static deployment |
 | Release, npm, GitHub, or Pages workflows | Exact-source and artifact identity; authority separation; writer-side rollback reconstruction; CSP/runtime-policy enforcement; cross-workflow writer-to-deployer serialization; retry/recovery behavior; workflow-policy assertions |
 
-External GitHub, Pages, npm, browser origin-trial, and ChatGPT workspace settings must be verified in their owning systems rather than inferred from repository tests. The historical `v0.1.0-alpha.0` tag predates the automated protected-tag and immutable-release policy and is not evidence that later tags may be moved or recreated.
+External GitHub, Pages, npm, experimental browser, and host-policy settings
+must be verified in their owning systems rather than inferred from repository
+tests. Compatibility allowances for existing release objects belong in
+executable validation and focused tests; they never authorize moving,
+recreating, or weakening protection for a current release object.
 
 Related operating guidance:
 

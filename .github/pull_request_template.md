@@ -8,23 +8,17 @@
 
 ## Verification
 
-<!-- List commands, browsers, devices, assistive technologies, and scenarios tested. -->
+<!-- List focused checks, the final gate, and any browsers, devices, assistive technologies, or scenarios tested. -->
 
 ## Risk and compatibility
 
-<!-- Call out public TypeScript/CSS changes, WebMCP schemas or disclosure, mobile/accessibility effects, security boundaries, package output, publication, or host-integration effects. -->
+<!-- Describe affected public contracts, accessibility, security boundaries, package output, release workflows, or host integrations. Use "None" when not applicable. -->
 
 ## Checklist
 
-- [ ] I kept the change focused and added or updated regression tests.
-- [ ] I followed the repository [coding conventions](../docs/code-style.md), including documentation version references.
-- [ ] I ran `npm run check:design` and reconciled observable visual changes with [`DESIGN.md`](../DESIGN.md); any intentional exception is already documented by its canonical owner.
-- [ ] Lint, typecheck, unit tests, package/example builds, built-output smoke tests, pinned-Chromium checks, and package verification pass locally on the repository-declared Node.js 24 toolchain.
-- [ ] I added no runtime, peer, optional, bundled, install-hook, remote-asset, or CDN dependency.
-- [ ] I considered hostile input, failure paths, stale asynchronous work, and teardown where relevant.
-- [ ] I kept any WebMCP change explicit, bounded, safe to unregister, compatible with unsupported browsers, and free of IDs, URLs, metadata, diagnostics, or application-action exposure.
-- [ ] I considered the managed F2 grid model, native anchors/buttons, touch, narrow widths, zoom, RTL, reduced motion, forced colors, and screen readers where relevant.
-- [ ] I updated types, tests, documentation, migration guidance, examples, all affected PNG screenshots/manifest entries, and `CHANGELOG.md` together for observable changes.
-- [ ] I did not publish, tag, create a GitHub release, or edit retained Pages state from this pull request; release authority remains in the protected workflows.
-- [ ] I did not include generated distributions, secrets, private event data, or unrelated formatting changes.
-- [ ] I reviewed [`SECURITY.md`](../SECURITY.md) and followed the [Code of Conduct](../CODE_OF_CONDUCT.md).
+- [ ] The change is focused, and I added regression coverage for changed behavior or explained why none is needed.
+- [ ] I followed the [coding conventions](https://github.com/tryagaindev/litefold-calendar/blob/main/docs/code-style.md) and ran `npm run check` with the repository-selected Node.js and npm toolchain.
+- [ ] When public behavior changed, I updated affected types, [documentation](https://github.com/tryagaindev/litefold-calendar/blob/main/docs/README.md), examples, migration guidance, and the [`Unreleased` changelog](https://github.com/tryagaindev/litefold-calendar/blob/main/CHANGELOG.md).
+- [ ] When visual or interaction behavior changed, I reconciled it with the [design system](https://github.com/tryagaindev/litefold-calendar/blob/main/DESIGN.md), repeated affected [accessibility checks](https://github.com/tryagaindev/litefold-calendar/blob/main/ACCESSIBILITY.md), and updated [canonical screenshots](https://github.com/tryagaindev/litefold-calendar/blob/main/docs/screenshots/README.md) only when required.
+- [ ] When WebMCP, untrusted input, or another security boundary changed, I followed the [WebMCP contract](https://github.com/tryagaindev/litefold-calendar/blob/main/docs/webmcp.md) and [security policy](https://github.com/tryagaindev/litefold-calendar/blob/main/SECURITY.md) as applicable.
+- [ ] I added no prohibited dependency, install hook, remote asset, generated distribution, secret, private event data, or unrelated formatting change.

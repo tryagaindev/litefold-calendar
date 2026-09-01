@@ -16,15 +16,9 @@ Use Litefold Calendar when your product needs a polished month calendar without 
 npm install @tryagaindev/litefold-calendar@alpha
 ```
 
-The package is pure ESM, has no runtime dependencies, performs no package-owned network requests, and loads no remote assets.
+The package is pure ESM and has no runtime dependencies. The example below assumes an npm-aware build tool that resolves bare module specifiers and CSS imports. For a page without a bundler, use the [classic-script entry-point recipe](docs/integration-guide.md#classic-script-entry-point).
 
-## Bundle behavior
-
-Litefold Calendar publishes side-effect-free ESM JavaScript for compatible bundlers. Unused root exports can be removed, and optional first-party extensions stay out of the application bundle when their explicit subpaths are not imported. The stylesheet is a separate, intentionally side-effectful import. Importing `createCalendar` includes the complete core calendar runtime; core features are not separate tree-shaking entry points.
-
-A runtime condition around a static extension import controls activation, not bundle inclusion. Omit the subpath import or use an intentional dynamic import when an extension must stay outside a build. Tree shaking changes the consumer bundle, not the files present in the installed npm package. See [first-party extension bundle behavior](docs/first-party-extensions.md#bundle-and-import-behavior) for the complete boundary.
-
-## Quick start
+## First render
 
 ```html
 <div data-my-calendar></div>
@@ -43,10 +37,10 @@ const calendar = createCalendar(host, {
 	initialDate: "2026-08-06",
 	events: [
 		{
-			id: "release-window",
-			title: "Alpha release window",
+			id: "team-planning",
+			title: "Team planning",
 			start: "2026-08-06",
-			url: "/events/release-window"
+			url: "/events/team-planning"
 		},
 		{
 			id: "design-review",
@@ -66,119 +60,34 @@ window.addEventListener("pagehide", (event) => {
 });
 ```
 
-Call `destroy()` when the calendar is permanently removed, such as during a component or router unmount. Litefold Calendar does not register a global page-lifecycle listener; a standalone page can use the shown non-cached `pagehide` cleanup while preserving the instance in the browser's back/forward cache.
+Call `destroy()` when the calendar is permanently removed, such as during a component or router unmount. A standalone page can use the shown non-cached `pagehide` cleanup while preserving the instance in the browser's back/forward cache.
 
-## Why Litefold Calendar
+The module can be evaluated in a server environment without accessing the DOM, but Litefold Calendar does not provide server-side rendering. Create and render the calendar on the client.
 
-* **Responsive by design:** One six-week month grid and selected-day agenda adapt from narrow application sidebars to wide desktop layouts.
-* **Accessible interaction:** Keyboard navigation, native links and buttons, visible focus, reduced-motion support, forced-colors support, and increased-contrast support are part of the component contract.
-* **Flexible data loading:** Use a static event array, fetch each visible range with `AbortSignal` support, or replace the event input without recreating the calendar.
-* **Input-aware navigation:** Users can page months with touch, pen, mouse, keyboard, or precision scrolling.
-* **Application-owned behavior:** Your application retains control over transport, caching, authorization, recurrence, routing, dialogs, editing, and other business rules.
-* **Framework-agnostic integration:** Use Litefold Calendar with plain JavaScript, TypeScript, server-rendered applications, or a component framework.
-* **Stable customization points:** Add typed metadata, custom toolbar content, render hooks, and scoped `--lfc-*` CSS tokens without depending on private DOM structure.
-* **Optional components:** Import first-party extensions from explicit subpaths so unused capabilities, including WebMCP, stay outside the application module graph.
+## Is it a fit?
 
-Litefold Calendar also supports all-day, timed, point, and multi-day events; inclusive date bounds; RTL layouts; safe relative and HTTP(S) links; atomic event validation; and SSR-safe module evaluation.
+Litefold Calendar focuses on a responsive six-week month grid and selected-day agenda. The application owns transport, caching, authorization, recurrence expansion, routing, dialogs, and editing. Choose a broader scheduling platform when you need time-grid or resource views, date-range selection, recurrence processing, or drag-and-drop editing.
 
-See [features and scope](docs/features.md) for the complete behavior contract.
+Review the [complete features and scope](docs/features.md) and [browser support policy](docs/browser-support.md) before adoption.
 
-New to the component vocabulary? See [calendar anatomy and color roles](docs/component-anatomy.md) for the names used by render hooks and styling guidance.
-
-## Choose Litefold Calendar when
-
-Litefold Calendar is a good fit for dashboards, portals, booking summaries, personal schedules, public event calendars, and mobile-oriented applications where users browse a month and work with one day's events.
-
-Choose a broader scheduling platform when you need resource scheduling, time-grid views, recurrence processing, interactive range selection, or drag-and-drop editing.
-
-## Load events for the visible range
-
-Use an event provider when events depend on the displayed month, authenticated user, or application filters:
-
-```ts
-const calendar = createCalendar(host, {
-	events: async ({ start, end, signal }) => {
-		const response = await fetch(`/api/events?start=${start}&end=${end}`, {
-			signal
-		});
-
-		if (!response.ok) {
-			throw new Error(`Event request failed with ${response.status}.`);
-		}
-
-		return response.json();
-	}
-});
-```
-
-The provider receives an inclusive-start, exclusive-end range covering the displayed 42-day grid.  Litefold Calendar validates each returned snapshot atomically, ignores stale responses, and leaves caching to the application.
-
-Return an array for an immediate update: Litefold Calendar validates and renders it synchronously without a loading or busy phase. Return a Promise-like value—including `Promise.resolve(...)` or the result of an `async` function—to use a loading render followed by a terminal render.
-
-Call `setEvents()` when a new static array or provider should replace the complete event input while preserving the displayed month, selection, focus context, and revealed agenda count.  Keep filter or cache state behind the same provider and use `refetchEvents()` when its identity does not change.  Locale, time-zone, date-bound, callback, and presentation changes still require a replacement calendar instance.
-
-Basic month-calendar migrations generally require mapping existing event records to Litefold Calendar's event shape and connecting date or event activation callbacks to existing application behavior.  See the [application integration guide](docs/integration-guide.md) for event modeling, application-owned caching, actions, and UI coordination.
-
-## Experimental WebMCP site tools
-
-Import WebMCP only when the application needs it, then register the configured extension:
-
-```ts
-import { webMcp } from "@tryagaindev/litefold-calendar/extensions/webmcp";
-
-const calendar = createCalendar(host, {
-	events,
-	extensions: [
-		webMcp({ toolNamePrefix: "my-schedule" })
-	]
-});
-```
-
-The extension lets a compatible browser agent page through events available in the currently loaded visible range, optionally filter one date, and navigate the rendered instance. `webMcp()` defaults to the prefix `"litefold-calendar"`; provide an explicit stable prefix when multiple calendars share one document because tool names are document-wide. Omitting the extension subpath import keeps its implementation out of the application import graph, and an unsupported experimental browser API remains a progressive no-op.
-
-WebMCP support does not add a remote MCP server, event editing, event activation, or another authorization path. Review the [first-party extension model](docs/first-party-extensions.md) and the exact tools, privacy boundary, compatibility snapshot, and test procedure in the [WebMCP site-tool guide](docs/webmcp.md) before enabling it for private schedules.
-
-## Screenshots
+## Preview
 
 ![Desktop advanced calendar example](docs/screenshots/desktop-month-grid-1440x900.png)
 
-*Desktop: filters, event actions, and overflow.*
+*Wide month grid with direct event actions and overflow.*
 
 ![Mobile dark-theme calendar example](docs/screenshots/mobile-month-agenda-dark-390x844.png)
 
-*Mobile: compact event markers and social-style overflow counts.*
+*Compact dark layout with the selected-day agenda.*
 
-<details>
-<summary>More screenshots</summary>
+Try the [hosted demo](https://tryagaindev.github.io/litefold-calendar/) or review the [full canonical screenshot gallery](docs/screenshots/README.md#reference-gallery).
 
-![Month and year picker](docs/screenshots/month-year-jump-1280x800.png)
+## Next steps
 
-![Mobile calendar touch paging](docs/screenshots/mobile-month-swipe-pull-390x844.png)
-
-![Event details dialog](docs/screenshots/event-details-dark-1280x800.png)
-
-![Keyboard focus on an event action](docs/screenshots/grid-event-keyboard-focus-1440x900.png)
-
-</details>
-
-Contributors updating these assets can use the [screenshot guide](docs/screenshots/README.md) for capture and verification instructions.
-
-## Examples
-
-Browse the [hosted demo](https://tryagaindev.github.io/litefold-calendar/), then choose a framework-free scenario:
-
-* [Basic JavaScript](examples/basic/) — a minimal static-data integration.
-* [Advanced TypeScript](examples/advanced/) — typed options, callbacks, consumer render hooks, an optional extension, and customization.
-* [Async errors](examples/async-errors/) — asynchronous loading, retained data, Retry, and application-owned failures.
-* [Classic-script loader](examples/classic-script/) — a classic entry script that loads the ESM package.
-* [FullCalendar v6 migration](examples/fullcalendar-v6-migration/) — a focused `dayGridMonth` rewrite recipe.
-* [Progressive enhancement](examples/progressive-enhancement/) — server-authored fallback markup coordinated with the client calendar.
-
-The [examples guide](examples/) explains the recipes and, for contributors, how to run and validate them. The hosted demo identifies its package version and source commit.
-
-## Documentation
-
-Use the [documentation hub](docs/README.md) as the complete task-oriented index for integration, accessibility, design, support, contribution, security, and release guidance. User-visible changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+- Run the [basic example](examples/basic/) or browse the [hosted demo](https://tryagaindev.github.io/litefold-calendar/).
+- Choose a reusable scenario from the [examples guide](examples/README.md).
+- Use the [documentation hub](docs/README.md) to find integration, contribution, and maintainer guidance.
+- Check [support routes](SUPPORT.md) and [release notes](CHANGELOG.md) when evaluating an upgrade.
 
 ## License
 
@@ -186,4 +95,4 @@ Use the [documentation hub](docs/README.md) as the complete task-oriented index 
 
 ## Contributing
 
-Working in this repository? Read the [contributor guide](CONTRIBUTING.md), then use the [common contributor commands](CONTRIBUTOR_COMMANDS.md) as copyable commands or run them from a supported Markdown-aware IDE.
+Working in this repository? Start with the [contributor guide](CONTRIBUTING.md).

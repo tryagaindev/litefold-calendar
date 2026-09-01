@@ -112,7 +112,6 @@ jobs:
       notes-sha256: ${{ steps.evidence.outputs.notes-sha256 }}
       registry-alpha: ${{ steps.registry-state.outputs.registry-alpha }}
       registry-state-sha256: ${{ steps.registry-state.outputs.registry-state-sha256 }}
-      registry-status: ${{ steps.registry-state.outputs.registry-status }}
       source-commit: ${{ steps.identity.outputs.source-commit }}
       tag: ${{ steps.identity.outputs.tag }}
       version: ${{ steps.identity.outputs.version }}
@@ -210,12 +209,9 @@ jobs:
               ' "${registry_json}"
             )"
             registry_alpha="$(jq --raw-output '."dist-tags".alpha // empty' "${registry_json}")"
-            registry_kind=present
           elif grep -Eq 'E404|404 Not Found' "${registry_error}"; then
-            metadata='{"versions":[],"dist-tags":{}}'
-            registry_state='{"status":"absent"}'
-            registry_alpha=''
-            registry_kind=absent
+            echo "The npm package must already exist before the normal alpha release workflow can run." >&2
+            exit 1
           else
             cat "${registry_error}" >&2
             exit "${registry_status}"
@@ -247,26 +243,23 @@ jobs:
             }
           }
           if (versions.length === 0) {
-            if (Object.keys(tags).length !== 0) {
-              throw new Error("An absent npm package must not expose dist-tags.");
+            throw new Error("The normal alpha release workflow requires an existing npm package.");
+          }
+          for (const name of ["alpha", "latest"]) {
+            const value = tags[name];
+            if (!supportedAlpha(value) || !versions.includes(value)) {
+              throw new Error(`npm ${name} must select a published supported alpha; found ${String(value)}.`);
             }
-          } else {
-            for (const name of ["alpha", "latest"]) {
-              const value = tags[name];
-              if (!supportedAlpha(value) || !versions.includes(value)) {
-                throw new Error(`npm ${name} must select a published supported alpha; found ${String(value)}.`);
-              }
-              if (value !== candidate && semver.gte(value, candidate)) {
-                throw new Error(`npm ${name} ${value} cannot move to ${candidate}.`);
-              }
+            if (value !== candidate && semver.gte(value, candidate)) {
+              throw new Error(`npm ${name} ${value} cannot move to ${candidate}.`);
             }
-            const publicationInProgress = versions.includes(candidate) &&
-              tags.alpha === candidate && tags.latest !== candidate;
-            if (tags.alpha !== tags.latest && !publicationInProgress) {
-              throw new Error(
-                `npm alpha and latest must match before a release; found alpha=${tags.alpha}, latest=${tags.latest}.`
-              );
-            }
+          }
+          const publicationInProgress = versions.includes(candidate) &&
+            tags.alpha === candidate && tags.latest !== candidate;
+          if (tags.alpha !== tags.latest && !publicationInProgress) {
+            throw new Error(
+              `npm alpha and latest must match before a release; found alpha=${tags.alpha}, latest=${tags.latest}.`
+            );
           }
           NODE
           # LFC_PRERELEASE_CHANNEL_POLICY_END
@@ -276,7 +269,6 @@ jobs:
           )"
           printf 'registry-alpha=%s\n' "${registry_alpha}" >> "${GITHUB_OUTPUT}"
           printf 'registry-state-sha256=%s\n' "${registry_state_sha256}" >> "${GITHUB_OUTPUT}"
-          printf 'registry-status=%s\n' "${registry_kind}" >> "${GITHUB_OUTPUT}"
 
       - name: Install pinned Chromium
         run: npx playwright install --with-deps chromium
@@ -509,7 +501,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           LFC_REGISTRY_ALPHA: ${{ needs.verify.outputs.registry-alpha }}
           LFC_REGISTRY_STATE_SHA256: ${{ needs.verify.outputs.registry-state-sha256 }}
-          LFC_REGISTRY_STATUS: ${{ needs.verify.outputs.registry-status }}
           LFC_SOURCE_COMMIT: ${{ needs.verify.outputs.source-commit }}
           LFC_VERSION: ${{ needs.verify.outputs.version }}
         run: |
@@ -533,11 +524,9 @@ jobs:
                 }
               ' channel.json
             )"
-            registry_status=present
           elif grep -Eq 'E404|404 Not Found' channel.err; then
-            registry_state='{"status":"absent"}'
-            registry_status=absent
-            printf '%s\n' '{"versions":[],"dist-tags":{}}' > channel.json
+            echo "The npm package disappeared after release verification; stop and investigate." >&2
+            exit 1
           else
             cat channel.err >&2
             exit "${channel_status}"
@@ -546,8 +535,7 @@ jobs:
           registry_state_sha256="$(
             printf '%s' "${registry_state}" | sha256sum | cut -d ' ' -f 1
           )"
-          if [[ "${registry_status}" != "${LFC_REGISTRY_STATUS}" ||
-            "${registry_state_sha256}" != "${LFC_REGISTRY_STATE_SHA256}" ]]; then
+          if [[ "${registry_state_sha256}" != "${LFC_REGISTRY_STATE_SHA256}" ]]; then
             echo "npm registry state changed after exact-source verification; rerun this exact workflow attempt." >&2
             exit 1
           fi
@@ -593,10 +581,6 @@ jobs:
           if [[ "${main_version}" != "${LFC_VERSION}" ]]; then
             echo "main now selects ${main_version}; refusing stale unpublished candidate ${LFC_VERSION}." >&2
             exit 1
-          fi
-
-          if [[ "${registry_status}" == "absent" ]]; then
-            exit 0
           fi
 
           if [[ ! "${registry_alpha}" =~ ^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ||
@@ -659,7 +643,6 @@ jobs:
           LFC_ASSET_DIGESTS: ${{ needs.verify.outputs.asset-digests }}
           LFC_BUNDLE_DIRECTORY: ${{ runner.temp }}/release-bundle
           LFC_REGISTRY_STATE_SHA256: ${{ needs.verify.outputs.registry-state-sha256 }}
-          LFC_REGISTRY_STATUS: ${{ needs.verify.outputs.registry-status }}
           LFC_SOURCE_COMMIT: ${{ needs.verify.outputs.source-commit }}
           LFC_TAG: ${{ needs.verify.outputs.tag }}
           LFC_VERSION: ${{ needs.verify.outputs.version }}
@@ -757,11 +740,9 @@ jobs:
                   }
                 ' channel.json
               )"
-              registry_status=present
             elif grep -Eq 'E404|404 Not Found' channel.err; then
-              registry_state='{"status":"absent"}'
-              registry_status=absent
-              printf '%s\n' '{"versions":[],"dist-tags":{}}' > channel.json
+              echo "The npm package disappeared immediately before publication; stop and investigate." >&2
+              exit 1
             else
               cat channel.err >&2
               exit "${channel_status}"
@@ -770,8 +751,7 @@ jobs:
             registry_state_sha256="$(
               printf '%s' "${registry_state}" | sha256sum | cut -d ' ' -f 1
             )"
-            if [[ "${registry_status}" != "${LFC_REGISTRY_STATUS}" ||
-              "${registry_state_sha256}" != "${LFC_REGISTRY_STATE_SHA256}" ]]; then
+            if [[ "${registry_state_sha256}" != "${LFC_REGISTRY_STATE_SHA256}" ]]; then
               echo "npm registry state changed immediately before publication; rerun this exact workflow attempt." >&2
               exit 1
             fi
@@ -811,9 +791,6 @@ jobs:
               echo "main now selects ${main_version}; refusing stale unpublished candidate ${LFC_VERSION}." >&2
               exit 1
             fi
-            if [[ "${registry_status}" == "absent" ]]; then
-              echo "The package is still absent and main still selects this candidate immediately before first publication."
-            fi
             publication=published
             npm publish "${LFC_TARBALL}" \
               --registry https://registry.npmjs.org/ \
@@ -828,7 +805,7 @@ jobs:
 
           printf 'expected-integrity=%s\n' "${expected_integrity}" >> "${GITHUB_OUTPUT}"
           printf 'publication=%s\n' "${publication}" >> "${GITHUB_OUTPUT}"
-          echo "::notice::An authenticated npm owner must ensure latest selects this alpha: npm dist-tag add @tryagaindev/litefold-calendar@${LFC_VERSION} latest --registry https://registry.npmjs.org/"
+          echo "::notice::An authenticated npm package maintainer must ensure latest selects this alpha: npm dist-tag add @tryagaindev/litefold-calendar@${LFC_VERSION} latest --registry https://registry.npmjs.org/"
 
   verify-registry:
     name: Verify registry integrity, imports, and provenance
@@ -905,8 +882,8 @@ jobs:
             [[ "${attempt}" -lt 60 ]] && sleep 10
           done
           if [[ "${verified}" != "true" ]]; then
-            echo "npm alpha and latest must both select ${LFC_VERSION}." >&2
-            echo "An authenticated npm owner must run: npm dist-tag add @tryagaindev/litefold-calendar@${LFC_VERSION} latest --registry https://registry.npmjs.org/" >&2
+            echo "npm did not expose the exact package integrity and both required dist-tags within the polling window." >&2
+            echo "Check for pending or blocked publish-time review before changing registry metadata. Advance latest only after the exact candidate is publicly readable with the expected integrity." >&2
             exit 1
           fi
 
