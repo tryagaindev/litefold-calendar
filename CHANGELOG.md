@@ -6,15 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Added focused Chromium, Firefox, and WebKit browser-test commands plus end-to-end Playwright-computed ARIA, live-region urgency, announcement, and focus-preservation coverage for screen-reader-facing behavior.
+
 ### Changed
 
 - Split ordinary commit-and-push guidance from authorized npm release operations, added reusable repository skills for both workflows, and reorganized documentation and examples around package-user, contributor, and maintainer paths.
 - Hardened alpha release guidance and workflow contracts around existing-package publication, npm publish-time review, exact hosted identities, immutable tags and assets, and policy-controlled release notes.
+- Expanded the Playwright release gate and CI/publication browser installation from Chromium alone to Chromium, Firefox, and WebKit. Trusted synthetic touch/pen and programmatic 400% zoom checks remain explicitly Chromium-only because they require a Chrome DevTools Protocol session, while portable wheel, disabled-pager, layout, interaction, and accessibility paths run across all three engines.
 
 <!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
 
 ### Fixed
 
+- Kept the examples and hosted-site skip links in the sequential keyboard tab order under WebKit/Safari link-focus preferences so first-Tab navigation reaches the intended bypass link.
 - Allowed WebMCP `get-events` and `navigate` callers to omit or provide malformed execution options by falling back to the extension lifecycle signal, while preserving caller-provided cancellation.
 
 ## [0.4.0-alpha.0] - 2026-08-30

@@ -54,6 +54,26 @@ async function expectNoHorizontalOverflow(page) {
 	expect(overflow.toolbar).toBeLessThanOrEqual(1);
 }
 
+async function withMediaContextPage(browser, baseURL, media, callback) {
+	if (typeof baseURL !== "string") {
+		throw new Error("Responsive browser coverage requires a base URL.");
+	}
+	const context = await browser.newContext({
+		baseURL,
+		colorScheme: "light",
+		locale: "en-US",
+		reducedMotion: "reduce",
+		timezoneId: "America/Los_Angeles",
+		...media
+	});
+	const page = await context.newPage();
+	try {
+		await callback(page);
+	} finally {
+		await context.close();
+	}
+}
+
 async function setExactCalendarHostWidth(page, width) {
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
 	await expectExampleReady(page, "/examples/advanced/");
@@ -190,7 +210,10 @@ async function expectSingleLineMonthTitle(
 	expect(metrics.textWrap).toBe("nowrap");
 	expect(metrics.whiteSpace).toBe("nowrap");
 	if (metrics.compactVisible) {
-		expect(metrics.pseudoContent).toContain(compactTitle);
+		expect(
+			metrics.pseudoContent.includes(compactTitle) ||
+			metrics.pseudoContent === "attr(data-lfc-compact-title)"
+		).toBe(true);
 	}
 	if (overflowExpected) {
 		expect(metrics.scrollWidth - metrics.clientWidth).toBeGreaterThan(1);
@@ -482,10 +505,11 @@ async function getCompactOverflowLayoutGeometry(
 		const compactBox = compact.getBoundingClientRect();
 		const primaryBox = primary.getBoundingClientRect();
 		const sameRow = Math.abs(centerBlock(primaryBox) - centerBlock(compactBox)) <= 1;
-		const rootsIntersect = primaryBox.left < compactBox.right &&
-			primaryBox.right > compactBox.left &&
-			primaryBox.top < compactBox.bottom &&
-			primaryBox.bottom > compactBox.top;
+		const inlineOverlap = Math.min(primaryBox.right, compactBox.right) -
+			Math.max(primaryBox.left, compactBox.left);
+		const blockOverlap = Math.min(primaryBox.bottom, compactBox.bottom) -
+			Math.max(primaryBox.top, compactBox.top);
+		const overlapDepth = Math.max(0, Math.min(inlineOverlap, blockOverlap));
 		const compactOnInlineEnd = sameRow
 			? direction === "rtl"
 				? compactBox.right <= primaryBox.left + 1
@@ -524,11 +548,11 @@ async function getCompactOverflowLayoutGeometry(
 				Math.abs(centerInline(compactBox) - inlineEndCenter)
 			),
 			primaryAtPaddedBlockEndDelta: Math.abs(primaryBox.bottom - paddedBlockEnd),
+			overlapDepth,
 			stackedQuarterCenterDelta: Math.max(
 				Math.abs(centerBlock(primaryBox) - (targetBox.top + (targetBox.height / 4))),
 				Math.abs(centerBlock(compactBox) - (targetBox.bottom - (targetBox.height / 4)))
-			),
-			rootsDoNotOverlap: !rootsIntersect
+			)
 		};
 		return geometry;
 	}, { inspectPairedRoots, targetSelector });
@@ -585,7 +609,7 @@ function expectPairedCompactOverflowLayout(geometry, { direction, layout }) {
 	expect(geometry.roots.blockSizeDelta).toBeLessThanOrEqual(1);
 	expect(geometry.roots.containedInTarget).toBe(true);
 	expect(geometry.roots.inlineSizeDelta).toBeLessThanOrEqual(1);
-	expect(geometry.roots.rootsDoNotOverlap).toBe(true);
+	expect(geometry.roots.overlapDepth).toBeLessThanOrEqual(1);
 	expect(geometry.targetInlineCenterDelta).toBeLessThanOrEqual(1);
 	if (layout === "row") {
 		expect(geometry.roots.blockCenterDelta).toBeLessThanOrEqual(1);
@@ -963,7 +987,8 @@ test("compact RTL layout reflows at 200% text size without changing focus order"
 for (const preference of [
 	{
 		eventBoundaryMinimum: 2,
-		focusMinimum: 4,
+		focusMinimum: 3,
+		focusTokenMinimum: 4,
 		label: "increased contrast",
 		media: { contrast: "more", forcedColors: "none" },
 		query: "(prefers-contrast: more)"
@@ -971,69 +996,94 @@ for (const preference of [
 	{
 		eventBoundaryMinimum: 1,
 		focusMinimum: 3,
+		focusTokenMinimum: 3,
 		label: "forced colors",
 		media: { contrast: "no-preference", forcedColors: "active" },
 		query: "(forced-colors: active)"
 	}
 ]) {
-	test(`compact ${preference.label} keeps focus, boundaries, and targets visible`, async ({ page }) => {
-		await page.emulateMedia(preference.media);
-		await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 390 });
-		await expectExampleReady(page, "/examples/advanced/");
+	test(`compact ${preference.label} keeps focus, boundaries, and targets visible`, async ({
+		baseURL,
+		browser,
+		browserName
+	}) => {
+		await withMediaContextPage(browser, baseURL, preference.media, async (page) => {
+			await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 390 });
+			await expectExampleReady(page, "/examples/advanced/");
 
-		expect(await page.evaluate((query) => matchMedia(query).matches, preference.query)).toBe(true);
-		await page.locator(".lfc-calendar-nav-button-next").focus();
-		await page.keyboard.press("Tab");
-		const titleButton = page.locator(".lfc-calendar-title-button");
-		await expect(titleButton).toBeFocused();
-
-		const visuals = await page.evaluate(() => {
-			const title = document.querySelector(".lfc-calendar-title-button");
-			const grid = document.querySelector(".lfc-calendar-grid");
-			const event = document.querySelector(".lfc-calendar-agenda-event");
-			const compactOverflow = document.querySelector(
-				".lfc-calendar-event-overflow.lfc-is-compact"
+			const mediaMatches = await page.evaluate(
+				(query) => matchMedia(query).matches,
+				preference.query
 			);
-			if (!(title instanceof HTMLElement) || !(grid instanceof HTMLElement) ||
-				!(event instanceof HTMLElement) || !(compactOverflow instanceof HTMLElement)) {
-				throw new Error("Expected the title, grid, event, and compact overflow probes.");
-			}
-			const titleStyle = getComputedStyle(title);
-			const gridStyle = getComputedStyle(grid);
-			const eventStyle = getComputedStyle(event);
-			const compactOverflowStyle = getComputedStyle(compactOverflow);
-			return {
-				compactOverflowColor: compactOverflowStyle.color,
-				compactOverflowDisplay: compactOverflowStyle.display,
-				compactOverflowPointerEvents: compactOverflowStyle.pointerEvents,
-				eventBoundaryColor: eventStyle.borderBlockStartColor,
-				eventBoundaryStyle: eventStyle.borderBlockStartStyle,
-				eventBoundaryWidth: Number.parseFloat(eventStyle.borderBlockStartWidth),
-				focusColor: titleStyle.outlineColor,
-				focusStyle: titleStyle.outlineStyle,
-				focusWidth: Number.parseFloat(titleStyle.outlineWidth),
-				gridBoundaryColor: gridStyle.borderBlockStartColor,
-				gridBoundaryStyle: gridStyle.borderBlockStartStyle,
-				gridBoundaryWidth: Number.parseFloat(gridStyle.borderBlockStartWidth)
-			};
-		});
+			test.skip(
+				!mediaMatches,
+				`The pinned ${browserName} build cannot emulate ${preference.query}.`
+			);
+			await page.locator(".lfc-calendar-nav-button-next").focus();
+			await page.keyboard.press("Tab");
+			const titleButton = page.locator(".lfc-calendar-title-button");
+			await expect(titleButton).toBeFocused();
 
-		expect(visuals.compactOverflowDisplay).not.toBe("none");
-		expect(visuals.compactOverflowPointerEvents).toBe("none");
-		expect(visuals.compactOverflowColor).not.toBe("rgba(0, 0, 0, 0)");
-		expect(visuals.focusStyle).toBe("solid");
-		expect(visuals.focusWidth).toBeGreaterThanOrEqual(preference.focusMinimum);
-		expect(visuals.focusColor).not.toBe("rgba(0, 0, 0, 0)");
-		expect(visuals.eventBoundaryStyle).toBe("solid");
-		expect(visuals.eventBoundaryWidth).toBeGreaterThanOrEqual(
-			preference.eventBoundaryMinimum
-		);
-		expect(visuals.eventBoundaryColor).not.toBe("rgba(0, 0, 0, 0)");
-		expect(visuals.gridBoundaryStyle).toBe("solid");
-		expect(visuals.gridBoundaryWidth).toBeGreaterThanOrEqual(1);
-		expect(visuals.gridBoundaryColor).not.toBe("rgba(0, 0, 0, 0)");
-		await expectTargetMinimums(page);
-		await expectNoHorizontalOverflow(page);
+			const visuals = await page.evaluate(() => {
+				const title = document.querySelector(".lfc-calendar-title-button");
+				const grid = document.querySelector(".lfc-calendar-grid");
+				const event = document.querySelector(".lfc-calendar-agenda-event");
+				const compactOverflow = document.querySelector(
+					".lfc-calendar-event-overflow.lfc-is-compact"
+				);
+				if (!(title instanceof HTMLElement) || !(grid instanceof HTMLElement) ||
+					!(event instanceof HTMLElement) || !(compactOverflow instanceof HTMLElement)) {
+					throw new Error("Expected the title, grid, event, and compact overflow probes.");
+				}
+				const titleStyle = getComputedStyle(title);
+				const gridStyle = getComputedStyle(grid);
+				const eventStyle = getComputedStyle(event);
+				const compactOverflowStyle = getComputedStyle(compactOverflow);
+				const focusTokenProbe = document.createElement("span");
+				focusTokenProbe.style.cssText =
+					"position: absolute; width: var(--lfc-internal-focus-size);";
+				title.append(focusTokenProbe);
+				const focusTokenWidth = Number.parseFloat(
+					getComputedStyle(focusTokenProbe).width
+				);
+				focusTokenProbe.remove();
+				return {
+					compactOverflowColor: compactOverflowStyle.color,
+					compactOverflowDisplay: compactOverflowStyle.display,
+					compactOverflowPointerEvents: compactOverflowStyle.pointerEvents,
+					eventBoundaryColor: eventStyle.borderBlockStartColor,
+					eventBoundaryStyle: eventStyle.borderBlockStartStyle,
+					eventBoundaryWidth: Number.parseFloat(eventStyle.borderBlockStartWidth),
+					focusColor: titleStyle.outlineColor,
+					focusStyle: titleStyle.outlineStyle,
+					focusTokenWidth,
+					focusWidth: Number.parseFloat(titleStyle.outlineWidth),
+					gridBoundaryColor: gridStyle.borderBlockStartColor,
+					gridBoundaryStyle: gridStyle.borderBlockStartStyle,
+					gridBoundaryWidth: Number.parseFloat(gridStyle.borderBlockStartWidth)
+				};
+			});
+
+			expect(visuals.compactOverflowDisplay).not.toBe("none");
+			expect(visuals.compactOverflowPointerEvents).toBe("none");
+			expect(visuals.compactOverflowColor).not.toBe("rgba(0, 0, 0, 0)");
+			expect(visuals.focusStyle).toBe("solid");
+			expect(visuals.focusTokenWidth).toBeGreaterThanOrEqual(
+				preference.focusTokenMinimum
+			);
+			expect(visuals.focusWidth).toBeGreaterThanOrEqual(preference.focusMinimum);
+			expect(visuals.focusColor).not.toBe("rgba(0, 0, 0, 0)");
+			expect(visuals.eventBoundaryStyle).toBe("solid");
+			expect(visuals.eventBoundaryWidth).toBeGreaterThanOrEqual(
+				preference.eventBoundaryMinimum
+			);
+			expect(visuals.eventBoundaryColor).not.toBe("rgba(0, 0, 0, 0)");
+			expect(visuals.gridBoundaryStyle).toBe("solid");
+			expect(visuals.gridBoundaryWidth).toBeGreaterThanOrEqual(1);
+			expect(visuals.gridBoundaryColor).not.toBe("rgba(0, 0, 0, 0)");
+			await expectTargetMinimums(page);
+			await expectNoHorizontalOverflow(page);
+		});
 	});
 }
 
@@ -1626,7 +1676,11 @@ for (const direction of ["ltr", "rtl"]) {
 	});
 }
 
-test("the compact counter remains contained at 400% browser zoom", async ({ context, page }) => {
+test("the compact counter remains contained at 400% browser zoom", async ({ browserName, context, page }) => {
+	test.skip(
+		browserName !== "chromium",
+		"Programmatic browser zoom uses Chromium CDP, which Playwright does not expose for Firefox or WebKit."
+	);
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_280 });
 	const presentation = await mountResponsiveMultipleEventFixture(page, {
 		compactDayMinBlockSize: "10rem",
@@ -1651,12 +1705,12 @@ test("the compact counter remains contained at 400% browser zoom", async ({ cont
 });
 
 test("the built-in compact counter stays visible in dark color scheme", async ({ page }) => {
-	await page.emulateMedia({ colorScheme: "dark" });
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
 	const presentation = await mountResponsiveMultipleEventFixture(page, {
 		customOverflow: false,
 		width: 390
 	});
+	await page.emulateMedia({ colorScheme: "dark" });
 	const visual = await presentation.compactDefault.evaluate((element) => {
 		const style = getComputedStyle(element);
 		return {

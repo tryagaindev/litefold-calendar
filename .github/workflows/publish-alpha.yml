@@ -270,11 +270,22 @@ jobs:
           printf 'registry-alpha=%s\n' "${registry_alpha}" >> "${GITHUB_OUTPUT}"
           printf 'registry-state-sha256=%s\n' "${registry_state_sha256}" >> "${GITHUB_OUTPUT}"
 
-      - name: Install pinned Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install pinned Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Run the complete release quality gate
         run: npm run check
+
+      - name: Upload browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-browser-diagnostics-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
       - name: Create the verified npm release bundle once
         run: npm run package

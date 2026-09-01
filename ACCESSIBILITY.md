@@ -118,7 +118,18 @@ The [DESIGN.md motion treatment](DESIGN.md#pager-direction-and-motion) is presen
 
 ## Testing
 
-Automated unit/DOM and pinned-Chromium checks cover semantics, native links/buttons, F2/Escape/Tab behavior, focus retention, compact and wide event-overflow customization, compact layout, RTL, reflow, normal and reduced selection feedback, native pager semantics and fallbacks, optional WebMCP navigation without focus or callback side effects, forced colors, error announcements, hostile content, and automated accessibility rules. These checks gate every release.
+Automated unit/DOM and Playwright checks in Chromium, Firefox, and WebKit cover semantics, native links/buttons, F2/Escape/Tab behavior, focus retention, compact and wide event-overflow customization, compact layout, RTL, reflow, normal and reduced selection feedback, native pager semantics and fallbacks, optional WebMCP navigation without focus or callback side effects, forced colors, error announcements, hostile content, and automated accessibility rules. These checks gate every release.
+
+### Automated screen-reader-facing coverage
+
+`tests/e2e/screen-reader-semantics.spec.js` runs in all three Playwright engine projects and verifies the screen-reader-facing browser contract:
+
+- Playwright-computed roles, accessible names, heading levels, selected/current states, and agenda relationships for navigation, the grid, and the selected-day region.
+- Keyboard movement and activation keep the current date, focused date, and selected date distinguishable, preserve the single roving tab stop, and publish the updated agenda.
+- Polite atomic `status` and assertive atomic `alert` live regions expose progress and failure text with the intended urgency.
+- Agenda disclosure moves focus to newly revealed content, while an unrelated source failure announces through the assertive region without stealing that focus.
+
+Playwright ARIA snapshots and live-region assertions run in each browser engine, but they do not inspect the native platform accessibility tree. They do not launch NVDA, Narrator, VoiceOver, or TalkBack; validate speech output, browse/virtual-cursor behavior, or interaction modes; or replace the dated assistive-technology matrix below.
 
 Manual browser and assistive-technology evidence is risk-based. Repeat the affected procedure and matrix rows when a change can alter interaction, semantics, accessible names, focus, announcements, responsive behavior, visual preferences, browser support, or the surrounding developer demo. An unrelated alpha can reuse still-applicable dated evidence. Complete the full supported matrix before stable promotion and after a support-policy change that invalidates the prior baseline. Automated results are necessary but not sufficient for claims about real browser/assistive-technology combinations.
 

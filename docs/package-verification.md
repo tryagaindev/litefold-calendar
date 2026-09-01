@@ -27,7 +27,7 @@ Run repository commands from the repository root with:
 - A Node version allowed by `package.json#devEngines.runtime.version` (currently Node 24.x).
 - The exact npm version in `package.json#packageManager`.
 - Dependencies installed with `npm ci --ignore-scripts`.
-- Playwright Chromium installed before the complete browser gate.
+- Playwright Chromium, Firefox, and WebKit installed before the complete browser gate.
 
 `npm run check` ends with temporary release-tarball verification, and
 `npm run package` creates retained release evidence. Both require a clean

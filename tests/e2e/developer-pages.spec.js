@@ -232,8 +232,8 @@ for (const colorScheme of ["light", "dark"]) {
 		if (typeof baseURL !== "string") {
 			throw new Error("Pages shell browser coverage requires a base URL.");
 		}
-		await page.emulateMedia({ colorScheme });
 		await mountPagesShell(page, baseURL);
+		await page.emulateMedia({ colorScheme });
 
 		const installCode = page.getByLabel("Install command", { exact: true });
 		const codeFocus = await codeBlockFocusStyle(installCode);
@@ -259,9 +259,9 @@ test("Pages shell supports keyboard, copy status, preferences, and narrow reflow
 	if (typeof baseURL !== "string") {
 		throw new Error("Pages shell browser coverage requires a base URL.");
 	}
-	await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
 	await page.setViewportSize({ height: 844, width: 390 });
 	await mountPagesShell(page, baseURL);
+	await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
 	const projectMark = page.locator(".my-pages-mark");
 	await expect(projectMark).toBeVisible();
 	await expect(projectMark).toHaveAttribute("alt", "");
@@ -299,11 +299,16 @@ test("Pages shell supports keyboard, copy status, preferences, and narrow reflow
 	expect(await page.evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches)).toBe(true);
 	expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await expectNoAutomatedAccessibilityViolations(page, testInfo);
 
-	await page.emulateMedia({ forcedColors: "active" });
+	await page.emulateMedia({
+		colorScheme: "dark",
+		contrast: "no-preference",
+		forcedColors: "active",
+		reducedMotion: "reduce"
+	});
 	expect(await page.evaluate(() => matchMedia("(forced-colors: active)").matches)).toBe(true);
 	await expect(page.getByRole("link", { name: "Run basic example" })).toBeVisible();
-	await expectNoAutomatedAccessibilityViolations(page, testInfo);
 });
 
 test("Pages shell wraps full provenance commits at 320px", async ({ baseURL, page }) => {

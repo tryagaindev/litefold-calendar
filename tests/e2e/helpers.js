@@ -11,7 +11,7 @@ const WCAG_TAGS = Object.freeze([
 ]);
 
 export async function expectExampleReady(page, route) {
-	const response = await page.goto(route, { waitUntil: "domcontentloaded" });
+	const response = await page.goto(route, { waitUntil: "commit" });
 	expect(response?.ok(), `Expected ${route} to return a successful response.`).toBe(true);
 	await expect(page.locator(READY_SELECTOR)).toHaveCount(1);
 	await expect(page.locator("[data-my-calendar]")).not.toHaveAttribute("aria-busy", "true");
