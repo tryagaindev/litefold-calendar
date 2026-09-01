@@ -7,7 +7,7 @@
     "playwright": "1.62.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "4b2c242a1aafc5011f425de3e7f051af1b5338df338090d70a21c9260327ead5",
+  "sourceFingerprint": "46406b1342a1269c906a629eaadfb2d841dbb6daa9e4a6cb9f3197812b2e3725",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -27,7 +27,7 @@
         "README.md",
         "docs/screenshots/README.md"
       ],
-      "sha256": "36a47c79d26e3b16cddc57de3b2bed8fed7c8263bc959038df4690e8083dfebd"
+      "sha256": "cab5462e7035251e61388c52973c6185d393e74a7acbaf9f60a2b61c16ee96b3"
     },
     {
       "id": "month-year-jump",
@@ -47,7 +47,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "02a300884f1459d00be0b627f1aa906382b7a7cecc403cde26066657199db364"
+      "sha256": "9de8f1ddb1505a6bd889bc597f93400f8446f7fd08416658c3565303f26acf88"
     },
     {
       "id": "mobile-month-agenda-dark",
@@ -68,7 +68,7 @@
         "README.md",
         "docs/screenshots/README.md"
       ],
-      "sha256": "ee341e7c306bbcc9077c8d6616906b60732792ce2f40ec119182a6cb0e256a11"
+      "sha256": "19d4a21c9caa193c470f2b15733faf665c291115e22f591371663452325a1bd6"
     },
     {
       "id": "mobile-month-swipe-pull",
@@ -88,7 +88,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "a26acd7a0a3932706acdf9b3ea8d356c56e2a0545dbec050188b5a2b2a1bc17f"
+      "sha256": "7843bb9598864fb96d9d4574c219fc9e3c49a3a2e5c7dcb742a68f457079e833"
     },
     {
       "id": "event-details-dark",
@@ -129,7 +129,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "8872f478112779c5b6c1ec1352976f677d2beb06b1a156da4d666d999566222d"
+      "sha256": "0a2c403c8efbd97d9e02cfe79d58e120d321e84ce6c186627aa8493cbb106844"
     }
   ]
 }

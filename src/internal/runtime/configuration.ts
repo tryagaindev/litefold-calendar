@@ -2,7 +2,12 @@ import { MAX_SOURCE_EVENT_LIMIT } from "../domain/event-normalization.js";
 import { resolveCalendarFirstDay } from "../domain/grid.js";
 import { LitefoldCalendarError } from "../../errors.js";
 import type { CalendarIcons } from "../../icons.js";
-import type { CalendarEventTimeDisplay, CalendarOptions } from "../../types.js";
+import type {
+	CalendarEventTimeDisplay,
+	CalendarGridEventPlacement,
+	CalendarOptions,
+	CalendarWeekRowSizing
+} from "../../types.js";
 import {
 	containsInteractiveContent,
 	invokeForUnknownResult,
@@ -18,6 +23,7 @@ const CALENDAR_OPTION_SCHEMA = Object.freeze({
 	eventTimeDisplay: "value",
 	events: "value",
 	extensions: "value",
+	gridEventPlacement: "value",
 	renderHooks: "value",
 	fallbackElement: "value",
 	firstDay: "value",
@@ -41,7 +47,8 @@ const CALENDAR_OPTION_SCHEMA = Object.freeze({
 	sourceEventLimit: "value",
 	swipe: "value",
 	timeZone: "value",
-	toolbarEnd: "value"
+	toolbarEnd: "value",
+	weekRowSizing: "value"
 } as const satisfies Record<keyof CalendarOptions, "callback" | "value">);
 
 const CALENDAR_OPTION_KEYS = Object.freeze(
@@ -49,6 +56,14 @@ const CALENDAR_OPTION_KEYS = Object.freeze(
 );
 const CALENDAR_OPTION_KEY_SET: ReadonlySet<string> = new Set(CALENDAR_OPTION_KEYS);
 const CONFIGURATION_ARRAY_LIMIT = MAX_SOURCE_EVENT_LIMIT + 1;
+
+/** Immutable construction snapshot with layout defaults resolved exactly once. */
+export type CalendarOptionsSnapshot<TMetadata> = Readonly<
+	CalendarOptions<TMetadata> & Required<Pick<
+		CalendarOptions<TMetadata>,
+		"gridEventPlacement" | "weekRowSizing"
+	>>
+>;
 
 export function createConfigurationError(message: string, cause?: unknown): LitefoldCalendarError {
 	return new LitefoldCalendarError({
@@ -127,7 +142,7 @@ export function snapshotConfigurationArray(
 
 export function snapshotCalendarOptions<TMetadata>(
 	options: unknown
-): Readonly<CalendarOptions<TMetadata>> {
+): CalendarOptionsSnapshot<TMetadata> {
 	if (!isConfigurationRecord(options)) {
 		throw createConfigurationError("options must be an object.");
 	}
@@ -147,7 +162,9 @@ export function snapshotCalendarOptions<TMetadata>(
 		}
 	}
 	normalizeEventTimeDisplay(snapshot["eventTimeDisplay"]);
-	return Object.freeze(snapshot) as Readonly<CalendarOptions<TMetadata>>;
+	snapshot["gridEventPlacement"] = normalizeGridEventPlacement(snapshot["gridEventPlacement"]);
+	snapshot["weekRowSizing"] = normalizeWeekRowSizing(snapshot["weekRowSizing"]);
+	return Object.freeze(snapshot) as CalendarOptionsSnapshot<TMetadata>;
 }
 
 export function normalizeIntegerOption(
@@ -175,6 +192,30 @@ export function normalizeEventTimeDisplay(value: unknown): CalendarEventTimeDisp
 		throw createConfigurationError(
 			'eventTimeDisplay must be "all", "grid", "agenda", or "none".'
 		);
+	}
+	return value;
+}
+
+/** Resolves vertical placement of the complete event stack within each month-grid day cell. */
+export function normalizeGridEventPlacement(value: unknown): CalendarGridEventPlacement {
+	if (value === undefined) {
+		return "top";
+	}
+	if (value !== "top" && value !== "center" && value !== "bottom") {
+		throw createConfigurationError(
+			'gridEventPlacement must be "top", "center", or "bottom".'
+		);
+	}
+	return value;
+}
+
+/** Resolves whether month-grid week rows share one intrinsic height or size independently. */
+export function normalizeWeekRowSizing(value: unknown): CalendarWeekRowSizing {
+	if (value === undefined) {
+		return "equal";
+	}
+	if (value !== "equal" && value !== "content") {
+		throw createConfigurationError('weekRowSizing must be "equal" or "content".');
 	}
 	return value;
 }

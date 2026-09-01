@@ -39,6 +39,7 @@ export type {
 	CalendarEventTimeDisplay,
 	CalendarEvents,
 	CalendarExtension,
+	CalendarGridEventPlacement,
 	CalendarRenderCleanup,
 	CalendarRenderContext,
 	CalendarRenderHooks,
@@ -48,5 +49,6 @@ export type {
 	CalendarPhase,
 	CalendarRange,
 	CalendarState,
+	CalendarWeekRowSizing,
 	CalendarWideEventOverflowContext
 } from "./types.js";

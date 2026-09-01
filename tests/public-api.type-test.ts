@@ -2,9 +2,11 @@ import type {
 	Calendar,
 	CalendarCompactEventOverflowContext,
 	CalendarEventOverflowElements,
+	CalendarGridEventPlacement,
 	CalendarOptions,
 	CalendarRenderCleanup,
 	CalendarRenderHooks,
+	CalendarWeekRowSizing,
 	CalendarWideEventOverflowContext
 } from "../src/index.js";
 
@@ -51,13 +53,36 @@ export function verifyPublicApiTypeContracts(
 	};
 	const options: CalendarOptions = {
 		events: [],
+		gridEventPlacement: "top",
 		onAnnounce: () => { observations += 1; },
 		onError: () => "default",
 		onStateChange: () => { observations += 1; },
-		renderHooks: [hooks]
+		renderHooks: [hooks],
+		weekRowSizing: "equal"
 	};
+	const gridEventPlacements: readonly CalendarGridEventPlacement[] = [
+		"top",
+		"center",
+		"bottom"
+	];
+	const weekRowSizings: readonly CalendarWeekRowSizing[] = ["equal", "content"];
 	void observations;
 	void options;
+	void gridEventPlacements;
+	void weekRowSizings;
+
+	const invalidGridEventPlacement: CalendarOptions = {
+		events: [],
+		// @ts-expect-error gridEventPlacement accepts only the documented placement values.
+		gridEventPlacement: "stretch"
+	};
+	const invalidWeekRowSizing: CalendarOptions = {
+		events: [],
+		// @ts-expect-error weekRowSizing accepts only equal or content sizing.
+		weekRowSizing: "fixed"
+	};
+	void invalidGridEventPlacement;
+	void invalidWeekRowSizing;
 
 	// @ts-expect-error Cleanup must not return a thenable.
 	const asyncCleanup: CalendarRenderCleanup = () => Promise.resolve();

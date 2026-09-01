@@ -7,6 +7,7 @@ This guide is the quickest way to determine whether Litefold Calendar fits a pro
 | Capability | What Litefold Calendar provides | Main public surface |
 | --- | --- | --- |
 | Calendar presentation | One responsive, fixed six-week Gregorian month grid and a selected-day agenda; adjacent-month dates are fillers, not prefetched pager panels | `createCalendar()`, `render()` |
+| Month-grid layout | Equal-height week rows with common full slots for normally visible compact primary/count/overflow roots by default, or independently content-sized weeks with intrinsic compact sizing; top, center, or bottom stack placement keeps dates top-aligned | `weekRowSizing`, `gridEventPlacement` |
 | Event model | Date-only, local date-time, point, and multi-day events with exclusive ends; optional validated HTTP(S) or relative links; visual time display can differ by surface | `CalendarEventInput`, `eventTimeDisplay` |
 | Event data | A static snapshot or abort-aware provider, shape-based synchronous/PromiseLike timing, complete source replacement, current-range refetch, and typed application metadata | `events`, `CalendarEventSource`, `setEvents()`, `refetchEvents()` |
 | Grid and agenda limits | A configurable grid cap, native overflow action, paged agenda rows, DOM limit, and visible/total progress text | `maxGridEventsPerDay`, `agendaPageSize`, `agendaDomLimit` |
@@ -27,7 +28,7 @@ Start with the [basic example](../examples/basic/) for a first render. The [exam
 
 ## Calendar display
 
-The package presents one fixed six-week Gregorian month grid plus the selected day's agenda. It supports adjacent-month filler dates, bounded navigation, native event representations, grid overflow, paged agenda rows, and visual time-display choices. Applications must provide the [minimum supported calendar host width](../DESIGN.md#responsive-model); hosts below that floor receive best-effort graceful degradation.
+The package presents one fixed six-week Gregorian month grid plus the selected day's agenda. Its week tracks are equally sized by default, with independent content sizing available, and its event/overflow stack can align to the top, center, or bottom of the space below each top-aligned date. It also supports adjacent-month filler dates, bounded navigation, native event representations, grid overflow, paged agenda rows, and visual time-display choices. Below a `24rem` calendar content width, package CSS shows the locale's abbreviated month with a numeric year in the toolbar and decorative pager lanes; exactly `24rem` and above uses the full month. Complete accessible month naming remains unchanged. Applications must provide the [minimum supported calendar host width](../DESIGN.md#responsive-model); hosts below that floor receive best-effort graceful degradation.
 
 The [API reference](api.md) owns exact grid, occupancy, sorting, limit, and agenda behavior. [DESIGN.md](../DESIGN.md) owns visual composition and responsive behavior; the [accessibility guide](../ACCESSIBILITY.md) owns semantics, naming, targets, keyboard behavior, and focus.
 
@@ -51,7 +52,7 @@ The [API configuration contract](api.md#configure-behavior-calendaroptions) owns
 
 ## Custom toolbar, rendering, and styling
 
-Application-owned toolbar content, directional icons, day badges, event content, overflow visuals, and mount behavior are available through public render hooks. Hooks customize documented content slots without transferring ownership of responsive placement or private package DOM. Litefold Calendar isolates a failing hook set and restores package defaults for the slots it owned.
+Application-owned toolbar content, directional icons, day badges, event content, overflow visuals, and mount behavior are available through public render hooks. Hooks customize documented content slots without transferring ownership of responsive placement or private package DOM. Consumers must not measure widths to reproduce package responsive states or target private title and pager labels; container CSS owns those transitions. Litefold Calendar isolates a failing hook set and restores package defaults for the slots it owned.
 
 The [render-hook API](api.md#customize-rendering-calendarrenderhooks) defines every input, return value, cleanup rule, and failure behavior. The [typed integration recipe](integration-guide.md#add-metadata-driven-visuals-without-private-selectors) shows how to map application metadata to owned classes and nodes.
 

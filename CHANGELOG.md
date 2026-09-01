@@ -8,10 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added construction-time `weekRowSizing` (`"equal"` or `"content"`) and `gridEventPlacement` (`"top"`, `"center"`, or `"bottom"`) options for intrinsic month-grid geometry without JavaScript measurement.
 - Added focused Chromium, Firefox, and WebKit browser-test commands plus end-to-end Playwright-computed ARIA, live-region urgency, announcement, and focus-preservation coverage for screen-reader-facing behavior.
 
 ### Changed
 
+- Week rows now default to the tallest week's intrinsic height instead of sizing independently; set `weekRowSizing: "content"` to retain independent content-sized rows. Grid event and overflow stacks now default to top alignment at every width instead of using compact-only bottom alignment; use `gridEventPlacement: "bottom"` when bottom placement is preferred across widths.
+- In equal mode, package-owned, normally visible compact primary-event, count, and compact-primary overflow roots now use one common full slot; set `weekRowSizing: "content"` to retain intrinsic compact sizing. Focus-only later summaries remain intrinsic. Custom compact visuals preserve equality when they fit that slot or use the existing `--lfc-control-min-size` and `--lfc-grid-event-min-block-size` tokens to enlarge all normal roots together; oversized output remains unclipped but opts out.
+- Below a `24rem` calendar content width, the visible toolbar title and decorative pull-pager text now use the locale's abbreviated month with a numeric year. Full visual month names remain at exactly `24rem` and above, while accessible month naming remains complete at every width.
 - Split ordinary commit-and-push guidance from authorized npm release operations, added reusable repository skills for both workflows, and reorganized documentation and examples around package-user, contributor, and maintainer paths.
 - Hardened alpha release guidance and workflow contracts around existing-package publication, npm publish-time review, exact hosted identities, immutable tags and assets, and policy-controlled release notes.
 - Expanded the Playwright release gate and CI/publication browser installation from Chromium alone to Chromium, Firefox, and WebKit. Trusted synthetic touch/pen and programmatic 400% zoom checks remain explicitly Chromium-only because they require a Chrome DevTools Protocol session, while portable wheel, disabled-pager, layout, interaction, and accessibility paths run across all three engines.

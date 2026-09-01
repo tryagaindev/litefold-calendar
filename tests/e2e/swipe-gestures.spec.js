@@ -192,6 +192,29 @@ function rangeLength(request) {
 		Date.parse(`${request.start}T00:00:00.000Z`)) / 86_400_000;
 }
 
+async function formatBrowserMonthTitle(page, monthIndex, month = "long") {
+	return page.evaluate((options) => new Intl.DateTimeFormat("en-US", {
+		calendar: "gregory",
+		month: options.month,
+		timeZone: "UTC",
+		year: "numeric"
+	}).format(new Date(Date.UTC(2026, options.monthIndex, 1))), {
+		month,
+		monthIndex
+	});
+}
+
+function pagingLaneLabels(host, direction) {
+	const lane = host.locator(`.lfc-calendar-swipe-lane-${direction}`);
+	const wrapper = lane.locator(".lfc-calendar-swipe-lane-label");
+	return {
+		compact: wrapper.locator(":scope > .lfc-calendar-swipe-lane-label-compact"),
+		full: wrapper.locator(":scope > .lfc-calendar-swipe-lane-label-full"),
+		lane,
+		wrapper
+	};
+}
+
 test.describe("native month pager", () => {
 	test.use({ reducedMotion: "no-preference" });
 
@@ -212,6 +235,33 @@ test.describe("native month pager", () => {
 				!(next instanceof HTMLElement) || !(grid instanceof HTMLElement)) {
 				throw new Error("Expected pager DOM.");
 			}
+			const laneSemantics = (lane) => {
+				const wrapper = lane.querySelector(".lfc-calendar-swipe-lane-label");
+				const full = wrapper?.querySelector(
+					":scope > .lfc-calendar-swipe-lane-label-full"
+				);
+				const compact = wrapper?.querySelector(
+					":scope > .lfc-calendar-swipe-lane-label-compact"
+				);
+				if (!(wrapper instanceof HTMLElement) || !(full instanceof HTMLElement) ||
+					!(compact instanceof HTMLElement)) {
+					throw new Error("Expected stable full and compact pager labels.");
+				}
+				return {
+					ariaHidden: lane.getAttribute("aria-hidden"),
+					available: lane.hasAttribute("data-lfc-page-available"),
+					childClasses: [...wrapper.children].map((child) => child.className),
+					compact: {
+						text: compact.textContent,
+						visible: getComputedStyle(compact).display !== "none"
+					},
+					full: {
+						text: full.textContent,
+						visible: getComputedStyle(full).display !== "none"
+					},
+					grids: lane.querySelectorAll("[role='grid']").length
+				};
+			};
 			return {
 				childClasses: [...pager.children].map((child) => child.className),
 				dayCount: grid.querySelectorAll(".lfc-calendar-day").length,
@@ -219,18 +269,8 @@ test.describe("native month pager", () => {
 				gridCount: pager.querySelectorAll("[role='grid']").length,
 				gridRole: grid.getAttribute("role"),
 				hasInlineStyle: element.matches("[style]") || element.querySelector("[style]") !== null,
-				next: {
-					ariaHidden: next.getAttribute("aria-hidden"),
-					available: next.hasAttribute("data-lfc-page-available"),
-					grids: next.querySelectorAll("[role='grid']").length,
-					label: next.querySelector(".lfc-calendar-swipe-lane-label")?.textContent
-				},
-				previous: {
-					ariaHidden: previous.getAttribute("aria-hidden"),
-					available: previous.hasAttribute("data-lfc-page-available"),
-					grids: previous.querySelectorAll("[role='grid']").length,
-					label: previous.querySelector(".lfc-calendar-swipe-lane-label")?.textContent
-				},
+				next: laneSemantics(next),
+				previous: laneSemantics(previous),
 				styles: {
 					direction: getComputedStyle(pager).direction,
 					scrollBehavior: getComputedStyle(pager).scrollBehavior,
@@ -240,6 +280,10 @@ test.describe("native month pager", () => {
 				tabIndex: pager.tabIndex
 			};
 		});
+		const julyFull = await formatBrowserMonthTitle(page, 6);
+		const julyCompact = await formatBrowserMonthTitle(page, 6, "short");
+		const septemberFull = await formatBrowserMonthTitle(page, 8);
+		const septemberCompact = await formatBrowserMonthTitle(page, 8, "short");
 		expect(semantics).toMatchObject({
 			childClasses: [
 				"lfc-calendar-swipe-lane lfc-calendar-swipe-lane-previous",
@@ -251,8 +295,28 @@ test.describe("native month pager", () => {
 			gridCount: 1,
 			gridRole: "grid",
 			hasInlineStyle: false,
-			next: { ariaHidden: "true", available: true, grids: 0, label: "September 2026" },
-			previous: { ariaHidden: "true", available: true, grids: 0, label: "July 2026" },
+			next: {
+				ariaHidden: "true",
+				available: true,
+				childClasses: [
+					"lfc-calendar-swipe-lane-label-full",
+					"lfc-calendar-swipe-lane-label-compact"
+				],
+				compact: { text: septemberCompact, visible: false },
+				full: { text: septemberFull, visible: true },
+				grids: 0
+			},
+			previous: {
+				ariaHidden: "true",
+				available: true,
+				childClasses: [
+					"lfc-calendar-swipe-lane-label-full",
+					"lfc-calendar-swipe-lane-label-compact"
+				],
+				compact: { text: julyCompact, visible: false },
+				full: { text: julyFull, visible: true },
+				grids: 0
+			},
 			styles: {
 				direction: "ltr",
 				scrollBehavior: "auto",
@@ -273,11 +337,24 @@ test.describe("native month pager", () => {
 			maxDate: "2026-09-30",
 			minDate: "2026-08-01"
 		});
+		const previousLabels = pagingLaneLabels(host, "previous");
+		const nextLabels = pagingLaneLabels(host, "next");
+		const augustFull = await formatBrowserMonthTitle(page, 7);
+		const augustCompact = await formatBrowserMonthTitle(page, 7, "short");
+		const septemberFull = await formatBrowserMonthTitle(page, 8);
+		const septemberCompact = await formatBrowserMonthTitle(page, 8, "short");
 		const initial = await page.evaluate(() => window.__lfcSwipeFixture.observations.requests);
 		expect(initial).toHaveLength(1);
 		expect(rangeLength(initial[0])).toBe(42);
-		await expect(host.locator(".lfc-calendar-swipe-lane-previous"))
-			.not.toHaveAttribute("data-lfc-page-available");
+		await expect(previousLabels.lane).toHaveAttribute("aria-hidden", "true");
+		await expect(nextLabels.lane).toHaveAttribute("aria-hidden", "true");
+		await expect(previousLabels.lane).not.toHaveAttribute("data-lfc-page-available");
+		await expect(previousLabels.full).toHaveText("");
+		await expect(previousLabels.compact).toHaveText("");
+		await expect(nextLabels.full).toHaveText(septemberFull);
+		await expect(nextLabels.compact).toHaveText(septemberCompact);
+		expect(await page.evaluate(() => window.__lfcSwipeFixture.observations.requests.length))
+			.toBe(1);
 
 		await setPagerPosition(host, "next", true, 0.25);
 		await expect.poll(() => page.evaluate(() =>
@@ -295,8 +372,14 @@ test.describe("native month pager", () => {
 		expect(afterNext).toHaveLength(2);
 		expect(rangeLength(afterNext[1])).toBe(42);
 		await expectPagerClean(host);
-		await expect(host.locator(".lfc-calendar-swipe-lane-next"))
-			.not.toHaveAttribute("data-lfc-page-available");
+		await expect(nextLabels.lane).not.toHaveAttribute("data-lfc-page-available");
+		await expect(nextLabels.full).toHaveText("");
+		await expect(nextLabels.compact).toHaveText("");
+		await expect(previousLabels.lane).toHaveAttribute("data-lfc-page-available", "");
+		await expect(previousLabels.full).toHaveText(augustFull);
+		await expect(previousLabels.compact).toHaveText(augustCompact);
+		expect(await page.evaluate(() => window.__lfcSwipeFixture.observations.requests.length))
+			.toBe(2);
 
 		await setPagerPosition(host, "next");
 		await expectPagerClean(host);
@@ -310,6 +393,12 @@ test.describe("native month pager", () => {
 		expect(afterPrevious).toHaveLength(3);
 		expect(rangeLength(afterPrevious[2])).toBe(42);
 		await expectPagerClean(host);
+		await expect(previousLabels.lane).not.toHaveAttribute("data-lfc-page-available");
+		await expect(previousLabels.full).toHaveText("");
+		await expect(previousLabels.compact).toHaveText("");
+		await expect(nextLabels.lane).toHaveAttribute("data-lfc-page-available", "");
+		await expect(nextLabels.full).toHaveText(septemberFull);
+		await expect(nextLabels.compact).toHaveText(septemberCompact);
 	});
 
 	test("layout geometry remains exact through an ancestor transform and RTL recentering", async ({ page }) => {

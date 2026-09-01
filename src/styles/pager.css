@@ -109,6 +109,14 @@
     text-wrap: balance;
   }
 
+  :where(.litefold-calendar) .lfc-calendar-swipe-lane-label-full {
+    display: block;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-swipe-lane-label-compact {
+    display: none;
+  }
+
   :where(.litefold-calendar):not([data-lfc-swipe-enabled])
     .lfc-calendar-swipe-viewport {
     overflow-x: hidden;

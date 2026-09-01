@@ -166,6 +166,9 @@ export type CalendarEventSurface = "grid-summary" | "agenda";
 /** Calendar surfaces on which event times remain visually displayed. */
 export type CalendarEventTimeDisplay = "all" | "grid" | "agenda" | "none";
 
+/** Vertical placement of the event stack within a month-grid day cell. */
+export type CalendarGridEventPlacement = "top" | "center" | "bottom";
+
 /** Package-owned element references supplied for event-overflow inspection and placement. */
 export interface CalendarEventOverflowElements<
 	TAction extends HTMLButtonElement | null = HTMLButtonElement | null
@@ -396,6 +399,9 @@ export type CalendarFirstDay = "locale" | 0 | 1 | 2 | 3 | 4 | 5 | 6;
 /** Valid native heading levels for the generated calendar heading. */
 export type CalendarHeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
+/** Intrinsic sizing behavior for month-grid week rows. */
+export type CalendarWeekRowSizing = "equal" | "content";
+
 /** Immutable options for a reusable month calendar. */
 export interface CalendarOptions<TMetadata = unknown> {
 	/** Maximum agenda events retained in the DOM; defaults to `200`. */
@@ -404,6 +410,8 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly agendaPageSize?: number;
 	/** Surfaces on which event times remain visually displayed; defaults to `"all"`. */
 	readonly eventTimeDisplay?: CalendarEventTimeDisplay;
+	/** Vertical placement of the month-grid event stack; defaults to `"top"`. */
+	readonly gridEventPlacement?: CalendarGridEventPlacement;
 	/** Synchronous bridge to an application-owned live announcer. */
 	readonly onAnnounce?: (this: void, announcement: Readonly<CalendarAnnouncement>) => undefined;
 	/** Handles pointer or keyboard context gestures on a day. */
@@ -466,6 +474,8 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly timeZone?: string;
 	/** Detached or host-descendant same-document application HTML element placed after built-in toolbar controls. */
 	readonly toolbarEnd?: HTMLElement;
+	/** Intrinsic week-row sizing behavior; defaults to `"equal"`. */
+	readonly weekRowSizing?: CalendarWeekRowSizing;
 }
 
 /**
