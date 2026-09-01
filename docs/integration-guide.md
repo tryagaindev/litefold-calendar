@@ -118,7 +118,13 @@ const localEvents: CalendarEvents<EventData> =
 
 This eager mapping runs before calendar construction, so the application must present and report any adapter failure as a startup error. A static array validates and commits its terminal state before the initiating `render()` or `setEvents()` call returns. It uses one full calendar render and never publishes `"loading"` or `aria-busy`.
 
-Use a provider when package-owned source failure and Retry behavior should apply. Each provider invocation chooses its own timing from its returned shape. A directly returned array follows the same immediate, one-render path as a static array. Any PromiseLike—including `Promise.resolve(array)`, an `async` function result, or a custom thenable—publishes a loading render and then a terminal render. Forward the provided `signal` to cancellable work and reject on transport, authorization, response-validation, or adapter failure:
+Use a provider when package-owned source failure and Retry behavior should
+apply. A directly returned array follows the immediate path; a PromiseLike uses
+loading then terminal state. The
+[source-timing contract](api.md#source-timing-and-renders) owns exact
+classification and callback order. Forward the supplied `signal` to
+cancellable work and reject on transport, authorization, response-validation,
+or adapter failure:
 
 ```ts
 const remoteEvents: CalendarEventSource<EventData> = async ({ end, signal, start }) => {
@@ -127,7 +133,10 @@ const remoteEvents: CalendarEventSource<EventData> = async ({ end, signal, start
 };
 ```
 
-Litefold Calendar invokes the provider and attaches PromiseLike handlers before publishing loading callbacks. `onStateChange` receives each current state before the corresponding DOM replacement, so callback reentrancy may supersede that work safely. Treat the supplied provider range as authoritative rather than deriving requests from viewport or gesture state. The [event-source contract](api.md#supply-events-calendarevents-and-calendareventsource) owns exact invocation, range, cancellation, replacement, and commit behavior.
+Treat the supplied provider range as authoritative rather than deriving
+requests from viewport or gesture state. The
+[event-source contract](api.md#supply-events-calendarevents-and-calendareventsource)
+owns invocation, range, cancellation, replacement, and commit behavior.
 
 ## Bound one calendar instance
 
@@ -341,7 +350,13 @@ Only one hook set can own each singleton hook. `renderEventOverflow` owns its co
 
 Both contexts expose `eventCount`, `visibleEventCount`, `overflowCount`, `text`, and stable `elements.root` / `elements.content` references. `elements.action` is `null` for a passive compact cue and is the package-owned overflow button for the wide branch or a compact-primary overflow action. Treat those elements as inspection and placement context rather than mutation targets; return the visual node. That button's accessible name, activation, focus transfer, and canonical fallback remain package-owned. Returned nodes must be new, detached, same-document, synchronous, and entirely noninteractive; the package treats them as presentational content.
 
-The package places a compact-primary marker/action and passive compact cue at the cell's block end in two equal, gap-free auto-fit grid blocks. Their centers evenly divide the full area beneath the date when both compact-control-size tracks, 44 CSS pixels by default, fit; otherwise they stack into centered equal full-width rows. This keeps them stacked through supported phone widths and moves them onto one row only near the compact ceiling. A markerless total uses one centered block; `maxGridEventsPerDay: 0` keeps the fallback inside one package-owned overflow action. The hook replaces only the visual content inside its assigned block. There is no public overflow-layout selector or CSS token to override this placement. Auto-fit uses the compact-control-size floor instead of measuring arbitrary hook content's intrinsic width, so keep returned compact content concise enough for its block; oversized application output remains application-owned.
+The package owns the responsive placement and gives each compact visual an
+assigned block. A markerless total uses one centered block, and
+`maxGridEventsPerDay: 0` keeps the fallback inside one package-owned overflow
+action. The hook replaces only visual content; no public overflow-layout
+selector or CSS token overrides placement. Keep returned compact content
+concise. [DESIGN.md](../DESIGN.md#responsive-model) owns the exact geometry and
+width transitions.
 
 Container resizing changes CSS visibility only; it does not invoke the hook again or replace either returned node. A failure in either branch quarantines the complete hook set and restores both compact and wide defaults. See the [render-hook API](api.md#customize-rendering-calendarrenderhooks) for every context field and return rule.
 
@@ -471,20 +486,21 @@ The [action contract](api.md#handle-user-actions-calendaraction) owns callback s
 
 Keep application token mapping outside the package and set overrides on the same host passed to `createCalendar()`. [DESIGN.md](../DESIGN.md) owns the canonical roles and defaults; the [CSS token contract](css-tokens.md#apply-token-overrides) provides the single supported bridge example, cascade rules, and CSP implications.
 
-Place the calendar in a host whose border box provides at least **320 CSS pixels** of inline size, the minimum supported design width. Narrower hosts receive best-effort graceful degradation only. Above that floor, allow the host to reflect its actual available width and leave exact responsive behavior to [DESIGN.md](../DESIGN.md#responsive-model). Do not override private responsive or pager internals.
+Place the calendar in a host whose border box meets the [minimum supported design width](../DESIGN.md#responsive-model). Hosts below that floor receive best-effort graceful degradation only. Above it, allow the host to reflect its actual available width and leave exact responsive behavior to the design contract. Do not override private responsive or pager internals.
 
 ## Classic-script entry point
 
 Litefold Calendar remains a pure ESM package. An application that cannot mark its entry script as a module can use a regular external script and load the package with standard dynamic `import()`:
 
 ```html
+<link rel="stylesheet" href="/assets/litefold-calendar/styles.css">
 <script defer src="./calendar-loader.js"></script>
 ```
 
 ```js
 "use strict";
 
-void import("./assets/litefold-calendar/index.js")
+void import("/assets/litefold-calendar/index.js")
 	.then(({ createCalendar }) => {
 		//Create and render the calendar.
 	})
@@ -495,7 +511,14 @@ void import("./assets/litefold-calendar/index.js")
 
 The loader has no static module syntax or module-script tag, but it still requires an ESM-capable evergreen browser. Do not use `nomodule`, present this as a legacy build, or expose the package through a mutable global.
 
-Resolve the package path through the application's normal deployment process and serve it with a JavaScript MIME type under the application Content Security Policy. See the runnable [classic-script example](../examples/classic-script/) and the [ECMA-262 `import()` contract](https://tc39.es/ecma262/multipage/ecmascript-language-expressions.html#sec-import-calls).
+Resolve the package path through the application's normal deployment process.
+Copy the complete ESM output tree and stylesheet while preserving relative
+module paths, serve JavaScript with the correct MIME type, and permit the
+same-origin stylesheet, entry, and dependent modules under the application
+Content Security Policy. The displayed URLs are illustrative application-owned
+deployment paths, not package specifiers. See the runnable
+[classic-script example](../examples/classic-script/) and the
+[ECMA-262 `import()` contract](https://tc39.es/ecma262/multipage/ecmascript-language-expressions.html#sec-import-calls).
 
 ## Acceptance checks
 
@@ -503,7 +526,11 @@ An integration is ready when:
 
 - Data adapters, authorization, range caching, filtering, and diagnostic handling remain application-owned and fail atomically.
 - Event replacement, actions, toolbar content, render hooks, extensions, and fallback coordination use documented public surfaces without private selectors.
-- Compact and wide `renderEventOverflow` customizations preserve canonical native-action behavior, use the package-supplied localized text and counts, stay within package-assigned blocks, and change CSS visibility on resize without rerunning the hook. At narrow widths, verify paired blocks remain equal, gap-free, and block-end aligned, evenly divide the full area beneath the date when sharing a row, and stay centered when stacked; markerless and `maxGridEventsPerDay: 0` cases remain one centered block/action. Keep custom compact content concise enough for its assigned block.
+- Compact and wide `renderEventOverflow` customizations preserve canonical
+  native-action behavior, use the package-supplied localized text and counts,
+  stay within package-assigned blocks, and satisfy the
+  [responsive design checks](../DESIGN.md#responsive-model) without rerunning
+  the hook on resize.
 - Lifecycle, validation, replacement, fallback, render-hook, and extension scenarios satisfy the [API reference](api.md) and failures satisfy the [error guide](errors.md).
 - Keyboard, direct-input, RTL, zoom, forced-color, reduced-motion, localization, and screen-reader flows satisfy the [accessibility verification matrix](../ACCESSIBILITY.md#testing).
 - Visual overrides satisfy [DESIGN.md](../DESIGN.md) and the [CSS token contract](css-tokens.md), including affected screenshot evidence.

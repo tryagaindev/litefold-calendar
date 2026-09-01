@@ -13,7 +13,7 @@ body:
     attributes:
       label: Package version or commit
       description: Use the exact npm version or source commit and include the tarball SHA-256 when relevant.
-      placeholder: 0.x.y-alpha.N; source commit or tarball SHA-256
+      placeholder: Exact npm version; full source commit; tarball SHA-256
     validations:
       required: true
   - type: input
@@ -28,7 +28,7 @@ body:
     attributes:
       label: Assistive technology and version
       description: Enter None when the barrier does not involve assistive technology.
-      placeholder: VoiceOver on iOS 20, or None
+      placeholder: VoiceOver on the current stable iOS release, or None
     validations:
       required: true
   - type: dropdown

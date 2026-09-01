@@ -14,7 +14,10 @@ import {
 	validatePreparedReleaseState,
 	writeReleaseFilesAtomically
 } from "../lib/release-state.mjs";
-import { parsePrepareReleaseArguments } from "../prepare-release.mjs";
+import {
+	formatPrepareReleaseMessages,
+	parsePrepareReleaseArguments
+} from "../prepare-release.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -221,6 +224,24 @@ void test("release CLI parsers expose preparation and local verification modes",
 		}
 	);
 	assert.throws(() => parseReleaseVerificationArguments(["--online"]), /Usage/u);
+});
+
+void test("local release preparation reports only state it creates", () => {
+	const result = {
+		branch: "release/v0.3.0-alpha.0",
+		changedFiles: ["CHANGELOG.md", "package-lock.json", "package.json"],
+		dryRun: false,
+		tag: "v0.3.0-alpha.0"
+	};
+	assert.deepEqual(formatPrepareReleaseMessages(result), [
+		"Prepared release files for v0.3.0-alpha.0; suggested hosted branch: release/v0.3.0-alpha.0.",
+		"Changed files: CHANGELOG.md, package-lock.json, package.json",
+		"Review the diff and run npm run release:verify. This local command creates no branch or pull request; use the hosted Prepare alpha release workflow for normal release work."
+	]);
+	assert.deepEqual(formatPrepareReleaseMessages({ ...result, dryRun: true }), [
+		"Would prepare release files for v0.3.0-alpha.0; suggested hosted branch: release/v0.3.0-alpha.0.",
+		"Changed files: CHANGELOG.md, package-lock.json, package.json"
+	]);
 });
 
 void test("Git verification binds an existing tag to the current commit", async (context) => {

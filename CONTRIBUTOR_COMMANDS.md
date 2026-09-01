@@ -1,12 +1,12 @@
 # Litefold Calendar contributor commands
 
-This file is a runnable convenience index for repository contributors. Package consumers only need the installation and integration guidance in [README.md](README.md). Contribution policy, prerequisites, and pull-request requirements remain in [CONTRIBUTING.md](CONTRIBUTING.md).
+This is the copyable command reference for repository contributors. Contribution policy and change obligations live in [CONTRIBUTING.md](CONTRIBUTING.md); package users should start with [README.md](README.md).
 
-Many Markdown-aware IDEs can run an individual shell fence. Each block therefore contains one cross-shell command and remains copyable everywhere else.
+Each shell fence contains one cross-shell command so it can be copied directly or run by a compatible Markdown-aware IDE.
 
 ## Set up the repository
 
-Verify the supported Node.js line and repository-selected npm client:
+Use a current Node.js 24 release and the exact npm version selected by `package.json#packageManager`. The broader `devEngines.packageManager` range is only a bootstrap compatibility warning; it does not replace the exact npm version required by the final gate.
 
 ```shell
 node --version
@@ -16,7 +16,7 @@ node --version
 npm --version
 ```
 
-Install the locked dependencies and browser:
+Install the locked development dependencies and repository-pinned browser:
 
 ```shell
 npm ci --ignore-scripts
@@ -25,6 +25,8 @@ npm ci --ignore-scripts
 ```shell
 npx --no-install playwright install chromium
 ```
+
+On a fresh Linux host that lacks browser system dependencies, use `npx --no-install playwright install --with-deps chromium` instead.
 
 ## Explore and build
 
@@ -40,7 +42,21 @@ Build all publishable and example output without starting a server:
 npm run build
 ```
 
-## Run focused checks
+## Choose focused validation
+
+Run the smallest relevant checks while iterating, then always run the final gate. The canonical contracts and companion-work obligations are in [CONTRIBUTING.md](CONTRIBUTING.md#change-obligations).
+
+| Change area | Start with |
+|---|---|
+| TypeScript or JavaScript behavior | `npm run lint`, `npm run typecheck`, `npm run test:unit` |
+| Repository scripts, package policy, or workflow contracts | `npm run test:tooling`, `npm run check:policy` |
+| Markdown, headings, links, root exports, or WebMCP integration | `npm run check:docs` |
+| Examples | `npm run typecheck:examples`, `npm run test:examples` |
+| DOM, interaction, accessibility, or browser behavior | `npm run test:unit`, `npm run test:browser`, plus affected manual scenarios in [ACCESSIBILITY.md](ACCESSIBILITY.md) |
+| CSS or visual behavior | `npm run lint:styles`, `npm run test:browser`; add `npm run check:design` when `DESIGN.md` changes |
+| Package exports or installed-consumer behavior | `npm run build`, then `npm run typecheck:examples:built`; after committing, use the clean-tree `npm run check:distribution` gate |
+
+Common focused commands:
 
 ```shell
 npm run lint
@@ -62,21 +78,15 @@ npm run test:tooling
 npm run check:docs
 ```
 
-Run the design check after changing `DESIGN.md`:
-
-```shell
-npm run check:design
-```
-
-Run real-browser behavior after changing DOM, CSS, accessibility, or interaction code:
-
 ```shell
 npm run test:browser
 ```
 
 ## Update screenshots intentionally
 
-This command writes the six tracked images and their manifest. Run it only when the visual change is intended, then review the result.
+When an intentional visual change affects a canonical scene, regenerate the
+tracked screenshot set and manifest, review every diff, and follow the
+[screenshot contract](docs/screenshots/README.md).
 
 ```shell
 npm run screenshots:update
@@ -88,14 +98,23 @@ npm run check:screenshots
 
 ## Run the final gate
 
-Both final gates include tarball verification and therefore require a clean worktree. Commit the intended source changes first. `check:fast` is useful only when Chromium is unavailable and is not a release substitute for the browser suite.
+Both commands include tarball verification and therefore require the intended changes to be committed and the worktree to be clean. `npm run check` is the complete repository gate invoked by CI; it does not reproduce hosted controls such as dependency review or the workflow's exact environment. `check:fast` omits real-browser scenarios and is only a local fallback when Chromium is unavailable.
 
 ```shell
 npm run check:fast
 ```
 
+Before submission, run the complete gate:
+
 ```shell
 npm run check
 ```
 
-Maintainer-only publication commands remain in the [release operations runbook](docs/release-operations.md).
+## Deliver a contributor change
+
+Automation that supports repository skills can invoke [`$commit-and-push`](.agents/skills/commit-and-push/SKILL.md) to audit Git state, validate and commit only the intended files, and push an ordinary feature branch. The skill is operational guidance, not a shell command or additional repository authority.
+
+Package publication and release administration are separate from contributing.
+Stop after the ordinary change workflow unless you are explicitly authorized as
+a release operator; authorized operators use the
+[release operations runbook](docs/release-operations.md).

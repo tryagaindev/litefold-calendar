@@ -1,2 +1,3 @@
-#The TryAgainDev maintainers team currently has one active maintainer.
+#Default code-review requests go to the project maintainer team. Additional
+#governance requirements are defined in MAINTAINERS.md and enforced separately.
 * @TryAgainDev/maintainers

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release to npm"
+  short_description: "Coordinate protected npm releases"
+  default_prompt: "Use $release-to-npm to classify the requested release phase, load the repository runbook, and pause before every external mutation."

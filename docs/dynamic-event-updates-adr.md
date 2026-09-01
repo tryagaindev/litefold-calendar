@@ -56,7 +56,10 @@ Recreation remains the correct operation when construction-time configuration ch
 
 This remains the recommended approach for filters, cache invalidation, authorization state, and remote data refreshes. It retains the current snapshot while the same range reloads, preserves instance identity, and uses cancellation and stale-result protection without changing provider identity.
 
-Before `setEvents()`, a component receiving a new static event array needed a stable provider, external array state, per-request filter capture, and exactly one refetch. That baseline boilerplate was the reason to select the narrow method.
+Without a direct replacement method, a component receiving a new static event
+array would need a stable provider, external array state, per-request filter
+capture, and exactly one refetch. That baseline boilerplate is the reason to
+select the narrow method.
 
 ### Selected: narrow `setEvents()` method
 
@@ -72,8 +75,10 @@ The implementation uses all of the following rules:
 - **Lifecycle:** require a rendered, non-destroyed instance using the same live guard as `refetchEvents()`. Calls before `render()`, after `destroy()`, or after a fatal unavailable transition throw synchronous `invalid-state` errors. A recoverable source-unavailable instance may accept a replacement and recover.
 - **Validation order:** check lifecycle before inspecting the argument. Then synchronously require an array or function and safely snapshot a static array. A top-level inspection or snapshot failure throws `invalid-argument` without aborting the current request, changing the current source, changing state, or invoking `onError`.
 - **Payload validation:** once the top-level input is accepted, make it the current source and run its result through the existing event-count, event-shape, URL, and atomic-normalization pipeline. A provider rejection or invalid payload follows the existing operational error route and retains a usable same-range snapshot. The accepted replacement remains current so Retry or `refetchEvents()` retries it; failure does not silently restore the previous provider.
-- **Timing classification:** classify every provider invocation by its returned shape. A direct array validates and commits one terminal render synchronously without `loading` or `aria-busy`. Any PromiseLike—including an already-fulfilled promise, async function, or custom thenable—publishes loading and busy state, then commits a second terminal render.
-- **Callback order:** invoke the provider and attach both Promise settlement handlers before publishing loading. Loading callbacks may supersede or destroy the request, but cannot prevent its invocation. Keep current-generation checks after provider work, normalization, callbacks, and render hooks.
+- **Timing and callback order:** preserve the
+  [public source-timing contract](api.md#source-timing-and-renders), including
+  direct-versus-PromiseLike classification, callback order, and reentrant
+  supersession checks.
 - **Cancellation and generations:** clear an active swipe transaction, increment the source generation, abort the previous source signal, and start exactly one load for the current 42-day range. Late success, failure, normalization, announcement, and render work from older generations must not commit.
 - **State and focus:** keep `displayedMonth` and `selectedDate`. Preserve the current focus token across source resolution and commit. Restore an exact day or event action when it still exists; when a focused event disappears, use the existing owning-day fallback. Do not move focus when it was outside the calendar.
 - **Agenda:** preserve `agendaVisibleCount` rather than resetting it to one page. Rendering still caps the visible result by the new event count and `agendaDomLimit`; adding more events does not reveal beyond the previously requested count.

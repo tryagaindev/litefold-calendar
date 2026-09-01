@@ -72,7 +72,11 @@ The fallback must belong to the host document and remain outside the calendar ho
 
 ## Fallback lifecycle
 
-Each event-source load is timed by its source value. A configured static array or an array returned directly by a provider commits its terminal state synchronously with one full render, never sets `aria-busy`, and settles the fallback before the initiating void method returns. Any PromiseLike—including an already-fulfilled `Promise.resolve(...)`, an `async` function result, or a custom thenable—keeps the fallback in its pending state for the loading render, then settles it with the terminal render. Litefold Calendar invokes a provider before loading callbacks run and attaches PromiseLike handlers before those callbacks; `onStateChange` runs before each corresponding DOM replacement.
+The [API source-timing contract](api.md#source-timing-and-renders) owns
+direct-versus-PromiseLike classification and callback order. For fallback
+coordination, a direct initial result settles visibility before the initiating
+void method returns; a PromiseLike keeps the pending visibility through the
+loading render and settles it with the terminal render.
 
 The package changes only the fallback element's `hidden` property:
 

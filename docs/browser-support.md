@@ -23,16 +23,18 @@ The package relies directly on these modern platform capabilities:
 | Area | Required capabilities |
 | --- | --- |
 | JavaScript | ECMAScript modules, promises, `AbortController`, URL parsing, and `Intl` |
-| DOM and input | Standard DOM, native semantic elements, the Popover API, Pointer/Touch/Wheel Events, native scrolling, and `ResizeObserver` |
+| DOM and input | Standard DOM, native semantic elements, the Popover API, Pointer/Touch/Wheel Events, and native scrolling |
 | CSS | Custom properties, Grid and subgrid, Scroll Snap, logical and intrinsic sizing, cascade layers, `:where()`, `:has()`, animations, and inline-size container queries and units |
 
 The optional [classic-script recipe](integration-guide.md#classic-script-entry-point) also requires dynamic `import()`.
 
 The displayed month/year button opens a package-owned `popover="auto"` with native form controls; it does not require `<input type="month">`. Locale-derived week starts use either `Intl.Locale#getWeekInfo()` or `Intl.Locale#weekInfo` and fall back to Sunday only when neither returns a usable `firstDay`. The package does not download compatibility code or modify global browser APIs.
 
+`ResizeObserver` is an optional direct-input enhancement. When available, it clears an in-progress paging gesture after the viewport resizes. Without it, the ordinary calendar and its toolbar, keyboard, picker, and public navigation routes remain available.
+
 ### Responsive layout
 
-Responsive behavior is CSS-driven from the calendar container. Applications must provide a host border box at least **320 CSS pixels wide**; narrower containers receive best-effort degradation and are not a supported layout target. There is no JavaScript fallback for missing container-query support. In supported browsers, resizing the host changes layout without rerendering, refetching, or moving focus.
+Responsive behavior is CSS-driven from the calendar container. Applications must meet the [minimum supported host width](../DESIGN.md#responsive-model); containers below that floor receive best-effort degradation and are not a supported layout target. There is no JavaScript fallback for missing container-query support. In supported browsers, resizing the host changes layout without rerendering, refetching, or moving focus.
 
 ### Direct-input paging
 
@@ -48,17 +50,16 @@ WebMCP is not a required platform capability and is outside the rolling browser-
 
 WebMCP is an optional extension imported from `@tryagaindev/litefold-calendar/extensions/webmcp`. Omitting `webMcp()` from `CalendarOptions.extensions` leaves it inactive; configuring it in a browser without the API produces a progressive no-op. In both cases, the ordinary calendar remains available.
 
-Use exact feature detection rather than browser-name or version inference. The dated browser positions, origin trials, ChatGPT desktop limitations, and verification procedure belong to the [WebMCP site-tool guide](webmcp.md#compatibility-and-testing).
+Use exact feature detection rather than browser-name or version inference. When WebMCP availability depends on an embedding host or browser policy, follow the [WebMCP compatibility and testing procedure](webmcp.md#compatibility-and-testing).
 
 ## Not supported
 
 The project does not support:
 
-- Internet Explorer.
-- Microsoft Edge Legacy using EdgeHTML.
-- Third-party in-app browsers or browser components that modify their underlying engine, inject incompatible scripts, or cannot reproduce a defect in the corresponding supported browser or system webview.
-- Unlisted, niche, or obscure browsers, even when they share an engine with a supported browser.
 - Browsers outside the rolling two-major-version window.
+- Browser components outside the supported table, including in-app browsers
+  that modify their engine, inject incompatible scripts, or cannot reproduce a
+  defect in the corresponding supported browser or system webview.
 - Polyfill-dependent operation, a legacy JavaScript build, CommonJS, `nomodule`, or transpilation performed by this package.
 
 An unsupported browser may happen to work, but compatibility is not tested or guaranteed there. Applications may transpile their own code, but modifying or wrapping the distributed package does not expand the project's support commitment.

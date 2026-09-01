@@ -170,22 +170,58 @@ Each first-party extension factory validates and snapshots configuration synchro
 
 An extension failure emits diagnostic-only `extension-failed` with its trusted `extensionId` and lifecycle `hook`. The manager aborts and disposes that extension exactly once, then continues independent work while the calendar remains live. Consumer visual hooks use the separate `render-hook-failed` / `renderHookId` channel and are not an extension-authoring surface.
 
-The [first-party extension guide](first-party-extensions.md) owns the public composition, bundle, authoring, and future third-party stability rules. The [package verification guide](package-verification.md) owns emitted-graph and packed-consumer evidence.
+The [first-party extension guide](first-party-extensions.md) owns public
+composition, lifecycle, bundle behavior, and future third-party stability. The
+[package verification guide](package-verification.md) owns emitted-graph and
+packed-consumer evidence.
+
+### Author an official extension
+
+Extension authoring is package-private. A contributor adding an official
+extension must:
+
+- Add a pure `src/extensions/<id>/index.ts` entry, export one camel-case
+  factory from `./extensions/<id>`, keep implementation details off the root,
+  and make the stable kebab-case ID correspond to the factory. Treat
+  `package.json#exports` as the public entry-point authority.
+- Accept one extension-owned options object, reject unreadable or unknown
+  input according to a documented symbol-key policy, snapshot retained values,
+  and return only a package-issued opaque `CalendarExtension`. Entry
+  evaluation and factory calls remain DOM-free.
+- Keep the root graph independent, import only approved private contracts,
+  request the least capability needed, and avoid peer-extension dependencies,
+  priorities, conflict rules, or discovery metadata.
+- Keep lifecycle hooks synchronous, bind asynchronous work to the lifetime
+  signal, make quarantine and disposal idempotent, and preserve fail-closed
+  behavior for retained capabilities.
+- Treat platform and application values as untrusted, minimize projections,
+  preserve authorization and bounds, use semantic accessible DOM where
+  applicable, and update the security model for a new trust boundary.
+- Update public API, consumer configuration, integration guidance, examples,
+  and `CHANGELOG.md` without duplicating the private protocol.
+- Cover absence, one and multiple instances, ordering, reentrancy, reuse,
+  duplicates, quarantine, reverse teardown, cleanup failure, stale
+  capabilities, hostile input, cancellation, and cross-instance isolation.
+  Verify DOM-free entry evaluation and emitted core-only and extension-inclusive
+  module graphs.
+
+Every extension must preserve ordinary UI, state, accessibility, and error
+presentation when it is absent, unsupported, or quarantined.
 
 ## Validation by change type
 
-Use the narrowest checks while iterating:
+Use the [contributor validation matrix](../CONTRIBUTOR_COMMANDS.md#choose-focused-validation)
+for copyable commands and the
+[change-obligation table](../CONTRIBUTING.md#change-obligations) for companion
+work. An architecture change must prove its affected dependency direction,
+transaction ownership, teardown, failure isolation, public package graph, and
+observable behavior as applicable.
 
-| Change | Focused checks |
-|---|---|
-| TypeScript contracts or implementation | `npm run lint`, `npm run typecheck`, `npm run test:unit` |
-| Repository scripts or artifact policy | `npm run test:tooling`, plus the affected package or build command |
-| Public exports, package layout, or examples | `npm run build`, `npm run typecheck:examples:built`, `npm run test:examples:built`, and `npm run check:docs` |
-| Documentation only | `npm run check:docs`; add `npm run check:design` for `DESIGN.md` |
-| DOM, CSS, interaction, or accessibility | Relevant unit tests, `npm run lint`, and affected `npm run test:browser` scenarios |
-
-After committing the intended changes and returning to a clean tree, run `npm run check`. It is the required complete gate and includes tarball policy that intentionally rejects a dirty worktree. `npm run check:distribution` is the corresponding clean-tree package/examples gate. `npm run check:fast` omits Playwright for environments without the pinned Chromium binary and does not replace browser verification before merge.
-
-DOM, CSS, interaction, or accessibility changes also require the affected pinned-Chromium scenarios and the relevant manual checks in the [accessibility guide](../ACCESSIBILITY.md). Public behavior changes require synchronized declarations, examples, API documentation, migration guidance, release notes, and screenshot evidence when a canonical scene changes.
+DOM, CSS, interaction, or accessibility changes also require the affected
+browser scenarios and manual checks in the
+[accessibility guide](../ACCESSIBILITY.md). Public behavior changes require the
+declarations, examples, API guidance, migration guidance, release notes, and
+screenshot evidence identified by contributor policy. Finish with the
+[complete repository gate](../CONTRIBUTOR_COMMANDS.md#run-the-final-gate).
 
 [Back to the documentation hub](README.md)

@@ -44,7 +44,10 @@ Factories validate and snapshot their configuration synchronously. The returned 
 
 Selected extensions activate and receive state in caller order. Teardown runs in reverse order. Distinct extension IDs are independent: Litefold Calendar defines no dependency, priority, precedence, or conflict system between them. One failed extension is quarantined without disabling the core calendar or another extension.
 
-Event-source timing is decided independently for each load. A configured static array or an array returned directly by a provider commits `ready`, `degraded`, or `unavailable` synchronously with one full render and no intermediate `loading` state or `aria-busy`. Any PromiseLike—including `Promise.resolve(...)`, an `async` function result, or a custom thenable—uses a loading render followed by a terminal render. Litefold Calendar invokes a provider before publishing loading callbacks and, when it returns a PromiseLike, attaches handlers before those callbacks. For every published state, the consumer's `onStateChange` runs before the corresponding DOM replacement.
+Extensions observe the normal event-source and state lifecycle. The
+[API source-timing contract](api.md#source-timing-and-renders) owns exact
+provider classification and callback order; the activation-specific delivery
+rules appear below.
 
 ## Choose the right boundary
 
@@ -120,19 +123,13 @@ The root entry exports the opaque `CalendarExtension` type and accepts `extensio
 
 Extension entry modules remain side-effect-free and safe to evaluate during server rendering. Importing one must not read browser globals, mutate a document, register tools, or discover calendars at module scope. Browser work starts only when a configured extension is activated for a rendered calendar.
 
-## First-party authoring checklist
+## Official extension changes
 
-Extension authoring remains package-private. A contributor adding an official extension must complete this checklist:
-
-- **Public surface:** add `src/extensions/<id>/index.ts`, export one camel-case factory from `./extensions/<id>`, and keep implementation details off the root entry. The factory name must correspond to the stable kebab-case ID; `package.json` exports remain the source of truth.
-- **Configuration:** accept one extension-owned options object, reject unknown own string keys or unreadable input, define the policy for symbol keys, snapshot retained values, and return only a package-issued opaque `CalendarExtension`. Importing the entry and calling its factory must remain DOM-free.
-- **Architecture:** keep the root graph independent, import only approved core contracts, request the least capability needed, and do not add peer-extension dependencies, conflict rules, priorities, or discovery metadata.
-- **Lifecycle:** keep hooks synchronous, bind asynchronous work to the lifetime signal, and make failure reporting and disposal idempotent. Preserve fail-closed behavior for retained capabilities.
-- **Presentation and security:** use semantic accessible DOM, extension-scoped selectors and assets, and existing public tokens where appropriate. Treat platform and application data as untrusted, minimize projections, preserve authorization and bounds, and document new trust boundaries.
-- **Documentation:** update the API table, this guide, the relevant integration guide, examples, and changelog. Cover defaults, privacy, unsupported platforms, diagnostics, bundling, and multiple instances.
-- **Verification:** cover zero, one, and multiple extensions; ordering, reentrancy, reuse, duplicates, quarantine, reverse teardown, cleanup failure, stale capabilities, hostile input, cancellation, and cross-instance isolation. Verify DOM-free entry evaluation and inspect package metafiles for core-only and extension-inclusive bundles.
-
-Every extension must preserve ordinary UI, state, accessibility, and error presentation when it is absent, unsupported, or quarantined.
+Extension authoring remains package-private. Contributors adding an official
+extension follow the
+[architecture authoring checklist](architecture.md#author-an-official-extension).
+This application-integration guide owns selection, configuration, lifecycle, bundle behavior,
+and the absence of a third-party authoring API.
 
 ## Third-party authoring stability
 

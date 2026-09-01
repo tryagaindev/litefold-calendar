@@ -12,6 +12,10 @@ Add Litefold Calendar to the application:
 npm install @tryagaindev/litefold-calendar@alpha
 ```
 
+Use the movable `alpha` tag only to evaluate the current candidate. For a
+repeatable migration or production-like environment, replace `alpha` with the
+exact prerelease reported by the registry and save that exact version.
+
 Remove the FullCalendar packages and plugins after the rewrite no longer imports them. Unlike FullCalendar v6, Litefold Calendar requires an explicit stylesheet import.
 
 ```html
@@ -57,7 +61,7 @@ The CSS import assumes a bundler that supports package CSS. Call `calendar.destr
 | `validRange.end` | `maxDate` | FullCalendar's end is exclusive; convert a date-only end to the preceding civil date. |
 | `timeZone` | `timeZone` or omission | Pass an IANA zone or `"UTC"`. Map FullCalendar's `"local"` sentinel to an omitted Litefold Calendar option, which uses device-local fields for `Date` inputs. Litefold Calendar never reinterprets event strings. |
 | `buttonText`, localized text | `messages` | Override only the message keys the application needs. |
-| `height`, `contentHeight`, `aspectRatio` | Application CSS | Litefold Calendar sizes from its host and content. The supported host width starts at 320 CSS pixels. |
+| `height`, `contentHeight`, `aspectRatio` | Application CSS | Litefold Calendar sizes from its host and content. The host must meet the [minimum supported design width](../DESIGN.md#responsive-model). |
 
 FullCalendar also permits `validRange` to be a function. Resolve dynamic bounds in application state before creating Litefold Calendar, then recreate the instance when those construction-time bounds change.
 
@@ -175,7 +179,12 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The range start is inclusive and the end is exclusive. Each invocation is timed by its returned shape: a direct array commits terminal state synchronously in one full render with no loading or `aria-busy`, while any PromiseLike uses a loading render followed by a terminal render. An `async` provider and even `Promise.resolve(array)` therefore opt into the async lifecycle. Litefold Calendar aborts superseded or destroyed requests and ignores stale results. It does not cache, combine first-class event sources, or expand recurrence; keep that work in application code.
+The range start is inclusive and the end is exclusive. The
+[source-timing contract](api.md#source-timing-and-renders) defines
+direct-versus-PromiseLike behavior. Litefold Calendar aborts superseded or
+destroyed requests and ignores stale results. It does not cache, combine
+first-class event sources, or expand recurrence; keep that work in application
+code.
 
 ## Rewrite callbacks
 

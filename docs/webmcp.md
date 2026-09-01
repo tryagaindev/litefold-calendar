@@ -28,7 +28,11 @@ calendar.render();
 
 With no options, `webMcp()` uses `"litefold-calendar"` as `toolNamePrefix`. A supplied prefix must contain 1 through 117 ASCII letters, digits, `_`, `.`, or `-`. This keeps the longer derived `-get-events` name within WebMCP's 128-character limit. Use a stable name for the calendar's role in the page, not a random or counter-based identifier. Supply distinct explicit prefixes whenever multiple calendars share one document because the tool registry is document-wide. Changing a prefix changes both public tool names, so treat it as an application compatibility contract.
 
-The extension feature-detects `document.modelContext.registerTool`, not the deprecated navigator-scoped predecessor. Browser support must not decide whether exposing calendar data is authorized. If an application needs to explain availability in its own UI, use a guarded feature test that compiles before experimental DOM declarations ship and fails closed on hostile accessors:
+The extension feature-detects only `document.modelContext.registerTool`.
+Browser support must not decide whether exposing calendar data is authorized.
+If an application needs to explain availability in its own UI, use a guarded
+feature test that compiles before experimental DOM declarations ship and fails
+closed on hostile accessors:
 
 ```ts
 function hasWebMcpSupport(document: Document): boolean {
@@ -73,7 +77,10 @@ When `date` is supplied, the tool returns events intersecting that allowed date,
 
 A current or retained usable snapshot returns `ok: true`, the numeric total, and the bounded page. While the current visible range has no loaded snapshot, it instead returns `ok: false` with error code `date-not-loaded`; an unavailable calendar with no usable snapshot returns `calendar-unavailable`. It never presents an unloaded range as an empty schedule. `navigate` is not read-only and returns no event content: it uses the same bounds, source cancellation, validation, failure, and stale-result rules as the public navigation methods, and waits for its own resulting source generation before returning. A destination load that ends unavailable also returns `calendar-unavailable`.
 
-Each navigation load is classified by its source value. A configured static array or an array returned directly by a provider commits its terminal state synchronously with one full render and no `loading` state or `aria-busy`. Any PromiseLike—including `Promise.resolve(...)`, an `async` function result, or a custom thenable—uses a loading render followed by a terminal render. Litefold Calendar invokes a provider before loading callbacks run and attaches PromiseLike handlers before those callbacks; `onStateChange` runs before the corresponding DOM replacement. The tool still waits for its own generation and returns the committed result in either case.
+Navigation uses the normal public navigation and event-source lifecycle, then
+returns the state committed by its own generation. See the
+[API lifecycle contract](api.md#source-timing-and-renders) for exact
+source timing and callback order.
 
 Every handled failure is a stable `{ ok: false, error: { code, message }, state }` envelope. Raw causes are never returned.
 
@@ -90,7 +97,10 @@ Canceling an execution rejects it with `AbortError` and stops waiting. A usable 
 
 Neither tool activates an event, selects an application command, follows a link, invokes `onDaySelect`, invokes an event or context-action callback, edits data, or bypasses application authorization. Ordinary state observation and event-source lifecycle callbacks still run for a committed navigation, just as they do for the equivalent public method. Tool results omit event identifiers, URLs, metadata, raw errors, and render-hook content. They expose only the bounded normalized fields required to understand the visible schedule.
 
-Litefold Calendar supports only imperative top-level registration through `document.modelContext.registerTool`. It does not use the deprecated navigator-scoped predecessor, declarative tools, cross-origin `exposedTo`, consumer APIs such as `getTools()` or `executeTool()`, or a WebMCP polyfill.
+Litefold Calendar supports imperative registration through
+`document.modelContext.registerTool`. It does not provide declarative tools,
+cross-origin exposure configuration, consumer-side tool execution APIs, or a
+WebMCP polyfill.
 
 The [public API reference](api.md#webmcp-extension) owns the exported factory and option shape. The [first-party extension guide](first-party-extensions.md) owns composition and bundle behavior. The [application integration guide](integration-guide.md#webmcp-site-tools) shows how to assign prefixes in a page that may host more than one calendar.
 
@@ -118,18 +128,24 @@ The repository [security model](security-model.md) covers the model/tool trust b
 
 ## Compatibility and testing
 
-Compatibility snapshot checked **2026-08-28**:
+WebMCP is experimental, and availability belongs to the target browser or host
+policy rather than this package:
 
-- The [WebMCP Community Group report](https://webmachinelearning.github.io/webmcp/) defines the current `document.modelContext` API. It is experimental and may change.
-- [Chrome's WebMCP guidance](https://developer.chrome.com/docs/ai/webmcp) documents an origin trial beginning in version 149 and an experimental flag for local development. Chrome also requires an origin-isolated document and gates WebMCP with the `tools` Permissions Policy, which defaults to `self`. [Microsoft Edge's separate origin trial](https://developer.microsoft.com/en-us/microsoft-edge/origin-trials/trials/0b76fe60-b266-458e-a285-04e375c0c31a) is active through November 17, 2026. Treat these as trial availability rather than a browser-support guarantee and feature-detect in every browser.
-- The [ChatGPT WebMCP documentation](https://learn.chatgpt.com/docs/webmcp) describes site-tool availability in ChatGPT desktop's built-in browser. Current support is for top-level imperative tools; declarative form tools and iframe tools are not supported. Availability can also depend on rollout, workspace policy, and selected model.
+| Observed situation | Integration response |
+| --- | --- |
+| `document.modelContext.registerTool` is absent, inaccessible, or policy-blocked | Treat the extension as an unavailable no-op and keep the ordinary calendar path complete. |
+| The feature test succeeds | Verify registration, tool execution, and teardown in that exact host; API presence alone is not disclosure authorization. |
+| The calendar is embedded | Verify the target host's current iframe, origin-isolation, and `tools` Permissions Policy before relying on exposure. Do not infer support from the top-level browser. |
+| The integration is production-bound | Recheck the [WebMCP Community Group report](https://webmachinelearning.github.io/webmcp/) and the target implementation's current requirements, such as [Chrome's WebMCP guidance](https://developer.chrome.com/docs/ai/webmcp). |
 
-Do not make WebMCP a required browser capability or infer availability from the browser brand alone. Use the guarded feature test above.
+Do not make WebMCP a required browser capability or infer availability from a
+browser brand, release number, workspace, or model. Use the guarded feature
+test above.
 
-To exercise a deployed page, use one of these experimental routes:
-
-- Open the top-level page in ChatGPT desktop's built-in browser under a workspace and model where site tools are available, then ask ChatGPT or Codex to read or navigate the named calendar. Do not put the calendar in an iframe.
-- Enroll the application origin in the Chrome or Edge trial, or follow Chrome's linked local-testing guidance to enable its experimental flag. For Chrome, also satisfy its origin-isolation and Permissions Policy requirements. Reload the page and confirm the exact feature test returns `true` before expecting registrations.
+To exercise a deployed page, open it in the exact target host and context,
+satisfy that host's current origin and policy requirements, then confirm the
+feature test returns `true` before expecting registrations. Repeat the
+unavailable-host path as a first-class test.
 
 For application verification:
 
@@ -137,7 +153,9 @@ For application verification:
 2. With a controlled model-context fixture, verify unique tool names, registration, first-page and cursor requests, rejected malformed input, execution with omitted callback options, caller-signal precedence, and cleanup after `destroy()`.
 3. Confirm `get-events` never changes calendar state, exposes no IDs, URLs, metadata, old snapshot data, or raw errors, and returns `pagination-stale` after its bound snapshot changes.
 4. Confirm `navigate` changes only the requested calendar view, preserves normal loading and error UI, never invokes application activation callbacks, and aborts pending execution on teardown.
-5. Exercise the deployed page in an enabled ChatGPT desktop browser or origin trial; an experimental flag is not the package's general compatibility baseline.
+5. Exercise the deployed page in the exact enabled host and embedded or
+   top-level context the application will use; local experimental settings are
+   not the package's general compatibility baseline.
 
 Package contributors can find exhaustive edge-case coverage in [`calendar-webmcp.test.ts`](../tests/calendar-webmcp.test.ts), [`calendar-webmcp-cursors.test.ts`](../tests/calendar-webmcp-cursors.test.ts), and the [browser smoke test](../tests/e2e/webmcp.spec.js).
 

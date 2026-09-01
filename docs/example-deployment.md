@@ -1,6 +1,6 @@
 # Static example deployment
 
-This guide is for maintainers operating the GitHub Pages developer demo. Contributors do not deploy examples manually: successful CI updates the rolling `main` preview, and successful alpha publication triggers immutable release snapshots.
+This guide is for maintainers operating the GitHub Pages developer demo. Contributors validate example changes through the [examples contributor lane](../examples/README.md#contributors) and do not deploy them manually: successful CI updates the rolling `main` preview, and successful alpha publication triggers immutable release snapshots.
 
 ## URL and identity contract
 
@@ -17,7 +17,7 @@ All deployed assets are repository-owned and same-origin. The demo has no analyt
 
 ## Operations at a glance
 
-| Operation | Trigger | Maintainer action |
+| Operation | Trigger | Maintainer or operator action |
 | --- | --- | --- |
 | Update rolling preview | Successful `CI` run for a push to `main` | None; inspect the resulting **Deploy static examples** run |
 | Add release snapshot | Successful **Publish npm alpha** completion after npm and GitHub release verification | None; verify the publisher-linked **Deploy static examples** run |
@@ -28,7 +28,8 @@ The separately scoped manual workflow is rollback-only. **Deploy static examples
 
 ## Repository setup
 
-Before the first deployment, a repository administrator must:
+Before the first deployment, a maintainer with GitHub `Admin` access to the
+repository must:
 
 1. Configure Pages to use **GitHub Actions** as its source.
 2. Protect the `github-pages` environment independently from `npm` and allow deployments from `main` only.
@@ -47,7 +48,7 @@ After npm verification and publication of the immutable GitHub prerelease, succe
 
 Before an automatic Pages snapshot can be retained, repository tooling:
 
-- Generates `examples/metadata.json` from the package version, exact source commit, and channel.
+- Generates `examples/metadata.json` as deployment provenance from the package version, exact source commit, and channel. The file is ignored build output; never edit or commit it.
 - Copies only the browser runtime files from `dist/` and `examples/`.
 - Injects the self-only Content Security Policy and developer provenance navigation into every staged page.
 - Rejects direct literal remote scripts, stylesheets, media, module imports, workers, sockets, beacons, and fetch targets.
@@ -115,6 +116,6 @@ Rerun the original publisher-linked **Deploy static examples** run only when all
 
 ## Verification
 
-`npm run check` is the complete repository gate. Tooling covers metadata and manifest validation, release ordering, static fallbacks, commit-pinned links, asset filtering, remote-resource rejection, exact CSP enforcement, retained-path immutability, idempotent retries, monotonic preview ancestry, workflow permissions, shared workflow-level queuing, authenticated writer-side rollback reconstruction, and rollback selection. Browser tests cover all six example routes plus keyboard/focus behavior, narrow full-SHA reflow, dark mode, forced colors, reduced motion, and automated accessibility rules.
+`npm run check` is the complete repository gate. Tooling covers metadata and manifest validation, release ordering, static fallbacks, commit-pinned links, asset filtering, remote-resource rejection, exact CSP enforcement, retained-path immutability, idempotent retries, monotonic preview ancestry, workflow permissions, shared workflow-level queuing, authenticated writer-side rollback reconstruction, and rollback selection. Browser tests cover every published example route plus keyboard/focus behavior, narrow full-SHA reflow, dark mode, forced colors, reduced motion, and automated accessibility rules.
 
 [Back to the documentation hub](README.md)

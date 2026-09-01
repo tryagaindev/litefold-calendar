@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit and Push"
+  short_description: "Safely perform requested Git stages"
+  default_prompt: "Use $commit-and-push to inspect my current change and perform only the commit or push stages I explicitly requested."

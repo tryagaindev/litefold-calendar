@@ -532,7 +532,7 @@ try {
 	}
 	console.log(
 		`Verified ${result.tarballName} (${result.tarballSha256}) from ${initialRepository.commit} ` +
-		"with a dependency-free install, extension tree shaking, and packed-byte browser interaction."
+		"with a dependency-free install, extension tree shaking, and packed-byte DOM interaction in an installed JSDOM consumer fixture."
 	);
 	if (releaseArguments.verifyOnly) {
 		console.log("Transient artifact bundle verified and removed; .artifacts was not changed.");

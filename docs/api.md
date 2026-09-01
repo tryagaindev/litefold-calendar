@@ -2,7 +2,10 @@
 
 This is the exhaustive reference for the package's public alpha API. Import core values and types from `@tryagaindev/litefold-calendar`, CSS from `@tryagaindev/litefold-calendar/styles.css`, and optional first-party components from their documented `/extensions/<id>` subpaths. Internal modules and `dist/` files are not supported entry points.
 
-Before `1.0.0`, public names and defaults may still change. Release notes and migration guidance will call out those changes.
+Before `1.0.0`, public names and defaults may still change. Review the
+[changelog](../CHANGELOG.md) for shipped changes and the
+[integration and API routes](README.md#integration-and-api) for applicable
+migration guidance before upgrading.
 
 Start with the [feature guide](features.md) to decide whether the focused month-and-agenda feature set fits your application. Use this page when writing or reviewing an integration.
 
@@ -55,7 +58,7 @@ function createCalendar<TMetadata = unknown>(
 ): Calendar<TMetadata>;
 ```
 
-`events` is the only required option. Pass an array for static data or a `CalendarEventSource` for range-aware data. `TMetadata` defaults to `unknown` and is normally inferred from typed events, an action, or render hooks. A basic calendar needs no generic argument. For supported visual layout, the host border box must provide at least **320 CSS pixels** of inline size; narrower hosts receive best-effort graceful degradation rather than a construction error.
+`events` is the only required option. Pass an array for static data or a `CalendarEventSource` for range-aware data. `TMetadata` defaults to `unknown` and is normally inferred from typed events, an action, or render hooks. A basic calendar needs no generic argument. For supported visual layout, the host border box must meet the [minimum supported design width](../DESIGN.md#responsive-model); hosts below that floor receive best-effort graceful degradation rather than a construction error.
 
 Given `<div id="my-calendar"></div>`:
 
@@ -425,7 +428,13 @@ interface CalendarWebMcpOptions {
 
 `webMcp()` returns a configured opaque extension for `CalendarOptions.extensions`. It defaults `toolNamePrefix` to `"litefold-calendar"`; supply an explicit stable prefix when multiple calendars can share one document because the WebMCP tool registry is document-wide. A prefix must contain 1 through 117 ASCII letters, digits, `_`, `.`, or `-`. A malformed object, unknown own string key, or invalid prefix is synchronous `invalid-configuration`; own symbol keys are ignored.
 
-A successfully rendered instance registers the read-only `<prefix>-get-events` tool and the navigating `<prefix>-navigate` tool through `document.modelContext`. The package never reads the deprecated navigator-scoped predecessor, never registers automatically, and preserves the complete normal calendar when the API is absent. A registration rejection is diagnostic-only `extension-failed` with `extensionId: "webmcp"`, `hook: "register"`, and phase `integration`; ordinary `CalendarState` and UI remain unchanged.
+A successfully rendered instance registers the read-only
+`<prefix>-get-events` tool and the navigating `<prefix>-navigate` tool
+through `document.modelContext`. The package never registers automatically
+and preserves the complete normal calendar when the API is absent. A
+registration rejection is diagnostic-only `extension-failed` with
+`extensionId: "webmcp"`, `hook: "register"`, and phase `integration`;
+ordinary `CalendarState` and UI remain unchanged.
 
 Omitting the extension subpath import keeps the WebMCP implementation outside the application import graph. A runtime conditional around a static import changes activation, not bundle inclusion. See the [first-party extension model](first-party-extensions.md) for bundle boundaries and the canonical [WebMCP site-tool contract](webmcp.md) for tools, envelopes, lifecycle, privacy, compatibility, and testing.
 
@@ -765,14 +774,27 @@ Two hooks have singleton ownership because each controls package-owned presentat
 
 `renderEventOverflow` receives a discriminated `CalendarEventOverflowContext` for each applicable pre-rendered variant. Branch on `variant`; do not infer the responsive state from viewport measurements:
 
-- `variant: "compact"` uses `surface: "day"`. When a primary marker is visible, `visibleEventCount` is `1`, `overflowCount` is the additional count, and `text` is signed, such as `+1`, `+999`, `+1K`, or `+1.3K` in `en-US`. Without a visible primary marker, `visibleEventCount` is `0`, `overflowCount` equals `eventCount`, and `text` is the unsigned total, such as `2`. Formatting uses the configured locale and `Intl.NumberFormat` with `notation: "compact"`, `compactDisplay: "short"`, `maximumFractionDigits: 1`, and `useGrouping: false`; the paired-marker formatter also uses `signDisplay: "always"`. The built-in visual is a bare semibold number. When paired with a primary marker/action, the two visuals occupy equal, gap-free, block-end-aligned auto-fit grid blocks. Their centers evenly divide the full area beneath the date when both compact-control-size tracks, 44 CSS pixels by default, fit; otherwise they become centered equal full-width rows. They stay stacked through supported phone widths and share a row only near the compact ceiling. A markerless standalone total occupies one centered block.
+- `variant: "compact"` uses `surface: "day"`. When a primary marker is visible, `visibleEventCount` is `1`, `overflowCount` is the additional count, and `text` is signed, such as `+1`, `+999`, `+1K`, or `+1.3K` in `en-US`. Without a visible primary marker, `visibleEventCount` is `0`, `overflowCount` equals `eventCount`, and `text` is the unsigned total, such as `2`. Formatting uses the configured locale and `Intl.NumberFormat` with `notation: "compact"`, `compactDisplay: "short"`, `maximumFractionDigits: 1`, and `useGrouping: false`; the paired-marker formatter also uses `signDisplay: "always"`. The built-in visual is a bare semibold number. [DESIGN.md](../DESIGN.md#responsive-model) owns its exact responsive placement.
 - `variant: "wide"` uses `surface: "grid-summary"`. `visibleEventCount` is the number of direct grid representations, `overflowCount` is the number omitted from them, and `text` is the localized exact `gridMore` value, such as `51 more`. This variant exists when the native grid-overflow action exists.
 
 `eventCount` is always the authoritative total. `elements.root` is the package-owned variant root and `elements.content` is its visual slot. `elements.action` is `null` for a passive compact cue and is the native `HTMLButtonElement` for the wide variant or when the overflow action itself is the compact primary visual, such as with `maxGridEventsPerDay: 0`. These references are for inspection and placement context: return visual content instead of directly changing, removing, or reparenting package-owned elements. A returned compact node replaces content only and remains within its package-assigned block. In the compact-primary action case, the fallback remains one package-owned action; a returned node stays inside it and `null` keeps the built-in numeric fallback. The native button, accessible name, activation, and focus transfer remain package-owned; `context.text` remains the package-formatted fallback even when a custom node replaces it visually.
 
-Compact output is presentational, unfocusable, and hidden from the accessibility tree; the day label retains the exact event total. A passive compact cue is pointer-transparent, so activating that area selects the day instead of activating the first event. The package owns the compact block-end placement and automatic one- or two-column grid; no public overflow-layout selector or CSS token is exposed. The repeat threshold uses the compact-control-size floor rather than arbitrary returned content's intrinsic width. Consumers must keep compact output concise enough for its assigned block; oversized application output can overflow and remains consumer-owned. Returned wide content replaces only visual content inside the native overflow button and cannot alter its behavior.
+Compact output is presentational, unfocusable, and hidden from the
+accessibility tree; the day label retains the exact event total. A passive
+compact cue is pointer-transparent, so activating that area selects the day
+instead of activating the first event. The package owns responsive placement;
+no public overflow-layout selector or CSS token is exposed. Consumers must keep
+compact output concise enough for its assigned block. Returned wide content
+replaces only visual content inside the native overflow button and cannot alter
+its behavior.
 
-Each applicable variant is created during the calendar render. When a native overflow action has both responsive presentations, its compact and wide variants coexist and container CSS selects between them at the `42rem` boundary. Resizing therefore does not invoke the hook again, rerender the calendar, measure the host in JavaScript, or replace a returned node. If either variant throws or returns an invalid value, the owning hook set is quarantined as one unit and every compact and wide package default it displaced is restored.
+Each applicable variant is created during the calendar render. Compact and
+wide variants coexist, and the container styles select the presentation defined
+by [the design contract](../DESIGN.md#responsive-model). Resizing therefore does
+not invoke the hook again, rerender the calendar, measure the host in JavaScript,
+or replace a returned node. If either variant throws or returns an invalid
+value, the owning hook set is quarantined as one unit and every compact and wide
+package default it displaced is restored.
 
 Day mount and badge hooks inspect every structural cell in the fixed grid, including cells whose out-of-range day button is already disabled; they must not make that day interactive. Overflow contexts are limited to in-range cells that have a rendered overflow variant; zero-event cells never invoke `renderEventOverflow`.
 

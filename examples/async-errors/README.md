@@ -4,7 +4,7 @@ This example keeps successful rendering and failure ownership visible on one pag
 
 ## Run it
 
-From the repository root, run `npm run demo`, then choose **Handle asynchronous failures** from the examples landing page. Wait for the first event to load before trying the controls.
+Follow the shared [local run instructions](../README.md#run-locally), then choose **Handle asynchronous failures** from the examples landing page. Wait for the first event to load before trying the controls.
 
 ## Failure scenarios
 

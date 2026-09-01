@@ -122,7 +122,10 @@ void test("the OIDC publisher consumes only the verified five-file bundle", asyn
 	assert.match(publish, /find \.[\s\S]*?wc -l\)" -eq 5/u);
 	assert.match(publish, /test -z "\$\(find \.[\s\S]*?! -type f/u);
 	assert.match(publish, /sha256sum --check --strict SHA256SUMS/u);
-	assert.match(publish, /E404\|404 Not Found[\s\S]*?package is (?:still )?absent/u);
+	assert.match(
+		publish,
+		/E404\|404 Not Found[\s\S]*?npm package disappeared immediately before publication/u
+	);
 	assert.match(
 		publish,
 		/const forbiddenDependencyFields = \[\s*"dependencies",\s*"peerDependencies",\s*"peerDependenciesMeta",\s*"optionalDependencies",\s*"bundledDependencies",\s*"bundleDependencies"\s*\]/u
@@ -139,8 +142,9 @@ void test("the OIDC publisher consumes only the verified five-file bundle", asyn
 	assert.doesNotMatch(source, /NPM_TOKEN|NODE_AUTH_TOKEN|registry-release-state\.mjs|release-verification\.mjs|verify-release-state\.mjs/u);
 });
 
-void test("first-publication candidates share one lock and only current main may claim npm E404", async () => {
+void test("registry-backed candidates share one lock and only current main may publish", async () => {
 	const source = await workflow("publish-alpha.yml");
+	const verify = job(source, "verify");
 	const publish = job(source, "publish");
 	assert.match(
 		source,
@@ -165,6 +169,11 @@ void test("first-publication candidates share one lock and only current main may
 	);
 	assert.equal(occurrences(publish, /main_commit="\$\(/gu), 2);
 	assert.match(publish, /\.object\.type == "commit"[\s\S]*?\.object\.sha/u);
+	assert.match(
+		verify,
+		/E404\|404 Not Found[\s\S]*?npm package must already exist before the normal alpha release workflow/u
+	);
+	assert.doesNotMatch(source, /registry-status|LFC_REGISTRY_STATUS|"status":"absent"/u);
 
 	const currentMainVersion = "0.2.0-alpha.1";
 	const queuedCandidates = ["0.2.0-alpha.0", currentMainVersion];
@@ -207,6 +216,7 @@ void test("npm 12 view results pass through one fail-closed normalizer", async (
 	assert.ok(integrityNormalize < tagsView);
 	assert.ok(tagsView < tagsNormalize);
 	assert.doesNotMatch(propagationLoop, /> "\$\{integrity_raw\}"[^;\n]*&&/u);
+	assert.match(verifyRegistry, /pending or blocked publish-time review/u);
 });
 
 void test("greater-alpha recovery follows the published alpha tag rather than the manifest parent", async (context) => {
@@ -489,7 +499,7 @@ void test("automatic deployment and rollback triggers remain physically isolated
 	}
 });
 
-void test("release documentation keeps publication push-only", async () => {
+void test("release documentation keeps publication push-only with one procedural owner", async () => {
 	const [administration, operations, releasing] = await Promise.all([
 		readFile(join(REPOSITORY_ROOT, "docs", "release-administration.md"), "utf8"),
 		readFile(join(REPOSITORY_ROOT, "docs", "release-operations.md"), "utf8"),
@@ -498,10 +508,27 @@ void test("release documentation keeps publication push-only", async () => {
 	assert.match(administration, /## Publication authority/u);
 	assert.match(
 		administration,
-		/`publish-alpha\.yml` starts only on pushes to `main`[\s\S]*?There is no manual, arbitrary-ref, or historical-commit publication path\./u
+		/`publish-alpha\.yml` starts only on pushes to `main`[\s\S]*?There is no\s+manual, arbitrary-ref, or non-current-commit publication path\./u
 	);
 	assert.match(operations, /The merge push is the only publication trigger\./u);
-	assert.match(releasing, /The merge push is the only publication trigger\./u);
+	assert.match(releasing, /merge push to canonical `main`\s+is the only publication trigger\./u);
+	assert.match(releasing, /\[Alpha release operations\]\(release-operations\.md\) owns the normal ordered/u);
+	assert.match(releasing, /\[Release administration\]\(release-administration\.md\) owns hosted controls/u);
+	assert.match(administration, /## Recovery matrix/u);
+	assert.match(administration, /Preparation reports an existing release branch or pull request/u);
+	assert.match(administration, /npm accepts the upload but the version remains unavailable/u);
+	assert.match(
+		administration,
+		/npm accepted the candidate but the `publish`\s+job itself failed[\s\S]*?Re-run all jobs/u
+	);
+	assert.match(
+		administration,
+		/If `publish` succeeded and only a downstream job failed, use \*\*Re-run failed jobs\*\*/u
+	);
+	assert.doesNotMatch(operations, /\| Observed state \| Required action \|/u);
+	assert.match(operations, /npm dist-tag add @tryagaindev\/litefold-calendar@EXACT_VERSION latest/u);
+	assert.doesNotMatch(administration, /npm dist-tag add/u);
+	assert.doesNotMatch(releasing, /npm dist-tag add|## Operator checklist|### 1\./u);
 	for (const guide of [administration, operations, releasing]) {
 		assert.doesNotMatch(
 			guide,

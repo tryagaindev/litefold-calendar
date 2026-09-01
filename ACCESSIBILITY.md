@@ -2,7 +2,7 @@
 
 Litefold Calendar is designed to support integration into WCAG 2.2 AA conforming pages when used according to this guidance. WCAG conformance applies to complete pages and processes, not an isolated component. Applications remain responsible for surrounding structure, content, contrast overrides, focus transitions outside the calendar, and end-to-end assistive-technology testing.
 
-Application developers can start with [Integration responsibilities](#integration-responsibilities) and run the relevant scenarios under [Testing](#testing). Contributors changing package interaction, semantics, layout, or announcements must also preserve the detailed contracts in the preceding sections.
+Package users can start with [Integration responsibilities](#integration-responsibilities) and run the relevant scenarios under [Testing](#testing). Contributors changing package interaction, semantics, layout, or announcements must also preserve the detailed contracts in the preceding sections.
 
 ## Interaction model
 
@@ -65,13 +65,9 @@ Returning `"handled"` from `onError` explicitly transfers both visible and acces
 
 ## Responsive and direct-input behavior
 
-The component uses CSS container queries rather than viewport width or JavaScript layout measurement. Its minimum supported design width is a 320 CSS-pixel calendar host border box, with no persistent two-dimensional content scrolling at that width. Narrower containers receive best-effort graceful degradation but are outside the design-support contract; the 280 CSS-pixel automated case is retained as a robustness stress check only. The transient native horizontal movement used by the optional decorative pager is not a second content axis or an adjacent interactive view. Verify the complete page at a viewport width equivalent to a 320 CSS-pixel host—for example, a 1,280-CSS-pixel viewport at 400% zoom. Automated and manual release verification covers supported component widths of 320, 340, 360, 375, 390, 412, and 768 CSS pixels.
+Responsive breakpoints, visual composition, and the supported design floor are canonical in the [responsive design](DESIGN.md#responsive-model). Layout uses CSS container queries rather than viewport width or JavaScript measurement. At the supported floor, reflow must not introduce persistent two-dimensional content scrolling; narrower containers are robustness targets rather than design claims. The pager's transient native horizontal movement is direct input, not a second content axis or adjacent interactive view. Verify the complete page at 400% zoom with the calendar host at the supported design floor.
 
-The [responsive design](DESIGN.md#responsive-model) exposes every capped event action in wide layouts and compacts the grid presentation when space is limited. The first actionable event remains fully named and later actions remain reachable when focused. Titles, times, and overflow information stay available in agenda rows, with visible/total progress for content beyond `agendaDomLimit`.
-
-At compact widths, every in-range day with more than one total event occurrence may show a locale-aware social-style number. With a visible primary marker it reports the additional occurrences with a sign, such as `+1`; without a visible primary it reports the unsigned total, such as `2`. The package aligns a primary marker/action and passive count at the cell's block end in two equal, gap-free auto-fitting grid blocks. Their centers evenly divide the full area beneath the date when both compact-control-size tracks, 44 CSS pixels by default, fit; otherwise they stack as centered, equal full-width rows. They remain stacked through supported phone widths and share one row only near the compact ceiling; a markerless total remains one centered block. Consumer compact hook output must remain concise enough for its assigned block because the auto-fit threshold cannot account for arbitrary intrinsic content width. A passive day-level count is decorative, `aria-hidden`, pointer-transparent, unfocusable, and independent of how many grid summaries fit under `maxGridEventsPerDay`; tapping it selects the day rather than activating the first event. When the native overflow action is the compact-primary control, including with `maxGridEventsPerDay: 0`, its compact number remains inside that single package-owned action, whose canonical name and activation remain authoritative. Neither form substitutes for the exact total in the day button's accessible name or changes F2 entry, action order, pointer activation, or agenda content.
-
-Marker and leading slots allow visual overflow while text slots own clipping and ellipsis. Render hooks may add noninteractive marker details without having them cut off, but applications remain responsible for avoiding overlap with names, focus rings, and adjacent actions. Empty slots do not reserve space.
+At every width, the first actionable event retains its complete accessible name; visually hidden later actions remain reachable through managed action navigation; and agenda rows retain titles, times, overflow details, and visible/total progress. Compact day counts are decorative, pointer-transparent, unfocusable, and excluded from action order. Pointer activation selects the day. If the overflow button carries the compact count, including when `maxGridEventsPerDay` is `0`, it remains one native action with package-owned naming and focus transfer. Neither presentation replaces the exact total in the day button's accessible name or changes F2, Arrow, Escape, Tab, pointer, or agenda behavior. Render-hook marker and leading content must remain noninteractive and must not obscure names, focus indicators, or adjacent actions.
 
 Static and interactive agenda rows keep marker or leading content, localized time, title, details, and trailing content in that DOM order. Their [visual alignment and narrow reflow](DESIGN.md#events-and-agenda) preserve usable reading space in both text directions.
 
@@ -79,7 +75,7 @@ The [compact visual treatment](DESIGN.md#responsive-model) may switch from short
 
 Toolbar controls remain in the same DOM and sequential-focus order at every width: Previous, Next, the interactive month title, Today, then application `toolbarEnd` content. The [responsive composition](DESIGN.md#responsive-model) changes rows without visual reordering. If a localized title cannot fit, only its visual presentation ellipsizes; the canonical full DOM text, trigger `aria-label`, and grid accessible name remain intact. The compact presentation is `aria-hidden` and cannot duplicate the accessible label or live announcement. Container resizing changes only CSS layout and does not rerender, replace focused nodes, refetch events, rerun render hooks, re-enter extension lifecycle, or require focus restoration.
 
-Controls and compact event actions use the [canonical target geometry](DESIGN.md#responsive-model). Applications must not reduce `--lfc-control-min-size` for controls or `--lfc-grid-event-min-block-size` for compact event actions below those design minima, or otherwise defeat accessible target sizing.
+Applications must preserve the target-size obligations defined by the [responsive design](DESIGN.md#responsive-model) when overriding public size tokens.
 
 Horizontal paging is an enhancement, never the only navigation method. With `swipe` enabled, touch, pen, and horizontal precision-scroll input use a native scroll-snap viewport to pull the one current grid toward a decorative Previous or Next lane. The following guarantees apply:
 
@@ -152,23 +148,19 @@ Manual test procedure (run the affected groups for a focused change and all grou
    - Repeat the preceding tasks at 320, 340, 360, 375, 390, 412, and 768 CSS pixels of component width; test LTR and RTL, light and dark color schemes, increased contrast, forced colors, reduced motion, 200% text size, 400% zoom, and portrait orientation as applicable.
    - Run 280 CSS pixels separately as a best-effort robustness stress check.
    - Confirm the month/year title stays on one line without horizontal overflow and retains its complete accessible text when visually ellipsized.
-   - With an allowed `2rem` custom marker and a noninteractive inline-end satellite, confirm the primary/count blocks remain equally sized, gap-free, and aligned at the cell's block end; they stay in centered equal full-width rows throughout supported phone widths; their centers evenly divide the full area beneath the date when both compact-control-size tracks fit near the compact ceiling; and they introduce no intersection or horizontal overflow. Confirm custom compact overflow output is concise enough to remain within its assigned block.
+   - Follow the [responsive visual checks](DESIGN.md#dos-and-donts) for custom marker and count geometry. In this accessibility pass, confirm compact cues remain decorative, complete accessible names and managed action order are unchanged, pointer activation reaches the documented target, and responsive reflow introduces no persistent two-dimensional scrolling.
 7. **Application integration**
    - Repeat affected tasks with application toolbar, progressive fallback, and render-hook content enabled.
 8. **WebMCP, when enabled**
    - Invoke each site tool through a controlled model-context fixture. Confirm read-only access does not change state; navigation preserves DOM focus, visible loading/error behavior, and callback boundaries; and teardown leaves no callable registration.
 
-### Developer-demo record
+### Developer-demo verification
 
-The redesigned GitHub Pages developer hub adds navigation and copy interactions outside the calendar component. Before publishing changes that invalidate the recorded evidence, repeat and date a pass covering its skip link, heading order, keyboard navigation, visible focus, copy success and manual-selection fallback, status announcement, narrow-screen reflow, dark mode, forced colors, and reduced motion. Record Pass only for checks that were actually performed.
-
-| Surface | Browser / assistive technology | Date | Result | Notes |
-|---|---|---|---|---|
-| Pages root, examples landing, and six recipe routes | Chromium 149; keyboard, accessibility tree, and axe (no screen reader) | 2026-08-26 | Pass (browser) | Skip link, sequential headings, keyboard order, visible focus, copy success and selection fallback, polite status text, 390 px reflow, dark mode, forced colors, reduced motion, and all six routes checked. Screen-reader speech remains part of the assistive-technology matrix below. |
+When a change affects the Pages developer hub, verify its skip link, heading order, sequential keyboard navigation, visible focus, copy success and manual-selection fallback, status announcement, responsive reflow, dark mode, forced colors, and reduced motion across every affected route. Record only checks that were performed in the pull request or private release evidence. Browser automation, accessibility-tree inspection, and automated rules do not establish screen-reader speech; use the assistive-technology matrix below for those claims.
 
 ### Assistive-technology record
 
-Release maintainers record actual results when a relevant change invalidates a row and before stable promotion. Do not infer a pass from an empty row or apply stale evidence to changed behavior.
+Maintainers responsible for a release record actual results when a relevant change invalidates a row and before stable promotion. Do not infer a pass from an empty row or apply stale evidence to changed behavior.
 
 | Platform | Browser and assistive technology | Version | Date | Result | Notes |
 |---|---|---|---|---|---|

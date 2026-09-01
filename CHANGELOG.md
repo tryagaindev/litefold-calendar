@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Split ordinary commit-and-push guidance from authorized npm release operations, added reusable repository skills for both workflows, and reorganized documentation and examples around package-user, contributor, and maintainer paths.
+- Hardened alpha release guidance and workflow contracts around existing-package publication, npm publish-time review, exact hosted identities, immutable tags and assets, and policy-controlled release notes.
+
 <!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
 
 ### Fixed

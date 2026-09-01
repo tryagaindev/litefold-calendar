@@ -1,151 +1,205 @@
 # Alpha release administration and recovery
 
-This guide is for repository and npm administrators. It covers one-time hosted setup, registry mutations, and failed-release recovery. Release operators should normally use the [alpha release operations runbook](release-operations.md).
-
-The steady-state process is deliberately short: run **Prepare alpha release**, review and merge its three-file pull request, approve the protected npm environment, advance `latest` to the published alpha, and verify the automatic GitHub release and Pages deployment. Publication starts only from the resulting push to `main`.
+This guide is for maintainers who manage GitHub and npm release controls. It owns
+hosted controls, unsupported transitions, exceptional registry actions, reruns,
+and the recovery matrix. Release operators use the
+[alpha release operations runbook](release-operations.md) for the normal ordered
+procedure and exact channel command.
 
 ## One-time hosted prerequisites
 
-Verify these settings before enabling publication and after any owner, repository, workflow filename, environment, or package-ownership change.
+Verify these settings before enabling publication and after any owner,
+repository, workflow filename, environment, package-ownership, or hosted-policy
+change.
 
 ### GitHub organization
 
-- Organization owners use two-factor authentication, and the organization requires it for every member and outside collaborator. Keep at least two trusted owners when a second maintainer is available, but otherwise grant owner access sparingly.
-- Base repository permission is **None**. Repository access is explicit, and members cannot create or delete repositories, change repository visibility, create teams, or create Pages sites unless an owner deliberately changes that policy.
-- GitHub Actions permits GitHub-owned actions and reusable workflows only, requires full commit-SHA pinning, gives `GITHUB_TOKEN` read access by default, and does not let workflows create or approve pull requests.
-- Personal access tokens (classic) cannot access the organization. Fine-grained personal access tokens require owner approval and must expire within 90 days.
-- OAuth application access is restricted. Organization data is available only to applications an owner explicitly approves; review existing approvals before removing or replacing an integration.
-- Immutable releases apply to every repository. The enforced organization security configuration applies to every public repository and is the default for new public repositories.
+- Require two-factor authentication for members and outside collaborators.
+  Grant organization-owner access only where it is needed for policy management
+  and account recovery.
+- Keep base repository permission at **None** and grant repository access
+  explicitly.
+- Permit only approved GitHub-owned Actions and reusable workflows, require full
+  commit-SHA pinning, keep the default `GITHUB_TOKEN` read-only, and prevent
+  workflows from creating or approving pull requests.
+- Restrict classic personal access tokens, require approval and expiration for
+  fine-grained tokens, and review OAuth application access.
 
 ### npm
 
-- The public repository identity exactly matches `package.json#repository`.
-- The intended maintainers control the `@tryagaindev` npm scope and `@tryagaindev/litefold-calendar`; maintainer accounts use two-factor authentication.
-- [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) is bound to the exact GitHub owner, repository, workflow filename `publish-alpha.yml`, environment `npm`, and allowed `npm publish` action. The workflow must remain on a GitHub-hosted runner with `id-token: write`. Do not add a long-lived `NPM_TOKEN` secret.
-- After trusted publishing works, set the package's publishing access to **Require two-factor authentication and disallow tokens**, and revoke legacy automation or granular publish tokens that the OIDC workflow replaced.
+- Confirm the public repository identity exactly matches
+  `package.json#repository`.
+- Confirm that only the intended accounts can administer the `@tryagaindev`
+  scope or maintain the package, and require two-factor authentication for those
+  accounts.
+- Bind [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) to
+  the exact GitHub owner, repository, `publish-alpha.yml` workflow, `npm`
+  environment, and the **npm publish** allowed action only. Keep the job on a
+  GitHub-hosted runner with `id-token: write`.
+- Disallow long-lived publication tokens. Once trusted publishing is active,
+  require two-factor authentication and disallow tokens for direct package
+  publication.
 
 ### GitHub repository and release
 
-- The GitHub `npm` environment requires release-maintainer approval, prevents an initiator from approving their own deployment when more than one maintainer is available, blocks administrator bypass, and has a deployment-branch policy that allows `main` only. Keep self-review available while there is only one maintainer; otherwise every release deadlocks.
-- The default branch requires a pull request, successful up-to-date **Build, test, and verify package** status, resolved review conversations, CodeQL merge protection, and linear history. It blocks deletion and force pushes. With one maintainer, require zero independent approvals; require an independent approval and code-owner review after a second maintainer is available.
-- A `v*` tag ruleset permits the source-pinned publisher to create a new exact-SHA release tag, then blocks updates, deletion, and force updates. It has no bypass actors.
-- Only squash merging is enabled, using the pull-request title and description. Automatic merging and deletion of merged head branches are enabled.
-- [GitHub immutable releases](https://docs.github.com/en/enterprise-cloud@latest/code-security/concepts/supply-chain-security/immutable-releases) are enabled.  Release artifacts must be attached while the prerelease is still a draft because published immutable tags and assets cannot be replaced.
-- The enforced public-repository security configuration enables the dependency graph, Dependabot alerts and security updates, CodeQL default setup, provider-pattern secret scanning, push protection, and private vulnerability reporting. GitHub Code Quality and licensed secret-scanning extensions (validity checks, extended metadata, non-provider and generic patterns, and AI-detected secrets) remain disabled. Weekly npm and GitHub Actions version-update pull requests come from `.github/dependabot.yml`.
+- Protect the `npm` environment with required reviewers, block administrator
+  bypass, and restrict it to `main`. When multiple eligible people can serve as
+  required reviewers, prevent self-review and require an independent approval.
+  While the project has one maintainer, do not enable prevent self-review when it
+  would deadlock publication; record that hosted decision.
+- Protect `main` with pull requests, the current **Build, test, and verify
+  package** check, resolved conversations, CodeQL merge protection, linear
+  history, and blocks on deletion and force pushes. Require independent approval
+  and code-owner review whenever another eligible maintainer is available.
+- Protect `v*` tags with a repository ruleset that blocks updates and deletion
+  and grants creation to the narrowest available actor. The workflow creates
+  and verifies an exact-SHA tag, but its `GITHUB_TOKEN` identifies the installed
+  GitHub Actions application rather than one specific workflow. Treat the tag
+  ruleset as defense in depth, keep unrelated workflows from receiving tag-write
+  authority, and verify the effective bypass actors directly.
+- Enable only squash merging, using the pull-request title and description.
+- Enable
+  [GitHub immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).
+  Attach artifacts while the prerelease is a draft because published tags and
+  assets cannot be replaced. Release titles and notes remain editable on the
+  platform; restrict write access and audit them against retained evidence.
+- Enable dependency graph, Dependabot alerts and security updates, CodeQL,
+  provider-pattern secret scanning, push protection, and private vulnerability
+  reporting. Verify every repository-level feature directly; an organization
+  default is not evidence that the repository still has the intended setting.
 
 ### GitHub Pages
 
-- Pages uses **GitHub Actions** as its publishing source.
-- The `github-pages` environment is protected independently from npm authority, blocks administrator bypass, and its deployment-branch policy allows `main` only.
-- The retained `pages-content` branch blocks deletion and non-fast-forward updates. Its workflow may advance the branch only from the verified retained head; maintainers do not edit that branch by hand.
-- Automatic and rollback Pages workflows share one non-canceling workflow-level concurrency group with the maximum built-in queue. This serializes retained-state validation, writes, packaging, and deployment across both workflows.
+- Use **GitHub Actions** as the Pages source.
+- Protect the `github-pages` environment independently from npm authority,
+  block administrator bypass, and restrict deployment to `main`.
+- Protect the retained `pages-content` branch from deletion and
+  non-fast-forward updates. Only the verified retained-state workflow advances
+  it.
+- Keep automatic and rollback Pages workflows in the same non-canceling,
+  maximum-queue workflow-level concurrency group.
 
-Repository files and tests describe these requirements but cannot prove that hosted settings are enabled.  Verify them in GitHub and npm rather than inferring them from a successful local check.
-
-If the package has never existed, an authorized npm owner may need one human-authenticated bootstrap publication before trusted publishing can be configured. Treat that as a separately reviewed exception: use a dedicated bootstrap version, pass `--tag alpha` explicitly, record the action, and configure trusted publishing before the next release. Never consume the version already prepared for automation, and do not add a token to GitHub as a shortcut.
-
-## Temporary alpha-as-latest policy
-
-Until the first stable release, completed alpha releases require both `alpha` and `latest` to select the same exact prerelease. This intentionally makes unqualified npm installs resolve to alpha software. The stable-release process must replace this temporary invariant before its first publication.
-
-Inspect live tags before release work. The queries are read-only; advancing `latest` mutates the public registry and requires an authenticated npm owner.
-
-```sh
-npm whoami --registry https://registry.npmjs.org/
-npm view @tryagaindev/litefold-calendar dist-tags --json --registry https://registry.npmjs.org/
-```
-
-If `npm whoami` reports that authentication is absent, the npm owner runs this exact command and completes the browser and second-factor flow privately:
-
-```sh
-npm login --registry https://registry.npmjs.org/
-```
-
-Rerun `npm whoami` afterward. Never share the npm browser session, CLI authentication URL, OTP, or token with an assistant or automation.
-
-If npm reports that the package does not exist, stop here and follow the bootstrap case above. Do not interpret a failed or malformed registry response as an empty tag set. Before preparing another alpha, the existing `alpha` and `latest` tags must select the same completed prerelease.
-
-Complete npm's second-factor flow if it is required for a registry mutation. Do not record an OTP in a command transcript, issue, or release note.
-
-After trusted publishing has placed the exact candidate under `alpha`, confirm the immutable version exists and atomically advance `latest` to it:
-
-```sh
-npm view "@tryagaindev/litefold-calendar@EXACT_VERSION" name version --json --registry https://registry.npmjs.org/
-npm dist-tag add @tryagaindev/litefold-calendar@EXACT_VERSION latest --registry https://registry.npmjs.org/
-npm view @tryagaindev/litefold-calendar dist-tags --json --registry https://registry.npmjs.org/
-```
-
-Replace `EXACT_VERSION` with the workflow candidate. Both tags must select it before the workflow publishes the immutable GitHub prerelease. Do not remove `latest`, point it at an unpublished or different version, or give the publish-only OIDC identity general dist-tag administration authority. If the workflow's polling window expires, complete and verify this exact tag update, then rerun the failed jobs for the original release attempt.
-
-## Historical tag exceptions
-
-Two published prereleases predate the protected annotated-tag and immutable-release policy. Their lightweight tags are accepted only at these exact identities:
-
-| Tag | Exact commit |
-| --- | --- |
-| `v0.1.0-alpha.0` | `53cf1fbb5f4176929c3105030a62e1d0c235b54f` |
-| `v0.2.0-alpha.0` | `8250ac4da9ada72a2915b8f810be404667ab47da` |
-
-Never move, recreate, annotate, or otherwise rewrite either historical tag to simulate current guarantees. No other lightweight release tag is permitted; every later version must satisfy the exact-SHA annotated-tag ruleset and immutable-release policy.
+Repository files and tests describe these requirements but cannot prove hosted
+settings. Verify them in GitHub and npm, then record the verifier, UTC time, and
+sanitized evidence in the private release record.
 
 ## Publication authority
 
-The workflow deliberately separates source execution from publication authority:
+The workflow separates source execution from public write authority:
 
-| Phase | Source checkout or execution | Authority and output |
+| Phase | Source execution | Authority and output |
 | --- | --- | --- |
-| Classify and verify | Exact pushed `github.sha`; full repository gate | Read-only repository access; retains the package bundle and release notes |
-| Stage GitHub release | No checkout and no project-code execution | Repository write access; creates or validates the exact tag, draft prerelease, notes, and assets |
-| Publish npm | No checkout, candidate/project install, candidate import, or project-code execution | Protected `npm` environment and npm OIDC; publishes only the checksum-verified tarball under `alpha` |
-| Synchronize npm channels | No workflow credential | An authenticated npm owner advances `latest` to the exact published alpha |
-| Verify and finalize | Clean public-package consumer, then a source-free release job | Requires `alpha` and `latest` to match, verifies registry bytes/imports/signatures/provenance, publishes the immutable GitHub prerelease, then completes successfully so native `workflow_run` starts Pages |
+| Classify and verify | Exact pushed commit; complete repository gate | Read-only repository access; retains the package bundle and release notes |
+| Stage GitHub release | No checkout or project-code execution | Repository write access; creates or validates the exact tag, draft prerelease, notes, and assets |
+| Publish npm | No checkout or candidate-code execution | Protected `npm` environment and npm OIDC; publishes only the checksum-verified tarball under `alpha` |
+| Synchronize npm channels | No workflow credential | An authenticated npm package maintainer advances `latest` to the exact verified alpha |
+| Verify and finalize | Clean public-package consumer, then a source-free release job | Verifies registry identity, imports, signatures, provenance, tag, release, and retained bytes before the native Pages handoff |
 
-`publish-alpha.yml` starts only on pushes to `main`, and only a changed alpha version with an exact first-parent diff limited to `package.json`, `package-lock.json`, and `CHANGELOG.md` enters publication. There is no manual, arbitrary-ref, or historical-commit publication path.
+`publish-alpha.yml` starts only on pushes to `main`. Only a changed alpha
+version whose first-parent diff is limited to `package.json`,
+`package-lock.json`, and `CHANGELOG.md` enters publication. There is no
+manual, arbitrary-ref, or non-current-commit publication path.
 
-Release Pages start through the `workflow_run`-only `deploy-examples.yml` after successful completion of the push-triggered publisher that verified npm and made the immutable prerelease public. The publisher supplies its verified full head commit; Pages accepts no release-ref input. Manual retained-main recovery is isolated in the `workflow_dispatch`-only `rollback-examples.yml`; it accepts a retained snapshot commit, never a release ref. Both Pages workflows use the same queued workflow-level lock, so one run owns retained-state validation through final deployment before the next begins. See [static example deployment](example-deployment.md) for both procedures.
+Release Pages start only through the successful publisher's native
+`workflow_run` handoff. Manual rolling-preview recovery remains isolated in
+`rollback-examples.yml`. See
+[static example deployment](example-deployment.md) for that authority boundary.
 
-The staging and finalization jobs intentionally have no checkout. Every GitHub CLI release mutation in those jobs names the repository explicitly; asset upload uses this shape:
+Source-free release jobs name the repository explicitly for every GitHub CLI
+mutation. Do not add a checkout merely to infer repository context.
 
-```sh
-gh release upload --repo "${GITHUB_REPOSITORY}" "${LFC_TAG}" "${LFC_BUNDLE_DIRECTORY}/${name}"
-```
+## Temporary alpha channel policy
 
-Do not add a checkout merely to give `gh` repository context. Keeping the write-capable jobs source-free is part of the authority boundary.
+Until a reviewed stable-release procedure replaces it, a completed alpha release
+requires npm `alpha` and `latest` to select the same exact prerelease.
+Registry reads must be fresh and well-formed; a missing package, failed response,
+or malformed response is not an empty tag set.
 
-Reruns accept existing state only when identity and bytes match exactly:
+The npm package maintainer performs authentication and channel mutation privately. Automation
+must never receive the browser session, authentication URL, password, token,
+one-time code, or recovery code. Follow
+[the operations channel step](release-operations.md#5-advance-the-temporary-npm-latest-tag)
+for the sole normal command sequence.
 
-- An npm version is complete only when registry integrity matches the retained tarball and both `alpha` and `latest` identify the exact version. A clean exact-version install and both supported imports must succeed with lifecycle scripts disabled. Signatures and SLSA provenance must bind the exact package bytes, repository, `refs/heads/main`, source commit, workflow, GitHub-hosted builder, and the `push` publisher event.
-- A tag, draft, published prerelease, or asset is reusable only at the same full commit with identical notes and bytes.
-- A release Pages path is reusable only when its version, tag commit, manifest, and bytes match exactly.
-- Authentication, network, malformed response, missing provenance, and ambiguous or conflicting public state abort the transition.
+## Unsupported transitions
+
+Stop and design a separately reviewed procedure before any of these transitions:
+
+- the package's first public publication or trusted-publisher bootstrap;
+- the first stable release;
+- replacing the temporary `alpha`/`latest` channel policy;
+- changing the trusted publisher's allowed action or adopting npm staged
+  publishing;
+- unpublishing a version;
+- moving, recreating, deleting, or replacing an immutable tag, release, asset,
+  or release Pages path; or
+- publishing from a ref or commit outside the protected normal path.
+
+The new procedure must define authorization, exact identities, audit evidence,
+credential boundaries, rollback or irreversibility, workflow changes, and
+independent verification before execution. Do not consume a candidate already
+prepared for the normal automated path.
+
+Deprecating a defective published version is a supported exceptional metadata
+action only when an authorized npm package maintainer has verified the exact version,
+replacement guidance, and private release record. Use the dedicated section
+below. Rolling `main` Pages rollback is also supported, but only through the
+[deployment rollback procedure](example-deployment.md#roll-back-the-rolling-preview).
 
 ## Rerun procedure
 
-A rerun of an existing run uses that run's original commit SHA, ref, and workflow definition. It can consume corrected hosted settings or registry state, but it cannot consume repository source or that workflow's changes merged later. Use this procedure only for a resolved transient infrastructure, authentication, or hosted-state failure. If package or source files must change, stop and follow the recovery matrix; prepare a greater alpha when required.
+A rerun uses the original run's commit, ref, and workflow definition. It may
+consume corrected transient infrastructure, authentication, or hosted
+configuration, but it cannot consume source or publisher-workflow changes merged
+later.
 
-1. Open the original **Publish npm alpha** run for the release merge commit. Do not start a different workflow or manufacture another event.
-2. Confirm the run's full commit SHA and candidate version match the retained bundle and any existing npm, tag, draft/release, or asset state.
-3. Confirm recovery required no source or workflow change, then use **Re-run failed jobs** (or **Re-run all jobs** when the failed dependency chain requires it).
-4. After completion, independently verify npm and GitHub identities, then verify the publisher-linked Pages run. If GitHub did not create that run after a successful publisher completion, review the current default-branch `deploy-examples.yml`, select **Re-run all jobs** on the original publisher, and validate the newly created Pages run independently. The publisher rerun retains its original identity, but the new downstream run uses the current Pages workflow definition while pinning release source and assembly tooling to the publisher SHA.
+1. Open the original **Publish npm alpha** run for the recorded release commit.
+2. Confirm its full commit, version, retained bundle, and any npm, tag, draft,
+   release, notes, or asset state match exactly.
+3. Confirm no source or publisher-workflow bytes changed to enable recovery.
+4. Select the rerun scope from the recorded job state:
+   - Use **Re-run failed jobs** when publication did not occur, or when the
+     `publish` job succeeded and only registry verification, release
+     finalization, or the native downstream handoff failed.
+   - Use **Re-run all jobs** when npm accepted the candidate but the `publish`
+     job itself failed. The `verify` job must rebuild the registry snapshot
+     before `publish` can safely recognize the existing candidate.
+   - Also use **Re-run all jobs** when a missing native downstream event must be
+     emitted again.
+5. Independently verify npm, GitHub, and the publisher-linked Pages run after
+   completion.
 
-If the original run is no longer rerunnable, or any public identity cannot be proved to match, do not recreate the attempt from another commit. Use the recovery matrix and prepare a greater alpha where required.
+A newly emitted Pages run uses the current default-branch Pages workflow while
+pinning release source and assembly tooling to the publisher commit. Review that
+workflow and validate the new run independently. If the original run is no longer
+rerunnable or any identity cannot be proved, do not recreate the attempt from a
+different commit.
 
 ## Recovery matrix
 
-| State | Recovery |
+| Observed state | Required action |
 | --- | --- |
-| Failure before npm publication | Resolve only transient infrastructure, authentication, or hosted-state configuration, then rerun the original exact-push attempt. A matching staged tag, draft, and assets may be reused. If source or workflow files must change, prepare a greater alpha. |
-| npm accepted identical verified bytes but the run ended afterward | Rerun the original publication attempt for that exact push so event identity, artifact, and provenance remain unchanged. If the original attempt cannot be resumed safely, stop, deprecate the incomplete version when appropriate, and prepare a greater alpha. |
-| npm accepted the candidate under `alpha`, but `latest` still selects the predecessor | Confirm the candidate's exact version and retained integrity, advance only `latest` to that candidate with an authenticated owner, then rerun the original failed jobs. |
-| npm contains the version with different or unverifiable bytes | Stop.  Do not reuse the version.  Investigate, deprecate when appropriate, and prepare a greater alpha. |
-| Tag, draft, or asset exists with matching identity | Rerun the original exact-push attempt; the stage is idempotent. |
-| Tag, draft, or asset conflicts | Do not move, delete, or overwrite it as part of a rerun. Stop, investigate, and prepare a greater alpha. |
-| Published npm alpha is defective | Deprecate the exact version with a replacement message and publish a greater alpha.  Avoid `npm unpublish` except for a genuine security/legal need allowed by npm policy. |
-| Immutable GitHub prerelease is defective | Leave it intact and publish a corrected greater alpha. |
-| Rolling `main` Pages preview is defective | Run **Roll back static examples** from `main` with **Snapshot ref** set to the exact 40-character lowercase `pages-content` commit documented by the deployment guide. This separate manual workflow is rollback-only. |
-| Release Pages verification failed | For a transient or hosted-state failure, rerun the original publisher-linked **Deploy static examples** run. An existing rerun cannot consume later workflow changes. If no downstream run exists, review the current default-branch Pages workflow, select **Re-run all jobs** on the successful original publisher, and independently validate the newly created Pages run. If release source or assembly tooling must change, publish a corrected greater alpha. Never dispatch a release by ref or replace a release path with different bytes. |
+| Preparation reports an existing release branch or pull request | Record the branch head and pull request, then compare their exact three-file state, base commit, candidate, and review status with the requested preparation. Resume only an exact still-valid match. Otherwise preserve any unrelated work; after explicit authorization, a maintainer with the required GitHub access records the old head, closes the stale pull request, removes only the stale unmerged release branch, and reruns preparation from current `main`. |
+| Failure before npm publication | Resolve only a transient infrastructure, authentication, or hosted-configuration problem, then rerun the original exact attempt. Matching staged state may be reused. If source or publisher-workflow bytes must change, prepare a greater alpha. |
+| npm accepts the upload but the version remains unavailable after registry polling | Treat the version as pending or blocked by publish-time review. Do not republish, reuse the version, or prepare a replacement while registry state is ambiguous. Check npm status and private npm package maintainer notifications; appeal a block through npm when offered. Once the exact expected integrity is publicly readable, rerun the original attempt. |
+| npm accepted identical verified bytes but the run ended afterward | If the `publish` job failed after npm accepted the candidate, use **Re-run all jobs** so `verify` rebuilds the registry snapshot before `publish` recognizes the existing candidate. If `publish` succeeded and only a downstream job failed, use **Re-run failed jobs**. Preserve the original event identity, artifact, and provenance. If exact resumption cannot be proved, stop and prepare a greater alpha; deprecate the incomplete version when appropriate. |
+| npm accepted the candidate under `alpha`, but `latest` selects another version | Confirm candidate identity and retained integrity, perform the operations runbook's exact channel step, then rerun the original failed jobs. |
+| npm contains the version with different or unverifiable bytes | Stop. Do not reuse or overwrite the version. Investigate, deprecate when appropriate, and prepare a greater alpha. |
+| Tag, draft, release, notes, or assets exist with matching identity and bytes | Rerun the original exact attempt; the matching stage is idempotently reusable. |
+| Tag, draft, release, notes, or assets conflict or cannot be proved | Stop. Do not move, delete, replace, or reuse them. Investigate and prepare a greater alpha. |
+| Published package or immutable prerelease is defective | Preserve immutable state, deprecate the package version when appropriate, and publish a corrected greater alpha. |
+| Publisher-linked release Pages run failed | Rerun that exact Pages run only for a transient or hosted-state problem. If release source or assembly tooling must change, publish a corrected greater alpha. |
+| No publisher-linked release Pages run exists | Confirm the original publisher succeeded, review the current Pages workflow, rerun all jobs on the original publisher, and validate the newly emitted Pages run against the recorded release commit. |
+| Rolling `main` Pages preview must move backward | Use **Roll back static examples** with the exact retained snapshot commit defined by the deployment guide. Never use it to create or replace release Pages. |
 
-Registry administration such as moving a dist-tag or deprecating a version requires an authenticated npm owner and is intentionally outside trusted publication. Before deprecating, replace every uppercase placeholder below and inspect both versions:
+Authentication, network, malformed responses, missing provenance, and ambiguous
+or conflicting public state fail closed.
+
+## Exceptional registry metadata
+
+An authenticated npm package maintainer may deprecate an exact defective version after a
+replacement has been selected. Replace every uppercase placeholder and inspect
+both versions before mutating registry metadata:
 
 ```sh
 npm view "@tryagaindev/litefold-calendar@EXACT_VERSION" name version deprecated dist.integrity --json --registry https://registry.npmjs.org/
@@ -154,4 +208,9 @@ npm deprecate "@tryagaindev/litefold-calendar@EXACT_VERSION" "Use REPLACEMENT_VE
 npm view "@tryagaindev/litefold-calendar@EXACT_VERSION" name version deprecated --json --registry https://registry.npmjs.org/
 ```
 
-The `npm deprecate` command mutates public registry metadata. Record the incident and recovery in the relevant GitHub release or repository issue without exposing credentials or private vulnerability details.
+The mutation requires explicit authorization immediately before
+`npm deprecate`. Record the exact identities, reason, npm package maintainer who
+performed the action, UTC time, command result, and sanitized recovery evidence
+in the private release record. Public
+communication follows the normal changelog, advisory, or release-note decision;
+do not expose credentials or private vulnerability details.

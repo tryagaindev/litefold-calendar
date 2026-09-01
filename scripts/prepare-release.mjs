@@ -39,6 +39,22 @@ export function parsePrepareReleaseArguments(arguments_) {
 	return { bump, dryRun, json };
 }
 
+export function formatPrepareReleaseMessages(result) {
+	const action = result.dryRun
+		? "Would prepare release files for"
+		: "Prepared release files for";
+	const messages = [
+		`${action} ${result.tag}; suggested hosted branch: ${result.branch}.`,
+		`Changed files: ${result.changedFiles.join(", ")}`
+	];
+	if (!result.dryRun) {
+		messages.push(
+			"Review the diff and run npm run release:verify. This local command creates no branch or pull request; use the hosted Prepare alpha release workflow for normal release work."
+		);
+	}
+	return messages;
+}
+
 export async function main(arguments_ = process.argv.slice(2)) {
 	const options = parsePrepareReleaseArguments(arguments_);
 	const result = await prepareRelease(options);
@@ -46,11 +62,8 @@ export async function main(arguments_ = process.argv.slice(2)) {
 		console.log(JSON.stringify(result));
 		return result;
 	}
-	const action = result.dryRun ? "Would prepare" : "Prepared";
-	console.log(`${action} ${result.tag} on ${result.branch}.`);
-	console.log(`Changed files: ${result.changedFiles.join(", ")}`);
-	if (!result.dryRun) {
-		console.log("Review the diff, run npm run release:verify, then open the generated release pull request.");
+	for (const message of formatPrepareReleaseMessages(result)) {
+		console.log(message);
 	}
 	return result;
 }

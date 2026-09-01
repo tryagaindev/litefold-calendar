@@ -2,7 +2,7 @@
 
 Thanks for helping improve Litefold Calendar. The project is maintained by TryAgainDev and released under the MIT License. Participation is governed by the [Contributor Covenant 3.0 Code of Conduct](CODE_OF_CONDUCT.md).
 
-This guide owns contribution policy and validation requirements. Use the [common contributor commands](CONTRIBUTOR_COMMANDS.md) as a copyable or IDE-runnable command index.
+This guide owns contribution policy and the obligations that accompany each kind of change. Use the [contributor command reference](CONTRIBUTOR_COMMANDS.md) for repository setup, focused checks, the final gate, and change delivery.
 
 ## Before you start
 
@@ -11,89 +11,56 @@ This guide owns contribution policy and validation requirements. Use the [common
 - Report suspected vulnerabilities privately according to [SECURITY.md](SECURITY.md); never include exploit details in a public issue.
 - Keep proposals within the alpha constraints: responsive, framework-agnostic, strict TypeScript/CSS, accessible by default, progressive where useful, and zero runtime dependencies.
 
-Small fixes may go directly to a pull request. Discuss large public-API, date-model, accessibility, extension, or release changes before implementation.
+Small fixes may go directly to a pull request. Discuss large public-API, date-model, accessibility, extension, packaging, or release-workflow changes before implementation.
 
-## Development
+## Repository requirements
 
-Use the repository-owned toolchain:
+- Use a current Node.js 24 release. [`.nvmrc`](.nvmrc) and `package.json#devEngines` define the supported runtime line.
+- Use the exact npm release selected by `package.json#packageManager` for the final repository gate. The broader `devEngines.packageManager` range is a bootstrap compatibility warning, not the version used to validate a contribution.
+- Install the exact development dependencies from `package-lock.json` and use the repository-pinned Chromium binary. The [contributor command reference](CONTRIBUTOR_COMMANDS.md#set-up-the-repository) owns the copyable setup commands.
+- Keep text files UTF-8 with LF line endings. Git attributes and EditorConfig enforce this across supported editors and operating systems.
+- Do not add runtime, peer, optional, or bundled dependencies; install hooks; remote assets; CDNs; fonts; or icons. Exact-pin and justify any new development dependency or browser tooling in the pull request.
 
-- A current stable release on the Node.js 24 line. [`.nvmrc`](.nvmrc) and `package.json#devEngines` define the supported major line.
-- The exact npm release in `package.json#packageManager`.
-- The exact development dependencies in `package-lock.json` and the locally pinned Chromium binary.
+Use focused checks while developing, then run the [complete repository gate](CONTRIBUTOR_COMMANDS.md#run-the-final-gate) before submission. Automated checks do not replace affected manual accessibility or compatibility review.
 
-The npm bundled with a Node installation is not automatically the repository-selected client. Activate the required Node and npm versions, verify them, then install the locked dependencies and browser:
+## Change obligations
 
-```shell
-node --version
-npm --version
-npm ci --ignore-scripts
-npx --no-install playwright install chromium
-```
+Put each contract in its canonical document and link to it from shorter guides. Do not create a second inventory or restate implementation details in contributor-facing policy.
 
-On a fresh Linux machine, use `npx --no-install playwright install --with-deps chromium` when operating-system browser dependencies are also absent. Repository checks enforce the Node 24 major line rather than one patch. Generated receipts and screenshot metadata record the patch that actually ran, while npm, Playwright, and Chromium remain exact-pinned. Keep the local Node 24 release current because development tools may raise their minimum compatible patch.
+| Change area | Canonical contract | Required companion work |
+|---|---|---|
+| Public TypeScript API, defaults, lifecycle, or event data | [API reference](docs/api.md) and [integration guide](docs/integration-guide.md) | Update declarations, focused tests, affected examples, migration guidance when needed, and `CHANGELOG.md`. |
+| Internal module or data-flow boundary | [Architecture guide](docs/architecture.md) | Preserve dependency direction, add focused failure and teardown coverage, and update a diagram only when its stable relationship changes. |
+| HTML semantics, keyboard/pointer interaction, focus, announcements, or error presentation | [Accessibility contract](ACCESSIBILITY.md) and [error handling](docs/errors.md) | Add observable regression coverage and repeat the affected manual accessibility scenarios. |
+| CSS tokens, responsive composition, motion, or visual state | [Design system](DESIGN.md) | Run design and browser checks; update and review the [canonical screenshots](docs/screenshots/README.md) only when a captured visual state intentionally changes. |
+| First-party extension composition or WebMCP | [First-party extension guide](docs/first-party-extensions.md) and [WebMCP guide](docs/webmcp.md) | Preserve the documented opt-in package boundary, update schemas and lifecycle coverage, and exercise supported and unavailable-host behavior. |
+| Package exports, build output, dependency policy, or tarball contents | [Package verification](docs/package-verification.md) | Update package-policy tests, installed-consumer verification, and release evidence contracts as applicable. |
+| Documentation or examples | [Documentation hub](docs/README.md), [example guide](examples/README.md), and [coding conventions](docs/code-style.md) | Keep audience routing and canonical ownership intact, validate links and exports, and update executable examples when observable behavior changes. |
+| Publication or hosted release workflow | [Release policy](docs/releasing.md), [release administration](docs/release-administration.md), and [release operations](docs/release-operations.md) | Obtain maintainer review, identify any required GitHub `Admin` or npm permission changes, and update workflow-contract tests and private evidence requirements together. Ordinary publication is outside the contributor workflow. |
 
-Keep text files UTF-8 with LF line endings. The repository's Git attributes and EditorConfig settings enforce this consistently across operating systems and editors.
+## Documentation audiences
 
-Use focused checks while developing. After committing the intended changes and returning to a clean tree, run the complete gate before submitting:
+Before changing prose or an example, identify its primary audience in the
+[documentation hub](docs/README.md) and write for that reader's immediate
+decision:
 
-```shell
-npm run check
-```
+| Audience | Reader mindset | What the document should optimize for |
+| --- | --- | --- |
+| Package user — getting started | “Can I use this, and can I get a correct first result quickly?” | State assumptions, show the shortest safe path, and route optional complexity elsewhere. |
+| Package user — integration and API | “What is the exact contract, tradeoff, and failure behavior in my application?” | Define supported composition, ownership, edge cases, and stable public boundaries without exposing repository mechanics. |
+| Contributor | “Where does this fact belong, what else must change, and how do I prove it?” | Name the canonical owner, companion work, observable checks, and review evidence. |
+| Maintainer | “Who has authority, what changes public state, and how is it verified or recovered?” | Make project roles, platform permissions, approval boundaries, exact identities, irreversible effects, stop conditions, and private evidence explicit. |
 
-This aggregate covers documentation and design validation, linting, type checking, unit and tooling tests, package and example builds, built-output smoke tests, pinned-Chromium behavior, automated accessibility, screenshots, and package policy. Its tarball verification intentionally rejects a dirty worktree. Run any affected manual accessibility checks as well. When Chromium is unavailable, `npm run check:fast` runs the complete non-browser portion; it is a development shortcut, not a substitute for the browser scenarios required before merge.
-
-Do not add `dependencies`, `peerDependencies`, `optionalDependencies`, bundled dependencies, install hooks, remote assets, CDNs, fonts, or icons. Development dependencies and browser tooling must be exact-pinned and justified in the pull request; Node follows the supported 24.x release line.
-
-## Documentation
-
-Follow the required [coding conventions](docs/code-style.md), including the single authoritative rule for documentation version references. The [documentation hub](docs/README.md) is the sole repo-wide index; do not reproduce its inventory in another guide.
-
-Put information in its authoritative document and link to it from shorter overviews:
-
-| Information | Authoritative document |
-|---|---|
-| Exact signatures, defaults, and lifecycle rules | [API reference](docs/api.md) |
-| Application recipes | [Integration guide](docs/integration-guide.md) |
-| Extension composition and first-party extension conventions | [First-party extension guide](docs/first-party-extensions.md) |
-| Visual roles and values | [Design system](DESIGN.md) |
-| WebMCP schemas and compatibility | [Site-tool guide](docs/webmcp.md) |
-| Normal publication steps | [Alpha release operations runbook](docs/release-operations.md) |
-| Release policy and workflow design | [Release policy](docs/releasing.md) |
-
-Keep contract-bearing artifacts synchronized:
-
-- A public API change updates types, API documentation, affected feature scope, relevant examples and executable coverage, and `CHANGELOG.md`.
-- A WebMCP change also covers the optional-subpath boundary, `webMcp(options?)` factory, schemas and annotations, unsupported-browser behavior, collision and partial-registration cleanup, safe output, and teardown.
-- A publication change updates release, administration, package-evidence, Pages, security-model, and workflow-contract documentation together.
-
-Keep the advanced example's `CompleteCalendarOptions`, `CompleteCalendarRenderHooks`, and `calendarMethods` maps exhaustive. A new public option, method, render hook, or first-party extension must receive a successful scenario, a relevant smoke/browser assertion, and a coverage-guide entry in the same change. Put deliberate source, validation, action, render-hook, extension, and presentation failures in the async-errors example instead of obscuring the advanced success path.
-
-Run `npm run check:docs` after changing Markdown headings, links, root exports, or WebMCP integration code. It validates local paths and anchors, link quality, index reachability, the deprecated navigator-scoped WebMCP surface, and the root export table in `docs/api.md`. It cannot validate external URLs or prove that prose matches runtime behavior, so review those manually and run affected example tests. Run `npm run check:design` after changing `DESIGN.md`; a visual change must also regenerate and review the six canonical screenshots and their manifest.
-
-## Implementation expectations
-
-- Preserve the documented public TypeScript and CSS contracts or clearly identify a breaking alpha change. API names, defaults, module boundaries, and integration patterns may change before 1.0 when that materially reduces concepts, boilerplate, casts, or adoption friction; update types, tests, docs, migration guidance, examples, and screenshots together without weakening accessibility, security, or behavior.
-- Keep TypeScript strict; do not hide unknown values with unsafe assertions or `any`.
-- Keep consumer-owned visual customization on the stable `CalendarRenderHooks`/`renderHooks` surface. Complete first-party components use opaque `CalendarExtension` values from documented extension factories and are composed through `extensions`; do not make the two contracts interchangeable or expose an unsupported third-party authoring surface.
-- Reserve `.litefold-calendar` and `data-litefold-calendar` for the public rendered root. Prefix every internal package-owned class, custom data attribute, ID, layer, keyframe, container, and token with `lfc`; native, ARIA, and SVG attributes retain their platform-defined names.
-- Render untrusted content as text. Do not use HTML-string APIs, dynamic code evaluation, or style sinks. The only core URL sink is the documented, length-bounded, relative/HTTP(S)-only `CalendarEventInput.url` path; do not add another.
-- Keep WebMCP out of the root import graph and available only through `webMcp(options?)` from `@tryagaindev/litefold-calendar/extensions/webmcp`, followed by explicit inclusion in `extensions`. The factory's default `toolNamePrefix` is `"litefold-calendar"`; examples with multiple calendars in one document must set distinct prefixes. Revalidate model arguments, bound every result, annotate untrusted event content, exclude identifiers/URLs/metadata/diagnostics, share one abort signal across the sequential registrations, and unregister on every teardown path. Never use the deprecated navigator-scoped surface.
-- Keep failure attribution unambiguous: registered extension failures report `extension-failed` with `extensionId`, while consumer render-hook failures report `render-hook-failed` with `renderHookId`. Both paths must remain isolated and disposable.
-- Keep package-owned work bounded, abortable, and fully disposable.
-- Make loading, empty, degraded, and failed states visibly and programmatically distinguishable.
-- Test keyboard, touch, pen, horizontal precision-scroll, narrow-width, zoom, RTL, reduced-motion, and forced-color behavior when affected. For native paging, assert public outcomes and fallbacks rather than exact user-agent physics.
-- Update documentation and dependency-free examples for observable behavior or API changes.
-- Keep the root facade small and follow the [internal architecture](docs/architecture.md): runtime may compose DOM/domain and public contracts, DOM may compose domain and public contracts, and domain remains independent. Do not create internal barrels or revive retired catch-all modules.
-
-For frontend work, follow the [design system](DESIGN.md) for visual decisions and the [coding conventions](docs/code-style.md) for implementation mechanics. Prefer semantic HTML and browser-native layout over custom JavaScript behavior. Make reusable components respond to their container and content rather than device categories. Responsive placement must remain CSS-only unless a public behavior—not layout—requires script; do not add viewport listeners, layout measurement, DOM movement, or visual reordering that conflicts with focus order. Keep selectors low-specificity and package styles inside the `lfc` cascade layer so application overrides stay predictable. Choose the smallest rule set that communicates layout intent, and remove a declaration only after confirming that it is redundant across supported states and widths.
+Give each document one primary job. If a paragraph does not help that audience
+make its decision, move it to the canonical owner or replace it with a link.
+Avoid parallel setup sequences, command inventories, API lists, responsive
+geometry, recovery matrices, and compatibility claims.
 
 ## Tests
 
-Add focused regression tests for bugs and public contracts. Include failure paths, stale asynchronous results, teardown, hostile input, and relevant accessibility semantics. Automated accessibility checks supplement rather than replace keyboard and assistive-technology review.
+Add focused regression tests for changed behavior and public contracts. Include relevant failure paths, stale asynchronous results, teardown, hostile input, and accessibility semantics. If a behavior or public contract does not need a regression test, explain why in the pull request.
 
-Assert observable behavior or a documented artifact contract. Do not make tests depend on verbatim source text, formatting, helper placement, or a particular dependency or tool version; those choices belong in implementation and repository configuration.
-
-Tests must be deterministic, must not require external services, and must not write tracked artifacts.
+Assert observable behavior or a documented artifact contract. Do not make tests depend on verbatim source text, formatting, helper placement, or incidental runtime state. Tests must be deterministic, require no external service, and leave no tracked artifacts behind.
 
 ## Commits and pull requests
 
@@ -103,14 +70,10 @@ A pull request should:
 
 - Explain the user-visible outcome and motivation.
 - Link related issues or design discussion.
-- Describe tests performed and remaining risks.
-- Call out design-system, public API, CSS token, accessibility, security, mobile, packaging, or application-integration effects.
-- Keep repository source, fixtures, screenshots, documentation, commit messages, and artifact metadata consumer-neutral. Application identities, branding, domains, paths, supplied screenshots, and implementation details must not enter this repository.
+- Describe verification performed and remaining risks.
+- Call out public API, design, accessibility, security, packaging, release-workflow, or host-integration effects when relevant.
+- Keep repository source, fixtures, screenshots, documentation, commit messages, and artifact metadata application-neutral. Do not include application identities, branding, private paths, secrets, or event data.
 - Update `CHANGELOG.md` under `Unreleased` for user-visible changes.
-- Contain no generated distribution files, local editor state, secrets, or unrelated formatting churn.
+- Exclude generated distributions, local editor state, and unrelated formatting churn.
 
-By contributing, you agree that your contribution is licensed under the repository's MIT License and that you have the right to submit it.
-
-## Review and decisions
-
-The current single maintainer makes final project and release decisions. Required automated checks apply to every pull request. Non-author approval becomes mandatory when a second maintainer is appointed; see [MAINTAINERS.md](MAINTAINERS.md).
+By contributing, you agree that your contribution is licensed under the repository's MIT License and that you have the right to submit it. Review and decision authority is defined in [MAINTAINERS.md](MAINTAINERS.md).

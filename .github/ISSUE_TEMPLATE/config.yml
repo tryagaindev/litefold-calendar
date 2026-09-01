@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Report a conduct concern privately
+    url: https://github.com/tryagaindev/litefold-calendar/blob/main/CODE_OF_CONDUCT.md#reporting-an-issue
+    about: Review the current recipients, conflict limitations, and external reporting options before emailing the private conduct mailbox.
   - name: Report a security vulnerability privately
     url: https://github.com/tryagaindev/litefold-calendar/security/advisories/new
     about: Do not disclose suspected vulnerabilities in a public issue.

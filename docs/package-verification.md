@@ -2,7 +2,25 @@
 
 Use this guide to verify release state, run the same package gate as CI, or inspect a published package. The automated release builds one tarball for the exact eligible `main` push and retains it through publication; the npm-authorized job does not rebuild it. npm creates signatures and provenance during publication, and the workflow verifies both before making the GitHub prerelease public.
 
-## Prerequisites
+## Audience routes
+
+- **Package users getting started** normally need only
+  [installation](../README.md#install) and
+  [first render](../README.md#first-render). They do not need repository release
+  evidence.
+- **Package users integrating the API** can inspect the
+  [local package selection](#inspect-local-package-selection) and supported
+  public entry points before integrating a candidate build.
+- **Contributors** run the
+  [canonical final-gate commands](../CONTRIBUTOR_COMMANDS.md#run-the-final-gate)
+  and use [the package-evidence summary](#complete-repository-gate) to
+  understand what its final stage proves.
+- **Maintainers and release operators** own
+  [release-state verification](#verify-release-state),
+  [retained evidence](#retain-a-local-verification-bundle), and
+  [registry and release evidence](#registry-and-release-evidence).
+
+## Contributor prerequisites
 
 Run repository commands from the repository root with:
 
@@ -11,16 +29,21 @@ Run repository commands from the repository root with:
 - Dependencies installed with `npm ci --ignore-scripts`.
 - Playwright Chromium installed before the complete browser gate.
 
-`npm run check` ends with release-tarball verification, and `npm run package` creates release evidence. Both require a clean tracked and untracked worktree. Use them after committing or otherwise isolating the changes under test; CI provides this clean state automatically.
+`npm run check` ends with temporary release-tarball verification, and
+`npm run package` creates retained release evidence. Both require a clean
+tracked and untracked worktree. Use `package` only for an authorized release
+evidence operation, not as an ordinary contributor gate.
 
 Choose the narrowest command that answers your question:
 
-| Goal | Command | Scope |
+| Audience and goal | Command | Scope |
 | --- | --- | --- |
-| Validate prepared version files | `npm run release:verify` | Local manifests, changelog, repository identity, commit, and local tag state |
-| Run the complete CI/release gate | `npm run check` | Static checks, unit and browser tests, screenshots, build, and temporary tarball verification |
-| Keep a local evidence bundle | `npm run package` | The verified tarball and its five-file release bundle under `.artifacts/` |
-| Preview npm file selection | `npm pack --dry-run --ignore-scripts` | Package contents only; it is not a substitute for `check:tarball` |
+| Release operator: validate prepared version files | `npm run release:verify` | Local manifests, changelog, repository identity, commit, and local tag state |
+| Contributor: run the complete repository gate used by CI | `npm run check` | Static checks, unit and browser tests, screenshots, build, and temporary tarball verification |
+| Release operator: retain a local evidence bundle | `npm run package` | The verified tarball and its write-once release bundle under `.artifacts/` |
+| Package user or contributor: preview local npm file selection | `npm pack --dry-run --ignore-scripts` | Local checkout contents only; it is not a substitute for `check:tarball` |
+
+npm always includes the root `README.md`, but canonical PNGs remain outside the package's `files` allowlist. A dry run should therefore list `README.md` and no `docs/screenshots/**` entries. This keeps installed package size independent of the screenshot gallery; `check:screenshots` verifies the repository assets separately. Tarball checks cannot prove hosted README rendering, so the [release operations checklist](release-operations.md#6-verify-npm-and-the-github-prerelease) owns the npm package-page check.
 
 ## Verify release state
 
@@ -34,11 +57,9 @@ The check validates that the package is configured as a public alpha, both lockf
 
 ## Complete repository gate
 
-```sh
-npm ci --ignore-scripts
-npx --no-install playwright install chromium
-npm run check
-```
+Use the canonical [setup and final-gate commands](../CONTRIBUTOR_COMMANDS.md#run-the-final-gate).
+This section describes the package evidence produced by that gate rather than
+duplicating its command sequence.
 
 The final `check:tarball` stage creates its tarball in a temporary directory. It verifies:
 
@@ -46,7 +67,12 @@ The final `check:tarball` stage creates its tarball in a temporary directory. It
 - Installation into a clean consumer with lifecycle scripts disabled and no runtime dependencies.
 - TypeScript use of `Calendar<TMetadata>` and `setEvents()`.
 - The root ESM entry, each documented first-party extension entry, and the stylesheet export.
-- Browser behavior from the packed bytes, including replacement, refetch, activation, and teardown.
+- Packed-byte DOM interaction in an installed JSDOM consumer fixture, including
+  replacement, refetch, activation, and teardown.
+
+Hosted CI runs this complete repository gate in its selected environment and
+adds platform-owned controls such as pull-request dependency review. A local
+`npm run check` result is not evidence that those hosted controls ran.
 
 Package policy also verifies the optional-extension boundary. The root module graph must not reach `dist/extensions/**` or WebMCP, while the documented WebMCP subpath must contain its JavaScript, declarations, and source maps. The clean consumer passes `webMcp` through `CalendarOptions.extensions` using only public imports. Optional entries must also evaluate under Node without reading DOM globals.
 
@@ -70,13 +96,17 @@ The command refuses to overwrite an existing version directory. Do not delete an
 
 The SPDX document is canonicalized after npm generates and validates it. Its namespace uses the package version and exact source commit, its timestamp uses the commit's committer time, and its keys have a fixed order. With the pinned toolchain, the same clean commit therefore produces byte-identical `sbom.spdx.json` content.
 
-## Inspect the package as a consumer
+## Inspect local package selection
 
 ```sh
 npm pack --dry-run --ignore-scripts
 ```
 
-Use the dry run for a quick, non-publishing view of npm's selected files. The public package must contain only `README.md`, `LICENSE`, `package.json`, and the expected `dist/` modules, declarations, source maps, and stylesheet. The supported imports are:
+Use the dry run for a quick, non-publishing view of files selected from the
+current checkout. It does not inspect an installed registry version. The public
+package must contain only `README.md`, `LICENSE`, `package.json`, and the
+expected `dist/` modules, declarations, source maps, and stylesheet. The
+supported imports are:
 
 ```ts
 import { createCalendar } from "@tryagaindev/litefold-calendar";
