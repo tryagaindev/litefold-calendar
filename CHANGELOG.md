@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+<!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
+
+## [0.5.0-alpha.0] - 2026-09-02
+
 ### Added
 
 - Added construction-time `weekRowSizing` (`"equal"` or `"content"`) and `gridEventPlacement` (`"top"`, `"center"`, or `"bottom"`) options for intrinsic month-grid geometry without JavaScript measurement.
