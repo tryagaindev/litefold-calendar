@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Runnable, framework-free examples for Litefold Calendar.">
+	<title>Examples | Litefold Calendar</title>
+	<link rel="stylesheet" href="./example.css">
+	<link rel="stylesheet" href="./index.css">
+</head>
+<body>
+	<a class="my-skip-link" href="#my-list" tabindex="0">Skip to examples</a>
+
+	<header class="my-landing-header">
+		<div class="my-landing-header-content">
+			<p class="my-landing-kicker">Dependency-free calendar recipes</p>
+			<h1>Build with Litefold Calendar</h1>
+			<p class="my-landing-summary">Run a focused recipe, inspect the source that produced it, and adapt the public API to your application.</p>
+			<nav class="my-developer-links" aria-label="Developer resources">
+				<a
+					href="https://github.com/tryagaindev/litefold-calendar/blob/main/docs/api.md"
+					data-my-repository-kind="blob"
+					data-my-repository-path="docs/api.md"
+				>API reference</a>
+				<a
+					href="https://github.com/tryagaindev/litefold-calendar/blob/main/docs/integration-guide.md"
+					data-my-repository-kind="blob"
+					data-my-repository-path="docs/integration-guide.md"
+				>Integration guide</a>
+			</nav>
+		</div>
+
+		<aside class="my-metadata" aria-labelledby="my-metadata-title" data-my-metadata-state="loading">
+			<h2 id="my-metadata-title">Build identity</h2>
+			<dl>
+				<div>
+					<dt>Version</dt>
+					<dd><code data-my-version>@alpha</code></dd>
+				</div>
+				<div>
+					<dt>Source commit</dt>
+					<dd>
+						<a href="https://github.com/tryagaindev/litefold-calendar/tree/main" data-my-commit-link>
+							<code data-my-commit>main branch</code>
+						</a>
+					</dd>
+				</div>
+				<div>
+					<dt>Channel</dt>
+					<dd data-my-channel>Local or unavailable</dd>
+				</div>
+			</dl>
+			<p data-my-metadata-status>Source links target <code>main</code> until build metadata loads.</p>
+		</aside>
+	</header>
+
+	<main id="my-list" class="my-landing-main" tabindex="-1">
+		<section aria-labelledby="my-list-title">
+			<div class="my-landing-section-heading">
+				<h2 id="my-list-title">Choose a task</h2>
+				<p>Every example runs against the package built for this deployment and stays within its public API.</p>
+			</div>
+
+			<ul class="my-card-list" role="list">
+				<li>
+					<article class="my-card">
+						<p class="my-card-tag">Start here</p>
+						<h3>
+							<a class="my-card-run" href="./basic/">
+								<span>Render static events</span>
+								<span class="my-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Select today, reveal its agenda, and activate an event from either surface.</p>
+						<a
+							class="my-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/basic"
+							data-my-repository-kind="tree"
+							data-my-repository-path="examples/basic"
+						>View source<span class="my-visually-hidden"> for Render static events</span></a>
+					</article>
+				</li>
+				<li>
+					<article class="my-card">
+						<p class="my-card-tag">Complete surface</p>
+						<h3>
+							<a class="my-card-run" href="./advanced/">
+								<span>Exercise the complete API</span>
+								<span class="my-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Call public methods, filter typed events, switch theme and direction, and inspect state.</p>
+						<a
+							class="my-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/advanced"
+							data-my-repository-kind="tree"
+							data-my-repository-path="examples/advanced"
+						>View source<span class="my-visually-hidden"> for Exercise the complete API</span></a>
+					</article>
+				</li>
+				<li>
+					<article class="my-card">
+						<p class="my-card-tag">Failure ownership</p>
+						<h3>
+							<a class="my-card-run" href="./async-errors/">
+								<span>Handle asynchronous failures</span>
+								<span class="my-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Fail a source request, transfer error UI to the application, and reject an action.</p>
+						<a
+							class="my-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/async-errors"
+							data-my-repository-kind="tree"
+							data-my-repository-path="examples/async-errors"
+						>View source<span class="my-visually-hidden"> for Handle asynchronous failures</span></a>
+					</article>
+				</li>
+				<li>
+					<article class="my-card">
+						<p class="my-card-tag">Server-first</p>
+						<h3>
+							<a class="my-card-run" href="./progressive-enhancement/">
+								<span>Enhance server-rendered HTML</span>
+								<span class="my-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Rebuild with failing and successful sources while watching the fallback lifecycle.</p>
+						<a
+							class="my-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/progressive-enhancement"
+							data-my-repository-kind="tree"
+							data-my-repository-path="examples/progressive-enhancement"
+						>View source<span class="my-visually-hidden"> for Enhance server-rendered HTML</span></a>
+					</article>
+				</li>
+				<li>
+					<article class="my-card">
+						<p class="my-card-tag">Rewrite guide</p>
+						<h3>
+							<a class="my-card-run" href="./fullcalendar-v6-migration/">
+								<span>Rewrite a dayGridMonth view</span>
+								<span class="my-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Supersede a range request, select a day, and activate an adapted event.</p>
+						<a
+							class="my-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/fullcalendar-v6-migration"
+							data-my-repository-kind="tree"
+							data-my-repository-path="examples/fullcalendar-v6-migration"
+						>View source<span class="my-visually-hidden"> for Rewrite a dayGridMonth view</span></a>
+					</article>
+				</li>
+				<li>
+					<article class="my-card">
+						<p class="my-card-tag">Loader boundary</p>
+						<h3>
+							<a class="my-card-run" href="./classic-script/">
+								<span>Load ESM from a classic script</span>
+								<span class="my-card-run-label" aria-hidden="true">Run</span>
+							</a>
+						</h3>
+						<p><strong>Try:</strong> Inspect the classic entry point, then select a date and activate an event.</p>
+						<a
+							class="my-card-source"
+							href="https://github.com/tryagaindev/litefold-calendar/tree/main/examples/classic-script"
+							data-my-repository-kind="tree"
+							data-my-repository-path="examples/classic-script"
+						>View source<span class="my-visually-hidden"> for Load ESM from a classic script</span></a>
+					</article>
+				</li>
+			</ul>
+		</section>
+	</main>
+
+	<footer class="my-landing-footer">
+		<p>Need the smallest installable setup? Start with the <a href="./basic/">basic example</a>, then compare its pinned source with the API reference.</p>
+	</footer>
+
+	<script type="module" src="./index.js"></script>
+</body>
+</html>

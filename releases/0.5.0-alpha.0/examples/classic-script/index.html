@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Classic-script loader | litefold-calendar</title>
+	<link rel="stylesheet" href="../../dist/styles.css">
+	<link rel="stylesheet" href="../example.css">
+	<script defer src="./main.js"></script>
+	<link rel="stylesheet" href="../../deployment-details.css">
+</head>
+<body>
+	<main class="my-shell">
+		<header class="my-intro">
+			<h1>Load ESM from a classic script</h1>
+			<p>Select August 4, 2026 and activate an event. This page uses a deferred classic entry script, which loads the ESM package with dynamic <code>import()</code>.</p>
+		</header>
+
+		<p class="my-alert" data-my-startup-error role="alert" aria-atomic="true"></p>
+		<div class="my-calendar" data-my-calendar></div>
+		<p class="my-result" data-my-result role="status" aria-atomic="true"></p>
+	</main>
+	<footer class="my-developer-footer" data-my-deployment-channel="release">
+		<nav aria-label="Developer resources">
+			<ul class="my-developer-footer-links">
+				<li><a href="../">All examples</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/tree/d1bf12fd8939b534f13d354f4adcd63dde1b4c05/examples/classic-script/">Recipe source</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/d1bf12fd8939b534f13d354f4adcd63dde1b4c05/docs/api.md">API reference</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/d1bf12fd8939b534f13d354f4adcd63dde1b4c05/docs/integration-guide.md">Integration guide</a></li>
+			</ul>
+		</nav>
+		<dl>
+			<dt>Package version</dt>
+			<dd><code>0.5.0-alpha.0</code></dd>
+			<dt>Deployment channel</dt>
+			<dd>Immutable release</dd>
+			<dt>Source commit</dt>
+			<dd><a href="https://github.com/tryagaindev/litefold-calendar/commit/d1bf12fd8939b534f13d354f4adcd63dde1b4c05"><code>d1bf12fd8939b534f13d354f4adcd63dde1b4c05</code></a></dd>
+		</dl>
+	</footer>
+</body>
+</html>
