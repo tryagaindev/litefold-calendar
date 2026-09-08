@@ -20,6 +20,10 @@ interface DetailedMetadata extends BaseMetadata {
 	readonly detail: string;
 }
 
+function consumeTypeAssertions(...values: readonly unknown[]): readonly unknown[] {
+	return values;
+}
+
 /** Compile-only assertions for public callback and instance contracts. */
 export function verifyPublicApiTypeContracts(
 	baseCalendar: Calendar<BaseMetadata>,
@@ -37,16 +41,12 @@ export function verifyPublicApiTypeContracts(
 				const compactElements: Readonly<CalendarEventOverflowElements> =
 					context.elements;
 				const compactSurface: "day" = context.surface;
-				void compactContext;
-				void compactElements;
-				void compactSurface;
+				consumeTypeAssertions(compactContext, compactElements, compactSurface);
 			} else {
 				const wideContext: Readonly<CalendarWideEventOverflowContext> = context;
 				const wideAction: HTMLButtonElement = context.elements.action;
 				const wideSurface: "grid-summary" = context.surface;
-				void wideAction;
-				void wideContext;
-				void wideSurface;
+				consumeTypeAssertions(wideAction, wideContext, wideSurface);
 			}
 			return context.document.createTextNode(context.text);
 		}
@@ -66,10 +66,7 @@ export function verifyPublicApiTypeContracts(
 		"bottom"
 	];
 	const weekRowSizings: readonly CalendarWeekRowSizing[] = ["equal", "content"];
-	void observations;
-	void options;
-	void gridEventPlacements;
-	void weekRowSizings;
+	consumeTypeAssertions(observations, options, gridEventPlacements, weekRowSizings);
 
 	const invalidGridEventPlacement: CalendarOptions = {
 		events: [],
@@ -81,15 +78,13 @@ export function verifyPublicApiTypeContracts(
 		// @ts-expect-error weekRowSizing accepts only equal or content sizing.
 		weekRowSizing: "fixed"
 	};
-	void invalidGridEventPlacement;
-	void invalidWeekRowSizing;
+	consumeTypeAssertions(invalidGridEventPlacement, invalidWeekRowSizing);
 
 	// @ts-expect-error Cleanup must not return a thenable.
 	const asyncCleanup: CalendarRenderCleanup = () => Promise.resolve();
 	// @ts-expect-error Cleanup must return exactly undefined.
 	const valueCleanup: CalendarRenderCleanup = () => 1;
-	void asyncCleanup;
-	void valueCleanup;
+	consumeTypeAssertions(asyncCleanup, valueCleanup);
 
 	const asyncHostCallback = () => Promise.resolve();
 	const invalidAnnouncer: CalendarOptions = {
@@ -112,10 +107,7 @@ export function verifyPublicApiTypeContracts(
 		dayDidMount: asyncHostCallback,
 		id: "asynchronous"
 	};
-	void invalidAnnouncer;
-	void invalidErrorHandler;
-	void invalidStateObserver;
-	void invalidMountHook;
+	consumeTypeAssertions(invalidAnnouncer, invalidErrorHandler, invalidStateObserver, invalidMountHook);
 
 	const removedMultipleEventIndicator: CalendarRenderHooks = {
 		id: "removed-multiple-event-indicator",
@@ -127,15 +119,13 @@ export function verifyPublicApiTypeContracts(
 		//@ts-expect-error The 0.4 overflow API replaces renderGridOverflowContent.
 		renderGridOverflowContent: () => null
 	};
-	void removedGridOverflowContent;
-	void removedMultipleEventIndicator;
+	consumeTypeAssertions(removedGridOverflowContent, removedMultipleEventIndicator);
 
 	// @ts-expect-error Calendar metadata is invariant; widening would make setEvents unsafe.
 	const widenedCalendar: Calendar<BaseMetadata> = detailedCalendar;
 	// @ts-expect-error Calendar metadata is invariant; narrowing would overstate accepted input.
 	const narrowedCalendar: Calendar<DetailedMetadata> = baseCalendar;
-	void widenedCalendar;
-	void narrowedCalendar;
+	consumeTypeAssertions(widenedCalendar, narrowedCalendar);
 
 	baseCalendar.render();
 	const render = baseCalendar.render;
