@@ -213,9 +213,8 @@ function pagingLaneLabels(host, direction) {
 test.describe("native month pager", () => {
 	test.use({ reducedMotion: "no-preference" });
 
-	test("renders hidden semantic lanes around one live grid and settles the current snap", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
-		const host = page.locator(HOST_SELECTOR);
+	test("renders hidden semantic lanes around one live grid and settles the current snap", { tag: "@firefox-regression" }, async ({ page }) => {
+		const host = await mountCalendarFixture(page);
 		const viewport = host.locator(VIEWPORT_SELECTOR);
 		await expect(host).toHaveAttribute("data-lfc-swipe-enabled", "true");
 		const semantics = await host.evaluate((element) => {
@@ -319,7 +318,9 @@ test.describe("native month pager", () => {
 		});
 		expect((await readPagerMetrics(host)).maximum).toBeGreaterThan(0);
 		await setPagerPosition(host, "next", true, 0.2);
-		await expect(page.locator(MONTH_SELECTOR)).toHaveText("2026-08-01");
+		await expect.poll(() => page.evaluate(() =>
+			window.__lfcSwipeFixture.calendar.getState().displayedMonth
+		)).toEqual({ day: 1, month: 8, year: 2026 });
 		await expectPagerClean(host);
 		await expect(viewport).not.toHaveAttribute("aria-hidden");
 	});
@@ -550,15 +551,16 @@ test.describe("native month pager", () => {
 		await expect(actionResult).toHaveText(initialActionResult ?? "");
 	});
 
-	test("trusted wheel pages horizontally and leaves vertical wheel unhandled", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
-		const host = page.locator(HOST_SELECTOR);
+	test("trusted wheel pages horizontally and leaves vertical wheel unhandled", { tag: "@firefox-regression" }, async ({ page }) => {
+		const host = await mountCalendarFixture(page);
 		let point = await gesturePoint(page.locator(
 			'.lfc-calendar-day-button[data-lfc-date="2026-08-13"]'
 		), 16);
 		await page.mouse.move(point.x, point.y);
 		await page.mouse.wheel(200, 0);
-		await expect(page.locator(MONTH_SELECTOR)).toHaveText("2026-09-01");
+		await expect.poll(() => page.evaluate(() =>
+			window.__lfcSwipeFixture.calendar.getState().displayedMonth
+		)).toEqual({ day: 1, month: 9, year: 2026 });
 		await expectPagerClean(host);
 
 		const viewport = host.locator(VIEWPORT_SELECTOR);
@@ -586,7 +588,9 @@ test.describe("native month pager", () => {
 			defaultPrevented: false,
 			isTrusted: true
 		});
-		await expect(page.locator(MONTH_SELECTOR)).toHaveText("2026-09-01");
+		await expect.poll(() => page.evaluate(() =>
+			window.__lfcSwipeFixture.calendar.getState().displayedMonth
+		)).toEqual({ day: 1, month: 9, year: 2026 });
 		await expectPagerClean(host);
 	});
 
