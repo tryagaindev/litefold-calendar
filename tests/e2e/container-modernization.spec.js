@@ -249,8 +249,19 @@ test("published site sections reflow independently and leave the skip link fixed
 	await page.setViewportSize({ width: 1200, height: 1000 });
 	await expectLibraryFixtureReady(page);
 	const source = await readFile(new URL("../../scripts/pages-site/index.html", import.meta.url), "utf8");
-	await page.setContent(source.replaceAll(/<script\b[^>]*>[\s\S]*?<\/script>/gu, "")
-		.replaceAll(/<link\b[^>]*>/gu, ""));
+	await page.evaluate((source) => {
+		//Import the site's owned layout sections from an inert document, preserving the minimal fixture head.
+		const parsed = new DOMParser().parseFromString(source, "text/html");
+		const sections = [".my-pages-skip-link", ".my-pages-site-header", "#my-pages-content", ".my-pages-footer"]
+			.map((selector) => {
+				const section = parsed.querySelector(selector);
+				if (section === null || section.querySelector("script, link") !== null) {
+					throw new Error(`Expected one static site layout section without executable or stylesheet elements: ${selector}`);
+				}
+				return document.importNode(section, true);
+			});
+		document.body.replaceChildren(...sections);
+	}, source);
 	await addSourceStyles(page, ["scripts/pages-site/site.css"]);
 	await page.addStyleTag({ content: ".my-pages-site-header, .my-pages-footer { inline-size: 320px; } body { min-block-size: 2000px; }" });
 	const header = page.locator(".my-pages-site-header");
@@ -321,7 +332,7 @@ async function mountCalendars(page) {
 	await expectLibraryFixtureReady(page);
 	await page.evaluate(async () => {
 		const { createCalendar } = await import("/dist/index.js");
-		const fixture = { calendars: [], requests: 0 };
+		const fixture = { calendars: [], errors: [], requests: 0 };
 		for (const [name, width] of [["compact", 320], ["wide", 900]]) {
 			const host = document.createElement("div");
 			host.id = `my-audit-${name}`;
@@ -337,8 +348,18 @@ async function mountCalendars(page) {
 				initialDate: "2026-08-06",
 				locale: "en-US",
 				now: () => new Date("2026-08-06T12:00:00Z"),
+				onError: (error) => { fixture.errors.push({ code: error.code, hook: error.hook, message: error.message }); },
 				onEventActivate: () => {},
-				renderHooks: [{ id: "audit-empty-marker", renderEventMarker: ({ event }) => event.id === "all-day" ? null : undefined }]
+				renderHooks: [{
+					id: "audit-empty-marker",
+					renderEventMarker: ({ document: ownerDocument, event }) => {
+						if (event.id === "all-day") { return null; }
+						const marker = ownerDocument.createElement("span");
+						marker.className = "my-audit-event-marker";
+						marker.textContent = "\u2022";
+						return marker;
+					}
+				}]
 			});
 			calendar.render();
 			fixture.calendars.push(calendar);
@@ -347,4 +368,15 @@ async function mountCalendars(page) {
 	});
 	await expect(page.locator("#my-audit-compact")).not.toHaveAttribute("aria-busy", "true");
 	await expect(page.locator("#my-audit-wide")).not.toHaveAttribute("aria-busy", "true");
+	expect(await page.evaluate(() => ({
+		errors: window.containerAudit.errors,
+		phases: window.containerAudit.calendars.map((calendar) => calendar.getState().phase)
+	}))).toEqual({ errors: [], phases: ["ready", "ready"] });
+	for (const id of ["my-audit-compact", "my-audit-wide"]) {
+		const host = page.locator(`#${id}`);
+		const emptyMarkers = host.locator('[data-lfc-event-id="all-day"] .lfc-calendar-event-marker');
+		await expect(emptyMarkers).toHaveCount(2);
+		for (const marker of await emptyMarkers.all()) { await expect(marker).toBeEmpty(); }
+		await expect(host.locator('[data-lfc-event-id="timed"] .my-audit-event-marker')).toHaveText(["\u2022", "\u2022"]);
+	}
 }
