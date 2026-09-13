@@ -1,6 +1,8 @@
-# Features and alpha scope
+<a id="features-and-alpha-scope"></a>
 
-This guide is the quickest way to determine whether Litefold Calendar fits a project. It maps common calendar terms to the public API and states what the alpha deliberately does not provide.
+# Features and scope
+
+This guide is the quickest way to determine whether Litefold Calendar fits a project. It maps common calendar terms to the public API and states the package's deliberate boundaries.
 
 ## Feature map
 
@@ -11,6 +13,7 @@ This guide is the quickest way to determine whether Litefold Calendar fits a pro
 | Event model | Date-only, local date-time, point, and multi-day events with exclusive ends; optional validated HTTP(S) or relative links; visual time display can differ by surface | `CalendarEventInput`, `eventTimeDisplay` |
 | Event data | A static snapshot or abort-aware provider, shape-based synchronous/PromiseLike timing, complete source replacement, current-range refetch, and typed application metadata | `events`, `CalendarEventSource`, `setEvents()`, `refetchEvents()` |
 | Grid and agenda limits | A configurable grid cap, native overflow action, paged agenda rows, DOM limit, and visible/total progress text | `maxGridEventsPerDay`, `agendaPageSize`, `agendaDomLimit` |
+| Day event counts | Independent compact/wide modes for summaries, total counts on every nonempty day, or counts only on days with multiple events; count activation opens the agenda or an application-owned chooser | `gridEventDisplay`, `onEventOverflowActivate` |
 | Navigation and bounds | Previous, Next, Today, a native month/year jump, public navigation/focus methods, and optional inclusive date limits | `prev()`, `next()`, `today()`, `gotoDate()`, `focusDate()`, `minDate`, `maxDate` |
 | User actions | Separate day selection, event activation, event context action, and day context action callbacks using native links and buttons | `onDaySelect`, `onEventActivate`, `onEventContextMenu`, `onDayContextMenu` |
 | Direct input and keyboard | Managed grid keyboard navigation plus RTL-aware native pull/snap paging for touch, pen, and horizontal precision scrolling; toolbar buttons remain the fallback | `swipe`, native interaction model |
@@ -36,11 +39,11 @@ The [API reference](api.md) owns exact grid, occupancy, sorting, limit, and agen
 
 The typed `events` option accepts a local snapshot or an application-owned, abort-aware provider. The same metadata generic flows through normalized events, actions, render hooks, and complete `setEvents()` replacements. Transport, authorization, aggregation, filtering, and caching remain application responsibilities.
 
-The [event and source contracts](api.md#supply-events-calendarevents-and-calendareventsource) own exact input grammar, URL validation, ranges, cancellation, atomic admission, replacement, reentrancy, retained-data behavior, and normalized output. Use the [integration guide](integration-guide.md#typed-source-adapter) for adapter and caching recipes.
+The [event and source contracts](api.md#supply-events-calendarevents-and-calendareventsource) own exact input grammar, URL validation, ranges, cancellation, atomic admission, replacement, reentrancy, retained-data behavior, and normalized output. Start with the [remote-data walkthrough](remote-data.md) for fetching and filters; use the [integration guide](integration-guide.md#typed-source-adapter) for typed adapter and caching recipes.
 
 ## Navigation and actions
 
-Users can navigate through native toolbar controls, the month/year popover, optional direct-input paging, keyboard commands, and public methods. Day selection, event activation, event context actions, and day context actions remain separate capabilities.
+Users can navigate through native toolbar controls, the month/year chooser, optional direct-input paging, keyboard commands, and public methods. Day selection, event activation, event-count activation, event context actions, and day context actions remain separate capabilities.
 
 The [API reference](api.md#control-the-calendar-calendar) owns method and callback contracts, bounds, and failure behavior. The [accessibility interaction model](../ACCESSIBILITY.md#interaction-model) owns keyboard, focus, popover, gesture, and RTL interaction; [DESIGN.md](../DESIGN.md) owns their presentation.
 
@@ -76,9 +79,11 @@ and callback shapes.
 
 `fallbackElement` can coordinate application-authored no-JavaScript content. The [API reference owns its exact lifecycle](api.md#application-integration-options); the [progressive-enhancement guide](seo-and-progressive-enhancement.md) owns the server-content, crawlability, metadata, privacy, and verification recipe.
 
-## Deliberate alpha boundaries
+<a id="deliberate-alpha-boundaries"></a>
 
-The alpha does not provide:
+## Deliberate boundaries
+
+The package does not provide:
 
 - Week, day, time-grid, separate list, timeline, resource, year, or multi-month views.
 - View switching, configurable grid duration, hidden weekends, week numbers, business hours, background events, or a now indicator.
@@ -91,8 +96,8 @@ The alpha does not provide:
 - Arbitrary HTML strings, per-event class names, or arbitrary background/text/border style inputs. Use validated event URLs, trusted render-hook nodes, and the documented built-in event marker color.
 - An SSR renderer, automatic JSON-LD, canonical event pages, metadata, sitemap policy, or search/privacy decisions.
 - Automatic WebMCP registration, a remote MCP server, declarative form or iframe tools, event activation, editing tools, or exposure of event IDs, URLs, metadata, render-hook content, and raw diagnostics.
-- Public third-party extension authoring. The alpha supports official extension factories and stable consumer render hooks; any future third-party lifecycle/capability contract will be explicit and lower stability.
+- Public third-party extension authoring. The package supports official extension factories and stable consumer render hooks; any future third-party lifecycle/capability contract will be explicit and lower stability.
 - Framework-specific wrappers, CommonJS output, polyfills, or legacy-browser builds.
 - Non-Gregorian calendar systems.
 
-These boundaries keep the alpha focused on a responsive, accessible month-and-agenda component with a small integration and security surface.
+These boundaries keep the package focused on a responsive, accessible month-and-agenda component with a small integration and security surface.

@@ -139,10 +139,13 @@ for (const [name, route] of EXAMPLE_ROUTES) {
 	});
 }
 
-test("examples landing exposes six keyboard-visible task cards", async ({ page }, testInfo) => {
+test("examples landing exposes seven keyboard-visible task cards including remote data", async ({ page }, testInfo) => {
 	const response = await page.goto("/examples/", { waitUntil: "domcontentloaded" });
 	expect(response?.ok()).toBe(true);
-	await expect(page.locator(".my-card")).toHaveCount(6);
+	await expect(page.locator(".my-card")).toHaveCount(7);
+	const remoteData = page.getByRole("link", { exact: true, name: "Load and filter remote events" });
+	await expect(remoteData).toBeVisible();
+	await expect(remoteData).toHaveAttribute("href", "./remote-data/");
 	await page.keyboard.press("Tab");
 	const skipLink = page.getByRole("link", { name: "Skip to examples" });
 	await expect(skipLink).toBeFocused();
@@ -183,7 +186,7 @@ test.describe("large-text developer-page reflow", () => {
 		await page.setViewportSize({ height: 844, width: 320 });
 		const response = await page.goto("/examples/", { waitUntil: "domcontentloaded" });
 		expect(response?.ok()).toBe(true);
-		await expect(page.locator(".my-card")).toHaveCount(6);
+		await expect(page.locator(".my-card")).toHaveCount(7);
 		await expect(page.locator("[data-my-metadata-state]"))
 			.toHaveAttribute("data-my-metadata-state", "ready");
 		await page.addStyleTag({ content: "html { font-size: 150%; }" });

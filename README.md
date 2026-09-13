@@ -8,12 +8,12 @@ Litefold Calendar is a mobile-first, responsive month calendar for applications 
 
 Use Litefold Calendar when your product needs a polished month calendar without adopting a complete scheduling platform or maintaining separate mobile and desktop implementations.
 
-> **Alpha:** Until the first stable release, npm's `alpha` and `latest` dist-tags intentionally select the same public prerelease, so an unqualified install also receives alpha software. Pin an exact version in production-like environments. Public API changes remain possible before `1.0.0` and will be documented in the changelog.
+> **Prerelease:** The `nightly` channel contains validated snapshots of `main`. Before the first stable release, `latest` also selects the current nightly; after stable publication, `latest` belongs to stable releases. Pin an exact version for reproducible deployments. Public API changes remain possible before `1.0.0` and are recorded in the changelog. Existing alpha releases remain available by exact version.
 
 ## Install
 
 ```sh
-npm install @tryagaindev/litefold-calendar@alpha
+npm install @tryagaindev/litefold-calendar@nightly
 ```
 
 The package is pure ESM and has no runtime dependencies. The example below assumes an npm-aware build tool that resolves bare module specifiers and CSS imports. For a page without a bundler, use the [classic-script entry-point recipe](docs/integration-guide.md#classic-script-entry-point).
@@ -84,6 +84,9 @@ Try the [hosted demo](https://tryagaindev.github.io/litefold-calendar/) or revie
 
 ## Next steps
 
+- Follow [Getting started](docs/getting-started.md) for a short adoption path.
+- Connect an API and filters with the [remote-data walkthrough](docs/remote-data.md).
+- Configure [day event counts](docs/integration-guide.md#choose-event-counts) and an [application-owned chooser](docs/integration-guide.md#own-the-event-chooser).
 - Run the [basic example](examples/basic/) or browse the [hosted demo](https://tryagaindev.github.io/litefold-calendar/).
 - Choose a reusable scenario from the [examples guide](examples/README.md).
 - Use the [documentation hub](docs/README.md) to find integration, contribution, and maintainer guidance.
