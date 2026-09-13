@@ -33,6 +33,47 @@
 		font-family: var(--my-font-family);
 	}
 
+	@supports not (color: light-dark(white, black)) {
+		:root {
+			--my-internal-light: initial;
+			--my-internal-dark: ;
+			--my-color: var(--my-internal-light, #102A36) var(--my-internal-dark, #EAF7F7);
+			--my-muted-color: var(--my-internal-light, #405F68) var(--my-internal-dark, #A8C8CC);
+			--my-page-background: var(--my-internal-light, #EDF5F5) var(--my-internal-dark, #031017);
+			--my-surface-background: var(--my-internal-light, #F7FCFC) var(--my-internal-dark, #061A23);
+			--my-subtle-background: var(--my-internal-light, #E9F4F5) var(--my-internal-dark, #0C2A34);
+			--my-border-color: var(--my-internal-light, #56737B) var(--my-internal-dark, #6E929A);
+			--my-primary-color: var(--my-internal-light, #047857) var(--my-internal-dark, #62E3A8);
+			--my-primary-contrast-color: var(--my-internal-light, #F4FFFB) var(--my-internal-dark, #062A20);
+			--my-focus-color: var(--my-internal-light, #4E46C7) var(--my-internal-dark, #C0B6FF);
+			--my-selected-background: var(--my-internal-light, #D4F4E5) var(--my-internal-dark, #12483F);
+			--my-selected-color: var(--my-internal-light, #0A3B32) var(--my-internal-dark, #D5FFF1);
+			--my-today-border-color: var(--my-internal-light, #071E26) var(--my-internal-dark, #062A20);
+			--my-event-background: var(--my-internal-light, #EFEEFF) var(--my-internal-dark, #282853);
+			--my-event-color: var(--my-internal-light, #262050) var(--my-internal-dark, #F1EEFF);
+			--my-event-border-color: var(--my-internal-light, #665CC3) var(--my-internal-dark, #A39AFF);
+			--my-event-accent-color: var(--my-internal-light, #A52A78) var(--my-internal-dark, #FF88C8);
+			--my-warning-background: var(--my-internal-light, #FFF7ED) var(--my-internal-dark, #431407);
+			--my-warning-color: var(--my-internal-light, #7C2D12) var(--my-internal-dark, #FFEDD5);
+			--my-warning-border-color: var(--my-internal-light, #C2410C) var(--my-internal-dark, #FDBA74);
+			--my-error-background: var(--my-internal-light, #FEF2F2) var(--my-internal-dark, #450A0A);
+			--my-error-color: var(--my-internal-light, #7F1D1D) var(--my-internal-dark, #FEE2E2);
+			--my-error-border-color: var(--my-internal-light, #B91C1C) var(--my-internal-dark, #FCA5A5);
+		}
+
+		@media (prefers-color-scheme: dark) {
+			:root:not([data-my-theme="light"]) {
+				--my-internal-light: ;
+				--my-internal-dark: initial;
+			}
+		}
+
+		:root[data-my-theme="dark"] {
+			--my-internal-light: ;
+			--my-internal-dark: initial;
+		}
+	}
+
 	:root[data-my-theme="light"] {
 		color-scheme: light;
 	}
@@ -129,6 +170,7 @@
 
 	.my-control-row,
 	.my-field-row {
+		align-items: center;
 		align-items: safe center;
 		display: flex;
 		flex-wrap: wrap;
@@ -181,6 +223,7 @@
 	}
 
 	.my-check {
+		align-items: center;
 		align-items: safe center;
 		display: inline-flex;
 		gap: 0.5rem;

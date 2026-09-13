@@ -286,7 +286,7 @@ For implementation work, start with the relevant component section, then check t
 
 ## Colors
 
-The light palette resembles clean ledger paper rather than pure white. The dark palette keeps the same semantic relationships instead of merely inverting the light values. `prefers-color-scheme: dark` selects the dark defaults; application overrides participate in the normal cascade.
+The light palette resembles clean ledger paper rather than pure white. The dark palette keeps the same semantic relationships instead of merely inverting the light values. The host defaults to `color-scheme: light dark` and follows system preference. Applications can force `light` or `dark`, or set `inherit` on the host to follow ancestor themes. Native `light-dark()` and its tested Baseline fallback select the same palette without resetting focused controls. Application token overrides participate in the normal cascade.
 
 ### Core surfaces
 
@@ -363,7 +363,7 @@ Interactive day and compact event targets never fall below 24 by 24 CSS pixels a
 
 Litefold Calendar's core interface is flat. Hierarchy comes from adjacent cool-toned surfaces, one-CSS-pixel rules, inset outlines, and the browser top layer—not floating cards or ornamental depth. The root, grid, agenda, status panel, controls, and month/year picker use borders rather than drop shadows. Event hover uses a restrained inset rule; selected and focused days use outlines that remain visible throughout feedback.
 
-The month/year picker uses the native popover top layer with a backdrop mixed from 20% current ink and transparency. It does not gain a drop shadow, blur, glass treatment, gradient, or simulated window chrome. Application-owned example dialogs may use their application's elevation system and are outside the package visual contract.
+The month/year picker uses the native popover top layer, or a native modal dialog where Popover is unavailable, with a backdrop mixed from 20% current ink and transparency. It does not gain a drop shadow, blur, glass treatment, gradient, or simulated window chrome. Application-owned example dialogs may use their application's elevation system and are outside the package visual contract.
 
 ## Shapes
 
@@ -386,7 +386,7 @@ Previous/Next are transparent glyph controls with the standard component radius.
 
 ### Month/year picker
 
-Use the native non-modal `popover="auto"` surface, native Month `<select>`, native Year `<input>`, a filled primary Show month action, and a quiet Cancel action. The picker is at most `24rem` wide, scrolls within the dynamic viewport when necessary, and stacks its fields only at the smallest container. Opening, validation, dismissal, and focus behavior are canonical in the [built-in month-and-year jump](docs/api.md#built-in-month-and-year-jump) and [interaction model](ACCESSIBILITY.md#interaction-model).
+Use the native non-modal `popover="auto"` surface with a native modal `<dialog>` fallback, native Month `<select>`, native Year `<input>`, a filled primary Show month action, and a quiet Cancel action. The picker is at most `24rem` wide, scrolls within the dynamic viewport when necessary, and stacks its fields only at the smallest container. Opening, validation, dismissal, and focus behavior are canonical in the [built-in month-and-year jump](docs/api.md#built-in-month-and-year-jump) and [interaction model](ACCESSIBILITY.md#interaction-model).
 
 ### Month grid and day states
 

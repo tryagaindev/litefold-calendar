@@ -5,7 +5,7 @@ import type { CalendarMonthTitleElements } from "./month-title.js";
 
 /** Stable package-owned elements used to control and render the month-and-year picker. */
 export interface CalendarMonthPickerElements extends CalendarMonthTitleElements {
-	readonly monthPicker: HTMLDivElement;
+	readonly monthPicker: HTMLDivElement | HTMLDialogElement;
 	readonly monthPickerCancelButton: HTMLButtonElement;
 	readonly monthPickerForm: HTMLFormElement;
 	readonly monthPickerMonth: HTMLSelectElement;
@@ -22,7 +22,7 @@ interface CalendarMonthPickerOptions {
 	readonly messages: Readonly<CalendarMessages>;
 	readonly minYear: number;
 	readonly monthNameFormatter: Intl.DateTimeFormat;
-	readonly onCancel: (this: void, event: MouseEvent) => void;
+	readonly onCancel: (this: void, event: Event) => void;
 	readonly onBeforeToggle: (this: void, event: Event) => void;
 	readonly onSubmit: (this: void, event: SubmitEvent) => void;
 	readonly onTitleClick: (this: void, event: MouseEvent) => void;
@@ -45,7 +45,7 @@ interface CalendarMonthPickerControllerOptions {
 	) => Readonly<CalendarDate> | null;
 }
 
-/** Owns native Popover state, validation, synchronization, and focus restoration. */
+/** Owns native Popover or dialog state, validation, synchronization, and focus restoration. */
 export class CalendarMonthPickerController {
 	private isOpen = false;
 	private restoreFocus = false;
@@ -74,7 +74,7 @@ export class CalendarMonthPickerController {
 		}, 0);
 	};
 
-	public readonly handleCancel = (event: MouseEvent): void => {
+	public readonly handleCancel = (event: Event): void => {
 		if (event.defaultPrevented || !this.options.canContinue()) {
 			return;
 		}
@@ -125,22 +125,32 @@ export class CalendarMonthPickerController {
 			return;
 		}
 		try {
-			elements.monthPicker.showPopover();
+			if (isDialogPicker(elements.monthPicker)) {
+				this.sync(elements);
+				elements.monthPicker.showModal();
+				this.handleToggle();
+			} else {
+				elements.monthPicker.showPopover();
+			}
 		} catch {
-			//The supported browser contract provides Popover; a changed host surface remains inert.
+			//A detached or application-modified surface cannot be opened.
+			this.finishClose();
 		}
 	};
 
 	public readonly handleToggle = (): void => {
 		const elements = this.options.getElements();
 		if (elements !== null && this.isPopoverOpen(elements)) {
+			const wasOpen = this.isOpen;
 			this.isOpen = true;
 			if (!this.options.canContinue()) {
 				this.hide(false);
 				return;
 			}
 			elements.titleButton.setAttribute("aria-expanded", "true");
-			this.sync(elements);
+			if (!wasOpen) {
+				this.sync(elements);
+			}
 			this.options.document.addEventListener("keydown", this.handleDocumentKeydown, true);
 			const active = this.options.document.activeElement;
 			if (active === null || active === this.options.document.body || active === elements.titleButton) {
@@ -174,10 +184,14 @@ export class CalendarMonthPickerController {
 		this.restoreFocus = this.restoreFocus || restoreFocus;
 		let hideFailed = false;
 		try {
-			elements.monthPicker.hidePopover();
+			if (isDialogPicker(elements.monthPicker)) {
+				elements.monthPicker.close();
+			} else {
+				elements.monthPicker.hidePopover();
+			}
 		} catch {
 			hideFailed = true;
-			//The supported browser contract provides Popover; teardown remains safe if host state changed first.
+			//Teardown remains safe if the application changed the surface first.
 		}
 		if (!hideFailed && this.isPopoverOpen(elements)) {
 			this.restoreFocus = false;
@@ -233,6 +247,9 @@ export class CalendarMonthPickerController {
 	}
 
 	private isPopoverOpen(elements: CalendarMonthPickerElements): boolean {
+		if (isDialogPicker(elements.monthPicker)) {
+			return elements.monthPicker.open;
+		}
 		try {
 			return elements.monthPicker.matches(":popover-open");
 		} catch {
@@ -263,7 +280,6 @@ export function createCalendarMonthPicker(
 	titleButton.setAttribute("aria-controls", monthPickerId);
 	titleButton.setAttribute("aria-expanded", "false");
 	titleButton.setAttribute("aria-haspopup", "dialog");
-	titleButton.setAttribute("popovertarget", monthPickerId);
 	titleButton.addEventListener("click", options.onTitleClick);
 	const titleLabel = options.document.createElement("span");
 	titleLabel.className = "lfc-calendar-title-label";
@@ -279,11 +295,24 @@ export function createCalendarMonthPicker(
 	titleButton.append(titleLabel);
 	title.append(titleButton);
 
-	const monthPicker = options.document.createElement("div");
+	const supportsPopover = typeof titleButton.showPopover === "function" &&
+		typeof titleButton.hidePopover === "function";
+	const monthPicker = options.document.createElement(supportsPopover ? "div" : "dialog");
 	monthPicker.className = "lfc-calendar-month-picker";
 	monthPicker.id = monthPickerId;
 	monthPicker.setAttribute("aria-labelledby", `${options.instanceName}-month-picker-title`);
-	monthPicker.setAttribute("popover", "auto");
+	if (supportsPopover) {
+		monthPicker.setAttribute("popover", "auto");
+		titleButton.setAttribute("popovertarget", monthPickerId);
+	} else if (isDialogPicker(monthPicker)) {
+		monthPicker.setAttribute("aria-modal", "true");
+		if (Reflect.has(monthPicker, "closedBy")) {
+			monthPicker.setAttribute("closedby", "any");
+		}
+		monthPicker.addEventListener("cancel", options.onCancel);
+		monthPicker.addEventListener("close", options.onToggle);
+		installDialogLightDismiss(monthPicker, options.onCancel);
+	}
 	monthPicker.setAttribute("role", "dialog");
 	const monthPickerTitle = createHeading(options.document, Math.min(6, options.headingLevel + 1));
 	monthPickerTitle.className = "lfc-calendar-month-picker-title";
@@ -342,8 +371,10 @@ export function createCalendarMonthPicker(
 	const monthPickerCancelButton = options.document.createElement("button");
 	monthPickerCancelButton.className = "lfc-calendar-month-picker-cancel";
 	monthPickerCancelButton.type = "button";
-	monthPickerCancelButton.setAttribute("popovertarget", monthPickerId);
-	monthPickerCancelButton.setAttribute("popovertargetaction", "hide");
+	if (supportsPopover) {
+		monthPickerCancelButton.setAttribute("popovertarget", monthPickerId);
+		monthPickerCancelButton.setAttribute("popovertargetaction", "hide");
+	}
 	monthPickerCancelButton.textContent = options.messages.cancel;
 	monthPickerCancelButton.addEventListener("click", options.onCancel);
 	monthPickerActions.append(jumpButton, monthPickerCancelButton);
@@ -370,4 +401,31 @@ export function createCalendarMonthPicker(
 
 function createHeading(document: Document, level: number): HTMLHeadingElement {
 	return document.createElement(`h${level.toString()}`) as HTMLHeadingElement;
+}
+
+function isDialogPicker(picker: HTMLDivElement | HTMLDialogElement): picker is HTMLDialogElement {
+	return picker.localName === "dialog";
+}
+
+function installDialogLightDismiss(picker: HTMLDialogElement, onCancel: (event: Event) => void): void {
+	if (Reflect.has(picker, "closedBy")) {
+		return;
+	}
+	let pressedBackdrop = false;
+	const isBackdrop = (event: MouseEvent): boolean => {
+		if (event.target !== picker) {
+			return false;
+		}
+		const rect = picker.getBoundingClientRect();
+		return event.clientX < rect.left || event.clientX > rect.right ||
+			event.clientY < rect.top || event.clientY > rect.bottom;
+	};
+	picker.addEventListener("pointerdown", (event) => { pressedBackdrop = isBackdrop(event); });
+	picker.addEventListener("pointercancel", () => { pressedBackdrop = false; });
+	picker.addEventListener("click", (event) => {
+		if (pressedBackdrop && isBackdrop(event)) {
+			onCancel(event);
+		}
+		pressedBackdrop = false;
+	});
 }

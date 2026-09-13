@@ -57,6 +57,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-agenda-event {
+    align-items: center;
     align-items: safe center;
     background: var(--lfc-event-background);
     border: var(--lfc-internal-hairline) solid var(--lfc-event-border-color);

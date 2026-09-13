@@ -1,5 +1,6 @@
 @layer lfc {
   :where(.litefold-calendar) .lfc-calendar-toolbar {
+    align-items: center;
     align-items: safe center;
     background: var(--lfc-background);
     border-block-end: var(--lfc-internal-hairline) solid var(--lfc-border-color);
@@ -11,6 +12,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-navigation {
+    align-items: center;
     align-items: safe center;
     display: grid;
     flex: 1 1 32rem;
@@ -21,6 +23,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-month-stepper {
+    align-items: center;
     align-items: safe center;
     display: flex;
     gap: 0.125rem;
@@ -40,6 +43,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-title-button {
+    align-items: center;
     align-items: safe center;
     appearance: none;
     background: transparent;
@@ -113,6 +117,11 @@
     gap: var(--lfc-gap);
   }
 
+  :where(.litefold-calendar) dialog.lfc-calendar-month-picker[open] {
+    display: grid;
+    gap: var(--lfc-gap);
+  }
+
   :where(.litefold-calendar) .lfc-calendar-month-picker::backdrop {
     background: color-mix(in oklab, var(--lfc-color) 20%, transparent);
   }
@@ -158,6 +167,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-month-picker-actions {
+    align-items: center;
     align-items: safe center;
     display: flex;
     flex-wrap: wrap;
@@ -177,6 +187,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-toolbar-end {
+    align-items: center;
     align-items: safe center;
     display: flex;
     flex: 0 1 auto;
@@ -279,6 +290,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-status-actions {
+    align-items: center;
     align-items: safe center;
     display: flex;
     flex-wrap: wrap;

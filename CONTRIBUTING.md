@@ -20,6 +20,7 @@ Small fixes may go directly to a pull request. Discuss large public-API, date-mo
 - Install the exact development dependencies from `package-lock.json` and use the repository-pinned Chromium, Firefox, and WebKit binaries. The [contributor command reference](CONTRIBUTOR_COMMANDS.md#set-up-the-repository) owns the copyable setup commands.
 - Keep text files UTF-8 with LF line endings. Git attributes and EditorConfig enforce this across supported editors and operating systems.
 - Do not add runtime, peer, optional, or bundled dependencies; install hooks; remote assets; CDNs; fonts; or icons. Exact-pin and justify any new development dependency or browser tooling in the pull request.
+- Target [Vite's Baseline Widely available preset](docs/browser-support.md) for the library, examples, and published site. Resolve `baseline-widely-available` through Vite's public API; the support window is fixed per major, not a daily rolling query. Review weekly Dependabot Vite updates, including majors, through CI. Any capability outside the effective targets needs feature detection and a tested supported fallback.
 
 Use focused checks while developing, then run the [complete repository gate](CONTRIBUTOR_COMMANDS.md#run-the-final-gate) before submission. Automated checks do not replace affected manual accessibility or compatibility review.
 

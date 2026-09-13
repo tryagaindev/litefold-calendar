@@ -13,27 +13,27 @@
     --lfc-grid-event-gap: 0.125rem;
     --lfc-grid-event-font-size: 0.75em;
     --lfc-grid-event-min-block-size: 1.5rem;
-    --lfc-color: #102a36;
-    --lfc-muted-color: #405f68;
-    --lfc-background: #f7fcfc;
-    --lfc-surface-background: #e9f4f5;
-    --lfc-border-color: #56737b;
-    --lfc-accent-color: #047857;
-    --lfc-accent-contrast-color: #f4fffb;
-    --lfc-focus-ring-color: #4e46c7;
-    --lfc-selected-background: #d4f4e5;
-    --lfc-selected-color: #0a3b32;
-    --lfc-today-border-color: #071e26;
-    --lfc-event-background: #efeeff;
-    --lfc-event-color: #262050;
-    --lfc-event-border-color: #665cc3;
-    --lfc-event-accent-color: #a52a78;
-    --lfc-warning-background: #fff7ed;
-    --lfc-warning-color: #7c2d12;
-    --lfc-warning-border-color: #c2410c;
-    --lfc-error-background: #fef2f2;
-    --lfc-error-color: #7f1d1d;
-    --lfc-error-border-color: #b91c1c;
+    --lfc-color: light-dark(#102a36, #eaf7f7);
+    --lfc-muted-color: light-dark(#405f68, #a8c8cc);
+    --lfc-background: light-dark(#f7fcfc, #061a23);
+    --lfc-surface-background: light-dark(#e9f4f5, #0c2a34);
+    --lfc-border-color: light-dark(#56737b, #6e929a);
+    --lfc-accent-color: light-dark(#047857, #62e3a8);
+    --lfc-accent-contrast-color: light-dark(#f4fffb, #062a20);
+    --lfc-focus-ring-color: light-dark(#4e46c7, #c0b6ff);
+    --lfc-selected-background: light-dark(#d4f4e5, #12483f);
+    --lfc-selected-color: light-dark(#0a3b32, #d5fff1);
+    --lfc-today-border-color: light-dark(#071e26, #062a20);
+    --lfc-event-background: light-dark(#efeeff, #282853);
+    --lfc-event-color: light-dark(#262050, #f1eeff);
+    --lfc-event-border-color: light-dark(#665cc3, #a39aff);
+    --lfc-event-accent-color: light-dark(#a52a78, #ff88c8);
+    --lfc-warning-background: light-dark(#fff7ed, #431407);
+    --lfc-warning-color: light-dark(#7c2d12, #ffedd5);
+    --lfc-warning-border-color: light-dark(#c2410c, #fdba74);
+    --lfc-error-background: light-dark(#fef2f2, #450a0a);
+    --lfc-error-color: light-dark(#7f1d1d, #fee2e2);
+    --lfc-error-border-color: light-dark(#b91c1c, #fca5a5);
     /* stylelint-disable-next-line unit-disallowed-list -- Design-documented one-CSS-pixel hairline. */
     --lfc-internal-hairline: 1px;
     /* stylelint-disable-next-line unit-disallowed-list -- Canonical visually-hidden sentinel. */
@@ -83,5 +83,51 @@
     min-inline-size: 0;
     overflow: clip;
     text-align: start;
+  }
+
+  /* Baseline engines without light-dark() resolve the same palette from the host color scheme. */
+  @supports not (color: light-dark(white, black)) {
+    :where(.litefold-calendar) {
+      --lfc-internal-light: initial;
+      --lfc-internal-dark: ;
+      --lfc-color: var(--lfc-internal-light, #102a36) var(--lfc-internal-dark, #eaf7f7);
+      --lfc-muted-color: var(--lfc-internal-light, #405f68) var(--lfc-internal-dark, #a8c8cc);
+      --lfc-background: var(--lfc-internal-light, #f7fcfc) var(--lfc-internal-dark, #061a23);
+      --lfc-surface-background: var(--lfc-internal-light, #e9f4f5) var(--lfc-internal-dark, #0c2a34);
+      --lfc-border-color: var(--lfc-internal-light, #56737b) var(--lfc-internal-dark, #6e929a);
+      --lfc-accent-color: var(--lfc-internal-light, #047857) var(--lfc-internal-dark, #62e3a8);
+      --lfc-accent-contrast-color: var(--lfc-internal-light, #f4fffb) var(--lfc-internal-dark, #062a20);
+      --lfc-focus-ring-color: var(--lfc-internal-light, #4e46c7) var(--lfc-internal-dark, #c0b6ff);
+      --lfc-selected-background: var(--lfc-internal-light, #d4f4e5) var(--lfc-internal-dark, #12483f);
+      --lfc-selected-color: var(--lfc-internal-light, #0a3b32) var(--lfc-internal-dark, #d5fff1);
+      --lfc-today-border-color: var(--lfc-internal-light, #071e26) var(--lfc-internal-dark, #062a20);
+      --lfc-event-background: var(--lfc-internal-light, #efeeff) var(--lfc-internal-dark, #282853);
+      --lfc-event-color: var(--lfc-internal-light, #262050) var(--lfc-internal-dark, #f1eeff);
+      --lfc-event-border-color: var(--lfc-internal-light, #665cc3) var(--lfc-internal-dark, #a39aff);
+      --lfc-event-accent-color: var(--lfc-internal-light, #a52a78) var(--lfc-internal-dark, #ff88c8);
+      --lfc-warning-background: var(--lfc-internal-light, #fff7ed) var(--lfc-internal-dark, #431407);
+      --lfc-warning-color: var(--lfc-internal-light, #7c2d12) var(--lfc-internal-dark, #ffedd5);
+      --lfc-warning-border-color: var(--lfc-internal-light, #c2410c) var(--lfc-internal-dark, #fdba74);
+      --lfc-error-background: var(--lfc-internal-light, #fef2f2) var(--lfc-internal-dark, #450a0a);
+      --lfc-error-color: var(--lfc-internal-light, #7f1d1d) var(--lfc-internal-dark, #fee2e2);
+      --lfc-error-border-color: var(--lfc-internal-light, #b91c1c) var(--lfc-internal-dark, #fca5a5);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :where(.litefold-calendar) {
+        --lfc-internal-light: ;
+        --lfc-internal-dark: initial;
+      }
+    }
+
+    :where(.litefold-calendar):where(.lfc-palette-light) {
+      --lfc-internal-light: initial;
+      --lfc-internal-dark: ;
+    }
+
+    :where(.litefold-calendar):where(.lfc-palette-dark) {
+      --lfc-internal-light: ;
+      --lfc-internal-dark: initial;
+    }
   }
 }

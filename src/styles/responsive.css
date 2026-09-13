@@ -30,6 +30,7 @@
 
     :where(.litefold-calendar) .lfc-calendar-title-button {
       inline-size: 100%;
+      justify-content: center;
       justify-content: safe center;
       padding-inline: 0;
     }
@@ -178,6 +179,7 @@
     :where(.litefold-calendar)
       .lfc-calendar-event-overflow-cluster
       > .lfc-calendar-event-overflow.lfc-is-compact {
+      justify-content: center;
       justify-content: safe center;
     }
 
@@ -269,9 +271,11 @@
     }
 
     :where(.litefold-calendar) .lfc-calendar-grid-more.lfc-is-compact-primary {
+      align-items: center;
       align-items: safe center;
       display: inline-flex;
       inline-size: var(--lfc-internal-compact-control-inline-size);
+      justify-content: center;
       justify-content: safe center;
       min-block-size: max(1.5rem, var(--lfc-grid-event-min-block-size));
       min-inline-size: min(100%, 1.5rem);

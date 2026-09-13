@@ -34,6 +34,7 @@ import { CalendarAnnouncementPresenter } from "../dom/announcement.js";
 import { presentCalendarIssue } from "../dom/issue-region.js";
 import { createCalendarStructure, type CalendarDom } from "../dom/structure.js";
 import { CalendarMonthPickerController } from "../dom/month-picker.js";
+import { CalendarPalette } from "../dom/palette.js";
 import { CalendarMonthTitleRenderer } from "../dom/month-title.js";
 import { createAgendaPresentation, type AgendaEventEntry } from "../dom/agenda.js";
 import { installEventActionListeners as installNativeEventActionListeners } from "../dom/event-structure.js";
@@ -176,6 +177,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private dayButtons = new Map<string, HTMLButtonElement>();
 	private displayedMonth: CalendarDate;
 	private dom: CalendarDom | null = null;
+	private palette: CalendarPalette | null = null;
 	private eventReplacementSequence = 0;
 	private focusedDate: CalendarDate;
 	private generation = 0;
@@ -455,6 +457,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 
 		try {
 			this.host.classList.add(ROOT_CLASS);
+			this.palette = new CalendarPalette(this.host, this.window);
 			this.host.setAttribute("data-litefold-calendar", "");
 			if (this.swipeEnabled) {
 				this.host.setAttribute("data-lfc-swipe-enabled", "true");
@@ -482,6 +485,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		this.isDestroyed = true;
 		this.isRendered = false;
 		this.monthPickerController.hide(false);
+		this.palette?.disconnect();
+		this.palette = null;
 		this.generation += 1;
 		this.registeredExtensions?.stop();
 		this.actionGenerations.clear();

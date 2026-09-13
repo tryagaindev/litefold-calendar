@@ -5,6 +5,14 @@
 		--my-task-color: light-dark(#006F8B, #70D8F4);
 	}
 
+	@supports not (color: light-dark(white, black)) {
+		:root {
+			--my-appointment-color: var(--my-internal-light, #00766C) var(--my-internal-dark, #4DE0B5);
+			--my-milestone-color: var(--my-internal-light, #7048B8) var(--my-internal-dark, #C6A7FF);
+			--my-task-color: var(--my-internal-light, #006F8B) var(--my-internal-dark, #70D8F4);
+		}
+	}
+
 	.my-controls,
 	.my-observation {
 		align-content: start;
@@ -101,6 +109,7 @@
 	}
 
 	.my-layers label {
+		align-items: center;
 		align-items: safe center;
 		display: inline-flex;
 		gap: 0.375rem;
