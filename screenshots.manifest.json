@@ -7,7 +7,7 @@
     "playwright": "1.62.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "cc6e5a6a445fc20bcef7f8117364f5003c223436b9df49448b3140371c71cdb9",
+  "sourceFingerprint": "d40a3c61db5ed6c7b75500f967077517da3b764aff4adcc131041f6cc29ce3e4",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -129,7 +129,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "9540be650dc76258b1fdff3352a96a32cdef07802e000763ba62261c1bae6d0b"
+      "sha256": "b844e61bb81953fb0592d207198945c589378bcecf68b3ba13488a4cb362f056"
     },
     {
       "id": "compact-default-counts",
