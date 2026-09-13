@@ -608,7 +608,7 @@ void test("release gates and Playwright retain the complete browser-engine matri
 
 void test("workflow artifacts use bounded purpose-specific retention", async () => {
 	const expectations = new Map([
-		["ci.yml", [7]],
+		["ci.yml", [7, 7]],
 		["deploy-examples.yml", [1, 1]],
 		["prepare-alpha.yml", [1]],
 		["publish-alpha.yml", [7, 30, 30]],
@@ -657,4 +657,30 @@ void test("workflow dependency caches stay disabled", async () => {
 			`${name} must explicitly disable setup-node package-manager caching.`
 		);
 	}
+});
+
+void test("browser gates reject flakes and retain reproducible Firefox qualification evidence", async () => {
+	const source = await workflow("ci.yml");
+	const qualification = job(source, "firefox-qualification");
+	assert.equal(playwrightConfiguration.failOnFlakyTests, true);
+	assert.match(qualification, /os: \[ubuntu-latest, windows-latest\]/u);
+	assert.match(qualification, /node scripts\/qualify-firefox\.mjs/u);
+	assert.match(qualification, /if: always\(\)[\s\S]*?path: test-results\/firefox-qualification\//u);
+	const config = await readFile(join(REPOSITORY_ROOT, "playwright.config.mjs"), "utf8");
+	assert.match(config, /workers: process\.env\["CI"\] \? 1 : 2/u);
+	assert.match(config, /retries: process\.env\["CI"\] \? 1 : 0/u);
+	for (const project of playwrightConfiguration.projects) {
+		if (project.name === "chromium") {
+			assert.equal(project.grepInvert, undefined);
+		} else {
+			assert.equal(project.grepInvert?.test("@chromium-input"), true);
+		}
+	}
+	const qualifier = await readFile(join(REPOSITORY_ROOT, "scripts", "qualify-firefox.mjs"), "utf8");
+	assert.match(qualifier, /--repeat-each=20/u);
+	assert.match(qualifier, /length: 3/u);
+	assert.match(qualifier, /--retries=0/u);
+	assert.match(qualifier, /--workers=1/u);
+	assert.match(qualifier, /PLAYWRIGHT_JSON_OUTPUT_FILE/u);
+	assert.match(qualifier, /PLAYWRIGHT_HTML_OUTPUT_DIR/u);
 });
