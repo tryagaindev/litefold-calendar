@@ -52,6 +52,109 @@ for (const [name, features] of [
 	});
 }
 
+for (const fallback of [false, true]) {
+	test(`built-in and custom navigation icons follow direction (${fallback ? "direction fallback" : "native"})`, async ({ page }) => {
+		if (fallback) { await disableModernLayoutFeatures(page, ["dir"]); }
+		await expectLibraryFixtureReady(page);
+		await page.addStyleTag({ url: "/examples/advanced/theme.css" });
+		await page.evaluate(async () => {
+			const { createCalendar } = await import("/dist/index.js");
+			for (const custom of [false, true]) {
+				const host = document.createElement("div");
+				host.id = custom ? "my-custom-navigation" : "my-native-navigation";
+				host.className = "my-calendar";
+				document.body.append(host);
+				const createIcon = (ownerDocument, text) => {
+					const icon = ownerDocument.createElement("span");
+					icon.className = "my-navigation-icon";
+					icon.dir = "ltr";
+					icon.setAttribute("aria-hidden", "true");
+					icon.textContent = text;
+					return icon;
+				};
+				createCalendar(host, {
+					events: [], initialDate: "2026-08-06",
+					...(custom ? { icons: {
+						next: (ownerDocument) => createIcon(ownerDocument, "\u2192"),
+						previous: (ownerDocument) => createIcon(ownerDocument, "\u2190")
+					} } : {})
+				}).render();
+			}
+		});
+		for (const id of ["my-native-navigation", "my-custom-navigation"]) {
+			const host = page.locator(`#${id}`);
+			const icons = host.locator(".lfc-calendar-navigation-icon, .my-navigation-icon");
+			await expect(icons).toHaveCount(2);
+			const originalIcons = await host.evaluateHandle((element) =>
+				[...element.querySelectorAll(".lfc-calendar-navigation-icon, .my-navigation-icon")]);
+			const previous = host.getByRole("button", { name: "Previous month", exact: true });
+			await previous.focus();
+			for (const direction of ["ltr", "rtl", "ltr"]) {
+				await host.evaluate((element, value) => { element.dir = value; }, direction);
+				if (fallback) { await expect(host).toHaveAttribute("data-lfc-direction", direction); }
+				await expectNavigationMirroring(icons, direction);
+				await expect(previous).toBeFocused();
+				expect(await host.evaluate((element, originals) =>
+					[...element.querySelectorAll(".lfc-calendar-navigation-icon, .my-navigation-icon")]
+						.every((icon, index) => icon === originals[index]), originalIcons)).toBe(true);
+			}
+			await originalIcons.dispose();
+		}
+	});
+}
+
+test("event rows honor live radius tokens, overflow insets and narrow agenda spans", async ({ page }) => {
+	await expectLibraryFixtureReady(page);
+	await page.evaluate(async () => {
+		const { createCalendar } = await import("/dist/index.js");
+		const host = document.querySelector("[data-my-calendar]");
+		host.style.inlineSize = "900px";
+		createCalendar(host, {
+			events: [
+				{ id: "first", title: "Calendar review", start: "2026-08-06T09:00" },
+				{ id: "second", title: "Follow-up meeting", start: "2026-08-06T10:00" }
+			],
+			initialDate: "2026-08-06",
+			gridEventDisplay: { compact: "events", wide: "events" },
+			maxGridEventsPerDay: 1,
+			renderHooks: [{
+				id: "style-contract-content",
+				renderEventDetails: ({ document }) => document.createTextNode("Confirmed"),
+				renderEventTrailing: ({ document }) => document.createTextNode("View details")
+			}]
+		}).render();
+	});
+	const host = page.locator("[data-my-calendar]");
+	const summary = host.locator(".lfc-calendar-event-summary").first();
+	const agendaEvent = host.locator(".lfc-calendar-agenda-event").first();
+	for (const radius of ["16px", "24px"]) {
+		await host.evaluate((element, value) => { element.style.setProperty("--lfc-border-radius", value); }, radius);
+		await expect(summary).toHaveCSS("border-radius", radius);
+		await expect(agendaEvent).toHaveCSS("border-radius", radius);
+	}
+	const overflow = host.locator(".lfc-calendar-more").first();
+	await expect(overflow).toBeVisible();
+	await expect.poll(() => overflow.evaluate((element) => {
+		const style = getComputedStyle(element);
+		return Number.parseFloat(style.paddingInlineStart) > 0 && style.paddingInlineStart === style.paddingInlineEnd;
+	})).toBe(true);
+	await host.evaluate((element) => { element.style.inlineSize = "320px"; });
+	for (const direction of ["ltr", "rtl"]) {
+		await host.evaluate((element, value) => { element.dir = value; }, direction);
+		await expect.poll(() => agendaEvent.evaluate((element) => {
+			const box = (selector) => element.querySelector(selector).getBoundingClientRect();
+			const leading = box(".lfc-calendar-event-leading");
+			const time = box(".lfc-calendar-time");
+			const rows = ["title", "details", "trailing"].map((slot) => box(`.lfc-calendar-event-${slot}`));
+			return rows.every((row, index) => row.width > 0 && row.height > 0 &&
+				row.left <= Math.min(leading.left, time.left) + 1 &&
+				row.right >= Math.max(leading.right, time.right) - 1 &&
+				row.top >= (index === 0 ? Math.max(leading.bottom, time.bottom) : rows[index - 1].bottom) - 1);
+		})).toBe(true);
+		await expectNoOverflow(agendaEvent);
+	}
+});
+
 test("direction fallback follows nested ancestor changes without replacing focused controls", async ({ page }) => {
 	await disableModernLayoutFeatures(page);
 	await mountCalendars(page);
@@ -69,12 +172,15 @@ test("direction fallback follows nested ancestor changes without replacing focus
 	});
 	await count.focus();
 	await expect(host.locator(".lfc-calendar-grid")).toHaveCSS("direction", "ltr");
+	await expectNavigationMirroring(host.locator(".lfc-calendar-navigation-icon"), "ltr");
 	await host.evaluate((host) => { host.parentElement.removeAttribute("dir"); });
 	await expect(host.locator(".lfc-calendar-grid")).toHaveCSS("direction", "rtl");
+	await expectNavigationMirroring(host.locator(".lfc-calendar-navigation-icon"), "rtl");
 	await expect(host.locator(".lfc-calendar-swipe-lane-previous")).toHaveCSS("order", "3");
 	await expect(count).toBeFocused();
 	await host.evaluate((host) => { host.parentElement.style.direction = "ltr"; });
 	await expect(host.locator(".lfc-calendar-grid")).toHaveCSS("direction", "ltr");
+	await expectNavigationMirroring(host.locator(".lfc-calendar-navigation-icon"), "ltr");
 	await expect(host.locator(".lfc-calendar-swipe-lane-previous")).toHaveCSS("order", "1");
 	await expect(count).toBeFocused();
 	await host.evaluate((host) => { host.dir = "rtl"; });
@@ -173,6 +279,13 @@ test("published site sections reflow independently and leave the skip link fixed
 
 function countFor(host) {
 	return host.locator(`.lfc-calendar-grid-more[data-lfc-date="${TARGET_DATE}"]`);
+}
+
+async function expectNavigationMirroring(icons, direction) {
+	await expect.poll(() => icons.evaluateAll((elements) => elements.map((element) => {
+		const transform = getComputedStyle(element).transform;
+		return transform === "none" ? 1 : new DOMMatrixReadOnly(transform).a;
+	}))).toEqual(direction === "rtl" ? [-1, -1] : [1, 1]);
 }
 
 async function expectNoOverflow(locator) {

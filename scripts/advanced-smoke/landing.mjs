@@ -15,7 +15,8 @@ const EXPECTED_EXAMPLE_PATHS = Object.freeze([
 	"basic/",
 	"classic-script/",
 	"fullcalendar-v6-migration/",
-	"progressive-enhancement/"
+	"progressive-enhancement/",
+	"remote-data/"
 ]);
 const LANDING_MODULE = join(EXAMPLES_DIRECTORY, "index.js");
 
