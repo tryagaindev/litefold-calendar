@@ -140,6 +140,54 @@ requests from viewport or gesture state. The
 [event-source contract](api.md#supply-events-calendarevents-and-calendareventsource)
 owns invocation, range, cancellation, replacement, and commit behavior.
 
+### Yield during expensive response adaptation
+
+If profiling shows that adapting a large validated response blocks interaction,
+yield between records inside the already asynchronous event source. This can
+improve responsiveness while adding elapsed time. Keep the simple mapping above
+for small responses such as the five-record remote-data fixture. The **8 ms**
+budget below is a starting point to profile and tune on your target devices.
+
+```ts
+async function adaptLargeResponse(
+	records: readonly ApplicationRecord[],
+	signal: AbortSignal
+): Promise<CalendarEventInput<EventData>[]> {
+	signal.throwIfAborted();
+	const WORK_BUDGET_MS = 8;
+	const events: CalendarEventInput<EventData>[] = [];
+	let deadline = performance.now() + WORK_BUDGET_MS;
+
+	for (const record of records) {
+		events.push(toCalendarInput(record));
+		if (events.length < records.length && performance.now() >= deadline) {
+			if (typeof globalThis.scheduler?.yield === "function") {
+				await globalThis.scheduler.yield();
+			} else {
+				await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			}
+			signal.throwIfAborted();
+			deadline = performance.now() + WORK_BUDGET_MS;
+		}
+	}
+
+	return events;
+}
+```
+
+After the provider fetches and validates its response, replace
+`return records.map(toCalendarInput)` with `return adaptLargeResponse(records, signal)`.
+The helper returns the whole array only after adaptation succeeds; an adapter
+failure or cancellation rejects the request without publishing a partial result.
+The provider's signal is checked before work and after every yield.
+
+Feature detection uses [`scheduler.yield()`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/yield)
+when available and a timer fallback otherwise. A yield cannot preempt one adapter
+call or split JSON parsing, sorting, or DOM layout into smaller operations; profile
+those separately. See [Optimize long tasks](https://web.dev/articles/optimize-long-tasks)
+for the scheduling tradeoffs. This application-side helper preserves the core's
+synchronous local-array behavior.
+
 ## Bound one calendar instance
 
 Use independently optional, inclusive civil-date bounds when product policy limits navigation or selection:

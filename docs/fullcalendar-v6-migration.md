@@ -9,11 +9,11 @@ Litefold Calendar is not a FullCalendar compatibility layer. Check the [feature 
 Add Litefold Calendar to the application:
 
 ```sh
-npm install @tryagaindev/litefold-calendar@alpha
+npm install @tryagaindev/litefold-calendar@nightly
 ```
 
-Use the movable `alpha` tag only to evaluate the current candidate. For a
-repeatable migration or production-like environment, replace `alpha` with the
+Use the movable `nightly` tag only to evaluate the current snapshot. For a
+repeatable migration or production-like environment, replace `nightly` with the
 exact prerelease reported by the registry and save that exact version.
 
 Remove the FullCalendar packages and plugins after the rewrite no longer imports them. Unlike FullCalendar v6, Litefold Calendar requires an explicit stylesheet import.

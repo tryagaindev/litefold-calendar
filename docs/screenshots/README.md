@@ -10,7 +10,7 @@ The manifest covers exactly these PNG files:
 |---|---|---|
 | `desktop-month-grid-1440x900.png` | Wide advanced month grid with direct event actions and overflow | 1440 × 900 |
 | `month-year-jump-1280x800.png` | Open native month-and-year chooser at a bounded month | 1280 × 800 |
-| `mobile-month-agenda-dark-390x844.png` | Compact dark navigation with the abbreviated `Aug 2026` title, month-grid event summaries, and selected-day agenda | 390 × 844 |
+| `mobile-month-agenda-dark-390x844.png` | Compact dark navigation with the abbreviated `Aug 2026` title, a single-event marker, total-count buttons, and selected-day agenda | 390 × 844 |
 | `mobile-month-swipe-pull-390x844.png` | Held native touch pull with the abbreviated `Aug 2026` toolbar and decorative `Sep 2026` adjacent-month lane | 390 × 844 |
 | `event-details-dark-1280x800.png` | Application-owned event details dialog opened from the agenda | 1280 × 800 |
 | `grid-event-keyboard-focus-1440x900.png` | Visible keyboard focus on a wide-layout grid event action after F2 | 1440 × 900 |

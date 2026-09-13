@@ -10,7 +10,7 @@ Follow the shared [local run instructions](../README.md#run-locally), then choos
 
 ## Choose a package version
 
-Use `npm install @tryagaindev/litefold-calendar@alpha` only for evaluation against the moving prerelease channel. After selecting a version for migration or production-like validation, install that exact prerelease version and commit the resulting lockfile so later channel movement cannot change the tested package.
+Use `npm install @tryagaindev/litefold-calendar@nightly` only for evaluation against the moving prerelease channel. After selecting a version for migration or production-like validation, install that exact prerelease version and commit the resulting lockfile so later channel movement cannot change the tested package.
 
 ## Follow the migration flow
 

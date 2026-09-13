@@ -9,7 +9,7 @@
     synchronized; do not turn private lfc-* selectors into consumer API.
   -->
   <title id="calendar-anatomy-title">Litefold Calendar and event anatomy</title>
-  <desc id="calendar-anatomy-desc">An annotated schematic identifies the month title, day button and date, selected day, grid event summary or action, compact social-style overflow count, wide overflow action, selected-day agenda, event leading rule, marker slot, leading content, time, title, details, and trailing content. A color key distinguishes the primary interface color, event leading-rule color, and per-event marker color.</desc>
+  <desc id="calendar-anatomy-desc">An annotated schematic shows wide event summaries beside the default compact total-count button. It identifies the month title, day button and date, selected day, grid event summary or action, compact total-count action, wide overflow action, selected-day agenda, event leading rule, marker slot, leading content, time, title, details, and trailing content. A color key distinguishes the primary interface color, event leading-rule color, and per-event marker color.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
@@ -156,11 +156,9 @@
   <rect class="quiet-control" x="407" y="278" width="80" height="25" rx="7" />
   <text class="event-label" x="447" y="296" text-anchor="middle">2 more</text>
 
-  <!-- Compact primary plus passive social count. -->
-  <rect x="507" y="244" width="48" height="58" rx="8" fill="none" stroke="var(--grid-line)" stroke-dasharray="4 4" />
-  <rect x="557" y="244" width="48" height="58" rx="8" fill="none" stroke="var(--grid-line)" stroke-dasharray="4 4" />
-  <circle class="marker-default" cx="531" cy="273" r="9" />
-  <text class="event-strong" x="581" y="279" text-anchor="middle">+3</text>
+  <!-- Default compact total-count action, shown beside the wide summary schematic. -->
+  <rect class="event" x="532" y="248" width="48" height="48" rx="8" />
+  <text class="event-strong" x="556" y="277" text-anchor="middle">4</text>
 
   <!-- Selected-day agenda. -->
   <rect class="surface-muted" x="70" y="452" width="756" height="100" rx="10" />
@@ -187,12 +185,12 @@
 
   <rect class="callout-box" x="882" y="288" width="278" height="54" rx="10" />
   <text class="callout" x="902" y="321">Grid event summary/action</text>
-  <path class="arrow" d="M 882 316 C 730 310, 590 284, 493 262" />
+  <path class="arrow" d="M 882 316 C 755 306, 659 232, 606 232 L 508 232 Q 499 232, 497 244 L 493 254" />
 
   <rect class="callout-box" x="882" y="358" width="278" height="54" rx="10" />
-  <text class="callout" x="902" y="381">Compact overflow cue</text>
-  <text class="small muted" x="902" y="400">Social-style count (+N)</text>
-  <path class="arrow" d="M 882 385 C 760 370, 665 320, 584 282" />
+  <text class="callout" x="902" y="381">Compact total-count action</text>
+  <text class="small muted" x="902" y="400">Default for multiple events</text>
+  <path class="arrow" d="M 882 385 C 760 370, 665 320, 580 280" />
 
   <rect class="callout-box" x="882" y="428" width="278" height="54" rx="10" />
   <text class="callout" x="902" y="451">Wide overflow action</text>

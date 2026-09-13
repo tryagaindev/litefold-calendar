@@ -117,3 +117,6 @@ calendar.destroy();
 ```
 
 Close application dialogs and release their listeners too. The [runnable entry point](../examples/remote-data/main.js) demonstrates cleanup on non-cached `pagehide`, native dialog dismissal, and returning focus after a request has replaced the originating event or count button.
+
+If profiling later finds expensive adaptation of large responses, see the optional
+[yielding adapter](integration-guide.md#yield-during-expensive-response-adaptation).

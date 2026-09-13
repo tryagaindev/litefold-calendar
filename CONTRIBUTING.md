@@ -9,7 +9,7 @@ This guide owns contribution policy and the obligations that accompany each kind
 - Search existing issues and pull requests before proposing duplicate work.
 - Use the appropriate issue form for bugs, accessibility barriers, and feature proposals.
 - Report suspected vulnerabilities privately according to [SECURITY.md](SECURITY.md); never include exploit details in a public issue.
-- Keep proposals within the alpha constraints: responsive, framework-agnostic, strict TypeScript/CSS, accessible by default, progressive where useful, and zero runtime dependencies.
+- Keep proposals within the project constraints: responsive, framework-agnostic, strict TypeScript/CSS, accessible by default, progressive where useful, and zero runtime dependencies.
 
 Small fixes may go directly to a pull request. Discuss large public-API, date-model, accessibility, extension, packaging, or release-workflow changes before implementation.
 
