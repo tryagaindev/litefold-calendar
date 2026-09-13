@@ -176,13 +176,8 @@ export class CalendarEventOverflowPresenter {
 		button.classList.toggle("lfc-is-wide-count-only", wideCount && !compactCount && !hasOverflow);
 
 		const overflowCount = wideCount ? options.eventCount : Math.max(0, options.eventCount - this.options.gridEventLimit);
-		const formattedCount = this.options.numberFormatter.format(overflowCount);
-		const text = formatCalendarMessage(wideCount ? this.options.messages.gridEventCount : this.options.messages.gridMore, {
-			count: formattedCount,
-			eventLabel: overflowCount === 1 ? this.options.messages.event : this.options.messages.events
-		});
-		const wide = createEventOverflowElements(this.options.document, "wide", text);
-		wide.root.classList.toggle("lfc-is-count", wideCount);
+		const wide = wideCount || hasOverflow
+			? this.createWideOverflow(options, button, wideCount, overflowCount) : null;
 		const accessibleCount = compactCount || wideCount ? options.eventCount : overflowCount;
 		const accessibleLabel = formatCalendarMessage(
 			compactCount || wideCount ? this.options.messages.gridEventCountLabel : this.options.messages.gridMoreLabel, {
@@ -192,23 +187,35 @@ export class CalendarEventOverflowPresenter {
 				? this.options.messages.event
 				: this.options.messages.events
 		});
-		button.setAttribute("aria-label", compactCount && !wideCount && hasOverflow
-			? `${accessibleLabel}, ${text}` : accessibleLabel);
+		button.setAttribute("aria-label", compactCount && !wideCount && wide !== null
+			? `${accessibleLabel}, ${wide.text}` : accessibleLabel);
+		return Object.freeze({ button, wide });
+	}
+
+	private createWideOverflow(
+		options: Readonly<PrepareDayEventOverflowOptions>,
+		button: HTMLButtonElement,
+		wideCount: boolean,
+		overflowCount: number
+	): Readonly<PreparedWideEventOverflowVariant> {
+		const text = formatCalendarMessage(wideCount ? this.options.messages.gridEventCount : this.options.messages.gridMore, {
+			count: this.options.numberFormatter.format(overflowCount),
+			eventLabel: overflowCount === 1 ? this.options.messages.event : this.options.messages.events
+		});
+		const wide = createEventOverflowElements(this.options.document, "wide", text);
+		wide.root.classList.toggle("lfc-is-count", wideCount);
 		return Object.freeze({
-			button,
-			wide: !wideCount && !hasOverflow ? null : Object.freeze({
-				action: button,
-				content: wide.content,
-				date: options.date,
-				dateString: options.dateString,
-				display: wideCount ? "count" : "overflow",
-				eventCount: options.eventCount,
-				overflowCount,
-				root: wide.root,
-				text,
-				variant: "wide",
-				visibleEventCount: options.eventCount - overflowCount
-			})
+			action: button,
+			content: wide.content,
+			date: options.date,
+			dateString: options.dateString,
+			display: wideCount ? "count" : "overflow",
+			eventCount: options.eventCount,
+			overflowCount,
+			root: wide.root,
+			text,
+			variant: "wide",
+			visibleEventCount: options.eventCount - overflowCount
 		});
 	}
 

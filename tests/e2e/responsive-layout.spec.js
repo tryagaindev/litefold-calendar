@@ -229,10 +229,7 @@ async function expectResponsiveMonthLabels(
 	});
 	await expect(titleFull).toHaveText(expectedTitleFull);
 	await expect(titleCompact).toHaveAttribute("aria-hidden", "true");
-	await expect(titleCompact).toHaveAttribute(
-		"data-lfc-compact-title",
-		expectedTitleCompact
-	);
+	await expect(titleCompact).toHaveText(expectedTitleCompact);
 	const titleButton = host.locator(".lfc-calendar-title-button");
 	const titleButtonLabel = await titleButton.getAttribute("aria-label");
 	expect(titleButtonLabel).not.toBeNull();
@@ -288,7 +285,7 @@ async function showSeptember(page) {
 	await expect(page.locator("[data-my-calendar]")).not.toHaveAttribute("aria-busy", "true");
 	await expect(page.locator(".lfc-calendar-title-label-full")).toHaveText(SEPTEMBER_TITLE);
 	await expect(page.locator(".lfc-calendar-title-label-compact"))
-		.toHaveAttribute("data-lfc-compact-title", compactTitle);
+		.toHaveText(compactTitle);
 }
 
 async function expectActiveMonthTitleNotToOverflow(host) {
@@ -300,15 +297,19 @@ async function expectActiveMonthTitleNotToOverflow(host) {
 		}
 		const active = getComputedStyle(compact).display === "none" ? full : compact;
 		const style = getComputedStyle(active);
+		const textRange = document.createRange();
+		textRange.selectNodeContents(active);
 		return {
 			clientWidth: active.clientWidth,
 			height: active.getBoundingClientRect().height,
 			lineHeight: Number.parseFloat(style.lineHeight),
 			scrollWidth: active.scrollWidth,
+			textWidth: textRange.getBoundingClientRect().width,
 			whiteSpace: style.whiteSpace
 		};
 	});
 	expect(metrics.clientWidth).toBeGreaterThan(0);
+	expect(metrics.textWidth).toBeGreaterThan(0);
 	expect(metrics.scrollWidth - metrics.clientWidth).toBeLessThanOrEqual(1);
 	expect(metrics.height).toBeLessThanOrEqual(metrics.lineHeight + 1);
 	expect(metrics.whiteSpace).toBe("nowrap");
@@ -327,12 +328,8 @@ async function expectSingleLineMonthTitle(
 	const titleLabelFull = page.locator(".lfc-calendar-title-label-full");
 	const titleLabelCompact = page.locator(".lfc-calendar-title-label-compact");
 	await expect(titleLabelFull).toHaveText(title);
-	await expect(titleLabelCompact).toHaveText("");
+	await expect(titleLabelCompact).toHaveText(expectedCompactTitle);
 	await expect(titleLabelCompact).toHaveAttribute("aria-hidden", "true");
-	await expect(titleLabelCompact).toHaveAttribute(
-		"data-lfc-compact-title",
-		expectedCompactTitle
-	);
 
 	await expect(page.locator(".lfc-calendar-title-button")).toHaveAttribute(
 		"aria-label",
@@ -354,36 +351,29 @@ async function expectSingleLineMonthTitle(
 		const activeTitle = compactVisible ? compactTitleLabel : fullTitleLabel;
 		const style = getComputedStyle(activeTitle);
 		const rect = activeTitle.getBoundingClientRect();
+		const textRange = document.createRange();
+		textRange.selectNodeContents(activeTitle);
 		return {
-			activeText: compactVisible
-				? compactTitleLabel.getAttribute("data-lfc-compact-title") ?? ""
-				: fullTitleLabel.textContent ?? "",
+			activeText: activeTitle.textContent ?? "",
 			clientWidth: activeTitle.clientWidth,
 			compactVisible,
 			height: rect.height,
 			lineHeight: Number.parseFloat(style.lineHeight),
 			overflowX: style.overflowX,
-			pseudoContent: compactVisible
-				? getComputedStyle(compactTitleLabel, "::before").content
-				: "none",
 			scrollWidth: activeTitle.scrollWidth,
 			textOverflow: style.textOverflow,
+			textWidth: textRange.getBoundingClientRect().width,
 			textWrap: style.textWrap,
 			whiteSpace: style.whiteSpace
 		};
 	});
 	expect(metrics.activeText).toBe(metrics.compactVisible ? expectedCompactTitle : title);
 	expect(metrics.clientWidth).toBeGreaterThan(0);
+	expect(metrics.textWidth).toBeGreaterThan(0);
 	expect(metrics.lineHeight).toBeGreaterThan(0);
 	expect(metrics.height).toBeLessThanOrEqual(metrics.lineHeight + 1);
 	expect(metrics.textWrap).toBe("nowrap");
 	expect(metrics.whiteSpace).toBe("nowrap");
-	if (metrics.compactVisible) {
-		expect(
-			metrics.pseudoContent.includes(expectedCompactTitle) ||
-			metrics.pseudoContent === "attr(data-lfc-compact-title)"
-		).toBe(true);
-	}
 	if (overflowExpected) {
 		expect(metrics.scrollWidth - metrics.clientWidth).toBeGreaterThan(1);
 		expect(metrics.overflowX).toBe("hidden");
@@ -401,7 +391,7 @@ async function setLongMonthTitle(page) {
 			throw new Error("Expected both month title presentations.");
 		}
 		fullTitle.textContent = titles.full;
-		compactTitle.setAttribute("data-lfc-compact-title", titles.compact);
+		compactTitle.textContent = titles.compact;
 		const titleButton = titleLabel.closest(".lfc-calendar-title-button");
 		if (!(titleButton instanceof HTMLButtonElement)) {
 			throw new Error("Expected the month title button.");
@@ -416,6 +406,7 @@ async function setLongMonthTitle(page) {
 async function expectCompactToolbarVisualLayout(page, layout) {
 	const positions = await page.locator(".lfc-calendar-toolbar").evaluate((toolbar) => {
 		const selectors = {
+			navigation: ".lfc-calendar-navigation",
 			next: ".lfc-calendar-nav-button-next",
 			previous: ".lfc-calendar-nav-button-previous",
 			title: ".lfc-calendar-title-button",
@@ -431,10 +422,28 @@ async function expectCompactToolbarVisualLayout(page, layout) {
 			return [name, {
 				bottom: box.bottom,
 				center: box.top + (box.height / 2),
+				left: box.left,
+				right: box.right,
 				top: box.top
 			}];
 		}));
 	});
+	const controls = [positions.previous, positions.next, positions.title, positions.today];
+	for (const [index, control] of controls.entries()) {
+		expect(control.left).toBeGreaterThanOrEqual(positions.navigation.left - 1);
+		expect(control.right).toBeLessThanOrEqual(positions.navigation.right + 1);
+		expect(control.top).toBeGreaterThanOrEqual(positions.navigation.top - 1);
+		expect(control.bottom).toBeLessThanOrEqual(positions.navigation.bottom + 1);
+		for (const other of controls.slice(index + 1)) {
+			const inlineOverlap = Math.min(control.right, other.right) -
+				Math.max(control.left, other.left);
+			const blockOverlap = Math.min(control.bottom, other.bottom) -
+				Math.max(control.top, other.top);
+			expect(inlineOverlap <= 1 || blockOverlap <= 1,
+				"Expected separate navigation button hit areas.").toBe(true);
+		}
+	}
+	expect(Math.abs(positions.next.center - positions.previous.center)).toBeLessThanOrEqual(1);
 
 	if (layout === "two-row") {
 		for (const control of [positions.title, positions.previous, positions.next]) {
@@ -450,10 +459,12 @@ async function expectCompactToolbarVisualLayout(page, layout) {
 	}
 
 	expect(layout).toBe("three-row");
-	for (const control of [positions.title, positions.previous, positions.next]) {
-		expect(Math.abs(control.center - positions.title.center)).toBeLessThanOrEqual(1);
+	const titleSharesStepperRow = Math.abs(positions.title.center - positions.previous.center) <= 1;
+	if (!titleSharesStepperRow) {
+		expect(positions.title.top).toBeGreaterThanOrEqual(
+			Math.max(positions.previous.bottom, positions.next.bottom)
+		);
 	}
-	expect(Math.abs(positions.next.center - positions.previous.center)).toBeLessThanOrEqual(1);
 	expect(positions.today.top).toBeGreaterThanOrEqual(
 		Math.max(positions.previous.bottom, positions.next.bottom, positions.title.bottom)
 	);
@@ -1657,8 +1668,8 @@ test("equal compact slots honor the existing public control and event size token
 	expect(singleton.inlineSize).toBeGreaterThanOrEqual(48);
 });
 
-test("focused later compact actions retain a keyboard-operable target for minimal content", async ({ page }) => {
-	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 390 });
+test("a focused later event retains its minimal-content target when compact counts appear", async ({ page }) => {
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
 	await expectExampleReady(page, "/examples/advanced/");
 
 	const selectedCell = page.getByRole("grid").locator(
@@ -1693,6 +1704,10 @@ test("focused later compact actions retain a keyboard-operable target for minima
 	await expect(actions.first()).toBeFocused();
 	await page.keyboard.press("ArrowDown");
 	await expect(laterAction).toBeFocused();
+	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 390 });
+	await expect(laterAction).toBeFocused();
+	await expect(laterAction).toBeVisible();
+	await expect(actions.first()).toBeHidden();
 	await expect(laterAction).toHaveAccessibleName(/.+/u);
 
 	const box = await laterAction.boundingBox();

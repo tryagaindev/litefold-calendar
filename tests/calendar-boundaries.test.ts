@@ -460,7 +460,9 @@ void test("the month title opens a localized native popover and jumps with day c
 	assert.ok(gridLabelId !== null && gridLabelId.length > 0);
 	assert.equal(picker.heading.contains(dom.window.document.getElementById(gridLabelId)), true);
 	assert.equal(picker.trigger.type, "button");
-	assert.equal(picker.trigger.textContent, "July 2026");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-full")?.textContent, "July 2026");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Jul 2026");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.getAttribute("aria-hidden"), "true");
 	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently July 2026");
 	assert.equal(picker.popover.getAttribute("popover"), "auto");
 	assert.equal(picker.popover.getAttribute("role"), "dialog");
@@ -547,7 +549,8 @@ void test("the month title opens a localized native popover and jumps with day c
 	assert.equal(isPopoverOpen(picker.popover), false);
 	assert.equal(picker.trigger.getAttribute("aria-expanded"), "false");
 	assert.equal(dom.window.document.activeElement, picker.trigger);
-	assert.equal(picker.trigger.textContent, "February 2027");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-full")?.textContent, "February 2027");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Feb 2027");
 	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently February 2027");
 });
 
@@ -904,7 +907,13 @@ function getMonthYearPicker(
 function getAccessibleName(element: HTMLElement): string {
 	const labelledBy = element.getAttribute("aria-labelledby")?.trim().split(/\s+/u) ?? [];
 	const referenced = labelledBy
-		.map((id) => element.ownerDocument.getElementById(id)?.textContent?.trim() ?? "")
+		.map((id) => {
+			const referencedElement = element.ownerDocument.getElementById(id);
+			if (referencedElement === null) { return ""; }
+			const copy = referencedElement.cloneNode(true) as HTMLElement;
+			for (const hidden of copy.querySelectorAll('[aria-hidden="true"]')) { hidden.remove(); }
+			return copy.textContent?.trim() ?? "";
+		})
 		.filter((value) => value.length > 0)
 		.join(" ");
 	if (referenced.length > 0) {

@@ -108,6 +108,8 @@ for (const fallback of [false, true]) {
 				parent.append(window.__lfcTheme.host);
 			});
 			await expectPalette(host, "light");
+			await host.evaluate((element) => { element.parentElement.className = "my-dark"; });
+			await expectPalette(host, "dark");
 			await page.evaluate(() => window.__lfcTheme.calendar.destroy());
 			await expect(host).not.toHaveClass(/lfc-palette/u);
 		});

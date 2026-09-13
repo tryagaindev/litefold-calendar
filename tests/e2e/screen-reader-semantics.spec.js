@@ -93,7 +93,7 @@ test.describe("screen-reader-facing browser semantics", () => {
 		await expect(selectedDay).toMatchAriaSnapshot(`
 			- gridcell [selected]:
 			  - button "Thursday, August 6, 2026, 53 items"
-			  - button "View 51 more items for Thursday, August 6, 2026"
+			  - button "View 53 items for Thursday, August 6, 2026, 51 additional"
 		`);
 		await expect(selectedDay.locator(":scope > .lfc-calendar-day-button"))
 			.toHaveAttribute("aria-current", "date");

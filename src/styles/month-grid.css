@@ -257,6 +257,12 @@
     line-height: 1;
   }
 
+  :where(.litefold-calendar)
+    .lfc-calendar-event-overflow.lfc-is-compact.lfc-is-count {
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
   :where(.litefold-calendar) .lfc-calendar-event-overflow-content {
     align-items: center;
     align-items: safe center;

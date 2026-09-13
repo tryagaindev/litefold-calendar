@@ -55,7 +55,7 @@ export class CalendarMonthTitleRenderer {
 		const fullTitle = this.fullFormatter.format(date);
 		const compactTitle = this.compactFormatter.format(date);
 		setTextContent(elements.titleLabelFull, fullTitle);
-		setCompactTitle(elements.titleLabelCompact, compactTitle);
+		setTextContent(elements.titleLabelCompact, compactTitle);
 		setAccessibleLabel(
 			elements.titleButton,
 			formatCalendarMessage(this.triggerLabelTemplate, { date: fullTitle })
@@ -66,12 +66,6 @@ export class CalendarMonthTitleRenderer {
 function setAccessibleLabel(element: HTMLButtonElement, value: string): void {
 	if (element.getAttribute("aria-label") !== value) {
 		element.setAttribute("aria-label", value);
-	}
-}
-
-function setCompactTitle(element: HTMLSpanElement, value: string): void {
-	if (element.getAttribute("data-lfc-compact-title") !== value) {
-		element.setAttribute("data-lfc-compact-title", value);
 	}
 }
 

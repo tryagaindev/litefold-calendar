@@ -52,17 +52,21 @@ export class CalendarPalette {
 		}
 	}
 
-	private readonly handleMutation = (): void => {
+	private readonly handleMutation = (records: readonly MutationRecord[]): void => {
 		if (this.disconnected) {
 			return;
 		}
-		this.observeAncestors();
+		if (records.some((record) => record.type === "childList" ||
+			(this.needsDirectionFallback && record.attributeName === "dir"))) {
+			this.observeAncestors();
+		}
 		this.sync();
 	};
 
 	private readonly handleConnection = (): void => {
-		if (this.host.isConnected) {
-			this.handleMutation();
+		if (!this.disconnected && this.host.isConnected) {
+			this.observeAncestors();
+			this.sync();
 		}
 	};
 

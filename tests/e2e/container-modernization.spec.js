@@ -83,13 +83,13 @@ test("direction fallback follows nested ancestor changes without replacing focus
 	await host.evaluate((host) => {
 		host.removeAttribute("dir");
 		host.parentElement.style.removeProperty("direction");
-		host.parentElement.dir = "auto";
 		const text = document.createElement("span");
 		text.id = "my-audit-direction-text";
 		text.textContent = "\u05d0\u05d1\u05d2";
 		host.parentElement.prepend(text);
 	});
 	await expect(host.locator(".lfc-calendar-grid")).toHaveCSS("direction", "rtl");
+	await host.evaluate((host) => { host.parentElement.dir = "auto"; });
 	await page.locator("#my-audit-direction-text").evaluate((text) => { text.firstChild.data = "English text"; });
 	await expect(host.locator(".lfc-calendar-grid")).toHaveCSS("direction", "ltr");
 	await expect(count).toBeFocused();
