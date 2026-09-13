@@ -50,7 +50,7 @@ tracks share the tallest intrinsic height or size independently; it does not
 change this DOM structure.
 
 The phrase **day badge** means the `renderDayBadge` slot. Use **Today
-indicator** for the circular treatment applied to today's day number, and use
+indicator** for the rounded treatment applied to today's day number, and use
 **event marker** for the visual attached to an event. These are three different
 parts.
 

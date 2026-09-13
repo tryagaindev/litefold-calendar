@@ -81,7 +81,6 @@
       inline-size: 2rem;
       justify-self: center;
       max-inline-size: calc(100% + 2 * var(--lfc-internal-day-padding));
-      min-block-size: min-content;
       min-inline-size: 0;
       padding: 0;
     }

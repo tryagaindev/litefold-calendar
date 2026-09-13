@@ -178,6 +178,33 @@ test("count controls remain usable in a 320px RTL container with enlarged text",
 	await expect(count).toBeFocused();
 });
 
+test("wrapped date digits stay inside their day and above its count at 200% text", { tag: "@firefox-regression" }, async ({ page }) => {
+	await mountCalendar(page, { count: 12, width: 320 });
+	await page.locator("[data-my-calendar]").evaluate(async (host) => {
+		//These local monospace fonts make two 32px digits wider than the compact badge's content box.
+		host.style.setProperty("--lfc-font-family", '"Courier New", "Liberation Mono", monospace');
+		host.style.setProperty("--lfc-font-size", "1rem");
+		document.documentElement.style.fontSize = "32px";
+		await document.fonts.ready;
+	});
+	const { count, day, grid } = targets(page);
+	await expect(day).toHaveAttribute("aria-current", "date");
+	await day.focus();
+	await day.press("F2");
+	await expect(count).toBeFocused();
+	await expectOnlyOneGridTabStop(grid);
+	const ordinary = await expectDayNumberContained(page, "2026-07-10", { wrapped: true });
+	const today = await expectDayNumberContained(page, TARGET_DATE, { wrapped: true });
+	expect(ordinary.fontSize).toBe(32);
+	expect(today.fontSize).toBe(32);
+	const countBox = await count.boundingBox();
+	expect(countBox).not.toBeNull();
+	expect(today.badge.bottom, "today badge stays above its count").toBeLessThanOrEqual(countBox.y + 1);
+	for (const line of today.lines) {
+		expect(line.bottom, "today text stays above its count").toBeLessThanOrEqual(countBox.y + 1);
+	}
+});
+
 for (const total of [12, 123]) {
 	for (const enlarged of [false, true]) {
 		for (const rtl of [false, true]) {
@@ -321,7 +348,7 @@ function expectRectInside(inner, outer, description) {
 	expect(inner.bottom, `${description}: bottom`).toBeLessThanOrEqual(outer.bottom + tolerance);
 }
 
-async function expectDayNumberContained(page, date) {
+async function expectDayNumberContained(page, date, { wrapped = false } = {}) {
 	const number = page.locator(`.lfc-calendar-day-button[data-lfc-date="${date}"] .lfc-calendar-day-number`);
 	await expect(number).toHaveText(String(Number(date.slice(-2))));
 	const geometry = await number.evaluate((badge) => {
@@ -331,12 +358,30 @@ async function expectDayNumberContained(page, date) {
 		};
 		const range = document.createRange();
 		range.selectNodeContents(badge);
+		const lines = [...range.getClientRects()].map(({ left, top, right, bottom }) => ({ left, top, right, bottom }));
+		const characters = [];
+		const walker = document.createTreeWalker(badge, NodeFilter.SHOW_TEXT);
+		while (walker.nextNode()) {
+			for (let offset = 0; offset < walker.currentNode.textContent.length; offset += 1) {
+				range.setStart(walker.currentNode, offset);
+				range.setEnd(walker.currentNode, offset + 1);
+				characters.push(rect(range));
+			}
+		}
 		return {
 			badge: rect(badge),
 			cell: rect(badge.closest(".lfc-calendar-day")),
-			lines: [...range.getClientRects()].map(({ left, top, right, bottom }) => ({ left, top, right, bottom }))
+			characters,
+			fontSize: Number.parseFloat(getComputedStyle(badge).fontSize),
+			lines
 		};
 	});
+	if (wrapped) {
+		expect(geometry.characters, `${date} has two measured digits`).toHaveLength(2);
+		expect(geometry.characters[1].top, `${date} digits occupy separate lines`).toBeGreaterThan(
+			geometry.characters[0].top + geometry.fontSize / 2
+		);
+	}
 	expectRectInside(geometry.badge, geometry.cell, `${date} badge inside its day`);
 	expect(geometry.lines.length).toBeGreaterThan(0);
 	for (const line of geometry.lines) {
@@ -345,6 +390,7 @@ async function expectDayNumberContained(page, date) {
 		expect(line.left, `${date} text inside badge left`).toBeGreaterThanOrEqual(geometry.badge.left - 1);
 		expect(line.right, `${date} text inside badge right`).toBeLessThanOrEqual(geometry.badge.right + 1);
 	}
+	return geometry;
 }
 
 async function mountCalendar(page, settings = {}) {

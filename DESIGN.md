@@ -380,7 +380,7 @@ The default shape is a modest `0.5rem` radius for the outer shell, grid, agenda,
 
 - Day cells remain rectangular so seven columns read as a single ruled ledger.
 - Grid and agenda event slips use the same public radius as their containing panels; the tighter scale comes from their smaller height and padding rather than a one-off corner value.
-- Day numbers prefer circular geometry within the available cell width; containment and readable enlarged text take precedence over a perfect circle. Previous/Next remain quiet rectangular controls with the system radius rather than introducing a second pill treatment.
+- Day numbers prefer circular geometry within the available cell width; containment and readable enlarged text take precedence over a perfect circle. At narrow widths with enlarged text, two-digit dates may wrap inside a taller rounded shape within the reserved date slot. Previous/Next remain quiet rectangular controls with the system radius rather than introducing a second pill treatment.
 - Focus and selection use outlines, not shape changes.
 - Borders are generally one-CSS-pixel hairlines. Increased-contrast mode thickens the boundaries that carry state.
 - Built-in navigation icons are simple directional glyphs; the default event marker is a small filled SVG circle. No icon font, remote image, mascot, ornament, or decorative illustration belongs in core.
