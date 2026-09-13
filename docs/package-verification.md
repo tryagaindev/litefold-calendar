@@ -1,6 +1,6 @@
 # Package verification
 
-Use this guide to verify release state, run the same package gate as CI, or inspect a published package. The automated release builds one tarball for the exact eligible `main` push and retains it through publication; the npm-authorized job does not rebuild it. npm creates signatures and provenance during publication, and the workflow verifies both before making the GitHub prerelease public.
+Use this guide to verify release state, run the same package gate as CI, or inspect a published package. The automated release builds one tarball for the exact green `main` snapshot and retains it through publication; the npm-authorized job does not rebuild it. npm creates signatures and provenance during publication, and the workflow verifies both before making the GitHub prerelease public.
 
 ## Audience routes
 
@@ -38,22 +38,30 @@ Choose the narrowest command that answers your question:
 
 | Audience and goal | Command | Scope |
 | --- | --- | --- |
-| Release operator: validate prepared version files | `npm run release:verify` | Local manifests, changelog, repository identity, commit, and local tag state |
+| Release operator: validate the snapshot plan | `npm run release:verify -- --plan PATH` | Immutable run identity, source manifest, exact commit, and clean source |
 | Contributor: run the complete repository gate used by CI | `npm run check` | Static checks, unit and browser tests, screenshots, build, and temporary tarball verification |
-| Release operator: retain a local evidence bundle | `npm run package` | The verified tarball and its write-once release bundle under `.artifacts/` |
+| Release operator: retain a nightly evidence bundle | `npm run package:nightly -- --plan PATH` | The stamped tarball and its write-once release bundle under `.artifacts/` |
 | Package user or contributor: preview local npm file selection | `npm pack --dry-run --ignore-scripts` | Local checkout contents only; it is not a substitute for `check:tarball` |
 
 npm always includes the root `README.md`, but canonical PNGs remain outside the package's `files` allowlist. A dry run should therefore list `README.md` and no `docs/screenshots/**` entries. This keeps installed package size independent of the screenshot gallery; `check:screenshots` verifies the repository assets separately. Tarball checks cannot prove hosted README rendering, so the [release operations checklist](release-operations.md#6-verify-npm-and-the-github-prerelease) owns the npm package-page check.
 
 ## Verify release state
 
-Run the read-only local release-state check after preparing a release or when diagnosing the preparation workflow:
+Nightly publication creates a plan from the workflow run's original creation time,
+run ID, event, exact source SHA, and `x.y.z-nightly.0` source version. An artifact
+version such as `0.6.0-nightly.20260912090000.123456789` is derived from those
+immutable inputs. Reruns retain the original identity.
 
 ```sh
-npm run release:verify
+npm run release:verify -- --plan PATH
 ```
 
-The check validates that the package is configured as a public alpha, both lockfile version fields match, the changelog is release-ready, the Git origin is canonical, and a local tag (if present) resolves to the current commit. It does not query npm or GitHub. The publication workflow adds the remote collision checks and requires the release commit's first-parent diff to contain only `CHANGELOG.md`, `package-lock.json`, and `package.json`.
+Replace `PATH` with the retained nightly plan. This read-only command validates
+its schema and derived identity, the manifest's public nightly policy, exact
+`HEAD`, and a clean tracked and untracked worktree. It does not query GitHub or
+npm. The workflow separately verifies a successful canonical `main` CI run,
+fresh registry state, predecessor completion, and current source eligibility.
+No release-only source commit or metadata pull request is needed.
 
 ## Complete repository gate
 
@@ -81,7 +89,7 @@ For intentional visual changes, follow the [screenshot update procedure](screens
 ## Retain a local verification bundle
 
 ```sh
-npm run package
+npm run package:nightly -- --plan PATH
 ```
 
 From a clean worktree, the command creates a write-once directory named `.artifacts/tryagaindev-litefold-calendar-<version>/` containing exactly:
@@ -92,7 +100,28 @@ From a clean worktree, the command creates a write-once directory named `.artifa
 - `SHA256SUMS`.
 - The packaged `LICENSE`.
 
-The command refuses to overwrite an existing version directory. Do not delete an existing bundle merely to produce different bytes for the same version; increment the prerelease version instead. During an automated release, these files are attached to the draft GitHub prerelease before it becomes immutable.
+The command refuses to overwrite an existing version directory. The source
+checkout keeps its development version; staging changes only the package
+manifest version before packing. The nightly receipt uses schema 2 and retains
+`sourceVersion`, the validated `nightly` plan, `manifestTransform: "version-only"`,
+and SHA-256 digests of the source and published manifests. `browserTargets`
+retains Vite's `baseline-widely-available` preset, versioned `effectiveQuery`,
+`resolvedAt`, locked Vite/esbuild `dataVersions`, selected `browsers`, and the
+JavaScript/CSS targets returned by Vite's public configuration resolver.
+`browserTargetsSha256` hashes its JSON serialization. The receipt records the
+original run's UTC creation date, including on reruns; target versions come from
+the locked Vite preset. The SBOM and tarball
+use the derived published version. `npm run package` retains the ordinary source
+version bundle for an explicitly requested local evidence operation.
+
+Do not delete an existing bundle to produce different bytes for the same
+version. Recover an interrupted workflow using the original run and retained
+bundle plus notes. The workflow restores its earliest complete artifact pair,
+checks archive digests, receipt identity and checksums, and bypasses rebuilding.
+Missing or expired evidence with staged or published state stops recovery.
+A source correction requires a new reviewed identity. During an automated
+release, these files are attached to the draft GitHub prerelease before it
+becomes immutable.
 
 The SPDX document is canonicalized after npm generates and validates it. Its namespace uses the package version and exact source commit, its timestamp uses the commit's committer time, and its keys have a fixed order. With the pinned toolchain, the same clean commit therefore produces byte-identical `sbom.spdx.json` content.
 
@@ -120,7 +149,18 @@ Tree shaking and package contents answer different questions. The extension file
 
 ## Registry and release evidence
 
-The publisher retries npm's eventually consistent reads and verifies the exact version, matching `alpha` and `latest` dist-tags, registry integrity, provenance/signatures, clean installation, root import, documented extension import, and stylesheet import before publishing the GitHub prerelease. Successful publisher completion triggers the separately authorized immutable Pages deployment through a same-repository `workflow_run` event bound to the same exact commit.
+The publisher retries npm's eventually consistent reads and verifies the exact
+version, `nightly` tag, registry integrity, provenance/signatures, clean
+installation, public imports, and stylesheet before publishing the GitHub
+prerelease. A separate job advances `latest` to the nightly while no stable
+version exists. Once stable exists, verification requires stable ownership of
+`latest` and nightlies leave it alone. Historical `alpha` remains frozen.
+
+Successful publisher completion triggers the separately authorized immutable
+Pages deployment through a same-repository `workflow_run`. Pages verifies the
+published receipt against the exact source SHA, original run identity, generated
+version, and GitHub asset digest before building that release directory. The
+publisher does not wait for Pages; operators verify both completed workflows.
 
 Inspect an exact published version rather than relying only on movable dist-tags:
 
@@ -133,7 +173,7 @@ Replace `EXACT_VERSION` with the release being checked. Confirm that:
 
 - The returned name and version are exact.
 - `dist.integrity` equals `npmIntegrity` in the GitHub prerelease's `package-verification.json`.
-- Both `alpha` and `latest` point to that exact prerelease until the first stable release replaces the temporary channel policy.
-- The npm package page shows provenance for the expected repository and `publish-alpha.yml` workflow.
+- `nightly` selects that exact version. Before stable exists, `latest` matches it; afterward `latest` selects a stable version. Historical `alpha` has not moved.
+- The npm package page shows provenance for the expected repository and `publish-nightly.yml` workflow.
 
 The workflow installs the exact version into a clean consumer before running `npm audit signatures`. Running that command in the repository would verify the development dependency tree instead. If a registry read is unavailable, ambiguous, or inconsistent with the retained bundle, stop and use the [recovery matrix](release-administration.md#recovery-matrix).

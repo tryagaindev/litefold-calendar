@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
 	copyFile,
+	cp,
 	mkdtemp,
 	readFile,
 	readdir,
@@ -24,6 +25,8 @@ import {
 } from "./lib/packed-extension-verification.mjs";
 import { REPOSITORY_ROOT, run, runNpm, runTsc } from "./lib/process.mjs";
 import { verifyPackedBrowserInteraction } from "./lib/packed-browser-verification.mjs";
+import { resolveBrowserTargets } from "./lib/browser-targets.mjs";
+import { readNightlyPlan, nightlyPackageManifest } from "./lib/nightly-release.mjs";
 import {
 	cleanupArtifactWorkspace,
 	createArtifactWorkspace,
@@ -298,7 +301,10 @@ async function verifyChecksums(artifactDirectory, orderedNames) {
 }
 
 const releaseArguments = parseReleaseArguments(process.argv.slice(2));
-const packageJson = JSON.parse(await readFile(join(REPOSITORY_ROOT, "package.json"), "utf8"));
+const sourcePackageJson = JSON.parse(await readFile(join(REPOSITORY_ROOT, "package.json"), "utf8"));
+const nightlyPlan = releaseArguments.nightlyPlanPath === undefined
+	? null : await readNightlyPlan(releaseArguments.nightlyPlanPath);
+const packageJson = nightlyPlan === null ? sourcePackageJson : nightlyPackageManifest(sourcePackageJson, nightlyPlan);
 const configuredNodeRange = packageJson.devEngines?.runtime?.version;
 if (configuredNodeRange !== SUPPORTED_NODE_RANGE) {
 	throw new Error(`Release packaging requires package.json to declare Node ${SUPPORTED_NODE_RANGE}.`);
@@ -318,12 +324,18 @@ if (requiredNpmVersion !== npmVersion) {
 const initialRepository = await repositoryState();
 
 async function produceReleaseBundle(artifactDirectory) {
-	await run(process.execPath, [BUILD_SCRIPT]);
+	if (nightlyPlan !== null && nightlyPlan.sourceCommit !== initialRepository.commit) {
+		throw new Error("Nightly plan source differs from the clean package source.");
+	}
+	const browserTargetDate = nightlyPlan?.createdAt.slice(0, 10) ?? process.env.LFC_BROWSER_TARGET_DATE;
+	const browserTargets = resolveBrowserTargets(browserTargetDate === undefined ? {} : { date: browserTargetDate });
+	const buildEnvironment = { ...process.env, LFC_BROWSER_TARGET_DATE: browserTargets.resolvedAt };
+	await run(process.execPath, [BUILD_SCRIPT], { env: buildEnvironment });
 	const postBuildRepository = await repositoryState();
 	if (postBuildRepository.commit !== initialRepository.commit) {
 		throw new Error("Git HEAD changed while rebuilding release output.");
 	}
-	await run(process.execPath, [POLICY_SCRIPT, "--built", "--pack"]);
+	await run(process.execPath, [POLICY_SCRIPT, "--built", "--pack"], { env: buildEnvironment });
 
 	await copyFile(join(REPOSITORY_ROOT, LICENSE_FILENAME), join(artifactDirectory, LICENSE_FILENAME));
 	const sbomResult = await run(process.execPath, [
@@ -332,7 +344,8 @@ async function produceReleaseBundle(artifactDirectory) {
 		"--source-commit",
 		initialRepository.commit,
 		"--source-date-epoch",
-		String(initialRepository.sourceDateEpoch)
+		String(initialRepository.sourceDateEpoch),
+		...(nightlyPlan === null ? [] : ["--version", packageJson.version])
 	], { capture: true });
 	const sbomBytes = `${JSON.stringify(JSON.parse(sbomResult.stdout), null, 2)}\n`;
 	if (sbomResult.stdout !== sbomBytes) {
@@ -344,13 +357,29 @@ async function produceReleaseBundle(artifactDirectory) {
 		{ encoding: "utf8", flag: "wx" }
 	);
 
-	const pack = await runNpm([
+	let packageStaging = null;
+	let pack;
+	try {
+		if (nightlyPlan !== null) {
+			packageStaging = await mkdtemp(join(tmpdir(), "lfc-nightly-package-"));
+			await cp(join(REPOSITORY_ROOT, "dist"), join(packageStaging, "dist"), { recursive: true });
+			for (const file of ["LICENSE", "README.md"]) {
+				await copyFile(join(REPOSITORY_ROOT, file), join(packageStaging, file));
+			}
+			await writeFile(join(packageStaging, "package.json"), `${JSON.stringify(packageJson, null, 2)}\n`);
+		}
+		pack = await runNpm([
 		"pack",
 		"--ignore-scripts",
 		"--json",
 		"--pack-destination",
 		artifactDirectory
-	], { capture: true });
+		], { capture: true, ...(packageStaging === null ? {} : { cwd: packageStaging }) });
+	} finally {
+		if (packageStaging !== null) {
+			await rm(packageStaging, { recursive: true, force: true });
+		}
+	}
 	const packResult = inspectPackResult(JSON.parse(pack.stdout), packageJson);
 	const tarballName = packResult.filename;
 	const tarballPath = join(artifactDirectory, tarballName);
@@ -370,7 +399,7 @@ async function produceReleaseBundle(artifactDirectory) {
 		throw new Error("npm pack SHA-1 compatibility digest does not match the tarball bytes.");
 	}
 	const receipt = {
-		schemaVersion: 1,
+		schemaVersion: nightlyPlan === null ? 1 : 2,
 		name: packageJson.name,
 		version: packageJson.version,
 		private: packageJson.private,
@@ -378,6 +407,15 @@ async function produceReleaseBundle(artifactDirectory) {
 		sourceRepository: repositoryUrl(packageJson),
 		sourceCommit: initialRepository.commit,
 		sourceTreeDirty: false,
+		browserTargets,
+		browserTargetsSha256: sha256(Buffer.from(JSON.stringify(browserTargets))),
+		...(nightlyPlan === null ? {} : {
+			sourceVersion: sourcePackageJson.version,
+			nightly: nightlyPlan,
+			manifestTransform: "version-only",
+			sourceManifestSha256: sha256(Buffer.from(JSON.stringify(sourcePackageJson))),
+			publishedManifestSha256: sha256(Buffer.from(JSON.stringify(packageJson)))
+		}),
 		license: packageJson.license,
 		npmIntegrity,
 		sha256: tarballSha256,

@@ -1,6 +1,6 @@
 # Static example deployment
 
-This guide is for maintainers operating the GitHub Pages developer demo. Contributors validate example changes through the [examples contributor lane](../examples/README.md#contributors) and do not deploy them manually: successful CI updates the rolling `main` preview, and successful alpha publication triggers immutable release snapshots.
+This guide is for maintainers operating the GitHub Pages developer demo. Contributors validate example changes through the [examples contributor lane](../examples/README.md#contributors) and do not deploy them manually: successful CI updates the rolling `main` preview, and successful nightly publication triggers immutable release snapshots.
 
 ## URL and identity contract
 
@@ -9,7 +9,7 @@ This guide is for maintainers operating the GitHub Pages developer demo. Contrib
 | Rolling main preview | `main/examples/` | Replaced after successful CI for the exact `main` commit, or restored from retained deployment history |
 | Immutable release | `releases/<package-version>/examples/` | Added by a separate release operation for the exact protected package tag; different bytes can never replace it |
 
-The Pages root selects the greatest SemVer release in `site-manifest.json` for its primary **Run** action. If no valid release exists, it falls back to the rolling preview and an `@alpha` install command. Release pages always show an exact version.
+The Pages root selects the greatest SemVer release in `site-manifest.json` for its primary **Run** action. This site selection is independent of npm dist-tags; after a stable publication, a newer nightly may still be the greatest displayed release while npm `latest` remains stable. If no valid release exists, it falls back to the rolling preview and an `@nightly` install command. Release pages always show an exact version.
 
 Each landing page and recipe identifies its channel, package version, full source commit, and commit-pinned source links. Static navigation remains useful when JavaScript is disabled or metadata cannot be loaded. Browser enhancement reads only validated same-origin metadata with `no-store`.
 
@@ -20,7 +20,7 @@ All deployed assets are repository-owned and same-origin. The demo has no analyt
 | Operation | Trigger | Maintainer or operator action |
 | --- | --- | --- |
 | Update rolling preview | Successful `CI` run for a push to `main` | None; inspect the resulting **Deploy static examples** run |
-| Add release snapshot | Successful **Publish npm alpha** completion after npm and GitHub release verification | None; verify the publisher-linked **Deploy static examples** run |
+| Add release snapshot | Successful **Publish npm nightly** completion after npm and GitHub release verification | None; verify the publisher-linked **Deploy static examples** run |
 | Retry release snapshot | Rerun the original publisher-linked **Deploy static examples** run only after a transient or hosted-state failure | Do not dispatch a release or supply a ref; if no downstream run exists, rerun the original publisher |
 | Restore rolling preview | Manual **Roll back static examples** dispatch from `main` | Set **Snapshot ref** to an exact retained commit |
 
@@ -32,7 +32,7 @@ Before the first deployment, a maintainer with GitHub `Admin` access to the
 repository must:
 
 1. Configure Pages to use **GitHub Actions** as its source.
-2. Protect the `github-pages` environment independently from `npm` and allow deployments from `main` only.
+2. Protect the `github-pages` environment independently from `npm-nightly` and `npm-nightly-tags` and allow deployments from `main` only.
 3. Allow the workflow token to create and maintain `pages-content` while restricting direct and force pushes to that branch.
 4. Keep `main`, `v*` tags, workflow files, and environment-rule changes under review.
 
@@ -42,13 +42,13 @@ These settings are hosted state and cannot be proved by repository tests. Rechec
 
 ## Build and authority boundaries
 
-Pages operations are split by trust boundary. `deploy-examples.yml` is `workflow_run`-only: successful same-repository `CI` and **Publish npm alpha** completions supply an exact `main` head commit for rolling and release channels. `rollback-examples.yml` is `workflow_dispatch`-only and can restore an exact retained `main/` snapshot. Neither workflow accepts a manual release ref.
+Pages operations are split by trust boundary. `deploy-examples.yml` is `workflow_run`-only: successful same-repository `CI` and **Publish npm nightly** completions supply the exact verified source commit for rolling and release channels. Nightly triggers are scheduled or manually dispatched from `main`; CI-linked previews still require a push to `main`. `rollback-examples.yml` is `workflow_dispatch`-only and can restore an exact retained `main/` snapshot. Neither workflow accepts a manual release ref.
 
-After npm verification and publication of the immutable GitHub prerelease, successful completion of `publish-alpha.yml` triggers Pages through GitHub's native `workflow_run` event. Pages verifies the canonical workflow name-and-path pair, same-repository push, full head commit, first-parent version change, protected tag, immutable prerelease, and main ancestry before building the release channel. npm/GitHub publication has no Pages authority, and a Pages failure does not make an already-published package version replaceable.
+After npm verification and publication of the immutable GitHub prerelease, successful completion of `publish-nightly.yml` triggers Pages through GitHub's native `workflow_run` event. The publisher does not wait for Pages; the operator verifies the downstream run before recording delivery complete, and the next nightly preflight checks the preceding release Pages. Pages verifies the canonical workflow name-and-path pair, same-repository scheduled/manual publisher, full source commit, protected tag, immutable prerelease, and receipt asset digest before building the release channel. It derives the published nightly version from the original publisher run's UTC creation time and run ID, then checks that version and commit against receipt schema 2. The source manifest's development base is expected to differ from the published version; a first-parent version change is not a nightly prerequisite. npm/GitHub publication has no Pages authority, and a Pages failure does not make an already-published package version replaceable.
 
 Before an automatic Pages snapshot can be retained, repository tooling:
 
-- Generates `examples/metadata.json` as deployment provenance from the package version, exact source commit, and channel. The file is ignored build output; never edit or commit it.
+- Generates `examples/metadata.json` as deployment provenance from the exact source commit and channel. Release builds use the published version established by the publisher receipt; rolling previews use the source development version. The file is ignored build output; never edit or commit it.
 - Copies only the browser runtime files from `dist/` and `examples/`.
 - Injects the self-only Content Security Policy and developer provenance navigation into every staged page.
 - Rejects direct literal remote scripts, stylesheets, media, module imports, workers, sockets, beacons, and fetch targets.
@@ -73,9 +73,10 @@ For a rolling preview:
 
 For a release:
 
-- Confirm the Pages run was triggered by the successful **Publish npm alpha** run and used that run's exact full head commit. Do not confuse it with the CI-linked rolling-main run that may have the same commit.
-- Confirm `releases/<version>/examples/metadata.json` reports the exact version, `release` channel, and the full commit from `package-verification.json` and the protected tag.
-- Confirm `site-manifest.json` maps that version to the same immutable directory.
+- Confirm the Pages run was triggered by the successful **Publish npm nightly** run and used that run's exact full head commit. Do not confuse it with the CI-linked rolling-main run that may have the same commit.
+- Confirm the retained receipt's `version`, `sourceCommit`, original publisher run identity, and digest match the immutable release asset. For nightly receipts, also verify `sourceVersion` and the version-only manifest transformation.
+- Confirm `releases/<version>/examples/metadata.json` reports the published version, `release` channel, and the full commit from `package-verification.json` and the protected tag. A nightly deployment must not accidentally use the source `nightly.0` development base as its directory or displayed version.
+- Confirm `site-manifest.json` maps that version to the same immutable directory. Existing alpha and nightly directories remain intact.
 - Open the release landing page and one recipe deep link; confirm the visible provenance and source links match.
 
 A rolling mismatch is expected only during an intentional rollback or while a newer deployment is completing. Any other missing or inconsistent identity requires investigation.
@@ -112,7 +113,7 @@ An automatic deployment never moves the retained preview backward or onto diverg
 
 If release metadata or a deep link is missing, first compare the upstream publisher run and head SHA, protected tag, GitHub prerelease, package receipt, retained `pages-content` state, and live site. Do not copy files into `pages-content` or edit the site manually.
 
-Rerun the original publisher-linked **Deploy static examples** run only when all existing identities and bytes match and the failure was transient or caused by hosted state. That rerun keeps the original commit SHA, ref, and workflow definition; it cannot consume later changes. If GitHub never created the downstream run, review the current default-branch `deploy-examples.yml`, then select **Re-run all jobs** on the successful original **Publish npm alpha** run. The publisher retains its original identity, while the new downstream run uses the current Pages workflow definition and still pins release source and assembly tooling to the publisher SHA. Validate that new run independently. Never use **Roll back static examples** for a release. If release source, assembly tooling, or published example bytes must change, stop and publish a greater package version.
+Rerun the original publisher-linked **Deploy static examples** run only when all existing identities and bytes match and the failure was transient or caused by hosted state. That rerun keeps the original commit SHA, ref, and workflow definition; it cannot consume later changes. If GitHub never created the downstream run, review the current default-branch `deploy-examples.yml`, then select **Re-run all jobs** on the successful original **Publish npm nightly** run. The publisher retains its original identity, while the new downstream run uses the current Pages workflow definition and still pins release source and assembly tooling to the publisher SHA. Validate that new run independently. Never use **Roll back static examples** for a release. If release source, assembly tooling, or published example bytes must change, stop and publish a greater package version.
 
 ## Verification
 

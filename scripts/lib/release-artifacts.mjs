@@ -77,6 +77,10 @@ async function assertMissingFinalDirectory(finalDirectory) {
 }
 
 export function parseReleaseArguments(arguments_) {
+	if (Array.isArray(arguments_) && arguments_.length === 2 &&
+		arguments_[0] === "--nightly-plan" && typeof arguments_[1] === "string" && arguments_[1].length > 0) {
+		return Object.freeze({ nightlyPlanPath: resolve(arguments_[1]), verifyOnly: false });
+	}
 	if (!Array.isArray(arguments_) || arguments_.some((argument) => argument !== "--verify-only")) {
 		throw new Error("Usage: node scripts/pack-release.mjs [--verify-only]");
 	}

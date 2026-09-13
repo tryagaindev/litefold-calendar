@@ -10,9 +10,9 @@ import { promisify } from "node:util";
 import { REPOSITORY_ROOT, runNpm } from "../lib/process.mjs";
 
 const execFileAsync = promisify(execFile);
-const WORKFLOW_PATH = join(REPOSITORY_ROOT, ".github", "workflows", "publish-alpha.yml");
+const WORKFLOW_PATH = join(REPOSITORY_ROOT, ".github", "workflows", "publish-nightly.yml");
 const FIXTURE_DIRECTORY = join(REPOSITORY_ROOT, "scripts", "tests", "fixtures", "npm-view-json");
-const VERSION = "0.2.0-alpha.0";
+const VERSION = "0.6.0-nightly.20260912090000.123456789";
 const SOURCE_COMMIT = "a".repeat(40);
 const EXPECTED_DIGEST = Buffer.alloc(64, 0xa5);
 const EXPECTED_INTEGRITY = `sha512-${EXPECTED_DIGEST.toString("base64")}`;
@@ -36,7 +36,7 @@ function inlineModule(source, marker) {
 	const lines = source.split(/\r?\n/u);
 	const start = lines.findIndex((line) => line.trim() === `# ${marker}_START`);
 	assert.notEqual(start, -1, `Expected inline module marker ${marker}.`);
-	assert.match(lines[start + 1].trim(), /^node --input-type=module <<'NODE'$/u);
+	assert.match(lines[start + 1].trim(), /^(?:if )?node --input-type=module <<'NODE'$/u);
 	const end = lines.findIndex(
 		(line, index) => index > start + 1 && line.trim() === "NODE"
 	);
@@ -89,67 +89,6 @@ void test("the workflow normalizer accepts only npm 12 single-result arrays", as
 			execFileAsync(process.execPath, ["--input-type=module", "--eval", normalizer, input, output]),
 			/npm view --json must return exactly one result/u
 		);
-	}
-});
-
-void test("the prerelease channel policy converges alpha and latest on the candidate", async () => {
-	const workflow = await readFile(WORKFLOW_PATH, "utf8");
-	const policy = inlineModule(workflow, "LFC_PRERELEASE_CHANNEL_POLICY");
-	const candidate = "0.3.0-alpha.0";
-	const runPolicy = (metadata) => runInlineModule(policy, {
-		cwd: REPOSITORY_ROOT,
-		env: {
-			...process.env,
-			LFC_REGISTRY_METADATA: JSON.stringify(metadata),
-			LFC_VERSION: candidate
-		}
-	});
-	const versions = ["0.1.0-alpha.0", "0.2.0-alpha.0"];
-
-	for (const metadata of [
-		{
-			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.2.0-alpha.0" },
-			versions
-		},
-		{
-			"dist-tags": { alpha: candidate, latest: "0.2.0-alpha.0" },
-			versions: [...versions, candidate]
-		},
-		{
-			"dist-tags": { alpha: candidate, latest: candidate },
-			versions: [...versions, candidate]
-		}
-	]) {
-		await runPolicy(metadata);
-	}
-
-	for (const metadata of [
-		{ "dist-tags": {}, versions: [] },
-		{ "dist-tags": { alpha: "0.2.0-alpha.0" }, versions },
-		{
-			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.1.0-alpha.0" },
-			versions
-		},
-		{
-			"dist-tags": { alpha: "0.2.0-alpha.1", latest: "0.1.0-alpha.0" },
-			versions: [...versions, "0.2.0-alpha.1"]
-		},
-		{
-			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.2.0" },
-			versions: [...versions, "0.2.0"]
-		},
-		{
-			"dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.2.1-alpha.0" },
-			versions
-		},
-		{
-			"dist-tags": { alpha: "0.4.0-alpha.0", latest: "0.4.0-alpha.0" },
-			versions: [...versions, "0.4.0-alpha.0"]
-		},
-		{ "dist-tags": [], versions: [] },
-		{ "dist-tags": { alpha: "0.2.0-alpha.0", latest: "0.2.0-alpha.0" }, versions: [] }
-	]) {
-		await assert.rejects(runPolicy(metadata));
 	}
 });
 
@@ -277,7 +216,7 @@ void test("the workflow accepts the tested GitHub CLI version and newer releases
 });
 
 const PROVENANCE_ENVIRONMENT = {
-	GITHUB_EVENT_NAME: "push",
+	GITHUB_EVENT_NAME: "workflow_dispatch",
 	GITHUB_REF: "refs/heads/main",
 	GITHUB_REPOSITORY: REPOSITORY,
 	GITHUB_REPOSITORY_ID: "987654321",
@@ -288,7 +227,7 @@ const PROVENANCE_ENVIRONMENT = {
 	GITHUB_SERVER_URL: SERVER_URL,
 	GITHUB_SHA: SOURCE_COMMIT,
 	GITHUB_WORKFLOW_REF:
-		`${REPOSITORY}/.github/workflows/publish-alpha.yml@refs/heads/main`,
+		`${REPOSITORY}/.github/workflows/publish-nightly.yml@refs/heads/main`,
 	GITHUB_WORKFLOW_SHA: SOURCE_COMMIT,
 	LFC_EXPECTED_INTEGRITY: EXPECTED_INTEGRITY,
 	LFC_SOURCE_COMMIT: SOURCE_COMMIT,
@@ -307,14 +246,14 @@ function provenanceStatement(attempt = 3) {
 				buildType: "https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1",
 				externalParameters: {
 					workflow: {
-						path: ".github/workflows/publish-alpha.yml",
+						path: ".github/workflows/publish-nightly.yml",
 						ref: "refs/heads/main",
 						repository: `${SERVER_URL}/${REPOSITORY}`
 					}
 				},
 				internalParameters: {
 					github: {
-						event_name: "push",
+						event_name: "workflow_dispatch",
 						repository_id: PROVENANCE_ENVIRONMENT.GITHUB_REPOSITORY_ID,
 						repository_owner_id: PROVENANCE_ENVIRONMENT.GITHUB_REPOSITORY_OWNER_ID
 					}
@@ -355,13 +294,13 @@ function provenanceBundle(statement = provenanceStatement()) {
 
 function provenanceCertificate(attempt = 3) {
 	const workflowIdentity =
-		`${SERVER_URL}/${REPOSITORY}/.github/workflows/publish-alpha.yml@refs/heads/main`;
+		`${SERVER_URL}/${REPOSITORY}/.github/workflows/publish-nightly.yml@refs/heads/main`;
 	return {
 		buildConfigDigest: SOURCE_COMMIT,
 		buildConfigURI: workflowIdentity,
 		buildSignerDigest: SOURCE_COMMIT,
 		buildSignerURI: workflowIdentity,
-		buildTrigger: "push",
+		buildTrigger: "workflow_dispatch",
 		issuer: "https://token.actions.githubusercontent.com",
 		runInvocationURI: invocation(attempt),
 		runnerEnvironment: "github-hosted",
@@ -479,6 +418,11 @@ void test("the workflow provenance policy accepts the current or an earlier atte
 	const policy = inlineModule(workflow, "LFC_PROVENANCE_POLICY");
 	await runPolicy(context, policy, { attempt: 3 });
 	await runPolicy(context, policy, { attempt: 1 });
+	const statement = provenanceStatement();
+	statement.predicate.buildDefinition.internalParameters.github.event_name = "schedule";
+	const certificate = provenanceCertificate();
+	certificate.buildTrigger = "schedule";
+	await runPolicy(context, policy, { statement, certificate, environment: { GITHUB_EVENT_NAME: "schedule" } });
 });
 
 void test("the workflow provenance policy rejects conflicting source and builder identities", async (context) => {
@@ -490,7 +434,7 @@ void test("the workflow provenance policy rejects conflicting source and builder
 		(options) => { options.statement.predicate.buildDefinition.externalParameters.workflow.ref = "refs/heads/other"; },
 		(options) => { options.statement.predicate.buildDefinition.externalParameters.workflow.path = ".github/workflows/other.yml"; },
 		(options) => { options.statement.predicate.buildDefinition.resolvedDependencies[0].digest.gitCommit = "b".repeat(40); },
-		(options) => { options.statement.predicate.buildDefinition.internalParameters.github.event_name = "workflow_dispatch"; },
+		(options) => { options.statement.predicate.buildDefinition.internalParameters.github.event_name = "push"; },
 		(options) => { options.statement.predicate.runDetails.builder.id = "https://github.com/actions/runner/self-hosted"; },
 		(options) => { options.statement.predicate.runDetails.metadata.invocationId = invocation(4); },
 		(options) => { options.statement.predicate.runDetails.metadata.invocationId = invocation(1, "987654321"); },
@@ -499,13 +443,13 @@ void test("the workflow provenance policy rejects conflicting source and builder
 		(options) => { options.certificate.runnerEnvironment = "self-hosted"; },
 		(options) => { options.certificate.sourceRepositoryIdentifier = "1"; },
 		(options) => { options.certificate.runInvocationURI = invocation(2); },
-		(options) => { options.certificate.buildTrigger = "workflow_dispatch"; },
+		(options) => { options.certificate.buildTrigger = "push"; },
 		(options) => { options.environment.GITHUB_REPOSITORY = "attacker/repository"; },
 		(options) => {
-			options.environment.GITHUB_EVENT_NAME = "workflow_dispatch";
+			options.environment.GITHUB_EVENT_NAME = "push";
 			options.statement.predicate.buildDefinition.internalParameters.github.event_name =
-				"workflow_dispatch";
-			options.certificate.buildTrigger = "workflow_dispatch";
+				"push";
+			options.certificate.buildTrigger = "push";
 		},
 		(options) => {
 			options.environment.GITHUB_EVENT_NAME = "pull_request";
@@ -529,4 +473,31 @@ void test("the workflow provenance policy rejects conflicting source and builder
 		}
 		await assert.rejects(runPolicy(context, policy, options));
 	}
+});
+
+
+void test("the source-free latest policy waits for visibility and preserves stable ownership", async (context) => {
+	const workflow = await readFile(WORKFLOW_PATH, "utf8");
+	const policy = inlineModule(workflow, "LFC_NIGHTLY_LATEST_POLICY");
+	const directory = await temporaryDirectory(context, "lfc-nightly-latest-");
+	const output = join(directory, "output.txt");
+	const previous = "0.5.0-alpha.3";
+	async function check({ versions = [previous, VERSION], latest = previous, nightly = VERSION,
+		integrity = EXPECTED_INTEGRITY } = {}) {
+		await writeFile(join(directory, "registry.json"), JSON.stringify({ versions, "dist-tags": { latest, nightly } }));
+		await writeFile(join(directory, "integrity.json"), JSON.stringify(integrity));
+		await writeFile(output, "");
+		await runInlineModule(policy, { cwd: directory, env: { ...process.env,
+			LFC_VERSION: VERSION, LFC_EXPECTED_INTEGRITY: EXPECTED_INTEGRITY, GITHUB_OUTPUT: output } });
+		return readFile(output, "utf8");
+	}
+	assert.equal(await check(), `latest-target=${VERSION}\nwrite=true\n`);
+	assert.equal(await check({ latest: VERSION }), `latest-target=${VERSION}\nwrite=false\n`);
+	assert.equal(await check({ versions: [previous, "0.5.0", VERSION], latest: "0.5.0" }),
+		"latest-target=0.5.0\nwrite=false\n");
+	await assert.rejects(check({ versions: [previous] }), { code: 75 });
+	await assert.rejects(check({ nightly: previous }), { code: 75 });
+	await assert.rejects(check({ integrity: null }), { code: 75 });
+	await assert.rejects(check({ integrity: "sha512-conflicting" }), /registry integrity changed/u);
+	await assert.rejects(check({ versions: [previous, "0.5.0", VERSION] }), /Stable owns latest/u);
 });

@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { NIGHTLY_VERSION_PATTERN } from "./lib/nightly-release.mjs";
+
 import { REPOSITORY_ROOT, runNpm } from "./lib/process.mjs";
 
 const EXPECTED_SPDX_VERSION = "SPDX-2.3";
@@ -114,6 +116,7 @@ function parseArguments(arguments_) {
 	let emitJson = false;
 	let sourceCommit;
 	let sourceDateEpochText;
+	let version;
 	for (let index = 0; index < arguments_.length; index += 1) {
 		const argument = arguments_[index];
 		if (argument === "--json") {
@@ -124,7 +127,7 @@ function parseArguments(arguments_) {
 			continue;
 		}
 
-		if (argument !== "--source-commit" && argument !== "--source-date-epoch") {
+		if (argument !== "--source-commit" && argument !== "--source-date-epoch" && argument !== "--version") {
 			throw usageError(`Unknown argument ${String(argument)}.`);
 		}
 		const value = arguments_[index + 1];
@@ -132,7 +135,12 @@ function parseArguments(arguments_) {
 			throw usageError(`${argument} requires a value.`);
 		}
 		index += 1;
-		if (argument === "--source-commit") {
+		if (argument === "--version") {
+			if (version !== undefined || !NIGHTLY_VERSION_PATTERN.test(value)) {
+				throw usageError("--version requires one generated nightly version.");
+			}
+			version = value;
+		} else if (argument === "--source-commit") {
 			if (sourceCommit !== undefined) {
 				throw usageError("--source-commit may be specified only once.");
 			}
@@ -160,7 +168,7 @@ function parseArguments(arguments_) {
 		throw usageError("--source-date-epoch must be a representable nonnegative integer.");
 	}
 
-	return { emitJson, sourceCommit, sourceDate };
+	return { emitJson, sourceCommit, sourceDate, ...(version === undefined ? {} : { version }) };
 }
 
 function sortObjectKeys(value) {
@@ -206,6 +214,24 @@ const sbom = JSON.parse(result.stdout);
 validateSbom(sbom, packageJson);
 
 if (options.emitJson) {
+	if (options.version !== undefined) {
+		const previousVersion = packageJson.version;
+		packageJson.version = options.version;
+		const runtimePackage = sbom.packages[0];
+		const previousId = runtimePackage.SPDXID;
+		const nextId = previousId.replace(previousVersion, options.version);
+		runtimePackage.SPDXID = nextId;
+		runtimePackage.versionInfo = options.version;
+		sbom.name = sbom.name.replace(previousVersion, options.version);
+		sbom.documentDescribes = [nextId];
+		for (const relationship of sbom.relationships) {
+			if (relationship.relatedSpdxElement === previousId) {relationship.relatedSpdxElement = nextId;}
+			if (relationship.spdxElementId === previousId) {relationship.spdxElementId = nextId;}
+		}
+		for (const reference of runtimePackage.externalRefs) {
+			if (reference.referenceType === "purl") {reference.referenceLocator = npmPurl(packageJson.name, options.version);}
+		}
+	}
 	const canonicalSbom = canonicalizeSbom(
 		sbom,
 		packageJson,

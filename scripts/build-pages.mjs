@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { parseExampleMetadata, serializeExampleMetadata } from "./lib/example-metadata.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
 import { parseSemVer } from "./lib/semver.mjs";
+import { validateNightlyPlan } from "./lib/nightly-release.mjs";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const DEFAULT_SHELL_DIRECTORY = join(REPOSITORY_ROOT, "scripts", "pages-site");
@@ -82,7 +83,7 @@ function parseArguments(arguments_) {
 	return { outputDirectory: resolve(arguments_[1]) };
 }
 
-export function validateDeploymentMetadata(metadata, packageVersion) {
+export function validateDeploymentMetadata(metadata, packageVersion, nightlyReceipt = null) {
 	const parsed = parseExampleMetadata(metadata);
 	if (parsed.channel !== "main" && parsed.channel !== "release") {
 		throw new Error("A Pages artifact must use the main or release deployment channel.");
@@ -92,7 +93,16 @@ export function validateDeploymentMetadata(metadata, packageVersion) {
 	} catch {
 		throw new Error("Deployment metadata version must match the package version.");
 	}
-	if (parsed.version !== packageVersion) {
+	if (nightlyReceipt !== null) {
+		const plan = validateNightlyPlan(nightlyReceipt.nightly);
+		if (nightlyReceipt.schemaVersion !== 2 || nightlyReceipt.sourceTreeDirty !== false ||
+			nightlyReceipt.manifestTransform !== "version-only" || nightlyReceipt.sourceVersion !== packageVersion ||
+			plan.baseVersion !== packageVersion || nightlyReceipt.sourceCommit !== parsed.commit ||
+			plan.sourceCommit !== parsed.commit || nightlyReceipt.version !== parsed.version ||
+			plan.version !== parsed.version || parsed.channel !== "release") {
+			throw new Error("Nightly Pages metadata must match the verified publisher receipt and source.");
+		}
+	} else if (parsed.version !== packageVersion) {
 		throw new Error("Deployment metadata version must match the package version.");
 	}
 
@@ -360,7 +370,9 @@ export async function buildPagesArtifact(options) {
 	const metadataPath = join(repositoryRoot, "examples", "metadata.json");
 	const metadata = validateDeploymentMetadata(
 		JSON.parse(await readFile(metadataPath, "utf8")),
-		packageManifest.version
+		packageManifest.version,
+		process.env.LFC_NIGHTLY_RECEIPT === undefined ? null :
+			JSON.parse(await readFile(process.env.LFC_NIGHTLY_RECEIPT, "utf8"))
 	);
 	const serializedMetadata = serializeExampleMetadata(metadata);
 	const repositoryUrl = repositoryWebUrl(packageManifest.repository);

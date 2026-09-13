@@ -58,10 +58,10 @@ const EXPECTED_REPOSITORY = "git+https://github.com/tryagaindev/litefold-calenda
 const EXPECTED_PUBLISH_CONFIG = Object.freeze({
     access: "public",
     provenance: true,
-    tag: "alpha"
+    tag: "nightly"
 });
 const WORKFLOW_NODE_VERSION = "24.19.0";
-const ALPHA_VERSION = /^0\.\d+\.\d+-alpha\.\d+$/u;
+const SOURCE_VERSION = /^\d+\.\d+\.\d+-nightly\.0$/u;
 const PUBLIC_ROOT_CLASS = "litefold-calendar";
 const PUBLIC_ROOT_SELECTOR = `:where(.${PUBLIC_ROOT_CLASS})`;
 const ROOT_ATTRIBUTE_SELECTOR = /\[\s*data-(?:lfc|litefold)-calendar\s*(?=\]|[~|^$*]?=)/iu;
@@ -1246,10 +1246,10 @@ if (packageJson.name !== EXPECTED_PACKAGE_NAME) {
     );
 }
 
-if (!ALPHA_VERSION.test(packageJson.version) ||
+if (!SOURCE_VERSION.test(packageJson.version) ||
     packageJson.private !== false) {
     addError(
-        "The manifest must declare a public 0.x.y-alpha.N prerelease."
+        "The source manifest must declare a public x.y.z-nightly.0 snapshot base."
     );
 }
 
@@ -1438,7 +1438,7 @@ if (!isExactValue(
     EXPECTED_PUBLISH_CONFIG
 )) {
     addError(
-        "Public alpha packages require exact public access, provenance, and alpha dist-tag policy."
+        "Public nightly packages require exact public access, provenance, and nightly dist-tag policy."
     );
 }
 
@@ -1581,13 +1581,7 @@ await inspectWorkflowTree({
         LFC_NPM_VERSION:
             String(referenceNpmVersion)
     },
-    ".github/workflows/prepare-alpha.yml": {
-        LFC_NODE_VERSION:
-        WORKFLOW_NODE_VERSION,
-        LFC_NPM_VERSION:
-            String(referenceNpmVersion)
-    },
-    ".github/workflows/publish-alpha.yml": {
+    ".github/workflows/publish-nightly.yml": {
         LFC_NODE_VERSION:
         WORKFLOW_NODE_VERSION,
         LFC_NPM_VERSION:
