@@ -504,7 +504,7 @@ void test("CI rejects high-severity dependency regressions on pull requests", as
 	assert.doesNotMatch(source, /pull-requests: write|issues: write/u);
 });
 
-void test("release gates and Playwright retain the complete browser-engine matrix", async () => {
+void test("hosted gates run Chromium and WebKit while local Playwright retains Firefox", async () => {
 	const [ciSource, publishSource, packageSource] = await Promise.all([
 		workflow("ci.yml"),
 		workflow("publish-nightly.yml"),
@@ -517,20 +517,39 @@ void test("release gates and Playwright retain the complete browser-engine matri
 	for (const verify of [ciVerify, publishVerify]) {
 		assert.match(
 			verify,
-			/name: Install pinned Playwright browsers[\s\S]*?npx playwright install --with-deps chromium firefox webkit/u
+			/name: Install pinned Playwright browsers[\s\S]*?npx playwright install --with-deps chromium webkit/u
 		);
+		assert.match(verify, /run: npm run check/u);
 	}
+	for (const source of [ciSource, publishSource]) {
+		assert.doesNotMatch(source, /firefox/iu);
+	}
+	const [localProjects, ciProjects] = await Promise.all([false, true].map(async (ci) => {
+		const { stdout } = await execFileAsync(process.execPath, ["--input-type=module", "--eval", `
+			import configuration from "./playwright.config.mjs";
+			process.stdout.write(JSON.stringify(configuration.projects.map(({ grepInvert, name, use }) => ({
+				browserType: use.defaultBrowserType,
+				grepInvert: grepInvert?.source ?? null,
+				name
+			}))));
+		`], {
+			cwd: REPOSITORY_ROOT,
+			env: { ...process.env, CI: ci ? "true" : "" }
+		});
+		return JSON.parse(stdout);
+	}));
 	assert.deepEqual(
-		playwrightConfiguration.projects?.map(({ name, use }) => ({
-			browserType: use?.defaultBrowserType,
-			name
-		})),
+		localProjects,
 		[
-			{ browserType: "chromium", name: "chromium" },
-			{ browserType: "firefox", name: "firefox" },
-			{ browserType: "webkit", name: "webkit" }
+			{ browserType: "chromium", grepInvert: null, name: "chromium" },
+			{ browserType: "firefox", grepInvert: "@chromium-input", name: "firefox" },
+			{ browserType: "webkit", grepInvert: "@chromium-input", name: "webkit" }
 		]
 	);
+	assert.deepEqual(ciProjects, [
+		{ browserType: "chromium", grepInvert: null, name: "chromium" },
+		{ browserType: "webkit", grepInvert: "@chromium-input", name: "webkit" }
+	]);
 	assert.equal(
 		packageManifest.scripts["test:browser:install"],
 		"playwright install chromium firefox webkit"
@@ -546,7 +565,7 @@ void test("release gates and Playwright retain the complete browser-engine matri
 
 void test("workflow artifacts use bounded purpose-specific retention", async () => {
 	const expectations = new Map([
-		["ci.yml", [7, 7]],
+		["ci.yml", [7]],
 		["deploy-examples.yml", [1, 1]],
 		["publish-nightly.yml", [7, 30, 30]],
 		["rollback-examples.yml", [1]]
@@ -594,23 +613,11 @@ void test("workflow dependency caches stay disabled", async () => {
 	}
 });
 
-void test("browser gates reject flakes and retain reproducible Firefox qualification evidence", async () => {
-	const source = await workflow("ci.yml");
-	const qualification = job(source, "firefox-qualification");
+void test("browser gates reject flakes and local Firefox qualification retains reproducible evidence", async () => {
 	assert.equal(playwrightConfiguration.failOnFlakyTests, true);
-	assert.match(qualification, /os: \[ubuntu-latest, windows-latest\]/u);
-	assert.match(qualification, /node scripts\/qualify-firefox\.mjs/u);
-	assert.match(qualification, /if: always\(\)[\s\S]*?path: test-results\/firefox-qualification\//u);
 	const config = await readFile(join(REPOSITORY_ROOT, "playwright.config.mjs"), "utf8");
 	assert.match(config, /workers: process\.env\["CI"\] \? 1 : 2/u);
 	assert.match(config, /retries: process\.env\["CI"\] \? 1 : 0/u);
-	for (const project of playwrightConfiguration.projects) {
-		if (project.name === "chromium") {
-			assert.equal(project.grepInvert, undefined);
-		} else {
-			assert.equal(project.grepInvert?.test("@chromium-input"), true);
-		}
-	}
 	const qualifier = await readFile(join(REPOSITORY_ROOT, "scripts", "qualify-firefox.mjs"), "utf8");
 	assert.match(qualifier, /--repeat-each=20/u);
 	assert.match(qualifier, /length: 3/u);

@@ -27,7 +27,7 @@ Run repository commands from the repository root with:
 - A Node version allowed by `package.json#devEngines.runtime.version` (currently Node 24.x).
 - The exact npm version in `package.json#packageManager`.
 - Dependencies installed with `npm ci --ignore-scripts`.
-- Playwright Chromium, Firefox, and WebKit installed before the complete browser gate.
+- Playwright Chromium, Firefox, and WebKit installed before the complete local browser gate; hosted CI and publication install and run Chromium and WebKit only.
 
 `npm run check` ends with temporary release-tarball verification, and
 `npm run package` creates retained release evidence. Both require a clean
@@ -39,7 +39,7 @@ Choose the narrowest command that answers your question:
 | Audience and goal | Command | Scope |
 | --- | --- | --- |
 | Release operator: validate the snapshot plan | `npm run release:verify -- --plan PATH` | Immutable run identity, source manifest, exact commit, and clean source |
-| Contributor: run the complete repository gate used by CI | `npm run check` | Static checks, unit and browser tests, screenshots, build, and temporary tarball verification |
+| Contributor: run the complete local repository gate | `npm run check` | Static checks, unit and browser tests, screenshots, build, and temporary tarball verification |
 | Release operator: retain a nightly evidence bundle | `npm run package:nightly -- --plan PATH` | The stamped tarball and its write-once release bundle under `.artifacts/` |
 | Package user or contributor: preview local npm file selection | `npm pack --dry-run --ignore-scripts` | Local checkout contents only; it is not a substitute for `check:tarball` |
 
@@ -78,9 +78,10 @@ The final `check:tarball` stage creates its tarball in a temporary directory. It
 - Packed-byte DOM interaction in an installed JSDOM consumer fixture, including
   replacement, refetch, activation, and teardown.
 
-Hosted CI runs this complete repository gate in its selected environment and
-adds platform-owned controls such as pull-request dependency review. A local
-`npm run check` result is not evidence that those hosted controls ran.
+Hosted CI runs the same gate command with Chromium and WebKit; the local browser
+matrix also includes Firefox. Hosted CI adds platform-owned controls such as
+pull-request dependency review. A local `npm run check` result is not evidence
+that those hosted controls ran.
 
 Package policy also verifies the optional-extension boundary. The root module graph must not reach `dist/extensions/**` or WebMCP, while the documented WebMCP subpath must contain its JavaScript, declarations, and source maps. The clean consumer passes `webMcp` through `CalendarOptions.extensions` using only public imports. Optional entries must also evaluate under Node without reading DOM globals.
 

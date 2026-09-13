@@ -17,7 +17,7 @@ Small fixes may go directly to a pull request. Discuss large public-API, date-mo
 
 - Use a current Node.js 24 release. [`.nvmrc`](.nvmrc) and `package.json#devEngines` define the supported runtime line.
 - Use the exact npm release selected by `package.json#packageManager` for the final repository gate. The broader `devEngines.packageManager` range is a bootstrap compatibility warning, not the version used to validate a contribution.
-- Install the exact development dependencies from `package-lock.json` and use the repository-pinned Chromium, Firefox, and WebKit binaries. The [contributor command reference](CONTRIBUTOR_COMMANDS.md#set-up-the-repository) owns the copyable setup commands.
+- Install the exact development dependencies from `package-lock.json` and use the repository-pinned Chromium, Firefox, and WebKit binaries for local checks. Hosted CI runs Chromium and WebKit; Firefox is exercised locally for now. The [contributor command reference](CONTRIBUTOR_COMMANDS.md#set-up-the-repository) owns the copyable setup commands.
 - Keep text files UTF-8 with LF line endings. Git attributes and EditorConfig enforce this across supported editors and operating systems.
 - Do not add runtime, peer, optional, or bundled dependencies; install hooks; remote assets; CDNs; fonts; or icons. Exact-pin and justify any new development dependency or browser tooling in the pull request.
 - Target [Vite's Baseline Widely available preset](docs/browser-support.md) for the library, examples, and published site. Resolve `baseline-widely-available` through Vite's public API; the support window is fixed per major, not a daily rolling query. Review weekly Dependabot Vite updates, including majors, through CI. Any capability outside the effective targets needs feature detection and a tested supported fallback.
@@ -61,7 +61,7 @@ geometry, recovery matrices, and compatibility claims.
 
 Add focused regression tests for changed behavior and public contracts. Include relevant failure paths, stale asynchronous results, teardown, hostile input, and accessibility semantics. If a behavior or public contract does not need a regression test, explain why in the pull request.
 
-Browser-neutral end-to-end scenarios must run in the Chromium, Firefox, and WebKit projects. Scope a scenario to one engine only when the required Playwright capability is engine-specific, state that reason in the skip annotation, and keep the portable public-behavior path covered across all three engines.
+Browser-neutral end-to-end scenarios must remain runnable in the Chromium, Firefox, and WebKit projects. Chromium and WebKit gate hosted CI and publication; run Firefox locally for affected browser behavior. Scope a scenario to one engine only when the required Playwright capability is engine-specific, state that reason in the skip annotation, and keep the portable public-behavior path covered across all three engines. This automation policy does not reduce the [supported browser window](docs/browser-support.md).
 
 Automated accessibility coverage includes Playwright-computed ARIA snapshots and live-region/focus contracts in each browser engine. It supplements rather than replaces keyboard review and testing with actual assistive technologies.
 

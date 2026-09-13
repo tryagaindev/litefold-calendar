@@ -249,7 +249,7 @@ jobs:
 
       - name: Install pinned Playwright browsers
         if: ${{ steps.registry-state.outputs.eligible == 'true' && steps.recovery.outputs.restored != 'true' }}
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run the complete release quality gate
         if: ${{ steps.registry-state.outputs.eligible == 'true' && steps.recovery.outputs.restored != 'true' }}

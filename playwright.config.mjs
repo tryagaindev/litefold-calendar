@@ -47,7 +47,7 @@ export default defineConfig({
 				...devices["Desktop Safari"]
 			}
 		}
-	],
+	].filter(({ name }) => !process.env["CI"] || name !== "firefox"),
 	reporter: process.env["CI"]
 		? [
 			["github"],

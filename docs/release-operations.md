@@ -8,7 +8,7 @@ The relevant Actions workflows are:
 
 | Workflow | Purpose |
 | --- | --- |
-| **CI** (`ci.yml`) | Verify the exact `main` commit, including browser qualification |
+| **CI** (`ci.yml`) | Verify the exact `main` commit, including Chromium and WebKit checks |
 | **Publish npm nightly** (`publish-nightly.yml`) | Scheduled or manually requested nightly snapshot |
 | **Deploy static examples** (`deploy-examples.yml`) | Automatic rolling preview and publisher-linked release Pages |
 | **Roll back static examples** (`rollback-examples.yml`) | Restore retained rolling-preview bytes; recovery only |
@@ -31,7 +31,7 @@ Keep a private, non-versioned record with these values. Record sanitized evidenc
 | --- | --- |
 | Requested change | Pull request and phase commits |
 | Source identity | Full 40-character `SOURCE_SHA`, source development version |
-| Validation | Exact-main CI run, Firefox qualification, final gate, visual review |
+| Validation | Exact-main CI run, final gate, local Firefox results when applicable, visual review |
 | Hosted controls | Verifier and UTC verification time |
 | Publisher identity | Run URL, run ID, original UTC creation time, attempt number |
 | Published identity | `EXACT_VERSION`, protected tag `vEXACT_VERSION` |
@@ -45,7 +45,7 @@ Keep a private, non-versioned record with these values. Record sanitized evidenc
 ## 1. Complete preflight
 
 - [ ] All intended changes and `[Unreleased]` notes are merged through required review.
-- [ ] The newest **CI** run for the exact current `main` commit succeeded, including **Build, test, and verify package** and both Firefox qualification jobs.
+- [ ] The newest **CI** run for the exact current `main` commit succeeded with **Build, test, and verify package**. Hosted browser checks cover Chromium and WebKit; Firefox is checked locally and has no required hosted status.
 - [ ] The final screenshots and any required manual accessibility evidence were reviewed.
 - [ ] Release-blocking security findings are resolved or explicitly dispositioned with recorded evidence.
 - [ ] Hosted settings match the [administration guide](release-administration.md#one-time-hosted-prerequisites).

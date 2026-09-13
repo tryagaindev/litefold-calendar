@@ -125,11 +125,11 @@ The [DESIGN.md motion treatment](DESIGN.md#pager-direction-and-motion) is presen
 
 ## Testing
 
-Automated unit/DOM and Playwright checks in Chromium, Firefox, and WebKit cover semantics, native links/buttons, F2/Escape/Tab behavior, focus retention, compact and wide event-overflow customization, compact layout, RTL, reflow, normal and reduced selection feedback, native pager semantics and fallbacks, optional WebMCP navigation without focus or callback side effects, forced colors, error announcements, hostile content, and automated accessibility rules. These checks gate every release.
+Automated unit/DOM and Playwright checks cover semantics, native links/buttons, F2/Escape/Tab behavior, focus retention, compact and wide event-overflow customization, compact layout, RTL, reflow, normal and reduced selection feedback, native pager semantics and fallbacks, optional WebMCP navigation without focus or callback side effects, forced colors, error announcements, hostile content, and automated accessibility rules. Chromium and WebKit run in hosted CI and gate publication. Firefox runs locally for now and remains within the [browser support policy](docs/browser-support.md); the complete local gate includes all three engines.
 
 ### Automated screen-reader-facing coverage
 
-`tests/e2e/screen-reader-semantics.spec.js` runs in all three Playwright engine projects and verifies the screen-reader-facing browser contract:
+`tests/e2e/screen-reader-semantics.spec.js` runs in Chromium and WebKit in hosted CI and in all three Playwright engine projects locally. It verifies the screen-reader-facing browser contract:
 
 - Playwright-computed roles, accessible names, heading levels, selected/current states, and agenda relationships for navigation, the grid, and the selected-day region.
 - Keyboard movement and activation keep the current date, focused date, and selected date distinguishable, preserve the single roving tab stop, and publish the updated agenda.

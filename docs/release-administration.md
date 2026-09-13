@@ -12,7 +12,7 @@ Require two-factor authentication and grant repository and organization administ
 
 ### GitHub repository and release
 
-- Protect `main` with reviewed pull requests, resolved conversations, linear history, deletion/force-push protection, and required CI. Require **Build, test, and verify package** and both **Qualify Firefox** jobs. Require code-owner and independent review where another eligible maintainer exists.
+- Protect `main` with reviewed pull requests, resolved conversations, linear history, deletion/force-push protection, and required CI. The required status is **Build, test, and verify package**, which runs Chromium and WebKit. Remove any former **Qualify Firefox** status requirements when adopting this workflow; Firefox checks now run locally. Require code-owner and independent review where another eligible maintainer exists.
 - Configure `npm-nightly` as the main-only npm publication environment, without a required reviewer or wait timer: scheduled and manually requested nightlies must complete unattended. Review changes to the environment and its workflow path.
 - Keep `npm-nightly` free of registry tokens. Nightly publication needs no npm secret or additional tag-writing environment.
 - Protect `v*` tags against updates and deletion. Permit creation only for the narrowest available actor; GitHub Actions credentials identify an application, not a single workflow. Review every workflow with repository-write authority.

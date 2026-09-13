@@ -10,7 +10,7 @@ Nightlies snapshot reviewed `main` directly. They do not create daily version co
 
 A completed nightly must satisfy these invariants:
 
-- The exact source commit passed CI, including required Firefox qualification, and the publication gate. New publication uses current canonical `main`.
+- The exact source commit passed CI and the publication gate, whose hosted browser checks run Chromium and WebKit. Firefox remains supported and is checked locally. New publication uses current canonical `main`.
 - npm `nightly` selects the exact published snapshot. Nightly publication leaves `latest` at its verified preflight value, which remains the frozen historical `alpha` before stable exists. The first stable release will move `latest` to stable, and stable owns it permanently afterward.
 - The protected `v<version>` tag resolves to the source commit. The GitHub release is a public immutable prerelease with the retained package, receipt, SBOM, license, and checksums.
 - Receipt schema 2 binds the source version, published version, source commit, original workflow identity, and version-only manifest transformation. Retained evidence records package integrity, asset digests, toolchain, and resolved compatibility targets.
@@ -25,7 +25,7 @@ The source development base advances through a reviewed change when the next rel
 
 | Stage | Authority |
 | --- | --- |
-| Select and verify | Exact source checkout, read-only repository access, successful same-commit CI, fresh registry state, and the complete local gate |
+| Select and verify | Exact source checkout, read-only repository access, successful same-commit CI, fresh registry state, and the hosted publication gate |
 | Stage GitHub release | No source checkout; narrowly scoped write permission for the verified tag, draft, notes, and assets |
 | Publish npm | No source checkout; `npm-nightly` environment and OIDC publish only the retained tarball under `nightly` |
 | Verify `latest` | Read-only registry checks confirm its preflight value is unchanged and, once stable exists, still selects stable |

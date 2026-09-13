@@ -40,7 +40,9 @@ Git stages. A commit or push alone does not start publication.
 
 - [ ] Push the feature branch and submit a pull request describing the final behavior,
   compatibility changes, tests, and any remaining limitations.
-- [ ] Resolve required review and CI results, including Firefox qualification.
+- [ ] Resolve required review and the **Build, test, and verify package** CI result,
+  including its Chromium and WebKit checks. Record affected Firefox checks locally;
+  Firefox has no required hosted status.
   A test passing only after a retry is a failure of the gate.
 - [ ] Merge through the protected branch workflow. Record the resulting full source SHA.
 - [ ] Confirm the required CI results refer to that exact merged source, not a previous

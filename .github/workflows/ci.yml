@@ -50,9 +50,9 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Install pinned Playwright browsers
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: npx playwright install --with-deps chromium webkit
 
-      - name: Run the complete local quality gate
+      - name: Run the CI quality gate
         run: npm run check
 
       - name: Upload browser results and failure diagnostics
@@ -64,53 +64,4 @@ jobs:
           path: |
             playwright-report/
             test-results/
-          retention-days: 7
-
-  firefox-qualification:
-    name: Qualify Firefox (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-
-    steps:
-      - name: Check out source without persisted credentials
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up exact Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: ${{ env.LFC_NODE_VERSION }}
-          package-manager-cache: false
-
-      - name: Set up exact npm
-        shell: bash
-        working-directory: ${{ runner.temp }}
-        run: npm install --global "npm@${LFC_NPM_VERSION}" --ignore-scripts
-
-      - name: Install locked development tooling
-        run: npm ci --ignore-scripts
-
-      - name: Install pinned Firefox
-        run: npx playwright install --with-deps firefox
-
-      - name: Build package and examples
-        run: npm run build
-
-      - name: Repeat regressions and qualify three complete Firefox runs
-        env:
-          DEBUG: pw:browser
-        run: node scripts/qualify-firefox.mjs
-
-      - name: Upload Firefox qualification evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: firefox-qualification-${{ matrix.os }}-${{ github.run_id }}
-          if-no-files-found: ignore
-          path: test-results/firefox-qualification/
           retention-days: 7

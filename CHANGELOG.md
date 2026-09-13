@@ -18,10 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Browser support now uses Vite's `baseline-widely-available` preset, maintained through reviewed Vite updates. Build, screenshot, and release evidence records the effective targets and tooling versions.
 - Adopted Vite library mode and example development while retaining explicit CSS loading, ESM imports, TypeScript declarations, and optional WebMCP isolation. Component layout in the examples and published site now responds to container width.
 - Replaced alpha delivery with daily and manually dispatched main-branch nightly snapshots in the next minor series. OIDC publication updates only `nightly`, leaving `latest` on historical alpha until stable publication. Existing alpha packages and release snapshots remain frozen; nightly publication retains exact source, package, and Pages identity without daily version commits or npm tokens.
+- Hosted CI and publication now run Chromium and WebKit. Firefox checks and repeated qualification remain available locally while hosted Firefox automation is paused; Firefox remains supported within the Vite Baseline window.
 
 ### Fixed
 
-- Isolated library browser fixtures from advanced-example setup, removed unsupported protocol tests before setup on Firefox/WebKit, and replaced a timing-dependent wheel assertion with deterministic transaction coverage. CI rejects flaky results and qualifies Firefox separately on Windows and Linux.
+- Isolated library browser fixtures from advanced-example setup, removed unsupported protocol tests before setup on Firefox/WebKit, and replaced a timing-dependent wheel assertion with deterministic transaction coverage. CI rejects flaky results.
 - Added native dialog and palette fallbacks for supported Baseline browsers without Popover or `light-dark()` support.
 - Kept compact count labels, focus rings, and date decoration within their day cells at narrow widths and enlarged text. Month navigation now reflows without overlapping controls when space is limited.
 
