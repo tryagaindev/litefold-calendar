@@ -17,12 +17,11 @@ Stop before a hosted mutation when any normalized identity differs.
 | Need | Read |
 | --- | --- |
 | Supported release policy and invariants | [Release policy](../../../../docs/releasing.md) |
-| Normal operator procedure and private release record | [Alpha release operations](../../../../docs/release-operations.md) |
+| Normal operator procedure and private release record | [Nightly release operations](../../../../docs/release-operations.md) |
 | Hosted controls, unsupported transitions, exceptional actions, and recovery | [Release administration](../../../../docs/release-administration.md) |
 | Artifact, installed-package, registry, signature, and provenance evidence | [Package verification](../../../../docs/package-verification.md) |
 | Release-linked example deployment and rollback | [Static example deployment](../../../../docs/example-deployment.md) |
-| Executable preparation state machine | [Prepare alpha release workflow](../../../../.github/workflows/prepare-alpha.yml) |
-| Executable publication state machine | [Publish alpha release workflow](../../../../.github/workflows/publish-alpha.yml) |
+| Executable nightly snapshot and publication state machine | [Publish nightly workflow](../../../../.github/workflows/publish-nightly.yml) |
 
 Read the current phase in its canonical owner immediately before acting. The
 documents and workflows override remembered behavior and this routing file.
@@ -39,3 +38,10 @@ Use only the supported transition described by current release administration.
 If a requested state has no reviewed procedure, stop and require a separately
 designed and approved one. Describe recovery by the observed state and required
 identity evidence, without relying on release chronology.
+
+Nightly publication snapshots reviewed `main` without a daily metadata commit.
+Its workflow owns generated versions, exact artifact retention, npm channel
+updates, and repeat-run recovery. Preserve historical alpha state. Stable
+publication is a separate procedure and must not be inferred from a nightly
+request. The [delivery checklist](../../../../docs/change-delivery.md) connects
+ordinary source changes with final package and Pages verification.

@@ -30,6 +30,10 @@ That helper installs the pinned browser binaries without changing package depend
 
 ## Explore and build
 
+Use `npm run dev` for Vite's local example development loop. Compatibility,
+screenshot, CSP, and release checks use the built package through the repository
+server; development-server success does not replace those checks.
+
 Build the package and examples, then start the loopback demo server:
 
 ```shell
@@ -119,14 +123,15 @@ npm run test:browser:built -- --project=webkit --output=test-results/playwright-
 
 Ports `49152` through `49154` are unassigned Dynamic/Private ports rather than registered service ports, but they are not reserved for this project or for testing. Confirm that the block is available locally before starting the processes; each process fails explicitly if another listener owns its port. Do not assign separate ports to projects or workers inside one Playwright invocation. Do not scan through arbitrary ports without browser validation; browsers reject some otherwise valid TCP ports.
 
-## Update screenshots intentionally
+## Prepare and review screenshots
 
-When an intentional visual change affects a canonical scene, regenerate the
-tracked screenshot set and manifest, review every diff, and follow the
-[screenshot contract](docs/screenshots/README.md).
+Prepare screenshot evidence after source and build inputs settle. The preparation
+command skips current evidence, otherwise builds and validates a staged capture
+batch and produces a before/after gallery. Review every changed scene using the
+[screenshot contract](docs/screenshots/README.md). CI verification remains read-only.
 
 ```shell
-npm run screenshots:update
+npm run screenshots:prepare
 ```
 
 ```shell
@@ -147,7 +152,21 @@ Before submission, run the complete gate:
 npm run check
 ```
 
+CI also qualifies Firefox on Windows and Linux with 20 zero-retry repetitions of
+the affected tests and three complete passes. After building, reproduce that
+qualification on the current platform with:
+
+```shell
+node scripts/qualify-firefox.mjs
+```
+
+This separate qualification is not included in `npm run check`.
+
 ## Deliver a contributor change
+
+For an end-to-end request, follow the [local-to-production checklist](docs/change-delivery.md).
+It connects phase commits, clean-tree checks, review, nightly publication, and the
+separate release Pages verification.
 
 Automation that supports repository skills can invoke [`$commit-and-push`](.agents/skills/commit-and-push/SKILL.md) to audit Git state, validate and commit only the intended files, and push an ordinary feature branch. The skill is operational guidance, not a shell command or additional repository authority.
 
