@@ -108,6 +108,7 @@ jobs:
       notes-artifact: ${{ steps.identity.outputs.notes-artifact }}
       notes-sha256: ${{ steps.evidence.outputs.notes-sha256 }}
       registry-predecessor: ${{ steps.registry-state.outputs.registry-predecessor }}
+      registry-latest: ${{ steps.registry-state.outputs.registry-latest }}
       registry-state-sha256: ${{ steps.registry-state.outputs.registry-state-sha256 }}
       source-commit: ${{ steps.identity.outputs.source-commit }}
       tag: ${{ steps.identity.outputs.tag }}
@@ -157,21 +158,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           LFC_VERSION: ${{ steps.identity.outputs.version }}
-          LFC_NIGHTLY_TOKEN_EXPIRES_AT: ${{ vars.NPM_NIGHTLY_TAG_TOKEN_EXPIRES_AT }}
         run: |
           set -euo pipefail
           npm view @tryagaindev/litefold-calendar versions dist-tags --json --registry https://registry.npmjs.org/ > "${RUNNER_TEMP}/registry.raw.json"
           node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" "${RUNNER_TEMP}/registry.raw.json" "${RUNNER_TEMP}/registry.json"
           node --input-type=module <<'NODE'
           import { readFileSync, appendFileSync } from "node:fs";
-          import { readNightlyPlan, validateNightlyRegistryState, tokenExpiryStatus } from "./scripts/lib/nightly-release.mjs";
+          import { readNightlyPlan, validateNightlyRegistryState } from "./scripts/lib/nightly-release.mjs";
           const metadata = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/registry.json`, "utf8"));
           const state = validateNightlyRegistryState(metadata, await readNightlyPlan(`${process.env.RUNNER_TEMP}/nightly-plan.json`));
-          if (!state.stableExists) {
-            const expiry = tokenExpiryStatus(process.env.LFC_NIGHTLY_TOKEN_EXPIRES_AT);
-            if (expiry.warn) console.log(`::warning::Rotate the nightly tag token before ${expiry.expiresAt}.`);
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT, `registry-predecessor=${state.predecessor}\nstable-exists=${state.stableExists}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `registry-predecessor=${state.predecessor}\nregistry-latest=${state.latest}\nstable-exists=${state.stableExists}\n`);
           NODE
           predecessor="$(jq -r '."dist-tags".nightly // ."dist-tags".alpha' "${RUNNER_TEMP}/registry.json")"
           eligible=true
@@ -837,98 +833,11 @@ jobs:
           printf 'publication=%s\n' "${publication}" >> "${GITHUB_OUTPUT}"
 
 
-  synchronize-latest:
-    name: Synchronize the temporary nightly latest channel
-    needs: [publish, verify]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: npm-nightly-tags
-    permissions:
-      contents: read
-    outputs:
-      latest-target: ${{ steps.target.outputs.latest-target }}
-    steps:
-      - name: Set up exact Node for tag synchronization
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: ${{ env.LFC_NODE_VERSION }}
-          package-manager-cache: false
-      - name: Install exact npm before exposing the tag credential
-        working-directory: ${{ runner.temp }}
-        run: npm install --global "npm@${LFC_NPM_VERSION}" --ignore-scripts
-      - name: Verify the candidate and stable ownership before tagging
-        id: target
-        env:
-          LFC_VERSION: ${{ needs.verify.outputs.version }}
-          LFC_EXPECTED_INTEGRITY: ${{ needs.publish.outputs.expected-integrity }}
-        run: |
-          set -euo pipefail
-          ready=false
-          for attempt in $(seq 1 40); do
-            if ! npm view @tryagaindev/litefold-calendar versions dist-tags --json --registry https://registry.npmjs.org/ > registry.raw.json ||
-              ! npm view "@tryagaindev/litefold-calendar@${LFC_VERSION}" dist.integrity --json --registry https://registry.npmjs.org/ > integrity.raw.json; then
-              sleep 10
-              continue
-            fi
-            node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" registry.raw.json registry.json
-            node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" integrity.raw.json integrity.json
-            # LFC_NIGHTLY_LATEST_POLICY_START
-            if node --input-type=module <<'NODE'
-          import { readFileSync, appendFileSync } from "node:fs";
-          const data = JSON.parse(readFileSync("registry.json", "utf8"));
-          const versions = typeof data.versions === "string" ? [data.versions] : data.versions;
-          const integrity = JSON.parse(readFileSync("integrity.json", "utf8"));
-          const stable = (version) => typeof version === "string" && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/u.test(version);
-          if (integrity !== null && integrity !== process.env.LFC_EXPECTED_INTEGRITY) {
-            throw new Error("Nightly registry integrity changed before latest synchronization.");
-          }
-          if (!Array.isArray(versions) || !versions.includes(process.env.LFC_VERSION) ||
-            data["dist-tags"]?.nightly !== process.env.LFC_VERSION || integrity === null) {
-            process.exit(75);
-          }
-          const stableExists = versions.some(stable);
-          const latest = data["dist-tags"].latest;
-          if (!versions.includes(latest) || (stableExists && !stable(latest))) {
-            throw new Error("Stable owns latest after its first publication; refusing an inconsistent channel.");
-          }
-          const target = stableExists ? latest : process.env.LFC_VERSION;
-          appendFileSync(process.env.GITHUB_OUTPUT, `latest-target=${target}\nwrite=${latest !== target}\n`);
-          NODE
-            # LFC_NIGHTLY_LATEST_POLICY_END
-            then
-              ready=true
-              break
-            else
-              status=$?
-              if [[ "${status}" != "75" ]]; then exit "${status}"; fi
-            fi
-            sleep 10
-          done
-          if [[ "${ready}" != "true" ]]; then
-            echo 'Nightly registry reads did not converge before latest synchronization.' >&2
-            exit 1
-          fi
-      - name: Advance only latest to the verified nightly
-        if: ${{ steps.target.outputs.write == 'true' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_NIGHTLY_TAG_TOKEN }}
-          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/nightly-tag.npmrc
-          LFC_VERSION: ${{ needs.verify.outputs.version }}
-          LFC_TOKEN_EXPIRES_AT: ${{ vars.NPM_NIGHTLY_TAG_TOKEN_EXPIRES_AT }}
-        run: |
-          set -euo pipefail
-          test -n "${NODE_AUTH_TOKEN}"
-          test "$(date -u --date="${LFC_TOKEN_EXPIRES_AT}" +%s)" -gt "$(date -u +%s)"
-          printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > "${NPM_CONFIG_USERCONFIG}"
-          trap 'rm -f -- "${NPM_CONFIG_USERCONFIG}"' EXIT
-          npm dist-tag add "@tryagaindev/litefold-calendar@${LFC_VERSION}" latest --registry https://registry.npmjs.org/
-
   verify-registry:
     name: Verify registry integrity, imports, and provenance
     needs:
       - publish
       - verify
-      - synchronize-latest
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -956,7 +865,7 @@ jobs:
       - name: Verify the published package from a clean consumer
         env:
           LFC_EXPECTED_INTEGRITY: ${{ needs.publish.outputs.expected-integrity }}
-          LFC_LATEST_TARGET: ${{ needs.synchronize-latest.outputs.latest-target }}
+          LFC_EXPECTED_LATEST: ${{ needs.verify.outputs.registry-latest }}
           LFC_SOURCE_COMMIT: ${{ needs.verify.outputs.source-commit }}
           LFC_TARBALL: ${{ runner.temp }}/release-bundle/${{ needs.verify.outputs.bundle-name }}.tgz
           LFC_VERSION: ${{ needs.verify.outputs.version }}
@@ -977,31 +886,49 @@ jobs:
               > "${integrity_raw}" 2>/dev/null; then
               node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" \
                 "${integrity_raw}" "${integrity_json}"
-              if npm view @tryagaindev/litefold-calendar dist-tags \
+              if npm view @tryagaindev/litefold-calendar versions dist-tags \
                 --registry https://registry.npmjs.org/ --json \
                 > "${tags_raw}" 2>/dev/null; then
                 node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" \
                   "${tags_raw}" "${tags_json}"
-                integrity="$(jq -r 'if type == "string" then . else empty end' "${integrity_json}")"
-                nightly="$(jq -r '.nightly // empty' "${tags_json}")"
-                latest="$(jq -r '.latest // empty' "${tags_json}")"
-                if [[ -n "${integrity}" && "${integrity}" != "${LFC_EXPECTED_INTEGRITY}" ]]; then
-                  echo "npm integrity conflicts with the verified release bundle." >&2
-                  exit 1
-                fi
-                if [[ "${integrity}" == "${LFC_EXPECTED_INTEGRITY}" &&
-                  "${nightly}" == "${LFC_VERSION}" &&
-                  "${latest}" == "${LFC_LATEST_TARGET}" ]]; then
+                # LFC_NIGHTLY_READBACK_POLICY_START
+                if node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const root = process.env.RUNNER_TEMP;
+          const metadata = JSON.parse(readFileSync(`${root}/registry-tags.json`, "utf8"));
+          const integrity = JSON.parse(readFileSync(`${root}/registry-integrity.json`, "utf8"));
+          const versions = typeof metadata.versions === "string" ? [metadata.versions] : metadata.versions;
+          const tags = metadata["dist-tags"];
+          if (integrity !== null && integrity !== process.env.LFC_EXPECTED_INTEGRITY) {
+            throw new Error("npm integrity conflicts with the verified release bundle.");
+          }
+          if (!Array.isArray(versions) || !versions.includes(process.env.LFC_VERSION) ||
+            tags?.nightly !== process.env.LFC_VERSION || integrity === null) {
+            process.exit(75);
+          }
+          const stable = (version) => typeof version === "string" && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/u.test(version);
+          if (tags.latest !== process.env.LFC_EXPECTED_LATEST || !versions.includes(tags.latest)) {
+            throw new Error("npm latest changed from the verified preflight snapshot; nightly cannot modify it.");
+          }
+          if (versions.some(stable) ? !stable(tags.latest) : tags.latest !== tags.alpha) {
+            throw new Error("npm latest must remain on historical alpha until stable takes ownership.");
+          }
+          NODE
+                # LFC_NIGHTLY_READBACK_POLICY_END
+                then
                   verified=true
                   break
+                else
+                  status=$?
+                  if [[ "${status}" != "75" ]]; then exit "${status}"; fi
                 fi
               fi
             fi
             [[ "${attempt}" -lt 60 ]] && sleep 10
           done
           if [[ "${verified}" != "true" ]]; then
-            echo "npm did not expose the exact package integrity and both required dist-tags within the polling window." >&2
-            echo "Check for pending or blocked publish-time review before changing registry metadata. Resume this exact attempt after correcting the reported registry or tag-token failure." >&2
+            echo "npm did not expose the exact package integrity, nightly tag, and unchanged latest tag within the polling window." >&2
+            echo "Check for pending or blocked publish-time review before changing registry metadata. Resume this exact attempt after correcting the reported registry or registry verification failure." >&2
             exit 1
           fi
 

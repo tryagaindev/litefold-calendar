@@ -149,12 +149,14 @@ Tree shaking and package contents answer different questions. The extension file
 
 ## Registry and release evidence
 
-The publisher retries npm's eventually consistent reads and verifies the exact
-version, `nightly` tag, registry integrity, provenance/signatures, clean
-installation, public imports, and stylesheet before publishing the GitHub
-prerelease. A separate job advances `latest` to the nightly while no stable
-version exists. Once stable exists, verification requires stable ownership of
-`latest` and nightlies leave it alone. Historical `alpha` remains frozen.
+The publisher uses npm trusted publishing through GitHub Actions OIDC, without
+an npm token, and publishes under `nightly`. It retries npm's eventually
+consistent reads and verifies the exact version, `nightly` tag, registry
+integrity, provenance/signatures, clean installation, public imports, and
+stylesheet before publishing the GitHub prerelease. The registry verification job
+also checks that `latest` remains unchanged from preflight. Before stable exists,
+`latest` must select the frozen historical `alpha`; once stable exists,
+verification requires stable ownership of `latest`.
 
 Successful publisher completion triggers the separately authorized immutable
 Pages deployment through a same-repository `workflow_run`. Pages verifies the
@@ -173,7 +175,7 @@ Replace `EXACT_VERSION` with the release being checked. Confirm that:
 
 - The returned name and version are exact.
 - `dist.integrity` equals `npmIntegrity` in the GitHub prerelease's `package-verification.json`.
-- `nightly` selects that exact version. Before stable exists, `latest` matches it; afterward `latest` selects a stable version. Historical `alpha` has not moved.
+- `nightly` selects that exact version. `latest` matches its preflight value; once stable exists, it selects a stable version. Historical `alpha` has not moved.
 - The npm package page shows provenance for the expected repository and `publish-nightly.yml` workflow.
 
 The workflow installs the exact version into a clean consumer before running `npm audit signatures`. Running that command in the repository would verify the development dependency tree instead. If a registry read is unavailable, ambiguous, or inconsistent with the retained bundle, stop and use the [recovery matrix](release-administration.md#recovery-matrix).

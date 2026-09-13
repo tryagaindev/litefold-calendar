@@ -40,8 +40,9 @@ designed and approved one. Describe recovery by the observed state and required
 identity evidence, without relying on release chronology.
 
 Nightly publication snapshots reviewed `main` without a daily metadata commit.
-Its workflow owns generated versions, exact artifact retention, npm channel
-updates, and repeat-run recovery. Preserve historical alpha state. Stable
+Its workflow owns generated versions, exact artifact retention, OIDC publication
+under `nightly`, and repeat-run recovery. It uses no npm token and verifies that
+`latest` remains unchanged. Preserve historical alpha state. Stable
 publication is a separate procedure and must not be inferred from a nightly
 request. The [delivery checklist](../../../../docs/change-delivery.md) connects
 ordinary source changes with final package and Pages verification.

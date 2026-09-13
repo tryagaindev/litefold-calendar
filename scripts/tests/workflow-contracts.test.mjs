@@ -68,16 +68,17 @@ void test("nightly recovery preserves original artifacts and Pages binds the ori
 	assert.match(pages, /actions\/runs\/\$\{LFC_UPSTREAM_RUN_ID\}\/attempts\/\$\{LFC_UPSTREAM_RUN_ATTEMPT\}\/jobs/u);
 });
 
-void test("latest token is isolated from source execution and OIDC publication", async () => {
+void test("nightly publication uses only OIDC and preserves the preflight latest tag", async () => {
 	const source = await workflow("publish-nightly.yml");
-	const sync = job(source, "synchronize-latest");
-	assert.match(sync, /environment: npm-nightly-tags/u);
-	assert.doesNotMatch(sync, /actions\/checkout@|npm ci|npm run |node scripts\/|id-token: write|npm publish/u);
-	assert.match(sync, /versions\.some\(stable\)[\s\S]*?stableExists \? latest : process\.env\.LFC_VERSION/u);
-	assert.match(sync, /NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_NIGHTLY_TAG_TOKEN \}\}/u);
-	assert.match(sync, /npm dist-tag add[\s\S]*?latest --registry https:\/\/registry\.npmjs\.org\//u);
-	assert.equal(occurrences(source, /secrets\.NPM_NIGHTLY_TAG_TOKEN/gu), 1);
-	assert.match(sync, /NPM_NIGHTLY_TAG_TOKEN_EXPIRES_AT/u);
+	const verify = job(source, "verify");
+	const verifyRegistry = job(source, "verify-registry");
+	assert.doesNotMatch(source, /synchronize-latest|npm-nightly-tags|NPM_TOKEN|NODE_AUTH_TOKEN|NPM_NIGHTLY_TAG_TOKEN|tokenExpiryStatus|npm dist-tag|_authToken/u);
+	assert.match(verify, /registry-latest: \$\{\{ steps\.registry-state\.outputs\.registry-latest \}\}/u);
+	assert.match(verify, /validateNightlyRegistryState[\s\S]*?registry-latest=\$\{state\.latest\}/u);
+	assert.match(verifyRegistry, /needs:\s*\n\s+- publish\s*\n\s+- verify\s*\n/u);
+	assert.match(verifyRegistry, /LFC_EXPECTED_LATEST: \$\{\{ needs\.verify\.outputs\.registry-latest \}\}/u);
+	assert.match(verifyRegistry, /tags\.latest !== process\.env\.LFC_EXPECTED_LATEST/u);
+	assert.doesNotMatch(verifyRegistry, /contents: write|id-token: write|npm publish/u);
 });
 
 void test("the OIDC publisher consumes only the verified five-file bundle", async () => {
@@ -153,13 +154,13 @@ void test("npm 12 view results pass through one fail-closed normalizer", async (
 		source,
 		/LFC_NORMALIZE_NPM_VIEW_JSON: >-[\s\S]*?!Array\.isArray\(value\) \|\| value\.length !== 1[\s\S]*?JSON\.stringify\(value\[0\]\)/u
 	);
-	assert.equal(occurrences(source, /^\s*(?:if )?(?:! )?npm view\b/gmu), 8);
+	assert.equal(occurrences(source, /^\s*(?:if )?(?:! )?npm view\b/gmu), 6);
 	assert.equal(
 		occurrences(
 			source,
 		/node --input-type=module --eval "\$\{LFC_NORMALIZE_NPM_VIEW_JSON\}"/gu
 		),
-		8
+		6
 	);
 	assert.doesNotMatch(source, /jq[^\n]*\.raw\.json|JSON\.parse\([^\n]*\.raw\.json/u);
 
@@ -172,7 +173,7 @@ void test("npm 12 view results pass through one fail-closed normalizer", async (
 		'"${integrity_raw}" "${integrity_json}"'
 	);
 	const tagsView = propagationLoop.indexOf(
-		"npm view @tryagaindev/litefold-calendar dist-tags"
+		"npm view @tryagaindev/litefold-calendar versions dist-tags"
 	);
 	const tagsNormalize = propagationLoop.indexOf('"${tags_raw}" "${tags_json}"');
 	assert.ok(integrityView >= 0 && integrityView < integrityNormalize);
@@ -305,7 +306,7 @@ void test("draft assets and final release publication are digest-bound and sourc
 	assert.match(provenancePolicy, /process\.env\.GITHUB_WORKFLOW_SHA === sourceCommit/u);
 	assert.match(provenancePolicy, /internalGitHub\?\.event_name === eventName/u);
 	assert.match(provenancePolicy, /certificate\.buildTrigger === eventName/u);
-	assert.match(verifyRegistry, /"\$\{nightly\}" == "\$\{LFC_VERSION\}"[\s\S]*?"\$\{latest\}" == "\$\{LFC_LATEST_TARGET\}"/u);
+	assert.match(verifyRegistry, /tags\?\.nightly !== process\.env\.LFC_VERSION[\s\S]*?tags\.latest !== process\.env\.LFC_EXPECTED_LATEST/u);
 	assert.doesNotMatch(verifyRegistry, /actions\/checkout@|GH_TOKEN|contents: write|id-token: write|npm publish/u);
 	assert.match(publishRelease, /needs:[\s\S]*?- stage-release[\s\S]*?- verify-registry/u);
 	assert.match(publishRelease, /LFC_ASSET_DIGESTS: \$\{\{ needs\.verify\.outputs\.asset-digests \}\}/u);

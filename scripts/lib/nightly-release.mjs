@@ -77,6 +77,9 @@ export function validateNightlyRegistryState(metadata, planValue) {
 		(stableExists && semver.prerelease(tags.latest) !== null)) {
 		throw new Error("npm latest must select a published version, and belongs to stable after first stable.");
 	}
+	if (!stableExists && (tags.latest !== tags.alpha || !/^0\.\d+\.\d+-alpha\.\d+$/u.test(tags.latest))) {
+		throw new Error("Before first stable, npm latest must remain on the frozen historical alpha.");
+	}
 	const predecessor = tags.nightly ?? tags.alpha;
 	if (typeof predecessor !== "string" || !versions.includes(predecessor) ||
 		!(NIGHTLY_VERSION_PATTERN.test(predecessor) || /^0\.\d+\.\d+-alpha\.\d+$/u.test(predecessor))) {
@@ -95,27 +98,8 @@ export function validateNightlyRegistryState(metadata, planValue) {
 	if (existing && tags.nightly !== plan.version) {
 		throw new Error("Existing nightly candidate is not selected by the nightly tag.");
 	}
-	if (!stableExists && predecessor !== plan.version && tags.latest !== predecessor) {
-		throw new Error("A previous nightly has incomplete latest synchronization; resume that attempt first.");
-	}
 	return Object.freeze({ existing, latest: tags.latest, predecessor, stableExists });
 }
-
-/** Checks expiry before public writes; rotation does not expose token material. */
-export function tokenExpiryStatus(expiresAt, now = new Date()) {
-	const expiry = new Date(expiresAt);
-	if (typeof expiresAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u.test(expiresAt) ||
-		!Number.isFinite(expiry.getTime()) || !Number.isFinite(now.getTime()) ||
-		expiry.toISOString().replace(".000Z", "Z") !== expiresAt) {
-		throw new Error("Nightly tag-token expiry must be an explicit UTC timestamp.");
-	}
-	const remaining = expiry.getTime() - now.getTime();
-	if (remaining <= 0) {
-		throw new Error("Nightly tag token has expired; rotate it before publishing.");
-	}
-	return Object.freeze({ expiresAt, warn: remaining <= 7 * 24 * 60 * 60 * 1_000 });
-}
-
 
 /** Selects retained evidence from this run; incomplete public attempts cannot rebuild. */
 export function selectNightlyRecoveryArtifacts({ artifacts, plan: value, attempt, hasPublicState }) {

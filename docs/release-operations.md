@@ -1,6 +1,6 @@
 # Nightly release operations runbook
 
-Use this runbook to publish and verify a nightly from reviewed `main`. Daily publication runs at **09:00 UTC**; use manual dispatch when a completed change needs publication immediately. The publisher derives the version, publishes through OIDC, updates the temporary `latest` channel, and hands off release Pages automatically.
+Use this runbook to publish and verify a nightly from reviewed `main`. Daily publication runs at **09:00 UTC**; use manual dispatch when a completed change needs publication immediately. The publisher derives the version, publishes under `nightly` through OIDC only, verifies that `latest` is unchanged, and hands off release Pages automatically.
 
 There is no release-preparation pull request or manual npm approval for a normal nightly. This guide also explains how to recognize a successful unchanged-source skip. Stable publication is a future procedure described in [release administration](release-administration.md#future-stable-release); these commands do not publish stable.
 
@@ -21,7 +21,7 @@ Stop on a failed required check, unknown registry state, mismatched identity, or
 
 ## Roles
 
-The release operator verifies the change and follows the publisher through Pages completion. Repository administrators maintain environments and required checks. An npm package maintainer provisions and rotates the isolated tag credential. Once those controls are configured, a normal run needs no manual channel update or protected-environment approval.
+The release operator verifies the change and follows the publisher through Pages completion. Repository administrators maintain environments and required checks. An npm package maintainer configures the trusted publisher. Once those controls are configured, a normal run needs no npm token, manual channel update, or protected-environment approval.
 
 ## Start a release record
 
@@ -36,7 +36,7 @@ Keep a private, non-versioned record with these values. Record sanitized evidenc
 | Publisher identity | Run URL, run ID, original UTC creation time, attempt number |
 | Published identity | `EXACT_VERSION`, protected tag `vEXACT_VERSION` |
 | Package evidence | Receipt, npm integrity, every retained asset digest, SBOM, compatibility target report |
-| Public verification | Registry versions/tags, signatures, provenance, immutable GitHub prerelease |
+| Public verification | Registry versions/tags including preflight and final `latest`, signatures, provenance, immutable GitHub prerelease |
 | Pages | Publisher-linked run, release metadata URL, matching source and version |
 | Completion or skip | UTC time and evidence establishing the outcome |
 
@@ -49,7 +49,7 @@ Keep a private, non-versioned record with these values. Record sanitized evidenc
 - [ ] The final screenshots and any required manual accessibility evidence were reviewed.
 - [ ] Release-blocking security findings are resolved or explicitly dispositioned with recorded evidence.
 - [ ] Hosted settings match the [administration guide](release-administration.md#one-time-hosted-prerequisites).
-- [ ] Before stable exists, the nightly tag token and its recorded expiry are current. Rotate when the seven-day warning appears.
+- [ ] Record the current `latest` version for read-only comparison after publication. Before stable exists, it must select the frozen historical `alpha`; afterward, it must select a stable version.
 - [ ] The preceding nightly is complete through Pages, or any partial attempt has been classified for recovery first.
 
 Use these read-only checks when working from GitHub CLI and npm:
@@ -94,8 +94,7 @@ Wait for the exact run to finish. It may queue behind an earlier publication; do
 | **Verify exact source and create release evidence** | Checks previous completion and either skips unchanged source or builds one verified candidate |
 | **Stage exact tag, draft, and release assets** | Stages the exact source tag and five retained assets |
 | **Publish or resume the verified npm nightly** | Publishes or recognizes the identical retained package through `npm-nightly` OIDC |
-| **Synchronize the temporary nightly latest channel** | Advances `latest` before stable exists; preserves stable ownership afterward |
-| **Verify registry integrity, imports, and provenance** | Verifies the public package from a clean consumer |
+| **Verify registry integrity, imports, and provenance** | Verifies the public package from a clean consumer and confirms `latest` still selects its preflight version |
 | **Publish the verified GitHub prerelease** | Finalizes the verified immutable prerelease and triggers Pages |
 
 The five uploaded release assets are the package `.tgz`, `package-verification.json`, `sbom.spdx.json`, `SHA256SUMS`, and `LICENSE`. GitHub's automatically generated source archives are excluded from that count. The Actions bundle and notes are retained for 30 days; browser diagnostics for seven days. Complete recovery while evidence remains available.
@@ -113,9 +112,9 @@ npm view "@tryagaindev/litefold-calendar@EXACT_VERSION" name version dist.integr
 npm view @tryagaindev/litefold-calendar versions dist-tags --json --registry https://registry.npmjs.org/
 ```
 
-Check that the exact package is readable and its `dist.integrity` equals the receipt's `npmIntegrity`. `nightly` must select `EXACT_VERSION`. If no stable version exists, `latest` must also select it. If any stable version exists, `latest` must select a stable version and the nightly job must have left it unchanged. Historical `alpha` stays unchanged.
+Check that the exact package is readable and its `dist.integrity` equals the receipt's `npmIntegrity`. `nightly` must select `EXACT_VERSION`. `latest` must still select its recorded preflight version; the nightly workflow never updates it. Before stable exists, `latest` selects the frozen historical `alpha`; once any stable version exists, it selects stable. Historical `alpha` stays unchanged.
 
-Channel synchronization is automated. If it fails, use [credential rotation and recovery](release-administration.md#tag-token-rotation), then resume the original verified attempt. A successful npm upload is not permission to create a replacement candidate while completion remains uncertain.
+Channel verification is read-only. If `latest` changed or registry identity is uncertain, stop and use the [recovery matrix](release-administration.md#recovery-matrix). Do not add a token or move a dist-tag to repair a nightly. A successful npm upload is not permission to create a replacement candidate while completion remains uncertain.
 
 <a id="6-verify-npm-and-the-github-prerelease"></a>
 
@@ -124,6 +123,7 @@ Channel synchronization is automated. If it fails, use [credential rotation and 
 - [ ] The receipt's published version, source version, full commit, workflow identity, and manifest transformation match the record.
 - [ ] The tag resolves to `SOURCE_SHA`; the GitHub release is public, immutable, and marked as a prerelease.
 - [ ] All five uploaded assets have the recorded digests; the notes and title match retained evidence.
+- [ ] The exact nightly version's npm package page renders its README, installation commands, and documentation links correctly. Select the nightly version explicitly; `latest` still identifies historical alpha before stable.
 - [ ] Clean public-package imports, stylesheet use, core/WebMCP integration, registry signatures, and provenance checks passed.
 - [ ] For a release introducing calendar behavior, a clean consumer verifies count activation, remote filtering, and focus return after an application dialog.
 

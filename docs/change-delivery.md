@@ -52,9 +52,9 @@ Git stages. A commit or push alone does not start publication.
   workflow on canonical `main`, or identify its scheduled run.
 - [ ] Record the source SHA, workflow run, generated version, artifact integrity, and
   immutable release identity. A started workflow is not a completed publication.
-- [ ] Verify the `nightly` npm dist-tag. Before the first stable version, verify
-  `latest` selects the same nightly; after stable exists, verify nightly automation
-  has left `latest` under stable ownership.
+- [ ] Verify the `nightly` npm dist-tag and confirm `latest` still selects its
+  recorded preflight version. Once stable exists, that unchanged version must be
+  stable. Nightly publication uses OIDC only and does not update `latest`.
 - [ ] Verify the exact published package, provenance, release assets, and installed
   consumer behavior through the [package verification procedure](package-verification.md).
 - [ ] Wait for the separate release Pages deployment and verify its version and source

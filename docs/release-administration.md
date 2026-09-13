@@ -1,6 +1,6 @@
 # Release administration and recovery
 
-This guide is for maintainers who configure GitHub and npm release controls. The [nightly operations runbook](release-operations.md) owns the normal ordered procedure. This document owns environment setup, credential rotation, immutable-state recovery, and requirements for a future stable publisher.
+This guide is for maintainers who configure GitHub and npm release controls. The [nightly operations runbook](release-operations.md) owns the normal ordered procedure. This document owns environment setup, trusted publishing, immutable-state recovery, and requirements for a future stable publisher.
 
 ## One-time hosted prerequisites
 
@@ -13,8 +13,8 @@ Require two-factor authentication and grant repository and organization administ
 ### GitHub repository and release
 
 - Protect `main` with reviewed pull requests, resolved conversations, linear history, deletion/force-push protection, and required CI. Require **Build, test, and verify package** and both **Qualify Firefox** jobs. Require code-owner and independent review where another eligible maintainer exists.
-- Configure `npm-nightly` and `npm-nightly-tags` as separate main-only environments. Neither uses a required reviewer or wait timer: scheduled and manually requested nightlies must complete unattended. Review changes to those environments and their workflow paths.
-- Keep `npm-nightly` free of registry tokens. Store the tag credential only in `npm-nightly-tags`.
+- Configure `npm-nightly` as the main-only npm publication environment, without a required reviewer or wait timer: scheduled and manually requested nightlies must complete unattended. Review changes to the environment and its workflow path.
+- Keep `npm-nightly` free of registry tokens. Nightly publication needs no npm secret or additional tag-writing environment.
 - Protect `v*` tags against updates and deletion. Permit creation only for the narrowest available actor; GitHub Actions credentials identify an application, not a single workflow. Review every workflow with repository-write authority.
 - Enable [GitHub immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases). Stage assets on the draft, then publish. Audit titles and notes against retained evidence because platform immutability protects tags and assets, not every metadata field.
 - Keep dependency monitoring, code scanning, secret scanning, push protection, and private vulnerability reporting enabled where available. Resolve or disposition release-blocking findings.
@@ -23,25 +23,13 @@ Require two-factor authentication and grant repository and organization administ
 
 npm supports multiple independent trusted-publisher configurations per package. They are additive: matching any configuration authorizes its permitted operation. Every configuration allows staging by default; direct publication requires a separate opt-in on that configuration. [npm's September 2026 publisher update](https://github.blog/changelog/2026-09-03-multiple-trusted-publishing-configurations-for-npm/)
 
-Bind [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) to the exact owner `tryagaindev`, repository `litefold-calendar`, workflow filename `publish-nightly.yml`, and environment `npm-nightly`. **Enable direct publication for this nightly binding** so the workflow's `npm publish` completes without staged-release approval. Verify that setting explicitly; adding the binding with its staging-only default does not satisfy unattended delivery. The publisher uses a GitHub-hosted runner and receives `id-token: write`.
+Bind [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) to the exact owner `tryagaindev`, repository `litefold-calendar`, workflow filename `publish-nightly.yml`, and environment `npm-nightly`. Enable **Allow npm publish** for direct publication so the workflow's `npm publish` completes without staged-release approval. Save and reload the binding to verify that setting; an unsaved form or the staging-only default does not satisfy unattended delivery. The publisher uses a GitHub-hosted runner and receives `id-token: write`.
 
 Adding the nightly binding does not revoke the alpha binding. Confirm no historical alpha publication is in flight, then remove the old alpha binding before enabling the nightly schedule. Preserve historical package versions, tags, releases, and evidence.
 
-Maintain two-factor authentication for package maintainers and verify scope/package ownership. The isolated `latest` update requires a granular write token because the adopted npm workflow does not use OIDC for secondary dist-tag updates. This intentionally replaces the previous package setting that disallowed tokens. Select a publishing access policy that continues to require human 2FA while allowing the configured granular token; verify the effective policy in npm.
+Maintain two-factor authentication for package maintainers, verify scope/package ownership, and keep token-based publication disallowed. Configure package access, maintainers, and trusted publishing through a private interactive npm session with the required 2FA challenge. Verify the effective package policy after saving changes.
 
-Create or delete tokens and change package access, maintainers, or trusted-publisher settings through a private interactive npm session with a 2FA challenge. A bypass-2FA token cannot perform those management operations. This applies to initial setup and subsequent credential rotations. [npm's July 2026 token-management change](https://github.blog/changelog/2026-07-31-restricting-npm-bypass-2fa-granular-access-tokens/)
-
-Provision the credential privately through npm's [granular token settings](https://docs.npmjs.com/creating-and-viewing-access-tokens/):
-
-1. Give it **Read and write (publish and stage)** access to **only** `@tryagaindev/litefold-calendar`. Do not grant the entire scope or organization-management permissions.
-2. Enable the 2FA bypass needed for unattended package metadata writes. This grants broader package-write authority than dist-tags alone; keep it isolated even though the workflow uses it only for `npm dist-tag add`.
-3. Set expiry to **30 days**. Store its exact UTC expiry as repository variable `NPM_NIGHTLY_TAG_TOKEN_EXPIRES_AT`, formatted `YYYY-MM-DDTHH:mm:ssZ`.
-4. Store the value as environment secret `NPM_NIGHTLY_TAG_TOKEN` in `npm-nightly-tags`. Do not paste it into a task, source file, workflow input, or release note.
-5. Verify environment branch restrictions and that only the final tag-writing step receives the credential. Tool installation and public registry validation run before that step.
-
-Do not introduce the token into the OIDC publish job, source checkout, project scripts, package installation, or Pages. The workflow's temporary npm authentication file is removed after the tag command. Keep a private inventory of token owner, selected package, creation/expiry, and rotation verifier without storing the value there.
-
-npm targets January 2027 for removing direct publication from bypass-2FA granular tokens. Package bytes in this workflow already publish through OIDC; the isolated token remains the secondary-dist-tag workaround tracked in [npm CLI issue 8547](https://github.com/npm/cli/issues/8547). Replace that workaround when supported OIDC tag updates are available. [Announced token publication change](https://github.blog/changelog/2026-07-31-restricting-npm-bypass-2fa-granular-access-tokens/)
+The nightly path publishes only through OIDC under `nightly`. It performs public read-only verification of `latest` and never writes that tag. Do not create an npm token, authentication secret, expiry variable, or token-backed fallback for this workflow. The first stable publisher will own the separate transition of `latest` to stable.
 
 ### GitHub Pages
 
@@ -54,8 +42,7 @@ Use **GitHub Actions** as the Pages source. Keep `github-pages` separate from np
 | Classify and verify | Exact source checkout, read-only repository access, same-commit green CI, full gate, registry predecessor and prior Pages checks |
 | Stage release | No checkout; repository write access to verified tag, draft, notes, and assets |
 | Publish npm | No checkout; `npm-nightly` OIDC publishes only checksum-verified retained bytes |
-| Synchronize channels | No checkout; `npm-nightly-tags` exposes the granular token only after candidate and stable-ownership checks |
-| Verify and finalize | Clean public-package verification, then source-free GitHub finalization |
+| Verify and finalize | Clean public-package verification, read-only confirmation that `latest` is unchanged, then source-free GitHub finalization |
 | Deploy Pages | Publisher-linked receipt verification; separate build, retained-state, and Pages permissions |
 
 The workflow runs on schedule or manual dispatch from canonical `main`. A new publication requires current main and successful exact-source CI. Recovery of an already published candidate may use the original attempt after main advances only when its retained and public identities still match; this exception cannot authorize a fresh upload from old source.
@@ -66,20 +53,9 @@ The non-canceling `npm-nightly-<repository>` concurrency group covers publicatio
 
 ## Nightly channel policy
 
-Before a stable version exists, completed delivery requires `nightly` and `latest` to select the same nightly. Once any stable version exists, nightly automation must preserve stable ownership of `latest`. A missing or malformed registry response is never interpreted as an empty package or as proof that stable does not exist.
+Completed nightly delivery requires `nightly` to select the exact candidate and `latest` to retain its verified preflight value. Before stable exists, `latest` must select the frozen historical `alpha` version. Nightly never writes `latest`. The first stable release will move `latest` to stable; once any stable version exists, nightly verification also requires it to select a published stable version. A missing or malformed registry response is never interpreted as an empty package or as proof that stable does not exist.
 
 The historical `alpha` dist-tag, versions, protected tags, immutable releases, and release Pages stay frozen. The first nightly can use the completed alpha as its predecessor. It does not rewrite alpha metadata or republish an alpha.
-
-## Tag-token rotation
-
-Before stable exists, verification checks the expiry variable before public writes and emits a warning when seven days or fewer remain. A missing, malformed, or expired timestamp blocks publication. The variable is an operator-recorded fact; it does not independently prove that the token is valid or unrevoked.
-
-1. In a private interactive npm session, complete the required 2FA challenge and create a replacement with the same package-only access and 30-day expiry.
-2. Replace `npm-nightly-tags` secret `NPM_NIGHTLY_TAG_TOKEN` and repository variable `NPM_NIGHTLY_TAG_TOKEN_EXPIRES_AT` together. Verify the timestamp against npm.
-3. Resume the original failed attempt if rotation repairs a transient authentication failure; otherwise let the next eligible nightly use it.
-4. Verify the exact channel update, then revoke the old token through npm's interactive 2FA flow. Record rotation evidence without credential material.
-
-If a token is compromised, revoke it immediately and investigate package versions and tags before resuming. Do not wait for the normal overlap. Once stable owns `latest`, the nightly tag-writing step no longer needs this token; retire it after confirming the stable workflow's separate authority.
 
 ## Rerun procedure
 
@@ -91,7 +67,7 @@ A rerun keeps the original run ID, creation time, source commit, workflow defini
 4. Confirm that an existing publication is reused with identical bytes. Do not rebuild and republish the same version. Missing or expired evidence requires investigation, not a guessed reconstruction.
 5. Verify package, channels, immutable release, and the exact publisher-linked Pages run after recovery.
 
-A rerun can consume repaired hosted configuration or credentials. A source or publisher-code repair requires a new reviewed commit and new nightly identity. Do not rerun an old workflow expecting it to load a newer implementation.
+A rerun can consume repaired hosted trusted-publisher or environment configuration. A source or publisher-code repair requires a new reviewed commit and new nightly identity. Do not rerun an old workflow expecting it to load a newer implementation.
 
 ## Recovery matrix
 
@@ -102,8 +78,8 @@ A rerun can consume repaired hosted configuration or credentials. A source or pu
 | Candidate has a matching staged tag/draft/assets but no npm version, and its source remains current main | Preserve the stage and resume its exact attempt; do not collide with or overwrite the staged identity. |
 | Candidate has a matching staged tag/draft/assets but no npm version, and main has advanced | Confirm no upload was accepted or remains pending. Preserve the abandoned staged identity and retained evidence, then start a new eligible current-main run with a new version. The old attempt cannot publish from stale source; do not move or overwrite its tag, draft, or assets. |
 | npm accepted the upload but the exact version is not yet publicly readable | Treat it as pending, blocked, or ambiguous. Check registry status and private package-maintainer notifications. Do not reuse the version or publish another candidate to bypass uncertainty. |
-| Exact npm version and integrity exist; channel synchronization or finalization failed | Restore transient credentials/configuration, then resume the original attempt with the retained bytes. Reclassify changed registry state through a full rerun when necessary. |
-| Tag token is expired or revoked | Rotate the isolated token and expiry variable, verify package state, then resume the original affected attempt. |
+| Exact npm version and integrity exist; registry verification or finalization failed | Restore transient hosted configuration, then resume the original attempt with the retained bytes. Investigate unexpected tag changes before reclassifying registry state through a full rerun. |
+| `latest` differs from its recorded preflight value | Stop and investigate the external change. Nightly has no authority to repair it; do not add a token or move a dist-tag. Resume only after the observed state is explained and valid under the channel policy. |
 | Stable version exists but `latest` selects a prerelease | Stop. Stable owns `latest`; investigate and use the approved stable recovery procedure. Nightly must not repair this by pointing `latest` to itself. |
 | npm version, tag, draft, notes, assets, or receipt conflict | Stop and investigate. Do not overwrite, delete, or reuse the identity. A reviewed correction receives a new greater version. |
 | Published package or example bytes are defective | Preserve immutable objects. Publish a corrected greater nightly and consider authorized deprecation of the defective version. |
@@ -117,7 +93,7 @@ A rerun can consume repaired hosted configuration or credentials. A source or pu
 Stable publication is not enabled by the nightly workflow. Before the first stable release, review and merge a stable workflow and validator changes implementing these requirements:
 
 - Select an explicit stable SemVer through maintainer review. Update source manifest and root lockfile versions consistently, and promote reviewed `[Unreleased]` notes into the dated stable changelog entry.
-- Require protected main, exact-source green CI, the full gate, and a separate stable publication environment with the intended human approval policy. Configure its exact npm trusted publisher binding; do not grant the nightly token stable-publication responsibility.
+- Require protected main, exact-source green CI, the full gate, and a separate stable publication environment with the intended human approval policy. Configure its exact npm trusted publisher binding; nightly publication authority does not authorize stable publication.
 - Use the existing publication queue across stable and nightly jobs. Publish one verified retained bundle with matching SBOM, integrity, source, provenance, protected tag, and immutable release evidence.
 - Publish stable under `latest` and verify it before allowing subsequent nightlies. From that first stable onward, nightly automation leaves `latest` under stable ownership even if a later nightly fails.
 - Advance the development base beyond the stable series in a reviewed follow-up before the next nightly. Keep `nightly`, `alpha`, and every existing release snapshot intact.

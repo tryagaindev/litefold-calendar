@@ -8,7 +8,7 @@ Litefold Calendar is a mobile-first, responsive month calendar for applications 
 
 Use Litefold Calendar when your product needs a polished month calendar without adopting a complete scheduling platform or maintaining separate mobile and desktop implementations.
 
-> **Prerelease:** The `nightly` channel contains validated snapshots of `main`. Before the first stable release, `latest` also selects the current nightly; after stable publication, `latest` belongs to stable releases. Pin an exact version for reproducible deployments. Public API changes remain possible before `1.0.0` and are recorded in the changelog. Existing alpha releases remain available by exact version.
+> **Prerelease:** The `nightly` channel contains validated snapshots of `main`. Nightly publication leaves `latest` on the frozen historical alpha; the first stable release will move `latest` to stable, and stable releases will own it afterward. Install `@nightly` explicitly or pin an exact version for reproducible deployments. Public API changes remain possible before `1.0.0` and are recorded in the changelog. Existing alpha releases remain available by exact version.
 
 ## Install
 

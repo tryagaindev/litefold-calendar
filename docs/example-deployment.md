@@ -32,7 +32,7 @@ Before the first deployment, a maintainer with GitHub `Admin` access to the
 repository must:
 
 1. Configure Pages to use **GitHub Actions** as its source.
-2. Protect the `github-pages` environment independently from `npm-nightly` and `npm-nightly-tags` and allow deployments from `main` only.
+2. Protect the `github-pages` environment independently from `npm-nightly` and allow deployments from `main` only.
 3. Allow the workflow token to create and maintain `pages-content` while restricting direct and force pushes to that branch.
 4. Keep `main`, `v*` tags, workflow files, and environment-rule changes under review.
 

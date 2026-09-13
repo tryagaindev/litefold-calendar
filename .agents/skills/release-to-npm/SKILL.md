@@ -41,8 +41,10 @@ response, or remembered prior run is not publication authority.
 
 Derive the candidate strategy, environment names, and required roles from the
 current runbook and hosted state. An authorized nightly start uses unattended
-trusted publication and does not require a manual environment reviewer or local
-npm login. Stable publication retains its separately configured review controls.
+OIDC trusted publication and does not require a manual environment reviewer, npm
+token, or local npm login. Nightly leaves `latest` unchanged and verifies it
+through public registry reads. Stable publication retains its separately
+configured review controls.
 One person may fill multiple roles only when the hosted policy permits it.
 
 For an authorized start or continuation, create or update the private release
@@ -77,9 +79,9 @@ Never publish locally, collect credentials in conversation or release notes,
 manufacture a release trigger, push or move a version tag, rewrite a shared branch,
 or create public release state from an arbitrary ref. Changes to hosted controls
 or credential policy require an explicitly authorized, reviewed migration; a
-failed release is not permission to improvise one. Route any scoped, expiring
-nightly tag credential through the documented private secret setup, never source
-code or retained artifacts.
+failed release is not permission to improvise one. Do not introduce an npm token
+or a secondary dist-tag write into the nightly path. The first stable release
+owns the future transition of `latest` to stable.
 
 ## Follow the selected phase
 

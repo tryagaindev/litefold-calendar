@@ -66,6 +66,32 @@ async function jsonFixture(name) {
 	return JSON.parse(await readFile(join(FIXTURE_DIRECTORY, name), "utf8"));
 }
 
+void test("nightly readback verifies candidate bytes and preserves preflight latest without tag writes", async (context) => {
+	const workflow = await readFile(WORKFLOW_PATH, "utf8");
+	const policy = inlineModule(workflow, "LFC_NIGHTLY_READBACK_POLICY");
+	const directory = await temporaryDirectory(context, "lfc-nightly-readback-");
+	const alpha = "0.5.0-alpha.0";
+	async function check({ versions = [alpha, VERSION], latest = alpha, nightly = VERSION,
+		expectedLatest = alpha, integrity = EXPECTED_INTEGRITY } = {}) {
+		await writeFile(join(directory, "registry-tags.json"), JSON.stringify({
+			versions, "dist-tags": { alpha, latest, nightly }
+		}));
+		await writeFile(join(directory, "registry-integrity.json"), JSON.stringify(integrity));
+		return runInlineModule(policy, { env: { ...process.env, RUNNER_TEMP: directory,
+			LFC_VERSION: VERSION, LFC_EXPECTED_INTEGRITY: EXPECTED_INTEGRITY,
+			LFC_EXPECTED_LATEST: expectedLatest } });
+	}
+	await check();
+	await check({ versions: [alpha, "0.5.0", VERSION], latest: "0.5.0", expectedLatest: "0.5.0" });
+	await assert.rejects(check({ versions: [alpha] }), { code: 75 });
+	await assert.rejects(check({ nightly: alpha }), { code: 75 });
+	await assert.rejects(check({ integrity: null }), { code: 75 });
+	await assert.rejects(check({ integrity: "sha512-conflict" }), /integrity conflicts/u);
+	await assert.rejects(check({ latest: VERSION }), /latest changed from the verified preflight/u);
+	await assert.rejects(check({ versions: [alpha, "0.5.0", VERSION] }), /until stable takes ownership/u);
+	await assert.rejects(check({ versions: [alpha, "0.5.0", VERSION], latest: "0.5.0" }), /latest changed/u);
+});
+
 void test("the workflow normalizer accepts only npm 12 single-result arrays", async (context) => {
 	const workflow = await readFile(WORKFLOW_PATH, "utf8");
 	const normalizer = foldedEnvironmentScript(workflow, "LFC_NORMALIZE_NPM_VIEW_JSON");
@@ -473,31 +499,4 @@ void test("the workflow provenance policy rejects conflicting source and builder
 		}
 		await assert.rejects(runPolicy(context, policy, options));
 	}
-});
-
-
-void test("the source-free latest policy waits for visibility and preserves stable ownership", async (context) => {
-	const workflow = await readFile(WORKFLOW_PATH, "utf8");
-	const policy = inlineModule(workflow, "LFC_NIGHTLY_LATEST_POLICY");
-	const directory = await temporaryDirectory(context, "lfc-nightly-latest-");
-	const output = join(directory, "output.txt");
-	const previous = "0.5.0-alpha.3";
-	async function check({ versions = [previous, VERSION], latest = previous, nightly = VERSION,
-		integrity = EXPECTED_INTEGRITY } = {}) {
-		await writeFile(join(directory, "registry.json"), JSON.stringify({ versions, "dist-tags": { latest, nightly } }));
-		await writeFile(join(directory, "integrity.json"), JSON.stringify(integrity));
-		await writeFile(output, "");
-		await runInlineModule(policy, { cwd: directory, env: { ...process.env,
-			LFC_VERSION: VERSION, LFC_EXPECTED_INTEGRITY: EXPECTED_INTEGRITY, GITHUB_OUTPUT: output } });
-		return readFile(output, "utf8");
-	}
-	assert.equal(await check(), `latest-target=${VERSION}\nwrite=true\n`);
-	assert.equal(await check({ latest: VERSION }), `latest-target=${VERSION}\nwrite=false\n`);
-	assert.equal(await check({ versions: [previous, "0.5.0", VERSION], latest: "0.5.0" }),
-		"latest-target=0.5.0\nwrite=false\n");
-	await assert.rejects(check({ versions: [previous] }), { code: 75 });
-	await assert.rejects(check({ nightly: previous }), { code: 75 });
-	await assert.rejects(check({ integrity: null }), { code: 75 });
-	await assert.rejects(check({ integrity: "sha512-conflicting" }), /registry integrity changed/u);
-	await assert.rejects(check({ versions: [previous, "0.5.0", VERSION] }), /Stable owns latest/u);
 });

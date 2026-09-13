@@ -5,7 +5,7 @@ import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createNightlyPlan, nightlyPackageManifest, tokenExpiryStatus, validateNightlyPlan,
+import { createNightlyPlan, nightlyPackageManifest, validateNightlyPlan,
 	validateNightlyRegistryState, selectNightlyRecoveryArtifacts, verifyRestoredNightlyBundle } from "../lib/nightly-release.mjs";
 import { validateDeploymentMetadata } from "../build-pages.mjs";
 import { resolveBrowserTargets } from "../lib/browser-targets.mjs";
@@ -51,20 +51,22 @@ void test("first nightly preserves historical alpha and identifies its published
 	});
 });
 
-void test("ordinary nightlies require previous channel completion and increasing versions", () => {
-	const metadata = { versions: [ALPHA, PREVIOUS], "dist-tags": { alpha: ALPHA, nightly: PREVIOUS, latest: PREVIOUS } };
+void test("ordinary nightlies advance only nightly while historical alpha keeps latest", () => {
+	const metadata = { versions: [ALPHA, PREVIOUS], "dist-tags": { alpha: ALPHA, nightly: PREVIOUS, latest: ALPHA } };
 	assert.equal(validateNightlyRegistryState(metadata, PLAN).predecessor, PREVIOUS);
+	assert.equal(validateNightlyRegistryState(metadata, PLAN).latest, ALPHA);
 	assert.throws(() => validateNightlyRegistryState({ ...metadata,
-		"dist-tags": { ...metadata["dist-tags"], latest: ALPHA } }, PLAN), /incomplete/u);
+		"dist-tags": { ...metadata["dist-tags"], latest: PREVIOUS } }, PLAN), /frozen historical alpha/u);
 	assert.throws(() => validateNightlyRegistryState({ ...metadata,
 		versions: [...metadata.versions, "0.7.0-nightly.20260912090000.123456790"] }, PLAN), /advance/u);
 });
 
-void test("exact candidate can resume between publish and latest synchronization", () => {
+void test("exact candidate resumes after publication with latest still on historical alpha", () => {
 	const metadata = { versions: [ALPHA, PLAN.version], "dist-tags": { alpha: ALPHA, nightly: PLAN.version, latest: ALPHA } };
 	assert.equal(validateNightlyRegistryState(metadata, PLAN).existing, true);
 	metadata["dist-tags"].latest = PLAN.version;
-	assert.equal(validateNightlyRegistryState(metadata, PLAN).existing, true);
+	assert.throws(() => validateNightlyRegistryState(metadata, PLAN), /frozen historical alpha/u);
+	metadata["dist-tags"].latest = ALPHA;
 	delete metadata["dist-tags"].nightly;
 	assert.throws(() => validateNightlyRegistryState(metadata, PLAN), /not selected/u);
 });
@@ -85,13 +87,15 @@ void test("missing and malformed registry evidence cannot become an empty releas
 	}
 });
 
-void test("token expiry blocks publication and warns during its last seven days", () => {
-	const now = new Date("2026-09-12T09:00:00Z");
-	assert.equal(tokenExpiryStatus("2026-10-12T09:00:00Z", now).warn, false);
-	assert.equal(tokenExpiryStatus("2026-09-19T09:00:00Z", now).warn, true);
-	assert.throws(() => tokenExpiryStatus("2026-09-12T09:00:00Z", now), /expired/u);
-	assert.throws(() => tokenExpiryStatus(undefined, now));
-	assert.throws(() => tokenExpiryStatus("2026-02-30T09:00:00Z", new Date("2026-01-01T00:00:00Z")), /UTC timestamp/u);
+void test("nightly cannot adopt another prerelease tag as the frozen pre-stable latest", () => {
+	const metadata = initialRegistry();
+	delete metadata["dist-tags"].alpha;
+	metadata["dist-tags"].nightly = PREVIOUS;
+	metadata.versions.push(PREVIOUS);
+	assert.throws(() => validateNightlyRegistryState(metadata, PLAN), /frozen historical alpha/u);
+	metadata["dist-tags"].alpha = PREVIOUS;
+	metadata["dist-tags"].latest = PREVIOUS;
+	assert.throws(() => validateNightlyRegistryState(metadata, PLAN), /frozen historical alpha/u);
 });
 
 void test("nightly Pages binds a generated package version to the exact source and receipt", () => {
