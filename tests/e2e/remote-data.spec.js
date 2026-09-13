@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { expectNoAutomatedAccessibilityViolations } from "./helpers.js";
+
 const EXAMPLE = "/examples/remote-data/";
 const FEED = "**/examples/remote-data/events.json?*";
 
@@ -27,13 +29,14 @@ test("remote example fetches the fixture, filters, refreshes, and distinguishes 
 	await expect(page.getByText("No events", { exact: true })).toBeVisible();
 });
 
-test("remote example opens a complete day chooser and restores focus", async ({ page }) => {
+test("remote example opens a complete day chooser and restores focus", async ({ page }, testInfo) => {
 	await openExample(page);
 	const count = page.getByRole("grid").getByRole("button", { name: /^View 3 events for /u });
 	await count.click();
 	const dialog = page.getByRole("dialog", { name: "Events for 2026-08-06" });
 	await expect(dialog).toBeVisible();
 	await expect(dialog.getByRole("button", { name: /^Choose /u })).toHaveCount(3);
+	await expectNoAutomatedAccessibilityViolations(page, testInfo);
 	await dialog.getByRole("button", { name: "Choose Print workshop", exact: true }).click();
 	await expect(dialog).not.toBeVisible();
 	await expect(page.getByRole("status").filter({ hasText: "Selected Print workshop" })).toContainText("No server data was changed.");

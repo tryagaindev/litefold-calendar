@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { request } from "node:http";
 import test from "node:test";
 
+import { EXAMPLE_ROUTES } from "../lib/example-routes.mjs";
 import { startRepositoryServer } from "../serve-repository.mjs";
 
 const EXPECTED_SECURITY_HEADERS = Object.freeze({
@@ -11,14 +12,6 @@ const EXPECTED_SECURITY_HEADERS = Object.freeze({
 	"referrer-policy": "no-referrer",
 	"x-content-type-options": "nosniff"
 });
-const EXAMPLE_ROUTES = Object.freeze([
-	"/examples/advanced/",
-	"/examples/async-errors/",
-	"/examples/basic/",
-	"/examples/classic-script/",
-	"/examples/fullcalendar-v6-migration/",
-	"/examples/progressive-enhancement/"
-]);
 
 function requestWithHost(origin, host) {
 	const url = new URL(origin);
@@ -65,7 +58,7 @@ void test("repository server routes the landing page without weakening its bound
 		assert.match(await landing.text(), /<title>Examples \| Litefold Calendar<\/title>/u);
 		assertSecurityHeaders(landing);
 
-		for (const route of EXAMPLE_ROUTES) {
+		for (const { route } of EXAMPLE_ROUTES) {
 			const example = await fetch(`${server.origin}${route}`);
 			assert.equal(example.status, 200, `Expected a runnable example route: ${route}`);
 			assert.match(example.headers.get("content-type") ?? "", /^text\/html/u);

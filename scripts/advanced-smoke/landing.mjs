@@ -6,18 +6,11 @@ import { pathToFileURL } from "node:url";
 import { JSDOM } from "jsdom";
 
 import { parseExampleMetadata } from "../lib/example-metadata.mjs";
+import { EXAMPLE_ROUTES } from "../lib/example-routes.mjs";
 import { REPOSITORY_ROOT } from "../lib/process.mjs";
 
 const EXAMPLES_DIRECTORY = join(REPOSITORY_ROOT, "examples");
-const EXPECTED_EXAMPLE_PATHS = Object.freeze([
-	"advanced/",
-	"async-errors/",
-	"basic/",
-	"classic-script/",
-	"fullcalendar-v6-migration/",
-	"progressive-enhancement/",
-	"remote-data/"
-]);
+const EXPECTED_EXAMPLE_PATHS = EXAMPLE_ROUTES.map(({ route }) => route.slice("/examples/".length)).sort();
 const LANDING_MODULE = join(EXAMPLES_DIRECTORY, "index.js");
 
 function installGlobal(name, value, descriptors) {
