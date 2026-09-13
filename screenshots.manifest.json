@@ -2,12 +2,12 @@
   "version": 1,
   "state": "final",
   "toolchain": {
-    "node": "24.19.0",
+    "node": "24.20.0",
     "npm": "12.0.2",
     "playwright": "1.62.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "6fbe2fdf6051785e75c204b4ac5ba80351ed7c059d6f5efecabd5a03913621de",
+  "sourceFingerprint": "fb28e2b9348573cd34c8da7dbd3f69533f7f36934420140c60125f757e0eaa5b",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -27,7 +27,7 @@
         "README.md",
         "docs/screenshots/README.md"
       ],
-      "sha256": "cab5462e7035251e61388c52973c6185d393e74a7acbaf9f60a2b61c16ee96b3"
+      "sha256": "ad46e85303e93587df067d5dbc7f5cb53a520019739d1d660ddbc150013228b3"
     },
     {
       "id": "month-year-jump",
@@ -47,7 +47,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "9de8f1ddb1505a6bd889bc597f93400f8446f7fd08416658c3565303f26acf88"
+      "sha256": "aacdf4aa1ee35ff8b2fb7fd6a349d3b05e47c792cae4c85b5420da7d4305a87b"
     },
     {
       "id": "mobile-month-agenda-dark",
@@ -68,7 +68,7 @@
         "README.md",
         "docs/screenshots/README.md"
       ],
-      "sha256": "19d4a21c9caa193c470f2b15733faf665c291115e22f591371663452325a1bd6"
+      "sha256": "f38dfc110721bdfcf159e0670e9f51b99af846dd0bc0b2d747168bea8388679d"
     },
     {
       "id": "mobile-month-swipe-pull",
@@ -88,7 +88,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "7843bb9598864fb96d9d4574c219fc9e3c49a3a2e5c7dcb742a68f457079e833"
+      "sha256": "baa9ec985ae5505cb3081b1ef16bcb3f6bc43439e92989ba6e6624b6852b3b74"
     },
     {
       "id": "event-details-dark",
@@ -108,7 +108,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "4905e43d8985d88ebc22a12c7181c3c0f34e9082b3d517eda984dd1797b0375a"
+      "sha256": "2b89afe1a643301884a53ccf59a7dcd932d22fca8b76b79c06fd9d9fe1a9a856"
     },
     {
       "id": "grid-event-keyboard-focus",
@@ -129,7 +129,119 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "6b82afcda9f73bade132a65923120b2569bec46b8ea2de74aa38e17a02d79e4e"
+      "sha256": "9540be650dc76258b1fdff3352a96a32cdef07802e000763ba62261c1bae6d0b"
+    },
+    {
+      "id": "compact-default-counts",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/compact-default-counts-390x844.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "setup": [
+        "wait-ready",
+        "mount-count-fixture",
+        "scroll-calendar"
+      ],
+      "alt": "Compact calendar with total counts on days containing multiple events",
+      "references": [
+        "docs/screenshots/README.md"
+      ],
+      "sha256": "e05eb374b815306c635fc367848b01f48bd25f1c0d5a7ae51e30f1097a546774"
+    },
+    {
+      "id": "compact-all-counts",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/compact-all-counts-390x844.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "setup": [
+        "wait-ready",
+        "mount-count-fixture",
+        "scroll-calendar"
+      ],
+      "alt": "Compact calendar with total counts on every nonempty day",
+      "references": [
+        "docs/screenshots/README.md"
+      ],
+      "sha256": "dd43d435efd2e7ce95484be7a43443977a3c2c13e5c2ef3e6aadab6e9778927b"
+    },
+    {
+      "id": "wide-all-counts",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/wide-all-counts-1440x900.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "hasTouch": false,
+      "setup": [
+        "wait-ready",
+        "mount-count-fixture",
+        "scroll-calendar"
+      ],
+      "alt": "Wide calendar with localized total event counts on every nonempty day",
+      "references": [
+        "docs/screenshots/README.md"
+      ],
+      "sha256": "3110b2b7c269419f1dc63ae8fd8bb642305c1b335a69d1770f4be5e9c14b9852"
+    },
+    {
+      "id": "count-keyboard-focus",
+      "route": "/examples/advanced/",
+      "output": "docs/screenshots/count-keyboard-focus-390x844.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": false,
+      "setup": [
+        "wait-ready",
+        "mount-count-fixture",
+        "scroll-calendar",
+        "focus-selected-day",
+        "press-f2"
+      ],
+      "alt": "Keyboard focus on a compact calendar total event count button",
+      "references": [
+        "docs/screenshots/README.md"
+      ],
+      "sha256": "3d54f1da2819de8345daa7fa952ac8f67bf0ac292baeb78b108fd85162ab3cce"
     }
-  ]
+  ],
+  "browserTargets": {
+    "query": "baseline-widely-available",
+    "effectiveQuery": "Vite 8.3.0: baseline-widely-available",
+    "resolvedAt": "2026-09-13",
+    "dataVersions": {
+      "vite": "8.3.0",
+      "esbuild": "0.28.2"
+    },
+    "browsers": [
+      "chrome111",
+      "edge111",
+      "firefox114",
+      "safari16.4",
+      "ios16.4"
+    ],
+    "javascript": [
+      "chrome111",
+      "edge111",
+      "firefox114",
+      "safari16.4",
+      "ios16.4"
+    ],
+    "css": [
+      "chrome111",
+      "edge111",
+      "firefox114",
+      "safari16.4",
+      "ios16.4"
+    ]
+  }
 }

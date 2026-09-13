@@ -114,7 +114,7 @@ if (Array.isArray(manifest.scenes)) {
 try {
 	const currentFingerprint = await computeSourceFingerprint();
 	if (currentFingerprint !== manifest.sourceFingerprint) {
-		errors.push("Screenshot source fingerprint is stale; run npm run screenshots:update.");
+		errors.push("Screenshot source fingerprint is stale; run npm run screenshots:prepare.");
 	}
 } catch (error) {
 	errors.push(`Unable to compute screenshot source fingerprint (${error.message}).`);

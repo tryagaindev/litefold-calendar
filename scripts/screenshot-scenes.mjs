@@ -5,6 +5,51 @@ const HELD_PULL_MINIMUM_OFFSET = 24;
 const HELD_PULL_START_RATIO = 0.8;
 const SWIPE_VIEWPORT_SELECTOR = ".lfc-calendar-swipe-viewport";
 
+export const ADDITIONAL_SCREENSHOT_SCENES = Object.freeze([
+	{ id: "compact-default-counts", width: 390, height: 844,
+		alt: "Compact calendar with total counts on days containing multiple events" },
+	{ id: "compact-all-counts", width: 390, height: 844,
+		alt: "Compact calendar with total counts on every nonempty day" },
+	{ id: "wide-all-counts", width: 1440, height: 900,
+		alt: "Wide calendar with localized total event counts on every nonempty day" },
+	{ id: "count-keyboard-focus", width: 390, height: 844,
+		alt: "Keyboard focus on a compact calendar total event count button" }
+].map(({ id, width, height, alt }) => Object.freeze({
+	id, route: ADVANCED_ROUTE, output: `docs/screenshots/${id}-${width}x${height}.png`,
+	viewport: { width, height }, hasTouch: false,
+	setup: ["wait-ready", "mount-count-fixture", "scroll-calendar",
+		...(id === "count-keyboard-focus" ? ["focus-selected-day", "press-f2"] : [])],
+	alt, references: ["docs/screenshots/README.md"]
+})));
+
+async function mountCountFixture(page, id) {
+	await page.evaluate(async (sceneId) => {
+		const { createCalendar } = await import("/dist/index.js");
+		const previous = document.querySelector("[data-my-calendar]");
+		const host = previous.cloneNode(false);
+		previous.replaceWith(host);
+		const gridEventDisplay = sceneId === "compact-all-counts"
+			? { compact: "count" }
+			: sceneId === "wide-all-counts" ? { wide: "count" } : undefined;
+		const calendar = createCalendar(host, {
+			initialDate: "2026-08-06", now: () => new Date("2026-08-06T12:00:00-07:00"),
+			locale: "en-US", firstDay: 1, gridEventDisplay, maxGridEventsPerDay: 2,
+			onEventActivate: () => {},
+			events: [
+				{ id: "planning", title: "Planning", start: "2026-08-04T09:00", accentColor: "#805FC0" },
+				{ id: "workshop", title: "Workshop", start: "2026-08-06T09:00", accentColor: "#3874CB" },
+				{ id: "review", title: "Project review", start: "2026-08-06T11:00", accentColor: "#805FC0" },
+				{ id: "office-hours", title: "Office hours", start: "2026-08-10T10:00", accentColor: "#3874CB" },
+				{ id: "training", title: "Training", start: "2026-08-10T13:00", accentColor: "#805FC0" },
+				{ id: "demo", title: "Team demo", start: "2026-08-10T15:00", accentColor: "#3874CB" }
+			]
+		});
+		calendar.render();
+		window.addEventListener("pagehide", () => calendar.destroy(), { once: true });
+	}, id);
+	await page.locator('[role="gridcell"][aria-selected="true"]').waitFor({ state: "visible" });
+}
+
 async function waitForReady(page, route) {
 	const response = await page.goto(route, { waitUntil: "domcontentloaded" });
 	if (response === null || !response.ok()) {
@@ -140,6 +185,20 @@ export async function prepareScreenshotScene(page, scene) {
 		case "grid-event-keyboard-focus":
 			await scrollCalendarIntoView(page);
 			await enterGridActionMode(page);
+			break;
+		case "compact-default-counts":
+		case "compact-all-counts":
+		case "wide-all-counts":
+		case "count-keyboard-focus":
+			await mountCountFixture(page, scene.id);
+			await scrollCalendarIntoView(page);
+			if (scene.id === "count-keyboard-focus") {
+				const selectedDay = page.locator('[role="gridcell"][aria-selected="true"] > button');
+				await selectedDay.focus();
+				await selectedDay.press("F2");
+				await page.locator('[role="gridcell"][aria-selected="true"] button:focus')
+					.filter({ hasText: "2" }).waitFor({ state: "visible" });
+			}
 			break;
 		default:
 			throw new Error(`Unknown screenshot scene: ${scene.id}`);
