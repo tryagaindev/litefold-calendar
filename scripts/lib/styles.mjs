@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { transform } from "esbuild";
 
 import { REPOSITORY_ROOT } from "./process.mjs";
+import { resolveBrowserTargets } from "./browser-targets.mjs";
 
 const STYLE_SOURCE_DIRECTORY = join(REPOSITORY_ROOT, "src", "styles");
 const LAYER_START = "@layer lfc {\n";
@@ -123,7 +124,7 @@ export async function composeStyles({
 }
 
 /** Minifies a composed stylesheet for distribution while preserving a trailing newline. */
-export async function minifyStyles(source) {
+export async function minifyStyles(source, targets = resolveBrowserTargets().css) {
 	if (typeof source !== "string") {
 		throw new TypeError("Styles to minify must be a string.");
 	}
@@ -132,12 +133,13 @@ export async function minifyStyles(source) {
 		legalComments: "none",
 		loader: "css",
 		minify: true,
-		sourcemap: false
+		sourcemap: false,
+		target: [...targets]
 	});
 	return `${result.code.trimEnd()}\n`;
 }
 
 /** Composes the canonical source modules and minifies only the public distributed stylesheet. */
 export async function composeDistributedStyles(options = {}) {
-	return minifyStyles(await composeStyles(options));
+	return minifyStyles(await composeStyles(options), options.targets);
 }

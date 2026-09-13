@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { dirname, extname, relative, resolve, sep } from "node:path";
+import { dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { gzipSync } from "node:zlib";
 
 import ts from "typescript";
@@ -101,7 +101,7 @@ export async function measureReachableJavaScriptGraph(entryPath, rootDirectory) 
 		);
 		for (const specifier of readStaticModuleSpecifiers(source)) {
 			if (!specifier.startsWith("./") && !specifier.startsWith("../")) {
-				continue;
+				throw new Error(`Measured JavaScript graph must not import external module ${specifier}.`);
 			}
 			const resolvedPath = resolve(dirname(path), specifier);
 			pending.push(extname(resolvedPath) === "" ? `${resolvedPath}.js` : resolvedPath);
@@ -233,7 +233,7 @@ function readStaticModuleSpecifiers(sourceFile) {
 
 function assertWithinRoot(path, root) {
 	const rootRelativePath = relative(root, path);
-	if (rootRelativePath === ".." || rootRelativePath.startsWith(`..${sep}`) || resolve(path) === root) {
+	if (isAbsolute(rootRelativePath) || rootRelativePath === ".." || rootRelativePath.startsWith(`..${sep}`) || resolve(path) === root) {
 		throw new Error(`Reachable module ${path} must remain beneath ${root}.`);
 	}
 }

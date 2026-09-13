@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { build } from "esbuild";
 
 import { extractExtensionEntries } from "./package-entries.mjs";
+import { extensionIdsFromSources, readDistributionSourceProvenance } from "./distribution-provenance.mjs";
 
 function assertExactExtensionSet(actual, expected, description) {
 	const actualIds = [...actual].sort((left, right) => left.localeCompare(right, "en"));
@@ -16,23 +17,20 @@ function assertExactExtensionSet(actual, expected, description) {
 	}
 }
 
-function bundledExtensionIds(metafile, packageName) {
-	const packageMarker = `/node_modules/${packageName}/dist/extensions/`;
+function bundledExtensionIds(metafile, provenance) {
 	const ids = new Set();
-
-	for (const inputPath of Object.keys(metafile.inputs)) {
-		const normalizedPath = `/${inputPath.replaceAll("\\", "/")}`;
-		const markerIndex = normalizedPath.lastIndexOf(packageMarker);
-		if (markerIndex < 0) {
-			continue;
-		}
-
-		const relativeExtensionPath = normalizedPath.slice(
-			markerIndex + packageMarker.length
-		);
-		const id = relativeExtensionPath.split("/", 1)[0];
-		if (id !== undefined && id.length > 0) {
-			ids.add(id);
+	for (const output of Object.values(metafile.outputs)) {
+		for (const [inputPath, contribution] of Object.entries(output.inputs)) {
+			if (contribution.bytesInOutput === 0 || !inputPath.startsWith("packed-package:")) {
+				continue;
+			}
+			const sources = provenance.get(inputPath.slice("packed-package:".length).replaceAll("\\", "/"));
+			if (sources === undefined) {
+				throw new Error(`Bundled input ${inputPath} is missing verified source provenance.`);
+			}
+			for (const id of extensionIdsFromSources(sources)) {
+				ids.add(id);
+			}
 		}
 	}
 
@@ -78,8 +76,18 @@ async function inspectExtensionFactories(installedPackage, extensionEntries) {
 	return Object.freeze(factories);
 }
 
-function packedPackagePlugin(installedPackage, packageJson) {
+function packedPackagePlugin(installedPackage, packageJson, provenance) {
 	const packageNamePattern = packageJson.name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+	const resolvePackedModule = (from, specifier) => {
+		const path = resolve(from, specifier);
+		const packagePath = relative(join(installedPackage, "dist"), path);
+		if ((!specifier.startsWith("./") && !specifier.startsWith("../")) ||
+			isAbsolute(packagePath) || packagePath === ".." || packagePath.startsWith(`..${sep}`) ||
+			!path.endsWith(".js")) {
+			throw new Error(`Packed JavaScript import ${specifier} must remain inside dist/.`);
+		}
+		return { namespace: "packed-package", path };
+	};
 
 	return {
 		name: "packed-package",
@@ -98,26 +106,24 @@ function packedPackagePlugin(installedPackage, packageJson) {
 						return { errors: [{ text: `Packed package does not export ${args.path}.` }] };
 					}
 
-					return {
-						namespace: "packed-package",
-						path: resolve(installedPackage, importTarget)
-					};
+					return resolvePackedModule(installedPackage, importTarget);
 				}
 			);
 			buildContext.onResolve(
 				{ filter: /^\./, namespace: "packed-package" },
-				(args) => ({
-					namespace: "packed-package",
-					path: resolve(dirname(args.importer), args.path)
-				})
+				(args) => resolvePackedModule(dirname(args.importer), args.path)
 			);
 			buildContext.onLoad(
 				{ filter: /\.js$/, namespace: "packed-package" },
-				async (args) => ({
-					contents: await readFile(args.path, "utf8"),
-					loader: "js",
-					resolveDir: dirname(args.path)
-				})
+				async (args) => {
+					provenance.set(args.path.replaceAll("\\", "/"),
+						await readDistributionSourceProvenance(args.path, installedPackage));
+					return {
+						contents: await readFile(args.path, "utf8"),
+						loader: "js",
+						resolveDir: dirname(args.path)
+					};
+				}
 			);
 		}
 	};
@@ -130,6 +136,7 @@ async function bundleFixture(
 	name,
 	source
 ) {
+	const provenance = new Map();
 	return build({
 		absWorkingDir: fixtureDirectory,
 		bundle: true,
@@ -137,7 +144,7 @@ async function bundleFixture(
 		logLevel: "silent",
 		metafile: true,
 		platform: "browser",
-		plugins: [packedPackagePlugin(installedPackage, packageJson)],
+		plugins: [packedPackagePlugin(installedPackage, packageJson, provenance)],
 		splitting: true,
 		stdin: {
 			contents: source,
@@ -148,7 +155,7 @@ async function bundleFixture(
 		treeShaking: true,
 		write: false,
 		outdir: join(fixtureDirectory, ".extension-bundles", name)
-	}).then((result) => bundledExtensionIds(result.metafile, packageJson.name));
+	}).then((result) => bundledExtensionIds(result.metafile, provenance));
 }
 
 function extensionImport(packageName, factory, localName = factory.factoryName) {

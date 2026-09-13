@@ -34,17 +34,18 @@ void test("root import graph excludes unreferenced optional modules", async (con
 	const directory = await mkdtemp(join(tmpdir(), "lfc-workflow-graph-"));
 	context.after(async () => { await rm(directory, { force: true, recursive: true }); });
 	await mkdir(join(directory, "extensions"));
+	await mkdir(join(directory, "chunks"));
 	const sources = new Map([
 		["index.js", 'export { createCalendar } from "./calendar.js";\nexport { CalendarError } from "./errors.js";\n'],
-		["calendar.js", 'import { helper } from "./internal.js";\nexport const createCalendar = helper;\n'],
+		["calendar.js", 'import { helper } from "./chunks/internal-a1234567.js";\nexport const createCalendar = helper;\n'],
 		["errors.js", "export class CalendarError extends Error {}\n"],
-		["internal.js", 'import "node:fs";\nexport const helper = () => undefined;\nexport const loadOptional = () => import("./extensions/webmcp.js");\n'],
+		[join("chunks", "internal-a1234567.js"), 'export const helper = () => undefined;\nexport const loadOptional = () => import("../extensions/webmcp.js");\n'],
 		[join("extensions", "webmcp.js"), "export const optional = true;\n"]
 	]);
 	await Promise.all([...sources].map(([path, source]) => writeFile(join(directory, path), source, "utf8")));
 
 	const graph = await measureReachableJavaScriptGraph(join(directory, "index.js"), directory);
-	assert.deepEqual(graph.files, ["calendar.js", "errors.js", "index.js", "internal.js"]);
+	assert.deepEqual(graph.files, ["calendar.js", "chunks/internal-a1234567.js", "errors.js", "index.js"]);
 	assert.equal(
 		graph.rawBytes,
 		[...sources].filter(([path]) => !path.includes("extensions"))
@@ -52,6 +53,10 @@ void test("root import graph excludes unreferenced optional modules", async (con
 	);
 	assert.ok(graph.separateGzipBytes > 0);
 	assert.ok(graph.combinedGzipBytes > 0);
+	await writeFile(join(directory, "index.js"), 'import "node:fs";\n', "utf8");
+	await assert.rejects(measureReachableJavaScriptGraph(join(directory, "index.js"), directory), /external module/u);
+	await writeFile(join(directory, "index.js"), 'export * from "../outside.js";\n', "utf8");
+	await assert.rejects(measureReachableJavaScriptGraph(join(directory, "index.js"), directory), /must remain beneath/u);
 });
 
 void test("workflow operation contract catches redundant renders without timing assertions", () => {

@@ -64,21 +64,21 @@ void test("distribution size reports raw and gzip deltas", () => {
 	assert.throws(() => summarizeDistributionFiles([]), /at least one/u);
 });
 
-void test("distribution report keeps entry, coordinator, and complete JavaScript graph rows", () => {
+void test("distribution report compares public entry, core import graph, and complete JavaScript graph rows", () => {
 	const current = Buffer.from("current calendar module\n", "utf8");
 	const baseline = Buffer.from("baseline module\n", "utf8");
 	const rows = createDistributionMeasurements(
-		{ coordinator: current, entry: current, javascript: [current, current] },
-		{ coordinator: baseline, entry: baseline, javascript: [baseline] }
+		{ coreImportGraph: summarizeDistributionFiles([current, current]), entry: current, javascript: [current, current, current] },
+		{ coreImportGraph: summarizeDistributionFiles([baseline]), entry: baseline, javascript: [baseline, baseline] }
 	);
 	assert.deepEqual(rows.map(({ key, label }) => ({ key, label })), [
 		{ key: "entry", label: "dist/index.js" },
-		{ key: "coordinator", label: "dist/internal/runtime/coordinator.js" },
-		{ key: "javascriptTotal", label: "dist JavaScript total (2 modules)" }
+		{ key: "coreImportGraph", label: "Core static import graph (2 modules)" },
+		{ key: "javascriptTotal", label: "dist JavaScript total (3 modules)" }
 	]);
-	assert.equal(rows[1]?.delta?.rawBytes, current.byteLength - baseline.byteLength);
-	assert.equal(rows[2]?.current.rawBytes, current.byteLength * 2);
-	assert.equal(rows[2]?.baseline?.rawBytes, baseline.byteLength);
+	assert.equal(rows[1]?.delta?.rawBytes, current.byteLength * 2 - baseline.byteLength);
+	assert.equal(rows[2]?.current.rawBytes, current.byteLength * 3);
+	assert.equal(rows[2]?.baseline?.rawBytes, baseline.byteLength * 2);
 });
 
 void test("measurement arguments preserve the minimum protocol", () => {

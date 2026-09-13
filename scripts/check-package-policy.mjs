@@ -10,6 +10,7 @@ import {
     SUPPORTED_NODE_SELECTOR
 } from "./lib/node-version.mjs";
 import { normalizeNpmPackResult } from "./lib/npm-pack-result.mjs";
+import { inspectDistributionInventory, inspectPackageBundles } from "./lib/package-bundle-policy.mjs";
 import {
     expectedExtensionExport,
     extractExtensionEntries,
@@ -147,20 +148,6 @@ const PACKED_MODULES = (await listFiles(join(REPOSITORY_ROOT, "src")))
     .sort((left, right) => left.localeCompare(right, "en"));
 
 const PACKED_MODULE_SET = new Set(PACKED_MODULES);
-
-const ALLOWED_PACKED_FILES = new Set([
-    "LICENSE",
-    "README.md",
-    "package.json",
-    "dist/styles.css",
-    "dist/styles.css.d.ts",
-    ...PACKED_MODULES.flatMap((moduleName) => [
-        `dist/${moduleName}.d.ts`,
-        `dist/${moduleName}.d.ts.map`,
-        `dist/${moduleName}.js`,
-        `dist/${moduleName}.js.map`
-    ])
-]);
 
 function inspectExtensionCatalog(extensionEntries) {
     const exportedIds = new Set(extensionEntries.map((entry) => entry.id));
@@ -1209,139 +1196,9 @@ async function inspectWorkflowTree(
 }
 
 function inspectPackedFiles(packResult) {
-    for (const file of packResult.files ?? []) {
-        const path =
-            String(file.path)
-                .replaceAll("\\", "/");
-
-        if (!ALLOWED_PACKED_FILES.has(path)) {
-            addError(
-                `Unexpected packed file: ${path}.`
-            );
-        }
-    }
-
-    const packedPaths =
-        new Set(
-            (packResult.files ?? []).map(
-                (file) =>
-                    String(file.path)
-                        .replaceAll("\\", "/")
-            )
-        );
-
-    for (const required of
-        ALLOWED_PACKED_FILES) {
-        if (!packedPaths.has(required)) {
-            addError(
-                `Required packed file is missing: ${required}.`
-            );
-        }
-    }
-}
-
-function inspectSourceMap(path, source) {
-    const packagePath =
-        relative(REPOSITORY_ROOT, path)
-            .replaceAll("\\", "/");
-
-    const mapExtension =
-        packagePath.endsWith(".d.ts.map")
-            ? ".d.ts.map"
-            : packagePath.endsWith(".js.map")
-                ? ".js.map"
-                : "";
-
-    const moduleName =
-        packagePath.startsWith("dist/") &&
-        mapExtension.length > 0
-            ? packagePath.slice(
-                "dist/".length,
-                -mapExtension.length
-            )
-            : "";
-
-    if (!PACKED_MODULE_SET.has(moduleName)) {
-        addError(
-            `${packagePath} is not an expected published source map.`
-        );
-        return;
-    }
-
-    let sourceMap;
-
-    try {
-        sourceMap =
-            JSON.parse(source);
-    } catch {
-        addError(
-            `${packagePath} is not valid JSON.`
-        );
-        return;
-    }
-
-    if (sourceMap === null ||
-        typeof sourceMap !== "object" ||
-        Array.isArray(sourceMap)) {
-        addError(
-            `${packagePath} must contain a source map object.`
-        );
-        return;
-    }
-
-    const expectedSource =
-        relative(
-            dirname(path),
-            join(
-                REPOSITORY_ROOT,
-                "src",
-                `${moduleName}.ts`
-            )
-        ).replaceAll("\\", "/");
-
-    const outputExtension =
-        mapExtension === ".d.ts.map"
-            ? ".d.ts"
-            : ".js";
-
-    const outputFile =
-        `${moduleName.split("/").at(-1) ?? moduleName}${outputExtension}`;
-
-    if (sourceMap.version !== 3) {
-        addError(
-            `${packagePath} must use source map version 3.`
-        );
-    }
-
-    if (sourceMap.file !== outputFile) {
-        addError(
-            `${packagePath} must identify ${outputFile} as its generated file.`
-        );
-    }
-
-    if (sourceMap.sourceRoot !== "") {
-        addError(
-            `${packagePath} must use an empty sourceRoot.`
-        );
-    }
-
-    if (!isExactValue(
-        sourceMap.sources,
-        [expectedSource]
-    )) {
-        addError(
-            `${packagePath} sources must resolve only to ${expectedSource}.`
-        );
-    }
-
-    if (mapExtension === ".js.map" &&
-        (!Array.isArray(sourceMap.sourcesContent) ||
-            sourceMap.sourcesContent.length !== 1 ||
-            typeof sourceMap.sourcesContent[0] !== "string" ||
-            sourceMap.sourcesContent[0].length === 0)) {
-        addError(
-            `${packagePath} must embed sourcesContent for every source.`
-        );
+    const paths = (packResult.files ?? []).map((file) => String(file.path).replaceAll("\\", "/"));
+    for (const error of inspectDistributionInventory(paths, PACKED_MODULES, publicJavaScript, { packed: true })) {
+        addError(error);
     }
 }
 
@@ -1366,6 +1223,8 @@ try {
 }
 
 inspectExtensionCatalog(extensionEntries);
+
+const publicJavaScript = ["dist/index.js", ...extensionEntries.map((entry) => entry.distJavaScript)];
 
 const developmentNodeRange =
     packageJson.devEngines?.runtime?.version;
@@ -1788,6 +1647,7 @@ if (process.argv.includes("--built")) {
         }
     }
 
+    const builtContent = new Map();
     for (const path of builtFiles) {
         const extension =
             extname(path);
@@ -1798,6 +1658,8 @@ if (process.argv.includes("--built")) {
                 "utf8"
             );
 
+        builtContent.set(relative(REPOSITORY_ROOT, path).replaceAll("\\", "/"), source);
+
         inspectRuntimeLiterals(
             path,
             source
@@ -1805,12 +1667,6 @@ if (process.argv.includes("--built")) {
 
         if (extension === ".js") {
             inspectScript(
-                path,
-                source
-            );
-        } else if (path.endsWith(".js.map") ||
-            path.endsWith(".d.ts.map")) {
-            inspectSourceMap(
                 path,
                 source
             );
@@ -1828,6 +1684,19 @@ if (process.argv.includes("--built")) {
                 source
             );
         }
+    }
+
+    const sourceContent = new Map(await Promise.all(PACKED_MODULES.map(async (moduleName) => {
+        const path = `src/${moduleName}.ts`;
+        return [path, await readFile(join(REPOSITORY_ROOT, path), "utf8")];
+    })));
+    for (const error of inspectPackageBundles({
+        files: builtContent,
+        sources: sourceContent,
+        sourceModules: PACKED_MODULES,
+        publicJavaScript
+    })) {
+        addError(error);
     }
 }
 
