@@ -367,7 +367,9 @@
     overflow-wrap: anywhere;
   }
 
-  :where(.litefold-calendar) .lfc-calendar-grid-more:has(.lfc-calendar-event-overflow.lfc-is-count) {
+  :where(.litefold-calendar)
+    .lfc-calendar-day-summaries:is([data-lfc-compact-display="count"], [data-lfc-wide-display="count"])
+    .lfc-calendar-grid-more {
     background: var(--lfc-event-background);
     border: var(--lfc-internal-hairline) solid var(--lfc-event-border-color);
     border-radius: var(--lfc-border-radius);

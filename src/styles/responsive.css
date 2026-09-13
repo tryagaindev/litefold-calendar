@@ -3,22 +3,13 @@
     :where(.litefold-calendar) .lfc-calendar-toolbar {
       display: grid;
       gap: 0.375rem;
-      grid-template-areas:
-        "navigation"
-        "toolbar-end";
       grid-template-columns: minmax(0, 1fr);
       padding-block: 0.375rem;
       padding-inline: 0.5rem;
     }
 
-    :where(.litefold-calendar)
-      .lfc-calendar-toolbar:not(:has(.lfc-calendar-toolbar-end)) {
-      grid-template-areas: "navigation";
-    }
-
     :where(.litefold-calendar) .lfc-calendar-navigation {
       gap: 0.375rem;
-      grid-area: navigation;
     }
 
     :where(.litefold-calendar) .lfc-calendar-title {
@@ -37,7 +28,6 @@
 
     :where(.litefold-calendar) .lfc-calendar-toolbar-end {
       gap: 0.375rem;
-      grid-area: toolbar-end;
       inline-size: 100%;
       justify-content: end;
       margin-inline-start: 0;
@@ -377,6 +367,14 @@
       .lfc-calendar-agenda-event
       .lfc-calendar-event-trailing {
       grid-column: 1 / -1;
+    }
+
+    @supports not selector(:has(*)) {
+      :where(.litefold-calendar)
+        .lfc-calendar-agenda-event
+        .lfc-calendar-event-title {
+        flex-basis: 100%;
+      }
     }
 
     :where(.litefold-calendar)

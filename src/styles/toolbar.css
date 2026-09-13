@@ -228,7 +228,7 @@
     inline-size: 1.25em;
   }
 
-  :where(.litefold-calendar):dir(rtl) .lfc-calendar-navigation-icon {
+  :where(.litefold-calendar):is(:dir(rtl), [data-lfc-direction="rtl"]) .lfc-calendar-navigation-icon {
     transform: scaleX(-1);
   }
 

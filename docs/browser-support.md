@@ -36,13 +36,15 @@ The package relies directly on these Baseline platform capabilities:
 | --- | --- |
 | JavaScript | ECMAScript modules, promises, `AbortController`, URL parsing, and `Intl` |
 | DOM and input | Standard DOM, native semantic elements and modal dialogs, Pointer/Touch/Wheel Events, and native scrolling |
-| CSS | Custom properties, Grid and subgrid, Scroll Snap, logical and intrinsic sizing, cascade layers, `:where()`, `:has()`, `:dir()`, animations, and inline-size container queries and units |
+| CSS | Custom properties, Grid and Flexbox, Scroll Snap, logical and intrinsic sizing, cascade layers, forgiving `:is()` / `:where()` selectors, animations, and inline-size container queries and units |
 
 The optional [classic-script recipe](integration-guide.md#classic-script-entry-point) also requires dynamic `import()`.
 
 Capabilities outside the resolved preset require feature detection and a tested supported path. The displayed month/year button uses `popover="auto"` when available and a native modal `<dialog>` otherwise. Both provide labelled Month and Year controls, validation, Jump, Cancel, Escape, light dismissal, and focus restoration. The fallback uses native modality; other page controls remain inert until dismissal. It does not require `<input type="month">` or modify global APIs.
 
 The palette uses `light-dark()` when available. Otherwise a small local controller mirrors the effective host `color-scheme` into the same CSS palette, observing system preference and live host/ancestor theme attributes. It does not rerender, refetch, reset picker input, or move focus. The default host scheme remains `light dark`; applications can set `color-scheme: light`, `dark`, or `inherit` on their host. Use `inherit` when an ancestor controls application themes. Removing the override resumes the automatic default. Application token overrides and forced-color/increased-contrast rules remain in the normal cascade.
+
+Agenda columns share tracks with subgrid where supported; explicit per-row tracks provide the supported fallback. Browsers without `:has()` use wrapping agenda rows that retain optional markers, times, titles, and supporting content. Required count actions and compact toolbar layout do not depend on relational selectors. Where `:dir()` is unavailable, the same local controller reflects the effective host direction, including nested ancestor resets and live attribute changes, into package-owned styling state. None of these fallbacks measures layout or replaces controls. Balanced/pretty text wrapping, stable scrollbar gutters, and safe alignment are enhancements over ordinary wrapping, scrolling, and alignment.
 
 Locale-derived week starts use either `Intl.Locale#getWeekInfo()` or `Intl.Locale#weekInfo` and fall back to Sunday only when neither returns a usable `firstDay`.
 
@@ -51,6 +53,8 @@ Locale-derived week starts use either `Intl.Locale#getWeekInfo()` or `Intl.Local
 ### Responsive layout
 
 Responsive behavior is CSS-driven from the calendar container. Applications must meet the [minimum supported host width](../DESIGN.md#responsive-model); containers below that floor receive best-effort degradation and are not a supported layout target. There is no JavaScript fallback for missing container-query support. In supported browsers, resizing the host changes layout without rerendering, refetching, or moving focus.
+
+Browser tests cover nested component containers, preserved interaction observers, and forced fallback paths. They disable unsupported selectors and declarations in the loaded CSS as well as JavaScript feature detection, so current-engine parsing cannot silently conceal an untested fallback.
 
 ### Direct-input paging
 

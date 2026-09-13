@@ -55,17 +55,17 @@
     scroll-snap-align: end;
   }
 
-  :where(.litefold-calendar):dir(rtl) .lfc-calendar-swipe-lane-previous {
+  :where(.litefold-calendar):is(:dir(rtl), [data-lfc-direction="rtl"]) .lfc-calendar-swipe-lane-previous {
     order: 3;
     scroll-snap-align: end;
   }
 
-  :where(.litefold-calendar):dir(rtl) .lfc-calendar-swipe-lane-next {
+  :where(.litefold-calendar):is(:dir(rtl), [data-lfc-direction="rtl"]) .lfc-calendar-swipe-lane-next {
     order: 1;
     scroll-snap-align: start;
   }
 
-  :where(.litefold-calendar):dir(rtl)
+  :where(.litefold-calendar):is(:dir(rtl), [data-lfc-direction="rtl"])
     :where(.lfc-calendar-grid, .lfc-calendar-swipe-lane) {
     direction: rtl;
   }
@@ -96,7 +96,7 @@
     line-height: 1;
   }
 
-  :where(.litefold-calendar):dir(rtl) .lfc-calendar-swipe-lane-icon {
+  :where(.litefold-calendar):is(:dir(rtl), [data-lfc-direction="rtl"]) .lfc-calendar-swipe-lane-icon {
     transform: scaleX(-1);
   }
 

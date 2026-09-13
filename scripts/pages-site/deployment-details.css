@@ -1,4 +1,5 @@
 .my-developer-footer {
+	container: my-deployment-details / inline-size;
 	background: Canvas;
 	border: 0.125rem solid currentColor;
 	color: CanvasText;
@@ -39,7 +40,7 @@
 	overflow-wrap: anywhere;
 }
 
-@media (max-width: 32rem) {
+@container my-deployment-details (inline-size <= 32rem) {
 	.my-developer-footer dl {
 		grid-template-columns: 1fr;
 	}
