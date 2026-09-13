@@ -1,6 +1,6 @@
 import { dirname, join, resolve } from "node:path";
 
-import { defineConfig } from "vite";
+import { defineConfig, normalizePath } from "vite";
 
 import { REPOSITORY_ROOT } from "./scripts/lib/process.mjs";
 import { composeStyles } from "./scripts/lib/styles.mjs";
@@ -27,23 +27,26 @@ export function sourceExamplesPlugin() {
 			});
 		},
 		resolveId(source, importer) {
-			const path = source.startsWith("/")
-				? join(REPOSITORY_ROOT, source)
-				: importer === undefined ? null : resolve(dirname(importer), source);
+			//Preserve Vite flags that distinguish direct CSS from imported style modules.
+			const pathname = source.replace(/[?#].*$/u, "");
+			const suffix = source.slice(pathname.length);
+			const path = pathname.startsWith("/")
+				? join(REPOSITORY_ROOT, pathname)
+				: importer === undefined ? null : resolve(dirname(importer), pathname);
 			if (path === join(REPOSITORY_ROOT, "dist", "styles.css")) {
-				return VIRTUAL_STYLES;
+				return `${VIRTUAL_STYLES}${suffix}`;
 			}
 			if (path === join(REPOSITORY_ROOT, "dist", "index.js")) {
-				return join(REPOSITORY_ROOT, "src", "index.ts");
+				return `${join(REPOSITORY_ROOT, "src", "index.ts")}${suffix}`;
 			}
 			const extension = path?.replaceAll("\\", "/")
 				.match(/\/dist\/extensions\/([a-z][a-z0-9-]*)\/index\.js$/u)?.[1];
 			if (extension !== undefined && path.startsWith(join(REPOSITORY_ROOT, "dist"))) {
-				return join(REPOSITORY_ROOT, "src", "extensions", extension, "index.ts");
+				return `${join(REPOSITORY_ROOT, "src", "extensions", extension, "index.ts")}${suffix}`;
 			}
 		},
 		load(id) {
-			if (id === VIRTUAL_STYLES) { return composeStyles(); }
+			if (id.replace(/[?#].*$/u, "") === VIRTUAL_STYLES) { return composeStyles(); }
 		},
 		transformIndexHtml: {
 			order: "pre",
@@ -54,9 +57,10 @@ export function sourceExamplesPlugin() {
 			}
 		},
 		handleHotUpdate(context) {
-			if (context.file.startsWith(join(REPOSITORY_ROOT, "src", "styles"))) {
-				const module = context.server.moduleGraph.getModuleById(VIRTUAL_STYLES);
-				if (module !== undefined) { context.server.moduleGraph.invalidateModule(module); }
+			if (normalizePath(context.file).startsWith(`${normalizePath(join(REPOSITORY_ROOT, "src", "styles"))}/`)) {
+				for (const module of context.server.moduleGraph.getModulesByFile(VIRTUAL_STYLES) ?? []) {
+					context.server.moduleGraph.invalidateModule(module);
+				}
 				context.server.ws.send({ type: "full-reload" });
 				return [];
 			}
