@@ -266,6 +266,10 @@
     min-inline-size: 0;
   }
 
+  :where(.litefold-calendar) .lfc-calendar-event-overflow.lfc-is-count {
+    color: inherit;
+  }
+
   :where(.litefold-calendar)
     .lfc-calendar-event-overflow.lfc-has-custom-event-overflow
     .lfc-event-overflow-default-content {
@@ -362,4 +366,12 @@
     min-inline-size: 0;
     overflow-wrap: anywhere;
   }
+
+  :where(.litefold-calendar) .lfc-calendar-grid-more:has(.lfc-calendar-event-overflow.lfc-is-count) {
+    background: var(--lfc-event-background);
+    border: var(--lfc-internal-hairline) solid var(--lfc-event-border-color);
+    border-radius: var(--lfc-border-radius);
+    color: var(--lfc-event-color);
+  }
+
 }

@@ -236,6 +236,12 @@
     }
 
     :where(.litefold-calendar)
+      .lfc-calendar-grid-more.lfc-is-wide-count-only:focus
+      .lfc-calendar-event-overflow.lfc-is-wide {
+      display: inline-flex;
+    }
+
+    :where(.litefold-calendar)
       .lfc-calendar-grid-more:not(.lfc-is-compact-primary):focus
       > .lfc-calendar-event-overflow.lfc-is-wide:not(
         .lfc-is-event-overflow-suppressed
@@ -287,6 +293,35 @@
       .lfc-calendar-weeks[data-lfc-week-row-sizing="equal"]
       .lfc-calendar-grid-more.lfc-is-compact-primary {
       aspect-ratio: 1;
+    }
+
+    /* A focused summary survives resizing; hidden summaries reject new focus entry. */
+    :where(.litefold-calendar) .lfc-calendar-grid-more.lfc-is-wide-count-only:not(:focus),
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-event-summary:not(:focus) {
+      display: none;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-grid-more {
+      grid-row: auto;
+      max-inline-size: 100%;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-event-summary.lfc-is-compact-primary:focus {
+      aspect-ratio: auto;
+      inline-size: 100%;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-event-summary.lfc-is-compact-primary:focus
+      > .lfc-calendar-event-title {
+      display: block;
     }
   }
 
@@ -406,6 +441,20 @@
   }
 
   @container lfc-calendar (inline-size > 42rem) {
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-wide-display="count"]
+      .lfc-calendar-event-summary:not(:focus),
+    :where(.litefold-calendar)
+      .lfc-calendar-grid-more:not(.lfc-has-wide-overflow, :focus) {
+      display: none;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-grid-more:not(.lfc-has-wide-overflow):focus
+      .lfc-calendar-event-overflow.lfc-is-compact {
+      display: inline-flex;
+    }
+
     :where(.litefold-calendar) .lfc-calendar-toolbar-end {
       flex: 0 1 auto;
       margin-inline-start: auto;

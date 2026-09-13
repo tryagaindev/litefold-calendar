@@ -1,20 +1,55 @@
-import type { CalendarEventActionElement } from "../../types.js";
+import type {
+	CalendarAction,
+	CalendarDate,
+	CalendarEvent,
+	CalendarEventActionElement,
+	CalendarEventOverflowActivation
+} from "../../types.js";
+import { formatCalendarDate } from "../domain/civil-date.js";
 import type { EventRepresentationElements } from "../dom/event-representation.js";
 
-interface GridOverflowActionListenerOptions {
+/** Advertises only keyboard actions installed on this day proxy. */
+export function setDayActionShortcuts(button: HTMLButtonElement, hasEvents: boolean, hasContext: boolean): void {
+	const shortcuts = [...(hasEvents ? ["F2"] : []), ...(hasContext ? ["Shift+F10"] : [])];
+	if (shortcuts.length > 0) {
+		button.setAttribute("aria-keyshortcuts", shortcuts.join(" "));
+	}
+}
+
+interface GridOverflowActionListenerOptions<TMetadata> {
 	readonly action: HTMLButtonElement;
+	readonly date: CalendarDate;
+	readonly events: () => readonly CalendarEvent<TMetadata>[];
+	readonly invokeAction: (action: () => unknown) => void;
 	readonly isCurrent: () => boolean;
-	readonly onActivate: () => void;
+	readonly onActivate: CalendarAction<CalendarEventOverflowActivation<TMetadata>> | undefined;
+	readonly onDefault: () => void;
 	readonly onKeydown: (event: KeyboardEvent) => void;
 }
 
 /** Installs package-owned overflow behavior before consumer visual hooks inspect the action. */
-export function installGridOverflowActionListeners(
-	options: Readonly<GridOverflowActionListenerOptions>
+export function installGridOverflowActionListeners<TMetadata>(
+	options: Readonly<GridOverflowActionListenerOptions<TMetadata>>
 ): void {
-	options.action.addEventListener("click", () => {
-		if (options.isCurrent()) {
-			options.onActivate();
+	options.action.addEventListener("click", (event) => {
+		if (!options.isCurrent()) {
+			return;
+		}
+		const onActivate = options.onActivate;
+		if (onActivate !== undefined) {
+			const events = Object.freeze([...options.events()]);
+			const context = Object.freeze({
+				date: Object.freeze({ ...options.date }),
+				dateString: formatCalendarDate(options.date),
+				element: options.action,
+				eventCount: events.length,
+				events,
+				nativeEvent: event
+			});
+			options.invokeAction(() => onActivate(context));
+		}
+		if (!event.defaultPrevented && options.isCurrent()) {
+			options.onDefault();
 		}
 	}, { capture: true });
 	options.action.addEventListener("keydown", (event) => {

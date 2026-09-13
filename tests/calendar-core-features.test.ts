@@ -269,6 +269,7 @@ void test("F2 action mode is non-wrapping and exits to the day proxy or agenda h
 		initialDate: "2026-07-14",
 		locale: "ar-EG",
 		maxGridEventsPerDay: 2,
+		gridEventDisplay: { compact: "events" },
 		messages: { gridMoreLabel: "Open {count} {eventLabel} on {date}" },
 		onDaySelect: () => { daySelections += 1; },
 		onEventActivate: (activation) => { activation.nativeEvent.preventDefault(); }

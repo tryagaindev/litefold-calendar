@@ -22,6 +22,7 @@ for (const mutation of [
 		const errors: LitefoldCalendarError[] = [];
 		let originalActionLabel: string | null = null;
 		const calendar = createCalendar(host, {
+			gridEventDisplay: { compact: "events" },
 			events: eventsForDate("2026-07-14", 2, `package-mutation-${mutation}`),
 			initialDate: "2026-07-14",
 			maxGridEventsPerDay: 1,
@@ -63,6 +64,7 @@ for (const mutation of ["remove cluster", "mutate summaries", "mutate day cell"]
 		const errors: LitefoldCalendarError[] = [];
 		let placementReached = false;
 		const calendar = createCalendar(host, {
+			gridEventDisplay: { compact: "events" },
 			events: eventsForDate("2026-07-14", 2, `compact-placement-${mutation}`),
 			initialDate: "2026-07-14",
 			maxGridEventsPerDay: 1,
@@ -128,6 +130,7 @@ for (const mutation of ["overflow attributes", "fallback text node value"] as co
 		let originalActionLabel: string | null = null;
 		let packageTextReached = false;
 		const calendar = createCalendar(host, {
+			gridEventDisplay: { compact: "events" },
 			events: eventsForDate("2026-07-14", 2, `connected-${mutation}`),
 			initialDate: "2026-07-14",
 			maxGridEventsPerDay: 1,
@@ -182,6 +185,7 @@ void test("later event hooks may mutate earlier consumer-owned output", async (c
 	const errors: LitefoldCalendarError[] = [];
 	let earlierOutput: HTMLElement | null = null;
 	const calendar = createCalendar(host, {
+		gridEventDisplay: { compact: "events" },
 		events: [event("consumer-owned", "2026-07-14T09:00", "Consumer owned")],
 		initialDate: "2026-07-14",
 		onError: (error) => { errors.push(error); },
@@ -228,6 +232,7 @@ void test("native grid-overflow activation precedes action-backed compact consum
 	let consumerClicks = 0;
 	let consumerKeydowns = 0;
 	const calendar = createCalendar(host, {
+		gridEventDisplay: { compact: "events" },
 		events: eventsForDate("2026-07-15", 2, "listener-order"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 0,
@@ -292,6 +297,7 @@ void test("a rejected renderEventOverflow Promise is observed, quarantined, and 
 	process.on("unhandledRejection", trackUnhandledRejection);
 	context.after(() => { process.off("unhandledRejection", trackUnhandledRejection); });
 	const calendar = createCalendar(host, {
+		gridEventDisplay: { compact: "events" },
 		events: eventsForDate("2026-07-14", 2, "asynchronous-overflow"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 1,

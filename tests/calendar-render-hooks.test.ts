@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 
 import {
-	createCalendar,
+	createCalendar as createCalendarWithDefaults,
 	type Calendar,
 	type CalendarEventOverflowContext,
 	type CalendarEventInput,
@@ -14,6 +14,9 @@ import {
 	installDom,
 	waitFor
 } from "./helpers/dom.js";
+
+const createLegacyCalendar: typeof createCalendarWithDefaults = (host, options) =>
+	createCalendarWithDefaults(host, { ...options, gridEventDisplay: { compact: "events" } });
 
 void test("render-hook sets are ordered, isolated, and completely cleaned up", async (context) => {
 	const { dom, host } = setupDom(context);
@@ -54,7 +57,7 @@ void test("render-hook sets are ordered, isolated, and completely cleaned up", a
 			}
 		}
 	];
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: async () => [event("render-hook-event", "2026-07-14", "Extended")],
 		renderHooks,
 		initialDate: "2026-07-14",
@@ -85,7 +88,7 @@ void test("day badges render into the visual-only badge slot", async (context) =
 	const { host } = setupDom(context);
 	let badgeElement: HTMLElement | undefined;
 	let badgeNode: Node | undefined;
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: async () => [],
 		renderHooks: [{
 			dayDidMount: ({ dateString, elements }) => {
@@ -118,7 +121,7 @@ void test("day badges render into the visual-only badge slot", async (context) =
 void test("a failing day badge is quarantined with the public hook name", async (context) => {
 	const { host } = setupDom(context);
 	let captured: LitefoldCalendarError | undefined;
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: async () => [],
 		renderHooks: [{
 			id: "failing-day-badge",
@@ -144,7 +147,7 @@ void test("a failing day badge is quarantined with the public hook name", async 
 void test("renderEventMarker replaces or suppresses the built-in marker", async (context) => {
 	const { host } = setupDom(context);
 	const surfaces: string[] = [];
-	const replacementCalendar = createCalendar(host, {
+	const replacementCalendar = createLegacyCalendar(host, {
 		events: [event("marker-event", "2026-07-14T09:00", "Marker event")],
 		renderHooks: [{
 			id: "replacement-marker",
@@ -166,7 +169,7 @@ void test("renderEventMarker replaces or suppresses the built-in marker", async 
 	assert.deepEqual(surfaces.sort(), ["agenda", "grid-summary"]);
 	replacementCalendar.destroy();
 
-	const suppressionCalendar = createCalendar(host, {
+	const suppressionCalendar = createLegacyCalendar(host, {
 		events: [event("suppressed-marker", "2026-07-14T09:00", "Suppressed marker")],
 		renderHooks: [{
 			id: "suppressed-marker",
@@ -187,7 +190,7 @@ void test("a quarantined marker renderer restores every built-in marker fallback
 	const { host } = setupDom(context);
 	let calls = 0;
 	let captured: LitefoldCalendarError | undefined;
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: [event("marker-fallback", "2026-07-14T09:00", "Marker fallback")],
 		renderHooks: [{
 			id: "failing-marker",
@@ -225,7 +228,7 @@ void test("a marker that reparents itself while connecting cannot suppress built
 	}
 	dom.window.customElements.define("lfc-reparenting-marker", ReparentingMarkerElement);
 	let captured: LitefoldCalendarError | undefined;
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: [event("reparenting-marker", "2026-07-14T09:00", "Reparenting marker")],
 		renderHooks: [{
 			id: "reparenting-marker",
@@ -256,7 +259,7 @@ void test("connected render-hook output cannot add interactive descendants", asy
 	}
 	dom.window.customElements.define("lfc-interactive-marker", InteractiveMarkerElement);
 	let captured: LitefoldCalendarError | undefined;
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: [event("interactive-marker", "2026-07-14T09:00", "Interactive marker")],
 		renderHooks: [{
 			id: "interactive-marker",
@@ -281,7 +284,7 @@ void test("connected render-hook output cannot add interactive descendants", asy
 
 void test("built-in event-overflow variants use adaptive counts independently of the grid cap", async (context) => {
 	const { host } = setupDom(context);
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: [
 			event("single", "2026-07-13T09:00", "Single event"),
 			...eventsForDate("2026-07-14", 4, "multiple")
@@ -308,7 +311,7 @@ void test("built-in event-overflow variants use adaptive counts independently of
 void test("renderEventOverflow receives both frozen variants and stable element references", async (context) => {
 	const { dom, host } = setupDom(context);
 	const contexts: Readonly<CalendarEventOverflowContext>[] = [];
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: eventsForDate("2026-07-14", 4, "context"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 2,
@@ -365,7 +368,7 @@ void test("renderEventOverflow receives both frozen variants and stable element 
 void test("renderEventOverflow skips out-of-range structural days", async (context) => {
 	const { host } = setupDom(context);
 	const calls: string[] = [];
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: [
 			...eventsForDate("2026-07-13", 2, "outside"),
 			...eventsForDate("2026-07-14", 2, "inside")
@@ -395,7 +398,7 @@ void test("renderEventOverflow skips out-of-range structural days", async (conte
 void test("renderEventOverflow supports custom, null, and undefined results in both variants", async (context) => {
 	const { host } = setupDom(context);
 	const contexts: Readonly<CalendarEventOverflowContext>[] = [];
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: [
 			...eventsForDate("2026-07-14", 2, "custom"),
 			...eventsForDate("2026-07-15", 2, "null"),
@@ -458,7 +461,7 @@ void test("renderEventOverflow supports custom, null, and undefined results in b
 void test("a suppressed or absent primary marker makes the compact count standalone", async (context) => {
 	const { host } = setupDom(context);
 	const compactContexts: Readonly<CalendarEventOverflowContext>[] = [];
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: eventsForDate("2026-07-14", 2, "markerless"),
 		initialDate: "2026-07-14",
 		onEventActivate: () => undefined,
@@ -490,7 +493,7 @@ void test("a suppressed or absent primary marker makes the compact count standal
 void test("static multi-event days show a standalone total without creating a wide action", async (context) => {
 	const { host } = setupDom(context);
 	const contexts: Readonly<CalendarEventOverflowContext>[] = [];
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: eventsForDate("2026-07-14", 2, "static"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 2,
@@ -519,7 +522,7 @@ void test("static multi-event days show a standalone total without creating a wi
 void test("a compact-primary overflow action retains its fallback when customization returns null", async (context) => {
 	const { host } = setupDom(context);
 	const contexts: Readonly<CalendarEventOverflowContext>[] = [];
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: eventsForDate("2026-07-14", 2, "zero-cap"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 0,
@@ -559,7 +562,7 @@ void test("a wide overflow failure quarantines the unified hook and restores eve
 	const { host } = setupDom(context);
 	const calls: string[] = [];
 	let captured: LitefoldCalendarError | undefined;
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: [
 			...eventsForDate("2026-07-14", 2, "first"),
 			...eventsForDate("2026-07-15", 3, "second")
@@ -611,7 +614,7 @@ void test("one node cannot be reused across compact and wide overflow variants",
 	const shared = dom.window.document.createElement("span");
 	shared.className = "shared-event-overflow";
 	let captured: LitefoldCalendarError | undefined;
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: eventsForDate("2026-07-14", 2, "shared"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 1,
@@ -637,7 +640,7 @@ for (const invalidVariant of ["compact", "wide"] as const) {
 	void test(`interactive ${invalidVariant} overflow output quarantines the unified hook`, async (context) => {
 		const { host } = setupDom(context);
 		const errors: LitefoldCalendarError[] = [];
-		const calendar = createCalendar(host, {
+		const calendar = createLegacyCalendar(host, {
 			events: eventsForDate("2026-07-14", 2, `interactive-${invalidVariant}`),
 			initialDate: "2026-07-14",
 			maxGridEventsPerDay: 1,
@@ -676,7 +679,7 @@ for (const outputKind of ["empty fragment", "comment", "template"] as const) {
 			template.content.append(ownerDocument.createElement("span"));
 			return template;
 		};
-		const calendar = createCalendar(host, {
+		const calendar = createLegacyCalendar(host, {
 			events: eventsForDate("2026-07-14", 2, `nonvisual-${outputKind}`),
 			initialDate: "2026-07-14",
 			maxGridEventsPerDay: 1,
@@ -699,7 +702,7 @@ for (const outputKind of ["empty fragment", "comment", "template"] as const) {
 
 void test("a template plus visible fragment child is accepted as overflow content", async (context) => {
 	const { host } = setupDom(context);
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: eventsForDate("2026-07-14", 2, "visible-fragment"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 1,
@@ -746,7 +749,7 @@ for (const mutation of ["append-sibling", "remove-ancestor"] as const) {
 		}
 		dom.window.customElements.define(tagName, MutatingOverflowElement);
 		const errors: LitefoldCalendarError[] = [];
-		const calendar = createCalendar(host, {
+		const calendar = createLegacyCalendar(host, {
 			events: eventsForDate("2026-07-15", 2, `mutating-${mutation}`),
 			initialDate: "2026-07-14",
 			maxGridEventsPerDay: 1,
@@ -784,7 +787,7 @@ void test("connected custom overflow output may extend only its own noninteracti
 		}
 	}
 	dom.window.customElements.define("lfc-self-contained-overflow", SelfContainedOverflowElement);
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: eventsForDate("2026-07-14", 2, "self-contained"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 1,
@@ -806,7 +809,7 @@ void test("connected custom overflow output may extend only its own noninteracti
 
 void test("renderEventLeading contains text nodes in a compact-hideable wrapper", async (context) => {
 	const { dom, host } = setupDom(context);
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: [event("text-leading", "2026-07-14T09:00", "Text leading")],
 		renderHooks: [{
 			id: "text-leading",
@@ -838,7 +841,7 @@ void test("cross-document render-hook nodes are rejected without taking down cor
 		foreignDom.window.close();
 	});
 	let captured: LitefoldCalendarError | undefined;
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: async () => [event("safe", "2026-07-14", "Core event")],
 		renderHooks: [{
 			id: "foreign-node",
@@ -859,7 +862,7 @@ void test("cross-document render-hook nodes are rejected without taking down cor
 void test("render-hook cleanup failures quarantine the hook set while preserving calendar data", async (context) => {
 	const { host } = setupDom(context);
 	const errors: LitefoldCalendarError[] = [];
-	const calendar = createCalendar(host, {
+	const calendar = createLegacyCalendar(host, {
 		events: async () => [event("cleanup", "2026-07-14", "Preserved event")],
 		renderHooks: [{
 			eventDidMount: () => () => {

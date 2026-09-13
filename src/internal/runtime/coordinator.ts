@@ -52,7 +52,8 @@ import {
 import { createDayCellElements, renderMonthWeeks, renderWeekdayHeadings } from "../dom/month-grid.js";
 import {
 	DayGridActionCollector,
-	installGridOverflowActionListeners
+	installGridOverflowActionListeners,
+	setDayActionShortcuts
 } from "./day-grid-actions.js";
 import { resolveCalendarIcons } from "./icon-configuration.js";
 import { IntegrationNodeController } from "./integration-nodes.js";
@@ -388,6 +389,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		this.eventOverflowPresenter = new CalendarEventOverflowPresenter({
 			document: this.document,
 			gridEventLimit: this.gridEventLimit,
+			gridEventDisplay: resolvedOptions.gridEventDisplay,
 			locale,
 			messages: this.messages,
 			numberFormatter: this.numberFormatter
@@ -824,13 +826,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		const accessibleLabel = isAllowed
 			? this.eventText.getDayAccessibleLabel(fullDateText, events.length)
 			: fullDateText;
-		const {
-			badge,
-			button,
-			cell,
-			number,
-			summaries
-		} = createDayCellElements({
+		const { badge, button, cell, number, summaries } = createDayCellElements({
 			accessibleLabel,
 			dateString,
 			dayNumber: this.dayFormatter.format(toUtcDate(date)),
@@ -888,8 +884,13 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			const { button: gridMore } = eventOverflow.grid;
 			installGridOverflowActionListeners({
 				action: gridMore,
+				date,
+				events: () => events.map((event) => event.event),
+				invokeAction: (action) => { this.invokeAction("onEventOverflowActivate", action); },
 				isCurrent: () => this.canUseRenderedAction(gridMore, renderGeneration),
-				onActivate: () => {
+				onActivate: this.options.onEventOverflowActivate,
+				onDefault: () => {
+					if (this.bounds.getDateNavigationFailure(date) !== null) { return; }
 					this.selectDate(date, "gridMore");
 					if (this.canContinueInteraction()) {
 						this.dom?.agendaTitle.focus({ preventScroll: true });
@@ -901,11 +902,9 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				}
 			});
 		}
-		if (eventOverflow.compact !== null) {
-			this.renderHookVisuals.renderEventOverflow(eventOverflow.compact);
-			if (!this.isRenderGenerationCurrent(renderGeneration)) {
-				return cell;
-			}
+		this.renderHookVisuals.renderEventOverflow(eventOverflow.compact);
+		if (!this.isRenderGenerationCurrent(renderGeneration)) {
+			return cell;
 		}
 		if (eventOverflow.grid !== null) {
 			const { button: gridMore, wide } = eventOverflow.grid;
@@ -949,13 +948,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			}
 			this.handleDayKeydown(event, date, button);
 		});
-		const dayShortcuts = [
-			...(gridActionSnapshot.length > 0 ? ["F2"] : []),
-			...(this.options.onDayContextMenu === undefined ? [] : ["Shift+F10"])
-		];
-		if (dayShortcuts.length > 0) {
-			button.setAttribute("aria-keyshortcuts", dayShortcuts.join(" "));
-		}
+		setDayActionShortcuts(button, gridActionSnapshot.length > 0, this.options.onDayContextMenu !== undefined);
 		if (this.options.onDayContextMenu !== undefined) {
 			button.addEventListener("contextmenu", (jsEvent) => {
 				if (jsEvent.defaultPrevented || !this.canUseRenderedAction(button, renderGeneration) ||

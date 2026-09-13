@@ -502,6 +502,7 @@ async function mountWeekLayoutFixture(
 				title: "Tall intrinsic layout anchor"
 			}, ...targetEvents],
 			initialDate: fixtureOptions.targetDate,
+			gridEventDisplay: { compact: "events" },
 			maxGridEventsPerDay: 2,
 			onDaySelect: () => {},
 			onEventActivate: () => {},
@@ -861,6 +862,7 @@ async function mountResponsiveMultipleEventFixture(
 			} : events,
 			renderHooks: [renderHook],
 			initialDate: "2026-08-06",
+			gridEventDisplay: { compact: "events" },
 			maxGridEventsPerDay: fixtureOptions.maxGridEventsPerDay,
 			onDaySelect: () => {
 				observations.daySelectCalls += 1;

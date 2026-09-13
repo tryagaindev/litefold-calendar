@@ -2,6 +2,8 @@ import type {
 	Calendar,
 	CalendarCompactEventOverflowContext,
 	CalendarEventOverflowElements,
+	CalendarEventOverflowActivation,
+	CalendarGridEventDisplay,
 	CalendarGridEventPlacement,
 	CalendarOptions,
 	CalendarRenderCleanup,
@@ -22,6 +24,32 @@ interface DetailedMetadata extends BaseMetadata {
 
 function consumeTypeAssertions(...values: readonly unknown[]): readonly unknown[] {
 	return values;
+}
+
+/** Count options preserve metadata inference and immutable activation snapshots. */
+export function verifyCountApiTypeContracts(): void {
+	const modes: readonly CalendarGridEventDisplay[] = ["events", "count", "count-when-multiple"];
+	const options: CalendarOptions<DetailedMetadata> = {
+		events: [],
+		gridEventDisplay: { compact: "count", wide: "count-when-multiple" },
+		onEventOverflowActivate: (context) => {
+			const activation: CalendarEventOverflowActivation<DetailedMetadata> = context;
+			const detail: string | undefined = context.events[0]?.metadata?.detail;
+			context.nativeEvent.preventDefault();
+			//@ts-expect-error The loaded occurrence snapshot cannot be extended by applications.
+			context.events.length = 0;
+			//@ts-expect-error Applications cannot change the authoritative count.
+			context.eventCount = 0;
+			consumeTypeAssertions(activation, detail);
+			return Promise.resolve();
+		}
+	};
+	const invalid: CalendarOptions = {
+		events: [],
+		//@ts-expect-error Only documented count and event presentation modes are supported.
+		gridEventDisplay: { compact: "auto" }
+	};
+	consumeTypeAssertions(modes, options, invalid);
 }
 
 /** Compile-only assertions for public callback and instance contracts. */

@@ -350,8 +350,10 @@ By default, the six week tracks have equal intrinsic height: every row matches t
 
 The date number and badge remain at the cell's block start. `gridEventPlacement` aligns the complete event-summary and overflow stack within the remaining block space at every width: `"top"` is the default, with `"center"` and `"bottom"` as alternatives. Center and bottom use safe alignment and fall back toward the top when the stack cannot fit; a content-filled cell may have no visible placement difference.
 
-- **Above `42rem`:** Toolbar content stays on the primary row, weekday labels use the wide size, and every capped event action consumes the available day-cell width. A native grid-overflow action shows its localized package content or `renderEventOverflow`-supplied wide visual content without changing the action itself.
-- **At or below `42rem`:** Built-in navigation occupies the first row and application `toolbarEnd` content the second. Gaps and margins contract. Day badges disappear. The first actionable grid event uses a marker-only presentation inside a 24–44 CSS-pixel action target; later actions are visually hidden unless focused. A day with more than one total event occurrence shows a locale-aware social-style count. When a primary marker/action and passive count coexist, two equal, gap-free auto-fit grid blocks keep them aligned within the event stack. Their centers evenly divide the available inline area when both compact-control-size tracks, 44 CSS pixels by default, fit; otherwise the blocks become centered, equal full-width rows. They therefore remain stacked through supported phone widths and share one row only near the compact ceiling. The count reports additional occurrences with a sign when the marker is visible, and the unsigned total when the marker is suppressed or no compact primary visual exists. A markerless standalone total uses one centered block. If the native overflow action is the compact-primary control, including `maxGridEventsPerDay: 0`, its compact variant remains one package-owned action instead of creating a separate cue. Full event information remains in the agenda.
+- **Above `42rem`:** Toolbar content stays on the primary row and weekday labels use the wide size. By default, capped event summaries fill the day width and remaining occurrences use a native overflow action. `gridEventDisplay.wide` can instead show a localized total-count button for every nonempty day (`"count"`) or only days with multiple occurrences (`"count-when-multiple"`).
+- **At or below `42rem`:** Navigation occupies the first row, application `toolbarEnd` content the second, and day badges disappear. The default `gridEventDisplay.compact: "count-when-multiple"` presents multiple occurrences as one bordered, recognizable total-count button, independent of the summary cap. `"count"` also uses this button for single-event days. A one-event day otherwise retains its existing event representation. Counts use localized compact number formatting and a complete, exact accessible total. An empty day has no count action.
+
+`gridEventDisplay: { compact: "events" }` restores the prior marker-plus-overflow presentation. Its first actionable event uses a marker-only 24–44 CSS-pixel target; later actions remain available on focus. A passive cue reports the signed additional count with a marker or the unsigned total without one. The package arranges marker and cue in equal auto-fit blocks, stacked when the full compact targets cannot fit beside each other. A zero summary cap suppresses individual summaries in every mode, while total-count actions remain available. All loaded normalized occurrences contribute to counts, including multi-day occurrences and visually suppressed markers.
 - **Below `24rem`:** The toolbar title and decorative pager lanes switch their visible month/year text from the full month to the locale's `month: "short", year: "numeric"` form. The full title, trigger name, grid name, and live text remain complete, while the compact title and entire pager lanes are excluded from accessibility. Agenda title and supporting event content span the row beneath marker and time so long text keeps useful measure.
 - **At or below `20rem`:** Previous/Next and the month title occupy the first row, Today the second, and application content the third. Picker fields stack, the status panel becomes one column, and narrow weekday labels replace short labels without changing their full accessible names. These are additional structural changes; month/year abbreviation already follows the below-`24rem` rule.
 
@@ -396,23 +398,9 @@ Today is a primary-filled circular number with its own border. Selection colors 
 
 ### Events and agenda
 
-Grid events are compact lavender slips with a violet outline, magenta
-logical-leading rule, preserved marker slot, and ellipsized text slots. At
-compact widths the first action uses a marker-only presentation within the full
-compact target. Its relationship to the day-level overflow cue, track sizing,
-stacking, markerless total, and `maxGridEventsPerDay: 0` fallback is defined
-once in the [responsive model](#responsive-model).
+Grid summaries use the event palette, logical-leading accent rule, marker slot, and ellipsized text. Total-count buttons use the same event palette with a visible border and no leading accent. Compact count buttons retain the full compact control target; wide counts display localized text such as “3 events.” The [responsive model](#responsive-model) defines when count and individual-event presentations apply.
 
-The compact cue is a bare semibold locale-aware number with no pill, background,
-border, or shadow. It shows the signed additional count when the primary visual
-represents one event and the unsigned total when no primary visual exists. The
-package owns placement according to `gridEventPlacement`; no overflow-layout
-selector or CSS token is public, and render hooks replace only visual content
-within the assigned block. Accessible
-naming and focus behavior follow the
-[interaction model](ACCESSIBILITY.md#interaction-model).
-
-Wide grid overflow remains an explicit native count/action rather than silently dropping events. `renderEventOverflow` may replace applicable pre-rendered compact and wide visual content through one discriminated hook; `context.text` supplies the package-formatted visual fallback, and mandatory native-action variants retain that fallback for `null` or invalid output. Custom content cannot replace the action, accessible label, target geometry, or agenda-focus behavior.
+The legacy passive compact overflow cue remains a bare semibold number. The package owns placement according to `gridEventPlacement`; render hooks replace only noninteractive visual content within the assigned block. `renderEventOverflow` exposes `display: "count" | "overflow"` in addition to the compact/wide variant. Count contexts set `visibleEventCount: 0` and `overflowCount: eventCount`. Mandatory actions keep their fallback for `null` or invalid output. The [interaction model](ACCESSIBILITY.md#interaction-model) defines application override and focus ownership.
 
 The agenda is a rounded surface panel immediately below the grid. Its ordered event rows reuse the event palette and visually align leading content, localized time, title, supporting details, and application trailing content. The canonical action and render-hook semantics are defined by the [interaction model](ACCESSIBILITY.md#interaction-model) and [render-hook API](docs/api.md#customize-rendering-calendarrenderhooks).
 

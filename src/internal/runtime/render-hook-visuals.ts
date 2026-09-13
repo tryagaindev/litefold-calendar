@@ -132,8 +132,8 @@ export class RenderHookVisualRenderer<TMetadata> {
 	}
 
 	/** Renders one pre-rendered compact or wide overflow variant through its singleton hook. */
-	public renderEventOverflow(options: Readonly<PreparedEventOverflowVariant>): void {
-		if (this.options.isDestroyed()) {
+	public renderEventOverflow(options: Readonly<PreparedEventOverflowVariant> | null): void {
+		if (options === null || this.options.isDestroyed()) {
 			return;
 		}
 		const runtime = this.options.renderHooks.find((candidate) =>
@@ -151,6 +151,7 @@ export class RenderHookVisualRenderer<TMetadata> {
 		const context = Object.freeze({
 			date: Object.freeze({ ...options.date }),
 			dateString: options.dateString,
+			display: options.display,
 			document: this.options.document,
 			elements: Object.freeze({
 				action: options.action,

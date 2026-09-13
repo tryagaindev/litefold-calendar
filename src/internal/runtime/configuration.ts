@@ -5,6 +5,7 @@ import type { CalendarIcons } from "../../icons.js";
 import type {
 	CalendarEventTimeDisplay,
 	CalendarGridEventPlacement,
+	CalendarGridEventDisplay,
 	CalendarOptions,
 	CalendarWeekRowSizing
 } from "../../types.js";
@@ -24,6 +25,7 @@ const CALENDAR_OPTION_SCHEMA = Object.freeze({
 	events: "value",
 	extensions: "value",
 	gridEventPlacement: "value",
+	gridEventDisplay: "value",
 	renderHooks: "value",
 	fallbackElement: "value",
 	firstDay: "value",
@@ -42,6 +44,7 @@ const CALENDAR_OPTION_SCHEMA = Object.freeze({
 	onDaySelect: "callback",
 	onError: "callback",
 	onEventActivate: "callback",
+	onEventOverflowActivate: "callback",
 	onEventContextMenu: "callback",
 	onStateChange: "callback",
 	sourceEventLimit: "value",
@@ -62,7 +65,7 @@ export type CalendarOptionsSnapshot<TMetadata> = Readonly<
 	CalendarOptions<TMetadata> & Required<Pick<
 		CalendarOptions<TMetadata>,
 		"gridEventPlacement" | "weekRowSizing"
-	>>
+	>> & { readonly gridEventDisplay: Readonly<{ compact: CalendarGridEventDisplay; wide: CalendarGridEventDisplay }> }
 >;
 
 export function createConfigurationError(message: string, cause?: unknown): LitefoldCalendarError {
@@ -163,6 +166,7 @@ export function snapshotCalendarOptions<TMetadata>(
 	}
 	normalizeEventTimeDisplay(snapshot["eventTimeDisplay"]);
 	snapshot["gridEventPlacement"] = normalizeGridEventPlacement(snapshot["gridEventPlacement"]);
+	snapshot["gridEventDisplay"] = normalizeGridEventDisplay(snapshot["gridEventDisplay"]);
 	snapshot["weekRowSizing"] = normalizeWeekRowSizing(snapshot["weekRowSizing"]);
 	return Object.freeze(snapshot) as CalendarOptionsSnapshot<TMetadata>;
 }
@@ -194,6 +198,29 @@ export function normalizeEventTimeDisplay(value: unknown): CalendarEventTimeDisp
 		);
 	}
 	return value;
+}
+
+/** Resolves and snapshots independent container-size presentation settings. */
+export function normalizeGridEventDisplay(
+	value: unknown
+): Readonly<{ compact: CalendarGridEventDisplay; wide: CalendarGridEventDisplay }> {
+	if (value !== undefined && !isConfigurationRecord(value)) {
+		throw createConfigurationError("gridEventDisplay must be an object when supplied.");
+	}
+	if (value !== undefined) {
+		assertKnownConfigurationKeys(value, new Set(["compact", "wide"]), "gridEventDisplay");
+	}
+	const resolve = (variant: "compact" | "wide", fallback: CalendarGridEventDisplay): CalendarGridEventDisplay => {
+		const mode = value === undefined ? undefined : readConfigurationValue(value, variant, `gridEventDisplay.${variant}`);
+		if (mode === undefined) {
+			return fallback;
+		}
+		if (mode !== "events" && mode !== "count" && mode !== "count-when-multiple") {
+			throw createConfigurationError(`gridEventDisplay.${variant} must be "events", "count", or "count-when-multiple".`);
+		}
+		return mode;
+	};
+	return Object.freeze({ compact: resolve("compact", "count-when-multiple"), wide: resolve("wide", "events") });
 }
 
 /** Resolves vertical placement of the complete event stack within each month-grid day cell. */

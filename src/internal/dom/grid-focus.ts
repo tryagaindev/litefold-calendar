@@ -54,12 +54,8 @@ export function enterGridActions(
 	host: HTMLElement
 ): void {
 	const actions = elements.gridActionsByDate.get(dateString) ?? [];
-	const firstAction = actions.find((action) => action.isConnected && host.contains(action));
-	if (firstAction === undefined) {
-		return;
-	}
 	setDayProxyTabStop(dateString, elements);
-	firstAction.focus({ preventScroll: true });
+	focusFirstEligible(actions, host);
 }
 
 /** Handles action-mode movement and returns whether the key was consumed. */
@@ -94,11 +90,10 @@ export function handleGridActionKeydown(
 		return false;
 	}
 	event.preventDefault();
-	const targetIndex = actionIndex + (event.key === "ArrowDown" ? 1 : -1);
-	const target = actions[targetIndex];
-	if (target !== undefined) {
-		target.focus({ preventScroll: true });
-	}
+	const candidates = event.key === "ArrowDown"
+		? actions.slice(actionIndex + 1)
+		: actions.slice(0, actionIndex).reverse();
+	focusFirstEligible(candidates, host);
 	return true;
 }
 
@@ -167,7 +162,34 @@ export function restoreCalendarFocus(
 	if (token.date !== undefined && (isGridActionToken(token) || (element === null && dateFallback !== null))) {
 		setDayProxyTabStop(token.date, elements);
 	}
+	focusRestorationTarget(target, token.date, elements, host);
+}
+
+function focusRestorationTarget(
+	target: HTMLElement,
+	date: string | undefined,
+	elements: Readonly<GridFocusElements>,
+	host: HTMLElement
+): void {
 	target.focus({ preventScroll: true });
+	if (target.ownerDocument.activeElement !== target && date !== undefined &&
+		!focusFirstEligible(elements.gridActionsByDate.get(date) ?? [], host)) {
+		elements.dayButtons.get(date)?.focus({ preventScroll: true });
+	}
+}
+
+/** Lets the browser reject CSS-hidden controls without duplicating responsive layout decisions. */
+function focusFirstEligible(actions: readonly CalendarEventActionElement[], host: HTMLElement): boolean {
+	for (const action of actions) {
+		if (!action.isConnected || !host.contains(action)) {
+			continue;
+		}
+		action.focus({ preventScroll: true });
+		if (action.ownerDocument.activeElement === action) {
+			return true;
+		}
+	}
+	return false;
 }
 
 function setDayProxyTabStop(dateString: string, elements: Readonly<GridFocusElements>): void {
