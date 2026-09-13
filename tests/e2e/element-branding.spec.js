@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+import { expectLibraryFixtureReady } from "./helpers.js";
+
 test("a forwarding DOM proxy cannot cross the public host boundary", async ({ page }) => {
-	const response = await page.goto("/examples/basic/", { waitUntil: "domcontentloaded" });
-	expect(response?.ok()).toBe(true);
+	await expectLibraryFixtureReady(page);
 
 	const result = await page.evaluate(async () => {
 		const { createCalendar } = await import("/dist/index.js");

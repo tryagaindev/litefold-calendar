@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { expectExampleReady, expectOnlyOneGridTabStop } from "./helpers.js";
+import { expectLibraryFixtureReady, expectOnlyOneGridTabStop } from "./helpers.js";
 
 const ANIMATION_NAME = "lfc-day-selection-reveal";
 const CONFIRM_ANIMATION_NAME = "lfc-day-selection-confirm";
@@ -8,11 +8,11 @@ const FEEDBACK_ANIMATION_NAMES = [ANIMATION_NAME, CONFIRM_ANIMATION_NAME].sort()
 const TARGET_DATE = "2026-08-31";
 const SECOND_TARGET_DATE = "2026-08-30";
 
-test.describe("when motion is allowed", () => {
+test.describe("when motion is allowed", { tag: "@firefox-regression" }, () => {
 	test.use({ reducedMotion: "no-preference" });
 
 	test("an immediate pointer click produces one coherent selection transition with a seamless cleanup", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
+		await expectLibraryFixtureReady(page, { calendar: true });
 		const grid = page.getByRole("grid");
 		const target = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
 		await armSelectionProbe(target);
@@ -84,7 +84,7 @@ test.describe("when motion is allowed", () => {
 	});
 
 	test("native Today navigation stays settled while direct current-day selection transitions", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
+		await expectLibraryFixtureReady(page, { calendar: true });
 		const grid = page.getByRole("grid");
 		const title = page.locator(".lfc-calendar-title-label-full");
 		await page.locator(".lfc-calendar-nav-button-next").click();
@@ -124,7 +124,7 @@ test.describe("when motion is allowed", () => {
 	});
 
 	test("rapid reselection cancels stale feedback and leaves only the latest transition", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
+		await expectLibraryFixtureReady(page, { calendar: true });
 		const grid = page.getByRole("grid");
 		const firstTarget = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
 		await armSelectionProbe(firstTarget);
@@ -153,7 +153,7 @@ test.describe("when motion is allowed", () => {
 	});
 
 	test("keyboard activation receives the same transition and immediate semantics", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
+		await expectLibraryFixtureReady(page, { calendar: true });
 		const grid = page.getByRole("grid");
 		const target = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
 		await target.focus();
@@ -189,15 +189,11 @@ test.describe("when motion is allowed", () => {
 	});
 });
 
-test.describe("with trusted touch input", () => {
+test.describe("with trusted touch input", { tag: "@chromium-input" }, () => {
 	test.use({ hasTouch: true, reducedMotion: "no-preference" });
-	test.skip(
-		({ browserName }) => browserName !== "chromium",
-		"Trusted touch injection uses Chromium CDP, which Playwright does not expose for Firefox or WebKit."
-	);
 
 	test("a tap hands off pressed-day feedback to the selection transition", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
+		await expectLibraryFixtureReady(page, { calendar: true });
 		const grid = page.getByRole("grid");
 		const target = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
 		await armSelectionProbe(target);
@@ -239,7 +235,7 @@ test.describe("when reduced motion is requested", () => {
 	test.use({ reducedMotion: "reduce" });
 
 	test("pointer and keyboard selection render their settled state immediately", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
+		await expectLibraryFixtureReady(page, { calendar: true });
 		const grid = page.getByRole("grid");
 		const pointerTarget = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
 		await pointerTarget.click();
@@ -268,7 +264,7 @@ test.describe("when forced colors are active", () => {
 	test.use({ forcedColors: "active", reducedMotion: "reduce" });
 
 	test("selected and focused state remains visibly outlined without decorative feedback", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
+		await expectLibraryFixtureReady(page, { calendar: true });
 		const grid = page.getByRole("grid");
 		const target = grid.locator(`button[data-lfc-date="${TARGET_DATE}"]`);
 		await target.focus();

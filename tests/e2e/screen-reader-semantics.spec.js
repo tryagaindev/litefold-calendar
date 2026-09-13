@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { expectExampleReady, expectOnlyOneGridTabStop } from "./helpers.js";
+import { expectExampleReady, expectLibraryFixtureReady, expectOnlyOneGridTabStop } from "./helpers.js";
 
 const ANNOUNCEMENT_FIXTURE_SELECTOR = "#my-screen-reader-announcement-fixture";
 const FAILURE_FIXTURE_SELECTOR = "#my-screen-reader-failure-fixture";
@@ -163,7 +163,7 @@ test.describe("screen-reader-facing browser semantics", () => {
 	});
 
 	test("routes progress and failures through polite and assertive live regions without stealing focus", async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
+		await expectLibraryFixtureReady(page);
 		const announcementHost = await mountAnnouncementFixture(page);
 		const politeLive = announcementHost.getByRole("status");
 		const assertiveLive = announcementHost.getByRole("alert");

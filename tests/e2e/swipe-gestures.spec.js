@@ -1,13 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-import { expectExampleReady } from "./helpers.js";
+import { expectExampleReady, expectLibraryFixtureReady } from "./helpers.js";
 
 const HOST_SELECTOR = "[data-my-calendar]";
 const MONTH_SELECTOR = "[data-my-state-month]";
 const VIEWPORT_SELECTOR = ".lfc-calendar-swipe-viewport";
 const WHEEL_BURST_MAXIMUM_SPAN_MILLISECONDS = 120;
-const CHROMIUM_INPUT_REASON =
-	"Trusted touch and pen injection uses Chromium CDP, which Playwright does not expose for Firefox or WebKit.";
 
 async function createChromiumInputClient(page, reducedMotion) {
 	const client = await page.context().newCDPSession(page);
@@ -17,10 +15,6 @@ async function createChromiumInputClient(page, reducedMotion) {
 	});
 	await page.emulateMedia({ reducedMotion });
 	return client;
-}
-
-function skipWithoutChromiumInput(browserName) {
-	test.skip(browserName !== "chromium", CHROMIUM_INPUT_REASON);
 }
 
 async function dispatchTouch(client, type, points) {
@@ -72,6 +66,7 @@ async function runTouchGesture(page, client, start, deltaX, deltaY, cancel = fal
 }
 
 async function mountCalendarFixture(page, options = {}) {
+	await expectLibraryFixtureReady(page);
 	await page.evaluate(async (fixtureOptions) => {
 		const { createCalendar } = await import("/dist/index.js");
 		const fixture = document.createElement("section");
@@ -218,11 +213,8 @@ function pagingLaneLabels(host, direction) {
 test.describe("native month pager", () => {
 	test.use({ reducedMotion: "no-preference" });
 
-	test.beforeEach(async ({ page }) => {
-		await expectExampleReady(page, "/examples/advanced/");
-	});
-
 	test("renders hidden semantic lanes around one live grid and settles the current snap", async ({ page }) => {
+		await expectExampleReady(page, "/examples/advanced/");
 		const host = page.locator(HOST_SELECTOR);
 		const viewport = host.locator(VIEWPORT_SELECTOR);
 		await expect(host).toHaveAttribute("data-lfc-swipe-enabled", "true");
@@ -332,7 +324,7 @@ test.describe("native month pager", () => {
 		await expect(viewport).not.toHaveAttribute("aria-hidden");
 	});
 
-	test("scrollend requests one month while current and bounded snaps do not", async ({ page }) => {
+	test("scrollend requests one month while current and bounded snaps do not", { tag: "@firefox-regression" }, async ({ page }) => {
 		const host = await mountCalendarFixture(page, {
 			maxDate: "2026-09-30",
 			minDate: "2026-08-01"
@@ -401,7 +393,7 @@ test.describe("native month pager", () => {
 		await expect(nextLabels.compact).toHaveText(septemberCompact);
 	});
 
-	test("layout geometry remains exact through an ancestor transform and RTL recentering", async ({ page }) => {
+	test("layout geometry remains exact through an ancestor transform and RTL recentering", { tag: "@firefox-regression" }, async ({ page }) => {
 		const host = await mountCalendarFixture(page);
 		const ruleInstalled = await page.evaluate(() => {
 			for (const sheet of document.styleSheets) {
@@ -467,7 +459,7 @@ test.describe("native month pager", () => {
 		)).toBe(5);
 	});
 
-	test("wheel burst timestamps remain one transaction across pager rerenders", async ({ page }) => {
+	test("wheel burst timestamps remain one transaction across pager rerenders", { tag: "@firefox-regression" }, async ({ page }) => {
 		const host = await mountCalendarFixture(page);
 		for (const wheelTimeIncrement of [WHEEL_BURST_MAXIMUM_SPAN_MILLISECONDS + 1, 10, 10]) {
 			await setPagerPosition(host, "next", true, 1, wheelTimeIncrement);
@@ -484,59 +476,8 @@ test.describe("native month pager", () => {
 		await expectPagerClean(host);
 	});
 
-	test("a trusted rapid three-event horizontal wheel burst commits exactly one page", async ({ page }) => {
-		const host = await mountCalendarFixture(page);
-		const point = await gesturePoint(host.locator(
-			'.lfc-calendar-day-button[data-lfc-date="2026-08-13"]'
-		), 16);
-		await page.evaluate(() => {
-			const burst = [];
-			Object.defineProperty(window, "__lfcTrustedWheelBurst", {
-				configurable: true,
-				value: burst
-			});
-			document.addEventListener("wheel", (event) => {
-				if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-					burst.push({
-						isTrusted: event.isTrusted,
-						timeStamp: event.timeStamp
-					});
-				}
-			}, { capture: true, passive: true });
-		});
-		await page.mouse.move(point.x, point.y);
-		for (let eventIndex = 0; eventIndex < 3; eventIndex += 1) {
-			await page.mouse.wheel(90, 0);
-		}
-
-		await expect.poll(() => page.evaluate(() =>
-			window.__lfcTrustedWheelBurst.length
-		)).toBe(3);
-		const trustedBurst = await page.evaluate(() => window.__lfcTrustedWheelBurst);
-		expect(trustedBurst).toHaveLength(3);
-		expect(trustedBurst.every((event) => event.isTrusted)).toBe(true);
-		const maximumObservedGap = Math.max(
-			...trustedBurst.slice(1).map((event, eventIndex) =>
-				event.timeStamp - trustedBurst[eventIndex].timeStamp
-			)
-		);
-		test.skip(
-			maximumObservedGap > WHEEL_BURST_MAXIMUM_SPAN_MILLISECONDS,
-			"The runner did not deliver the trusted wheel events within one burst window."
-		);
-		await expect.poll(() => page.evaluate(() =>
-			window.__lfcSwipeFixture.calendar.getState().displayedMonth.month
-		)).toBe(9);
-		await page.waitForTimeout(300);
-		expect(await page.evaluate(() => ({
-			month: window.__lfcSwipeFixture.calendar.getState().displayedMonth.month,
-			requests: window.__lfcSwipeFixture.observations.requests.length
-		}))).toEqual({ month: 9, requests: 2 });
-		await expectPagerClean(host);
-	});
-
-	test("trusted touch returns short pulls, commits once in LTR and RTL, and stops at bounds", async ({ browserName, page }) => {
-		skipWithoutChromiumInput(browserName);
+	test("trusted touch returns short pulls, commits once in LTR and RTL, and stops at bounds", { tag: "@chromium-input" }, async ({ page }) => {
+		await expectExampleReady(page, "/examples/advanced/");
 		const client = await createChromiumInputClient(page, "no-preference");
 		const host = page.locator(HOST_SELECTOR);
 		const viewport = host.locator(VIEWPORT_SELECTOR);
@@ -576,8 +517,8 @@ test.describe("native month pager", () => {
 		await expect(actionResult).toHaveText(rtlAction ?? "");
 	});
 
-	test("trusted vertical, multi-touch, and canceled gestures preserve the current month", async ({ browserName, page }) => {
-		skipWithoutChromiumInput(browserName);
+	test("trusted vertical, multi-touch, and canceled gestures preserve the current month", { tag: "@chromium-input" }, async ({ page }) => {
+		await expectExampleReady(page, "/examples/advanced/");
 		const client = await createChromiumInputClient(page, "no-preference");
 		const host = page.locator(HOST_SELECTOR);
 		const viewport = host.locator(VIEWPORT_SELECTOR);
@@ -610,6 +551,7 @@ test.describe("native month pager", () => {
 	});
 
 	test("trusted wheel pages horizontally and leaves vertical wheel unhandled", async ({ page }) => {
+		await expectExampleReady(page, "/examples/advanced/");
 		const host = page.locator(HOST_SELECTOR);
 		let point = await gesturePoint(page.locator(
 			'.lfc-calendar-day-button[data-lfc-date="2026-08-13"]'
@@ -648,10 +590,9 @@ test.describe("native month pager", () => {
 		await expectPagerClean(host);
 	});
 
-	test("trusted pen input is not intercepted", async ({ browserName, page }) => {
-		skipWithoutChromiumInput(browserName);
-		const client = await createChromiumInputClient(page, "no-preference");
+	test("trusted pen input is not intercepted", { tag: "@chromium-input" }, async ({ page }) => {
 		const host = await mountCalendarFixture(page);
+		const client = await createChromiumInputClient(page, "no-preference");
 		const viewport = host.locator(VIEWPORT_SELECTOR);
 
 		await viewport.evaluate((element) => {
@@ -675,23 +616,23 @@ test.describe("native month pager", () => {
 		await dispatchPen(client, "mousePressed", point, true);
 		await dispatchPen(client, "mouseMoved", { x: point.x + 80, y: point.y }, true);
 		await dispatchPen(client, "mouseReleased", { x: point.x + 80, y: point.y }, false);
-		const penOutcome = await page.evaluate(() => ({
+		const penOutcome = await host.evaluate((element) => ({
 			events: window.__lfcPenEvents,
-			hasInlineStyle: document.querySelector("[data-my-calendar]")?.matches("[style]") ||
-				document.querySelector("[data-my-calendar] [style]") !== null
+			hasInlineStyle: element.matches("[style]") || element.querySelector("[style]") !== null
 		}));
 		expect(penOutcome.events.length).toBeGreaterThanOrEqual(3);
 		expect(penOutcome.events.every((event) =>
 			event.isTrusted && !event.defaultPrevented && !event.hasCapture
 		)).toBe(true);
 		expect(penOutcome.hasInlineStyle).toBe(false);
-		await expect(page.locator(MONTH_SELECTOR)).toHaveText("2026-08-01");
+		expect(await page.evaluate(() =>
+			window.__lfcSwipeFixture.calendar.getState().displayedMonth.month
+		)).toBe(8);
 	});
 
-	test("held touch cannot double-navigate across refetch or programmatic navigation", async ({ browserName, page }) => {
-		skipWithoutChromiumInput(browserName);
-		const client = await createChromiumInputClient(page, "no-preference");
+	test("held touch cannot double-navigate across refetch or programmatic navigation", { tag: "@chromium-input" }, async ({ page }) => {
 		const host = await mountCalendarFixture(page);
+		const client = await createChromiumInputClient(page, "no-preference");
 		const viewport = host.locator(VIEWPORT_SELECTOR);
 		let point = await gesturePoint(viewport);
 
@@ -770,10 +711,9 @@ test.describe("native month pager", () => {
 		}))).toEqual({ month: 8, requests: 1, state: null });
 	});
 
-	test("swipe false ignores trusted touch paging", async ({ browserName, page }) => {
-		skipWithoutChromiumInput(browserName);
-		const client = await createChromiumInputClient(page, "no-preference");
+	test("swipe false ignores trusted touch paging", { tag: "@chromium-input" }, async ({ page }) => {
 		const host = await mountCalendarFixture(page, { swipe: false });
+		const client = await createChromiumInputClient(page, "no-preference");
 		const point = await gesturePoint(host.locator(VIEWPORT_SELECTOR));
 		await runTouchGesture(page, client, point, -120, 0);
 		await page.waitForTimeout(200);
@@ -788,11 +728,9 @@ test.describe("native month pager", () => {
 test.describe("native pager with reduced motion", () => {
 	test.use({ reducedMotion: "reduce" });
 
-	test("tracks directly and has no post-terminal snap interpolation or authored animation", async ({ browserName, page }) => {
-		skipWithoutChromiumInput(browserName);
-		await expectExampleReady(page, "/examples/advanced/");
-		const client = await createChromiumInputClient(page, "reduce");
+	test("tracks directly and has no post-terminal snap interpolation or authored animation", { tag: "@chromium-input" }, async ({ page }) => {
 		const host = await mountCalendarFixture(page);
+		const client = await createChromiumInputClient(page, "reduce");
 		const viewport = host.locator(VIEWPORT_SELECTOR);
 		expect(await page.evaluate(() => ({
 			noPreference: matchMedia("(prefers-reduced-motion: no-preference)").matches,

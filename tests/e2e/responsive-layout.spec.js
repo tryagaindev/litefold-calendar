@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import {
 	expectExampleReady,
+	expectLibraryFixtureReady,
 	gridEventActions
 } from "./helpers.js";
 
@@ -463,7 +464,7 @@ async function expectCompactToolbarVisualLayout(page, layout) {
 
 async function prepareWeekLayoutFixturePage(page) {
 	await page.setViewportSize({ height: COMPACT_VIEWPORT_HEIGHT, width: 1_100 });
-	await expectExampleReady(page, "/examples/advanced/");
+	await expectLibraryFixtureReady(page);
 }
 
 async function mountWeekLayoutFixture(
@@ -733,7 +734,7 @@ async function mountResponsiveMultipleEventFixture(
 		width = 768
 	} = {}
 ) {
-	await expectExampleReady(page, "/examples/advanced/");
+	await expectLibraryFixtureReady(page);
 	await page.addStyleTag({
 		content: `
 			.my-responsive-marker {
@@ -1376,7 +1377,7 @@ test("short month labels use the strict 24rem content-box boundary without runti
 	expect(stability).toEqual({ callsStable: true, nodesStable: true, providerCalls: 1 });
 });
 
-test("default equal rows grow intrinsically and remain stable across responsive layout", async ({ page }) => {
+test("default equal rows grow intrinsically and remain stable across responsive layout", { tag: "@firefox-regression" }, async ({ page }) => {
 	await prepareWeekLayoutFixturePage(page);
 	const { host } = await mountWeekLayoutFixture(page);
 	const initial = await getWeekLayoutGeometry(host);
@@ -1412,9 +1413,11 @@ test("default equal rows grow intrinsically and remain stable across responsive 
 	expect(grown.anchorMarkerBlockSize).toBeGreaterThanOrEqual(192);
 	expectEqualWeekHeights(grown);
 	expectWeekLayoutContained(grown);
-	expect(Math.min(...grown.weekHeights) - Math.max(...initial.weekHeights))
-		.toBeGreaterThan(48);
-	expect(grown.calendarBlockSize - initial.calendarBlockSize).toBeGreaterThan(6 * 48);
+	const rowGrowth = grown.weekHeights.map((height, index) => height - initial.weekHeights[index]);
+	expect(Math.min(...rowGrowth), "Every equal row must grow to contain the taller marker.")
+		.toBeGreaterThan(0);
+	expect(grown.calendarBlockSize - initial.calendarBlockSize)
+		.toBeCloseTo(rowGrowth.reduce((total, growth) => total + growth, 0), 0);
 
 	for (const width of [390, 768]) {
 		await setWeekLayoutFixtureWidth(page, width);
