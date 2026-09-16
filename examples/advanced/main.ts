@@ -644,7 +644,7 @@ const advancedRenderHooks = Object.freeze({
 		const content = ownerDocument.createElement("span");
 		content.className = `my-event-overflow-${variant}`;
 		content.dataset["testDate"] = dateString;
-		content.dataset["testDisplay"] = display;
+		content.dataset["testDisplay"] = display === "count" ? "count" : "overflow";
 		content.dataset["testEventCount"] = String(eventCount);
 		content.dataset["testOverflowCount"] = String(overflowCount);
 		content.dataset["testSurface"] = surface;
@@ -756,6 +756,9 @@ const calendarOptions = {
 	},
 	onEventOverflowActivate: ({ dateString, element, eventCount, nativeEvent }) => {
 		//Observing activation preserves the default agenda behavior; cancellation belongs to an app-owned chooser.
+		if (!(nativeEvent instanceof MouseEvent) || !(element instanceof HTMLButtonElement)) {
+			return;
+		}
 		reportAction(`Viewing ${String(eventCount)} items on ${dateString} with ${nativeEvent.type} on ${element.localName}.`);
 	},
 	onStateChange: updateState,
