@@ -155,7 +155,7 @@ FullCalendar's explicit `allDay` can override what its date strings imply. Litef
 
 Litefold Calendar accepts Gregorian `YYYY-MM-DD` strings and local date-times such as `YYYY-MM-DDTHH:mm`; seconds and fractional seconds are also supported. It does not accept `Date` objects, UTC `Z` suffixes, or numeric offsets in event fields. Convert those values according to the application's scheduling semantics rather than stripping an offset.
 
-`accentColor` is the built-in event marker color, not a replacement for arbitrary FullCalendar backgrounds, borders, or text colors. The [calendar anatomy guide](component-anatomy.md#three-color-roles-that-sound-similar) distinguishes it from the two calendar-wide color tokens. Use render hooks and application CSS when metadata needs richer treatment.
+`accentColor` is the built-in event marker color, not a replacement for arbitrary FullCalendar backgrounds, borders, or text colors. The [calendar anatomy guide](styling.md#three-color-roles-that-sound-similar) distinguishes it from the two calendar-wide color tokens. Use render hooks and application CSS when metadata needs richer treatment.
 
 Validate untrusted transport JSON against the application's service schema before adapting it. Litefold Calendar then validates the entire adapted snapshot atomically.
 

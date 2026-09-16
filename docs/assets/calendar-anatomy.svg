@@ -5,7 +5,7 @@
     src/internal/runtime/event-overflow-presentation.ts, src/styles/month-grid.css,
     src/styles/agenda.css, and DESIGN.md. Review this SVG whenever those files rename or
     reorder illustrated parts, change render-hook slots, change overflow variants, or change
-    accent-color ownership. Keep the adjacent text equivalent in docs/component-anatomy.md
+    accent-color ownership. Keep the adjacent text equivalent in docs/styling.md
     synchronized; do not turn private lfc-* selectors into consumer API.
   -->
   <title id="calendar-anatomy-title">Litefold Calendar and event anatomy</title>

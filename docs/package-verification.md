@@ -146,7 +146,7 @@ import "@tryagaindev/litefold-calendar/styles.css";
 
 The root import is sufficient for a calendar without optional components. The WebMCP subpath is supported only when that component is selected; it is not re-exported from root. No internal source or `dist/` subpath is a supported public entry point.
 
-Tree shaking and package contents answer different questions. The extension files remain in the one npm tarball, but an application that omits the extension subpath import leaves WebMCP outside its module graph so a bundler can omit those bytes. A runtime condition around a static import does not establish that exclusion. See the [first-party extension bundle contract](first-party-extensions.md#bundle-and-import-behavior).
+Tree shaking and package contents answer different questions. The extension files remain in the one npm tarball, but an application that omits the extension subpath import leaves WebMCP outside its module graph so a bundler can omit those bytes. A runtime condition around a static import does not establish that exclusion. See the [first-party extension bundle contract](api.md#extension-imports-and-bundles).
 
 ## Registry and release evidence
 

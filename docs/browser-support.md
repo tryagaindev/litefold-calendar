@@ -2,13 +2,38 @@
 
 Litefold Calendar targets **Baseline Widely available** across the library, examples, and published documentation site. The package has no runtime dependencies, global polyfills, or separate legacy build.
 
+## Minimum browser versions
+
+The table below is generated from the same Vite resolver used by the package
+build.  Both columns apply; use the newer minimum when they differ.  A dash means
+the preset supplies no explicit target for that column, not a promise of support
+in older versions.  Install current security and patch updates.
+
+<!-- browser-targets:start -->
+<!-- Generated from the shared browser target resolver; do not edit by hand. -->
+Preset: `baseline-widely-available`.  Resolver: Vite `8.3.0`; esbuild `0.28.2`.
+
+| Browser | JavaScript minimum | CSS minimum |
+| --- | --- | --- |
+| Google Chrome | 111 | 111 |
+| Microsoft Edge (Chromium) | 111 | 111 |
+| Mozilla Firefox | 114 | 114 |
+| Safari on macOS | 16.4 | 16.4 |
+| Safari on iOS / iPadOS | 16.4 | 16.4 |
+<!-- browser-targets:end -->
+
+These values describe **this source revision**, not every published version.
+When evaluating a release, read this guide at that release's tag or source
+commit; `main` follows development.  Branded browsers, mobile devices, webviews,
+and assistive technologies still require the checks described below.
+
 ## Supported release window
 
 The shared build target is Vite's `baseline-widely-available` preset. Vite fixes the preset's Baseline date for each major release; targets do not advance merely because another day passes. The repository resolves the preset through Vite's public API and uses its effective browser targets for JavaScript and CSS, without maintaining a separate browser-version list. See [Vite's target policy](https://vite.dev/config/build-options#build-target).
 
 Baseline Widely available describes capabilities interoperable across the core browser set for at least 30 months. The support commitment uses the installed Vite preset's fixed window, so a current Baseline badge alone does not prove support in every resolved target. See [MDN's Baseline definition](https://developer.mozilla.org/en-US/docs/Glossary/Baseline/Compatibility).
 
-Run `npm run browsers:report` to see the preset identifier, resolution date, resolved JavaScript/CSS targets, and the installed Vite and esbuild versions under `dataVersions`. Builds write the same evidence to `.cache/browser-targets.json`; release and screenshot evidence use the effective targets. Weekly Dependabot updates include Vite major updates, which require review and CI before they can change the supported window. The recorded resolution date is evidence of when the report was generated, not a rolling compatibility cutoff.
+The generated table makes the resolved versions readable without cloning the repository.  Builds, screenshots, and release receipts retain the same target evidence.  Reviewed Vite dependency updates can change the support window; a report's resolution date is not a rolling compatibility cutoff.  Contributors can [refresh and check the generated table](../CONTRIBUTOR_COMMANDS.md#refresh-browser-documentation).
 
 | Environment | Supported browsers |
 | --- | --- |

@@ -1,6 +1,15 @@
-# Advanced TypeScript example
+<a id="advanced-typescript-example"></a>
 
-This example combines range loading, typed metadata, render hooks, application controls, observable state, fallback content, and WebMCP. Start with the [basic example](../basic/) when a static event array and activation callback are enough.
+# Advanced API showcase (TypeScript)
+
+This is an exhaustive API demonstration and repository test fixture, **not an
+application starter**.  Its controls and boundary scenarios cover range loading,
+typed metadata, hooks, state, fallback content, and WebMCP together.
+
+Start with [Basic JavaScript](../basic/) for local events or
+[Remote data JavaScript](../remote-data/) for an API, filtering, and a dialog.
+For a single advanced capability, copy its
+[integration recipe](../../docs/integration-guide.md) rather than this entire fixture.
 
 ## Run it
 
@@ -27,12 +36,11 @@ In the browser, try these paths:
 - The application owns filtering and `rawRangeCache`; changing either does not affect the calendar until `refetchEvents()` is called.
 - `onStateChange`, the host's public `aria-busy` state, and `dayDidMount` drive application-owned observation without reading private DOM.
 - The unified `renderEventOverflow` hook branches on its compact/wide discriminant without measuring the container. It uses package-formatted text or returns application-owned DOM while package CSS chooses the applicable responsive presentation.
-- Package-owned container CSS also shows the locale's abbreviated month with a numeric year in the toolbar and decorative pager lanes below a `24rem` calendar content width while preserving complete accessible month naming. The application neither measures for this state nor targets private label descendants.
-- The construction-time `weekRowSizing: "content"` option demonstrates independently content-sized weeks and intrinsic compact roots, while `gridEventPlacement: "bottom"` moves each complete event/overflow stack without moving its top-aligned date. Use `"equal"` for common full slots across package-owned, normally visible compact primary/count/overflow roots, `"top"` for the default placement, or `"center"` for the remaining placement.
+- `weekRowSizing: "content"` and `gridEventPlacement: "bottom"` demonstrate non-default layout choices.  Consult the [layout options](../../docs/api.md#data-date-and-layout-options) rather than copying these choices as defaults.
 - `eventDidMount` returns cleanup that remains safe when its signal aborts.
 - `fallbackElement` keeps useful schedule content available until a usable event snapshot commits.
 - The dialog and external live regions remain application-owned; callbacks provide the data and native event context.
-- WebMCP is opt-in through `extensions: [webMcp({ toolNamePrefix: "my-schedule" })]`. Review the [first-party extension guide](../../docs/first-party-extensions.md) and [WebMCP guide](../../docs/webmcp.md) before exposing private schedule data.
+- WebMCP is opt-in through `extensions: [webMcp({ toolNamePrefix: "my-schedule" })]`. Review the [extension API](../../docs/api.md#configure-first-party-extensions) and [WebMCP guide](../../docs/webmcp.md) before exposing private schedule data.
 
 The example uses `eventTimeDisplay: "agenda"`, so grid summaries stay compact while agenda rows show localized times. It deliberately selects non-default month-grid sizing and placement so both layout options remain visible in the complete API example. Application-owned identifiers use `my-*`; public styling uses documented `--lfc-*` custom properties rather than private package selectors.
 

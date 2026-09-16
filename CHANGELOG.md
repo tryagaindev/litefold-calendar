@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Consolidated anatomy and CSS integration into one styling guide; moved generic extension contracts into the API reference, extension implementation guidance into architecture, and delivery steps into contributor/release procedures. Removed obsolete move-notice pages and their references.
+- Made Getting started a self-contained install, render, update, and cleanup tutorial; surfaced civil-date and exclusive-end warnings before the first event example, shortened feature and integration summaries, and distinguished the advanced API showcase from application starters. Public API and accessibility contracts are unchanged.
+- Published a generated minimum-browser table in the support guide. `browsers:report -- --write-docs` updates it from the shared Vite resolver; `check:docs` rejects stale targets or toolchain provenance without rewriting files.
 - **Migration:** compact calendars now default to a total-count button when a day contains multiple events. Set `gridEventDisplay: { compact: "events" }` to retain individual compact event presentation. Wide calendars continue to show event summaries by default.
 - Browser support now uses Vite's `baseline-widely-available` preset, maintained through reviewed Vite updates. Build, screenshot, and release evidence records the effective targets and tooling versions.
 - Adopted Vite library mode and example development while retaining explicit CSS loading, ESM imports, TypeScript declarations, and optional WebMCP isolation. Component layout in the examples and published site now responds to container width.

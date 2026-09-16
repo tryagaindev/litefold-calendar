@@ -20,6 +20,11 @@ The package is pure ESM and has no runtime dependencies. The example below assum
 
 ## First render
 
+Event strings are calendar dates or local date-times, **not timestamps with `Z`
+or UTC offsets**.  Convert API instants into your application's chosen time zone
+before passing them in; do not simply remove the suffix.  Explicit event ends
+are exclusive.  See the [date examples](docs/getting-started.md#understand-event-dates).
+
 ```html
 <div data-my-calendar></div>
 ```
@@ -84,13 +89,10 @@ Try the [hosted demo](https://tryagaindev.github.io/litefold-calendar/) or revie
 
 ## Next steps
 
-- Follow [Getting started](docs/getting-started.md) for a short adoption path.
-- Connect an API and filters with the [remote-data walkthrough](docs/remote-data.md).
-- Configure [day event counts](docs/integration-guide.md#choose-event-counts) and an [application-owned chooser](docs/integration-guide.md#own-the-event-chooser).
-- Run the [basic example](examples/basic/) or browse the [hosted demo](https://tryagaindev.github.io/litefold-calendar/).
-- Choose a reusable scenario from the [examples guide](examples/README.md).
-- Use the [documentation hub](docs/README.md) to find integration, contribution, and maintainer guidance.
-- Check [support routes](SUPPORT.md) and [release notes](CHANGELOG.md) when evaluating an upgrade.
+- New integration: follow [Getting started](docs/getting-started.md) to render, replace local events, and clean up.
+- Already rendering: connect an API, filters, and refresh with the [remote-data walkthrough](docs/remote-data.md).
+- Need a specific capability: find a task in the [documentation hub](docs/README.md) or a runnable recipe in the [examples guide](examples/README.md).
+- Upgrading or troubleshooting: check [release notes](CHANGELOG.md) and [support routes](SUPPORT.md).
 
 ## License
 

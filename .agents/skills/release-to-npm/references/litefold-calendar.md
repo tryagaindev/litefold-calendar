@@ -44,5 +44,7 @@ Its workflow owns generated versions, exact artifact retention, OIDC publication
 under `nightly`, and repeat-run recovery. It uses no npm token and verifies that
 `latest` remains unchanged. Preserve historical alpha state. Stable
 publication is a separate procedure and must not be inferred from a nightly
-request. The [delivery checklist](../../../../docs/change-delivery.md) connects
-ordinary source changes with final package and Pages verification.
+request. Finish ordinary source work with the
+[contributor delivery checklist](../../../../CONTRIBUTOR_COMMANDS.md#deliver-a-contributor-change),
+then follow [nightly release operations](../../../../docs/release-operations.md)
+through package and Pages verification only when release work is authorized.

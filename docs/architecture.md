@@ -1,6 +1,6 @@
 # Internal architecture
 
-This guide helps contributors decide where a change belongs and which invariants must survive a refactor. It describes repository ownership and dependency direction rather than adding another consumer contract. Public signatures and lifecycle belong to the [API reference](api.md), optional component invariants belong to the [first-party extension guide](first-party-extensions.md), visual behavior belongs to [DESIGN.md](../DESIGN.md), interaction and accessibility behavior belongs to the [accessibility guide](../ACCESSIBILITY.md), and failure semantics belong to the [error guide](errors.md).
+This guide helps contributors decide where a change belongs and which invariants must survive a refactor. It describes repository ownership and dependency direction rather than adding another consumer contract. Public signatures and lifecycle belong to the [API reference](api.md), optional component invariants belong to the [extension API](api.md#configure-first-party-extensions), visual behavior belongs to [DESIGN.md](../DESIGN.md), interaction and accessibility behavior belongs to the [accessibility guide](../ACCESSIBILITY.md), and failure semantics belong to the [error guide](errors.md).
 
 ## Dependency direction
 
@@ -109,7 +109,7 @@ sequenceDiagram
 
 A direct array performs one terminal render without a loading or busy phase. A PromiseLike attaches both settlement handlers before publishing loading, then performs one loading render and one terminal render. Source rejection or invalid payload follows the same ownership and generation gates: a current failure enters the documented error-admission path, while stale work may be reported but cannot update state or DOM. See the [error guide](errors.md) for failure presentation and recovery.
 
-Configured extensions receive state through their separate queued lifecycle after the consumer callback; the [first-party extension guide](first-party-extensions.md#capabilities-lifecycle-and-isolation) owns that ordering contract.
+Configured extensions receive state through their separate queued lifecycle after the consumer callback; see the [extension lifecycle sequence](#extension-lifecycle-implementation).
 
 The immutable options snapshot keeps the construction-time `events` value, while the coordinator owns the current static array or provider without wrapping one as the other. `setEvents()` validates and snapshots a replacement before changing that input, then starts a new source generation. Abort-listener and validation-getter reentrancy must not let an older transaction reclaim source or controller ownership from a newer accepted replacement.
 
@@ -170,10 +170,70 @@ Each first-party extension factory validates and snapshots configuration synchro
 
 An extension failure emits diagnostic-only `extension-failed` with its trusted `extensionId` and lifecycle `hook`. The manager aborts and disposes that extension exactly once, then continues independent work while the calendar remains live. Consumer visual hooks use the separate `render-hook-failed` / `renderHookId` channel and are not an extension-authoring surface.
 
-The [first-party extension guide](first-party-extensions.md) owns public
-composition, lifecycle, bundle behavior, and future third-party stability. The
-[package verification guide](package-verification.md) owns emitted-graph and
-packed-consumer evidence.
+Consumer configuration and bundle rules are in the
+[API reference](api.md#configure-first-party-extensions); emitted-graph and
+packed-consumer checks are in [package verification](package-verification.md).
+
+### Choose an implementation boundary
+
+| Boundary | Choose it when |
+| --- | --- |
+| Calendar core | The behavior is required for ordinary semantics, safety, accessibility, or lifecycle and every root consumer needs it. |
+| Consumer render hook | An application supplies presentation at an existing mount point and owns its content, callbacks, resources, and cleanup. |
+| First-party extension | An optional package-owned component coordinates state, navigation, browser integration, presentation, or an independently removable lifetime.  It may be headless, as WebMCP is. |
+| Separate package | Installation, versioning, dependencies, security policy, or removal from installed bytes must be independent of this package. |
+
+### Extension lifecycle implementation
+
+The private host supplies only capabilities declared by the extension definition.
+Capability objects and state snapshots are immutable.  Retained capabilities fail
+closed after quarantine or calendar destruction; consumer render hooks cannot
+request those capabilities, observe peers, or join this lifecycle.
+
+```mermaid
+sequenceDiagram
+  accTitle: First-party extension activation, delivery, and teardown order
+  accDescr: Extensions activate and receive state in registration order. A direct initial result renders before activation and is then delivered once. An initial promise-like loading state is not replayed. Destruction aborts and disposes extensions in reverse order.
+  actor Consumer as Application
+  participant Calendar
+  participant First as Extension 1
+  participant Last as Extension n
+  Consumer->>Calendar: render()
+  alt Direct initial array
+    Calendar->>Calendar: Terminal commit, onStateChange, and DOM render
+    Calendar->>First: activate()
+    Calendar->>Last: activate()
+    Calendar-->>First: Queued terminal state delivery
+    Calendar-->>Last: Queued terminal state delivery
+  else Initial PromiseLike
+    Calendar->>Calendar: Attach settlement handlers; loading callback and render
+    Calendar->>First: activate()
+    Calendar->>Last: activate()
+    Note over First,Last: The already-published loading state is not replayed.
+    Calendar->>Calendar: Terminal commit, onStateChange, and DOM render
+    Calendar-->>First: Queued terminal state delivery
+    Calendar-->>Last: Queued terminal state delivery
+  end
+  Note over Calendar,Last: Later coalesced state deliveries run 1 to n after consumer onStateChange.
+  Consumer->>Calendar: destroy()
+  Calendar--x Last: Abort lifetime
+  Calendar->>Last: dispose()
+  Calendar--x First: Abort lifetime
+  Calendar->>First: dispose()
+```
+
+Activation and delivery follow registration order; teardown reverses it.  A
+direct initial result commits before activation and queues one terminal delivery.
+An initial PromiseLike activates after the loading render without replaying that
+state, then delivers the terminal result.  Later deliveries are coalesced after
+`onStateChange`.  Keep entry points synchronous and bind asynchronous work to the
+supplied lifetime signal.  Fatal stop uses the same reverse teardown as destroy;
+a failing entry point aborts and disposes only that extension and emits one
+diagnostic while other work continues.
+
+The [public extension contract](api.md#configure-first-party-extensions) defines
+consumer-visible behavior; the authoring checks below cover reentrancy, stale
+capabilities, isolation, and transaction safeguards.
 
 ### Author an official extension
 

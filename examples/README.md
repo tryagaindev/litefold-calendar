@@ -1,6 +1,12 @@
 # Examples
 
-Use this page to choose, run, and validate the repository examples. Each recipe is framework-free and uses only published package surfaces.
+Choose a small recipe for your task.  Start with [Basic JavaScript](basic/) for
+local events or [Remote data JavaScript](remote-data/) for an API.  Each example
+is framework-free and uses published package surfaces.
+
+The [advanced API showcase](advanced/) is an exhaustive demonstration and test
+fixture, not an application starter.  You do not need its complete setup to use
+typed events, filters, or a dialog.
 
 ## Choose by audience and scenario
 
@@ -10,7 +16,7 @@ Use this page to choose, run, and validate the repository examples. Each recipe 
 | Package user — getting started | Preserve useful server-rendered content until the calendar is ready | [Progressive enhancement](progressive-enhancement/) |
 | Package user — getting started | Load the ESM build from an existing classic-script entry point | [Classic-script loader](classic-script/) |
 | Package user — everyday integration | Fetch JSON, filter categories, refresh, and open a count/event dialog | [Remote data JavaScript](remote-data/) |
-| Package user — integration and API | Integrate a range-aware source, typed metadata, application controls, hooks, state, and WebMCP | [Advanced TypeScript](advanced/) |
+| Package user — API exploration | Explore the complete API and its interactions, not a minimal integration | [Advanced API showcase (TypeScript)](advanced/) |
 | Package user — integration and API | Own source, action, and render-hook failure presentation | [Async errors](async-errors/) |
 | Package user — integration and API | Rewrite a FullCalendar v6 `dayGridMonth` source shape | [FullCalendar v6 migration](fullcalendar-v6-migration/) |
 | Contributor | Exercise public declarations, browser behavior, accessibility, and package output | [Contributor fixture and validation notes](#contributors) |
@@ -22,7 +28,8 @@ Use this page to choose, run, and validate the repository examples. Each recipe 
 
 Start with [Basic JavaScript](basic/). Add [Progressive enhancement](progressive-enhancement/) when the page must remain useful without JavaScript or before the first usable snapshot. Use [Classic-script loader](classic-script/) only when an existing classic entry point cannot be converted to a module script.
 
-To integrate the package rather than run this repository, begin with the root [installation](../README.md#install) and [first render](../README.md#first-render).
+To integrate the installed package rather than run this repository, follow
+[Getting started](../docs/getting-started.md).
 
 The examples use repository-relative files so they can test the exact build output. Installed applications use package imports instead:
 
@@ -47,7 +54,7 @@ Use [Remote data JavaScript](remote-data/) after the basic example. It demonstra
 
 ### Integration and API
 
-Use [Advanced TypeScript](advanced/) for typed metadata, caching, render hooks, external controls, fallback ownership, and optional extensions. Use [Async errors](async-errors/) when deciding whether the package or application owns visible recovery UI. The [FullCalendar v6 migration](fullcalendar-v6-migration/) is a bounded adapter example for that source API shape, not a compatibility layer.
+Use the [integration guide](../docs/integration-guide.md) for individual typed-adapter, caching, and render-hook recipes.  Use the [advanced API showcase](advanced/) to explore how all capabilities interact. Use [Async errors](async-errors/) when deciding whether the package or application owns visible recovery UI. The [FullCalendar v6 migration](fullcalendar-v6-migration/) is a bounded adapter example for that source API shape, not a compatibility layer.
 
 Exact public signatures, defaults, and timing belong in the [API reference](../docs/api.md). Application ownership and composition recipes belong in the [integration guide](../docs/integration-guide.md).
 

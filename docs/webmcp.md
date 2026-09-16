@@ -102,7 +102,7 @@ Litefold Calendar supports imperative registration through
 cross-origin exposure configuration, consumer-side tool execution APIs, or a
 WebMCP polyfill.
 
-The [public API reference](api.md#webmcp-extension) owns the exported factory and option shape. The [first-party extension guide](first-party-extensions.md) owns composition and bundle behavior. The [application integration guide](integration-guide.md#webmcp-site-tools) shows how to assign prefixes in a page that may host more than one calendar.
+The [public API reference](api.md#webmcp-extension) owns the exported factory and option shape. The [extension API](api.md#configure-first-party-extensions) owns composition and bundle behavior. The [application integration guide](integration-guide.md#webmcp-site-tools) shows how to assign prefixes in a page that may host more than one calendar.
 
 ## Lifecycle and fallback
 

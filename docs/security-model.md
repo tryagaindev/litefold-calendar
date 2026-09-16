@@ -163,6 +163,6 @@ Related operating guidance:
 - [Nightly release operations](release-operations.md) defines the step-by-step operator runbook.
 - [Release administration](release-administration.md) defines publication controls and recovery.
 - [Package verification](package-verification.md) defines artifact evidence.
-- [First-party extensions](first-party-extensions.md) defines optional component boundaries.
+- [First-party extensions](api.md#configure-first-party-extensions) defines optional component boundaries.
 - [Static example deployment](example-deployment.md) defines Pages procedures.
 - [WebMCP site-tool integration](webmcp.md) defines integration and privacy guidance.

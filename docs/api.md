@@ -17,7 +17,7 @@ Start with the [feature guide](features.md) to decide whether the focused month-
 | Supply, replace, or reload local or remote events | [`CalendarEvents`](#supply-events-calendarevents-and-calendareventsource) and [`Calendar`](#control-the-calendar-calendar) |
 | Validate dates and event occupancy | [`CalendarEventInput`](#define-events-calendareventinput-and-calendarevent) |
 | Configure layout, localization, callbacks, and limits | [`CalendarOptions`](#configure-behavior-calendaroptions) |
-| Register a complete optional component | [First-party extensions](first-party-extensions.md) |
+| Register a complete optional component | [First-party extensions](api.md#configure-first-party-extensions) |
 | Expose bounded browser site tools | [WebMCP extension](#webmcp-extension) |
 | Handle day and event actions | [Action callbacks](#handle-user-actions-calendaraction) |
 | Observe displayed month, selection, loading, and failures | [`CalendarState`](#observe-state-calendarstate) |
@@ -101,7 +101,7 @@ Litefold Calendar does not infer application unmounts or register a global page-
 
 Invalid construction input throws a synchronous `LitefoldCalendarError` with code `invalid-configuration`. This includes an invalid or reversed `minDate` / `maxDate` range, a range that intersects no renderable month, and an explicitly supplied `initialDate` that is outside the inclusive range or cannot render its month. When `initialDate` is omitted, the date produced by `now` instead resolves to the nearest in-range date in a renderable month. Because no usable instance exists after a construction failure, `onError` cannot observe it; catch it at the application bootstrap boundary when startup fallback UI is required.
 
-The root class is the supported styling hook. The data attribute is a stable presence-only JavaScript discovery marker, has no value contract, and must not be used for styling. See the [CSS token contract](css-tokens.md).
+The root class is the supported styling hook. The data attribute is a stable presence-only JavaScript discovery marker, has no value contract, and must not be used for styling. See the [Styling and customization](styling.md).
 
 ## Control the calendar: `Calendar`
 
@@ -285,7 +285,7 @@ Event IDs must contain a non-whitespace character, remain at most 256 UTF-16 cod
 
 Day occurrences use one canonical order across grid summaries, the agenda, and overflow callbacks: all-day events first, then ascending complete civil start, normalized title, and preserved ID. Title and ID comparisons use UTF-16 code-unit order rather than locale collation.
 
-`accentColor` is the per-event **event marker color** field. It accepts exactly an opaque six-digit hexadecimal color (`#RRGGBB`, case-insensitive input) and normalizes it to uppercase. An invalid value becomes `null` rather than invalidating the event; the built-in marker then uses its CSS-token fallback. This field colors only the built-in SVG marker. It does not tint an event summary or choose its text, background, border, or event leading-rule color. Core rendering does not emit a `style` attribute. See [calendar anatomy and color vocabulary](component-anatomy.md#three-color-roles-that-sound-similar) for the related names. Use `renderEventMarker` when metadata-driven visual treatment needs more than the built-in marker, and keep that application-owned output compatible with the application Content Security Policy.
+`accentColor` is the per-event **event marker color** field. It accepts exactly an opaque six-digit hexadecimal color (`#RRGGBB`, case-insensitive input) and normalizes it to uppercase. An invalid value becomes `null` rather than invalidating the event; the built-in marker then uses its CSS-token fallback. This field colors only the built-in SVG marker. It does not tint an event summary or choose its text, background, border, or event leading-rule color. Core rendering does not emit a `style` attribute. See [calendar anatomy and color vocabulary](styling.md#three-color-roles-that-sound-similar) for the related names. Use `renderEventMarker` when metadata-driven visual treatment needs more than the built-in marker, and keep that application-owned output compatible with the application Content Security Policy.
 
 `url` is optional. It must be unchanged by trimming, contain no control character or credentials, and resolve against the host document to a relative or HTTP(S) destination. Both the supplied string and the resolved destination must be no longer than 2,048 UTF-16 code units. Empty, malformed, unsupported-scheme, credential-bearing, control-character, trim-altered, or oversized values reject the complete snapshot. A normalized event exposes the validated relative reference unchanged, a canonical absolute HTTP(S) string, or `null`; the native anchor resolves a relative reference in the host document.
 
@@ -413,7 +413,7 @@ The [advanced TypeScript example](../examples/advanced/) demonstrates every opti
 | `icons` | Text previous/next icons | Partially replaces decorative navigation content through document-aware factories. | An unknown own string key, invalid factory, factory throw, or reused, interactive, parented, cross-document, or otherwise invalid factory result is `invalid-configuration` during construction. If an accepted icon node becomes leased, reparented, or otherwise unavailable before `render()` claims it, `render()` throws recoverable `invalid-state`. |
 | `toolbarEnd` | No custom toolbar element | Moves one detached or host-descendant, same-document `HTMLElement` after the built-in controls in DOM and focus order. The application retains its state and listeners. | A structurally invalid, cross-document, or externally parented element is `invalid-configuration` during construction. If an accepted element becomes leased, reparented, or otherwise unavailable before `render()` claims it, `render()` throws recoverable `invalid-state`. `destroy()` detaches an unchanged eligible element; the application owns reinsertion. |
 | `fallbackElement` | No fallback element | Exclusively leases a same-document element that is DOM-disjoint from the host—neither element may contain the other. A pending initial promise-like result preserves its original `hidden` state; a direct-array result coordinates it before `render()` returns. Later commits follow the rules below without overwriting an application mutation. A sibling is the normal arrangement. | A structurally invalid, cross-document, host-descendant, or host-ancestor element is `invalid-configuration` during construction. An element that is already leased or otherwise unavailable when `render()` claims integration nodes produces `invalid-state`. Both failures leave it untouched. |
-| `extensions` | Empty array | Activates configured opaque first-party components after a successful render. Activation and state delivery use caller order; teardown uses reverse order. Initial direct-array work queues exactly one terminal state delivery after activation. Initial promise-like work activates after the loading transition and does not replay that earlier loading state. | A forged value or duplicate stable ID is synchronous `invalid-configuration` before host mutation. A runtime failure quarantines only that extension and reports diagnostic-only `extension-failed` with `extensionId`. |
+| `extensions` | Empty array | Configures optional package components.  See [extension configuration and lifecycle](#configure-first-party-extensions). | Invalid values or duplicate IDs throw `invalid-configuration`; runtime failures are isolated diagnostic-only `extension-failed`. |
 | `onEventActivate` | No callback action | Handles native anchor/button activation on `"grid-summary"` and `"agenda"`; may return `void` or `PromiseLike<void>`. A linked event remains an anchor regardless. | A throw or rejection becomes `action-failed`. A callback may synchronously prevent a link's default navigation. |
 | `onEventOverflowActivate` | Select day and focus agenda | Handles a native total-count or overflow button before day selection or DOM replacement. Receives the occurrence date, ordered immutable full-day events, total count, current button, and native click. Synchronous `preventDefault()` transfers interaction and focus ownership to the application. | A throw or rejection becomes `action-failed`. Async cancellation cannot stop the default interaction; return the action promise for failure reporting. |
 | `isEventContextMenuAvailable` | Every occurrence is eligible when `onEventContextMenu` exists; otherwise none are | Synchronously narrows context-action availability per occurrence and surface. It receives date, event, and surface only. | A throw, non-boolean, or thenable fails closed and reports one recoverable `host-integration-failed` issue per calendar instance. |
@@ -428,6 +428,76 @@ The [advanced TypeScript example](../examples/advanced/) demonstrates every opti
 Toolbar layout is container-driven and never changes sequential focus order: Previous, Next, month title, and Today, then `toolbarEnd`. The [responsive design](../DESIGN.md#responsive-model) owns the row composition. The title keeps one canonical full localized DOM string and accessible name; compact visual labels are `aria-hidden` and use a complete locale-formatted abbreviated month and year.
 
 `fallbackElement` stays unchanged through construction and while an initial promise-like result is pending. A direct array has no loading interval: its usable or unavailable terminal result coordinates the fallback before the initiating `render()` returns. The first usable snapshot hides it, including a successful empty snapshot. A degraded refresh with retained usable data keeps it hidden. An unavailable or fatal state with no usable snapshot restores its original `hidden` state; retry success hides it again. Before each write, the package requires the current value to match its last observed or written value. If application code changes `hidden`, package writes are skipped while that value differs, and `destroy()` preserves the differing application value. If application code later restores the package's last value, normal package management can resume. `destroy()` always releases the lease and restores the original value only when the package still manages the current value.
+
+## Configure first-party extensions
+
+Use `renderHooks` for application-owned visual content and `extensions` for
+complete optional components shipped by Litefold Calendar.  Grouping render
+hooks does not turn them into an extension.  WebMCP is the currently available
+component; its [setup guide](webmcp.md#enable-site-tools) shows the explicit import
+and registration.
+
+### Extension configuration
+
+Obtain an opaque `CalendarExtension` from an official factory and pass it in
+`CalendarOptions.extensions`.  Factories validate and snapshot their options
+synchronously.  Values are immutable and reusable across independent calendars,
+with separate runtime state and cancellation for each instance.  Reuse does not
+bypass document-wide restrictions: co-resident WebMCP calendars need distinct
+tool-name prefixes.
+
+Construction snapshots and validates the complete extensions array before host
+mutation.  Unreadable or forged values, repeated values, and duplicate stable
+IDs—including separately configured values for the same extension—throw
+synchronous `invalid-configuration`.  Distinct IDs can coexist; there is no
+dependency, priority, precedence, or conflict-resolution system.  There is no
+`registerExtension` method or runtime discovery.  Recreate the calendar to
+change its configured extensions.
+
+### Extension lifecycle and failures
+
+Activation and state delivery follow configured order.  Teardown reverses it.
+
+| Initial source result | Activation and first state delivery |
+| --- | --- |
+| Direct array | After the terminal state callback and DOM render, activate the extensions and queue one terminal-state delivery. |
+| PromiseLike | Activate after the loading callback and render.  Do not replay that earlier loading state; deliver the terminal state when it commits. |
+
+Later state deliveries are coalesced and occur after the application's
+`onStateChange` callback.  Lifecycle entry points are synchronous; asynchronous
+extension work uses the extension's lifetime signal.
+
+A failed extension is quarantined, aborted, and disposed without disabling the
+core calendar or another extension.  It reports diagnostic-only
+`extension-failed` with `extensionId`; it does not add a `CalendarState` issue or
+ordinary error UI.  Consumer render-hook failures instead use `render-hook-failed`
+with `renderHookId`.  Destruction and fatal stop abort and dispose extensions in
+reverse order; retained capabilities fail closed after quarantine or teardown.
+
+### Extension imports and bundles
+
+Import each component from its explicit `/extensions/<id>` subpath.  The root
+exports the `CalendarExtension` type but neither re-exports factories nor imports
+specific extension implementations.  Extension modules are side-effect-free and
+safe to evaluate on a server: importing one does not access browser globals,
+discover calendars, or register tools.  Browser work begins only on activation
+for a rendered calendar.
+
+Omitting a value from `extensions` prevents activation.  Omitting its subpath from
+the application's import graph lets a bundler exclude the implementation.  A
+runtime condition around a static import controls activation, not bundle
+inclusion; use a build-time branch or dynamic import before construction when
+separate builds must omit it.  Optional extension files still ship in the same
+npm tarball.  Bundle exclusion does not remove installed files.
+
+### Third-party authoring
+
+There is no public third-party extension-authoring API.  Store, reuse, and pass
+factory results, but do not inspect or forge them or rely on the package-private
+runtime protocol.  Use render hooks for application visuals.  Any future authoring
+surface will be explicit, separately documented, and lower stability than the
+consumer render-hook API.  Official contributors use the
+[extension authoring checklist](architecture.md#author-an-official-extension).
 
 ## WebMCP extension
 
@@ -454,7 +524,7 @@ registration rejection is diagnostic-only `extension-failed` with
 `extensionId: "webmcp"`, `hook: "register"`, and phase `integration`;
 ordinary `CalendarState` and UI remain unchanged.
 
-Omitting the extension subpath import keeps the WebMCP implementation outside the application import graph. A runtime conditional around a static import changes activation, not bundle inclusion. See the [first-party extension model](first-party-extensions.md) for bundle boundaries and the canonical [WebMCP site-tool contract](webmcp.md) for tools, envelopes, lifecycle, privacy, compatibility, and testing.
+See [extension import behavior](#extension-imports-and-bundles) for activation versus bundle inclusion, and the [WebMCP guide](webmcp.md) for tools, envelopes, privacy, compatibility, and testing.
 
 ## Handle user actions: `CalendarAction`
 
@@ -649,7 +719,7 @@ Every supplied message must be a string containing at least one non-whitespace c
 
 ## Customize rendering: `CalendarRenderHooks`
 
-The [calendar anatomy guide](component-anatomy.md) shows where each stable day,
+The [calendar anatomy guide](styling.md#calendar-anatomy) shows where each stable day,
 event, and overflow element belongs and maps the visual names to these hooks.
 
 ```ts
