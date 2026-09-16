@@ -183,7 +183,7 @@ function renderPrimaryDeployment(documentReference, entry) {
 	setLink(documentReference, "my-primary-source-link", examplesSourceUrl(entry.commit, "examples/basic"));
 	setLink(documentReference, "my-api-link", sourceUrl(entry.commit, "docs/api.md"));
 	setLink(documentReference, "my-integration-link", sourceUrl(entry.commit, "docs/integration-guide.md"));
-	setLink(documentReference, "my-quick-start-link", sourceUrl(entry.commit, "README.md#quick-start"));
+	setLink(documentReference, "my-quick-start-link", sourceUrl(entry.commit, "docs/getting-started.md"));
 	setText(documentReference, "my-selected-version", entry.version);
 	setText(documentReference, "my-selected-channel", entry.channel === "release"
 		? "Immutable release"
