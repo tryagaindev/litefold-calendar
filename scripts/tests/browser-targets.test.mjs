@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { resolveConfig } from "vite";
 
+import { replaceBrowserTargetDocumentation } from "../lib/browser-target-documentation.mjs";
 import { BROWSER_TARGET_PRESET, browserTargetsFingerprint, normalizeBrowserTargetDate,
 	resolveBrowserTargets } from "../lib/browser-targets.mjs";
 
@@ -33,4 +35,10 @@ void test("a new resolution date does not change preset targets or screenshot fr
 	assert.equal(browserTargetsFingerprint(report), browserTargetsFingerprint(later));
 	assert.notEqual(browserTargetsFingerprint(report), browserTargetsFingerprint({ ...report,
 		javascript: [...report.javascript, "chrome999"] }));
+});
+
+void test("committed browser documentation matches the installed public resolver", async () => {
+	const source = await readFile(new URL("../../docs/browser-support.md", import.meta.url), "utf8");
+	assert.equal(replaceBrowserTargetDocumentation(source, resolveBrowserTargets()), source,
+		"Run npm run browsers:report -- --write-docs after reviewing dependency changes.");
 });

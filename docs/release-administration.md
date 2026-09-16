@@ -95,7 +95,7 @@ Stable publication is not enabled by the nightly workflow. Before the first stab
 - Select an explicit stable SemVer through maintainer review. Update source manifest and root lockfile versions consistently, and promote reviewed `[Unreleased]` notes into the dated stable changelog entry.
 - Require protected main, exact-source green CI, the full gate, and a separate stable publication environment with the intended human approval policy. Configure its exact npm trusted publisher binding; nightly publication authority does not authorize stable publication.
 - Use the existing publication queue across stable and nightly jobs. Publish one verified retained bundle with matching SBOM, integrity, source, provenance, protected tag, and immutable release evidence.
-- Publish stable under `latest` and verify it before allowing subsequent nightlies. From that first stable onward, nightly automation leaves `latest` under stable ownership even if a later nightly fails.
+- Publish stable under `latest` and verify both the package and its receipt-bound versioned Pages site before declaring the transition complete or allowing subsequent nightlies. From that first stable onward, nightly automation leaves `latest` under stable ownership even if a later nightly fails.
 - Advance the development base beyond the stable series in a reviewed follow-up before the next nightly. Keep `nightly`, `alpha`, and every existing release snapshot intact.
 - Define recovery before enabling dispatch: exact-byte resumption for a partial stable attempt, no version reuse or tag movement, corrected greater stable releases for defects, and receipt-bound release Pages verification.
 

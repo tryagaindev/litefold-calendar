@@ -7,7 +7,7 @@
     "playwright": "1.62.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "d3e79175a972875e5c88c29b0b95b18d2ae5f5e46dfc1b60bfc264cee37c5d2f",
+  "sourceFingerprint": "7c7da7e02f095a05bf17ef78acd6d43fda0c8fdc7da926cf12f5f43c1e66f3cc",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -211,13 +211,13 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "1a9c43420466c78bf73f0c7817e7ae4a23504c54768abbcccab9c9bd7a33383a"
+      "sha256": "bfffb7ca4cf635f00d15217feadc26aecab0a34ed9e429d520974fc89df9f849"
     }
   ],
   "browserTargets": {
     "query": "baseline-widely-available",
     "effectiveQuery": "Vite 8.3.0: baseline-widely-available",
-    "resolvedAt": "2026-09-13",
+    "resolvedAt": "2026-09-16",
     "dataVersions": {
       "vite": "8.3.0",
       "esbuild": "0.28.2"

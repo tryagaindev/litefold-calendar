@@ -46,6 +46,22 @@ Build all publishable and example output without starting a server:
 npm run build
 ```
 
+## Refresh browser documentation
+
+After changing the locked Vite or esbuild version, regenerate the
+[minimum-browser table](docs/browser-support.md#minimum-browser-versions) from
+the shared resolver and review its targets before committing:
+
+```shell
+npm run browsers:report -- --write-docs
+```
+
+The default `npm run browsers:report` still prints JSON and records dated build
+evidence.  `npm run check:docs` checks the committed table without rewriting it;
+ordinary builds and CI do not silently update source documentation.  The table
+is retained with each source revision, so release readers must use the matching
+tag or commit rather than the rolling `main` guide.
+
 ## Choose focused validation
 
 Run the smallest relevant checks while iterating, then always run the final gate. The canonical contracts and companion-work obligations are in [CONTRIBUTING.md](CONTRIBUTING.md#change-obligations).
@@ -164,9 +180,33 @@ This separate local qualification is not included in `npm run check` and is not 
 
 ## Deliver a contributor change
 
-For an end-to-end request, follow the [local-to-production checklist](docs/change-delivery.md).
-It connects phase commits, clean-tree checks, review, nightly publication, and the
-separate release Pages verification.
+Use this checklist after defining the change and identifying the
+[companion-work obligations](CONTRIBUTING.md#change-obligations):
+
+- [ ] Fetch the canonical upstream and use a feature branch based on the intended
+  source.  Preserve unrelated changes, prototypes, stashes, and existing commits.
+- [ ] Make focused changes and run the affected checks.  Keep phases reviewable
+  and record validation before committing each one.  Update authoritative docs,
+  executable examples, and `Unreleased` notes as applicable.
+- [ ] For responsive changes, test the calendar container independently of the
+  viewport.  [Prepare and review screenshots](#prepare-and-review-screenshots)
+  after source and build inputs settle; unchanged pixels may still require
+  refreshed source evidence.  CI does not accept reference images automatically.
+- [ ] Stage only intended paths or hunks; inspect the staged diff, file list,
+  evidence, and whitespace.  Create a focused Conventional Commit and inspect
+  both that commit and the remaining worktree, including any hook changes.
+- [ ] Run the [complete final gate](#run-the-final-gate) from the committed, clean
+  tree.  Fix failures in a focused commit before pushing; a retry-only pass is
+  not evidence of a reliable gate.
+- [ ] Push the feature branch and submit a pull request describing behavior,
+  compatibility effects, validation, and remaining limitations.  Resolve required
+  review and the **Build, test, and verify package** CI result; record affected
+  Firefox checks locally.
+
+When authorized to merge, use the protected branch workflow and record the full
+merged source SHA.  Confirm required CI succeeds for that exact merged source,
+not just a previous pull-request head.  Contributor delivery ends with the
+reviewed change; a commit, push, or merge is not proof of package publication.
 
 Automation that supports repository skills can invoke [`$commit-and-push`](.agents/skills/commit-and-push/SKILL.md) to audit Git state, validate and commit only the intended files, and push an ordinary feature branch. The skill is operational guidance, not a shell command or additional repository authority.
 

@@ -34,7 +34,7 @@ Put each contract in its canonical document and link to it from shorter guides. 
 | Internal module or data-flow boundary | [Architecture guide](docs/architecture.md) | Preserve dependency direction, add focused failure and teardown coverage, and update a diagram only when its stable relationship changes. |
 | HTML semantics, keyboard/pointer interaction, focus, announcements, or error presentation | [Accessibility contract](ACCESSIBILITY.md) and [error handling](docs/errors.md) | Add observable regression coverage and repeat the affected manual accessibility scenarios. |
 | CSS tokens, responsive composition, motion, or visual state | [Design system](DESIGN.md) | Run design and browser checks; update and review the [canonical screenshots](docs/screenshots/README.md) only when a captured visual state intentionally changes. |
-| First-party extension composition or WebMCP | [First-party extension guide](docs/first-party-extensions.md) and [WebMCP guide](docs/webmcp.md) | Preserve the documented opt-in package boundary, update schemas and lifecycle coverage, and exercise supported and unavailable-host behavior. |
+| First-party extension composition or WebMCP | [Extension API](docs/api.md#configure-first-party-extensions) and [WebMCP guide](docs/webmcp.md) | Preserve the documented opt-in package boundary, update schemas and lifecycle coverage, and exercise supported and unavailable-host behavior. |
 | Package exports, build output, dependency policy, or tarball contents | [Package verification](docs/package-verification.md) | Update package-policy tests, installed-consumer verification, and release evidence contracts as applicable. |
 | Documentation or examples | [Documentation hub](docs/README.md), [example guide](examples/README.md), and [coding conventions](docs/code-style.md) | Keep audience routing and canonical ownership intact, validate links and exports, and update executable examples when observable behavior changes. |
 | Publication or hosted release workflow | [Release policy](docs/releasing.md), [release administration](docs/release-administration.md), and [release operations](docs/release-operations.md) | Obtain maintainer review, identify any required GitHub `Admin` or npm permission changes, and update workflow-contract tests and private evidence requirements together. Ordinary publication is outside the contributor workflow. |
@@ -54,8 +54,16 @@ decision:
 
 Give each document one primary job. If a paragraph does not help that audience
 make its decision, move it to the canonical owner or replace it with a link.
-Avoid parallel setup sequences, command inventories, API lists, responsive
-geometry, recovery matrices, and compatibility claims.
+Keep the README's first-render preview short and the Getting started tutorial
+self-contained; do not make the tutorial redirect to the preview for required
+steps.  A small runnable initialization example may appear in both, but keep
+it aligned with the basic example and verify it when the public API changes.
+Put costly integration surprises, especially date grammar, exclusive ends, and
+teardown, beside the code they affect.
+
+Avoid duplicating command inventories, API lists, responsive geometry, recovery
+matrices, and compatibility claims.  Label exhaustive API showcases and test
+fixtures before their setup instructions so readers can choose a smaller recipe.
 
 ## Tests
 

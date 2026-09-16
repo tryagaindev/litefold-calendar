@@ -1,39 +1,37 @@
 # Application integration guide
 
-This guide shows how an existing web application can adopt Litefold Calendar while keeping application policy outside the package.
+Use this guide to add a specific capability to a calendar that already renders.
+For ordinary API loading, filtering, and refresh, follow [Remote data](remote-data.md).
+Exact signatures, defaults, and failure behavior are in the [API reference](api.md).
 
-For the common API-loading path, start with the [remote-data walkthrough](remote-data.md). This guide is the deeper reference for typed adaptation, caching, styling, and composition. Jump directly to [event counts](#choose-event-counts) or [application-owned dialogs](#own-the-event-chooser) when extending an existing integration.
+| Task | Recipe |
+| --- | --- |
+| Preserve typed application metadata | [Typed source adapter](#typed-source-adapter) |
+| Show busy-day totals | [Event counts](#choose-event-counts) |
+| Open an existing picker or details dialog | [Application-owned chooser](#own-the-event-chooser) |
+| Add metadata-driven visual content | [Render-hook styling](#add-metadata-driven-visuals-without-private-selectors) |
+| Load from an existing non-module entry point | [Classic-script entry point](#classic-script-entry-point) |
 
 ## Ownership boundary
 
-Litefold Calendar owns:
+Litefold Calendar handles date placement, rendering, navigation, request
+cancellation, focus, and default recovery UI.  Your application handles networking,
+authorization, response validation, time-zone conversion, caching, filters, editing,
+routing, dialogs, and diagnostics.  Server content, search metadata, and privacy
+policy also remain application responsibilities.
 
-- Civil-date parsing, interval placement, inclusive instance bounds, the one-current-range month grid, selected-day agenda, and navigation, including the native month/year chooser.
-- Loading, request cancellation, generation guards, default retry/error UI, managed grid/event focus, progressive fallback coordination, and native pull/snap paging.
-- Generic event, action, consumer render-hook, opaque first-party extension, message, and documented `--lfc-*` token contracts.
-
-The application owns:
-
-- Networking, authentication, authorization, response validation, and diagnostic telemetry.
-- Time-zone conversion performed before event strings cross the package boundary.
-- Caching, cache invalidation, filtering, and data-freshness policy.
-- Application identifiers, metadata, routes, dialogs, commands, design tokens, and per-event surface-color policy.
-- Canonical pages, metadata, structured data, privacy, and no-JavaScript fallback content.
-
-In copyable examples, `my-*` names are application-owned placeholders: DOM IDs and classes, `data-my-*` attributes, `--my-*` custom properties, `@layer my` or `my.*` layers, render-hook IDs, and WebMCP prefixes. Replace them consistently for your application. `.litefold-calendar`, `data-litefold-calendar`, and documented `--lfc-*` properties are public hooks owned by Litefold Calendar; generated `.lfc-*` and `data-lfc-*` identifiers remain private.
-
-Do not add application-specific branches, URLs, entity rules, or selectors to the package core.
+In the recipes, `my-*` names are application-owned placeholders; rename them
+consistently.  Use `.litefold-calendar`, `data-litefold-calendar`, documented
+`--lfc-*` tokens, and public callbacks or hooks instead of private `.lfc-*` or
+`data-lfc-*` descendants.  See [Styling and customization](styling.md) for themes and visual content.
 
 ## Adoption sequence
 
-Follow these phases in order and skip the optional ones that do not apply:
-
-1. **Render the core calendar.** Install an exact prerelease, import `@tryagaindev/litefold-calendar/styles.css`, and pass a validated local event array.
-2. **Connect application data.** Add a typed adapter and, when needed, an abort-aware provider with application-owned authorization, caching, and filters. Use `setEvents()` to replace the complete input and `refetchEvents()` to rerun the current input after external state changes.
-3. **Apply product policy.** Configure inclusive date bounds, visual time exposure, toolbar content, native event links, and action callbacks.
-4. **Add optional customization.** Use named render-hook sets for application-owned visuals and explicit extension subpaths for complete first-party components. Do not inspect or style private package descendants.
-5. **Add progressive and visual integration.** Coordinate server-authored fallback markup with `fallbackElement`, then map application design tokens to documented `--lfc-*` tokens on the host.
-6. **Verify public behavior.** Test state, callbacks, roles and names, application-owned selectors, failure recovery, responsive layout, and input methods instead of private `lfc-*` structure.
+New integrations should complete [Getting started](getting-started.md), then
+connect [remote data](remote-data.md) as needed.  Return here for optional recipes;
+a typed adapter, cache, render hook, or extension is not a prerequisite for the
+first render.  Verify the behavior you add, including failure recovery and
+[application accessibility responsibilities](../ACCESSIBILITY.md#integration-responsibilities).
 
 ## Typed source adapter
 
@@ -105,7 +103,7 @@ function toAccentColor(value: string | null): string | undefined {
 }
 ```
 
-The package applies the event marker color field, `accentColor`, only to its built-in SVG marker. It does not tint the event summary or change its text, background, border, or event leading-rule color, and core rendering does not emit a `style` attribute. The [calendar anatomy and color guide](component-anatomy.md#three-color-roles-that-sound-similar) distinguishes this per-event field from the calendar-wide primary interface color and event leading-rule color. Use public tokens for application-wide styling and render-hook-owned classes for a finite event palette; use `renderEventMarker` for richer marker content.
+The package applies the event marker color field, `accentColor`, only to its built-in SVG marker. It does not tint the event summary or change its text, background, border, or event leading-rule color, and core rendering does not emit a `style` attribute. The [calendar anatomy and color guide](styling.md#three-color-roles-that-sound-similar) distinguishes this per-event field from the calendar-wide primary interface color and event leading-rule color. Use public tokens for application-wide styling and render-hook-owned classes for a finite event palette; use `renderEventMarker` for richer marker content.
 
 Dynamic event-surface colors remain an application concern. A trusted `eventDidMount` hook can place a previously validated color in an application-owned custom property on `elements.root`, but doing so creates inline style state and is incompatible with `style-src-attr 'none'`. Prefer finite render-hook-owned classes for strict-CSP integrations. Never copy unvalidated feed values into CSS, and keep text contrast, focus, forced-colors, and cleanup behavior application-owned.
 
@@ -223,7 +221,7 @@ const calendar = createCalendar(host, {
 
 `webMcp()` defaults to `"litefold-calendar"`. Use explicit role-based prefixes such as `my-schedule` and `my-public-calendar` whenever a page can host more than one calendar. Do not use array positions, counters, random values, tenant secrets, user identifiers, or localized labels. Tool names live in the document registry and are part of the application integration contract.
 
-The static import above remains in the application import graph even when `myWebMcpEnabled` is false at runtime. Builds that must remove WebMCP bytes should omit the subpath import through an application build-time branch, or dynamically import the extension before constructing the calendar. Litefold Calendar performs no runtime extension discovery. See [first-party extensions](first-party-extensions.md#bundle-and-import-behavior) for the exact bundle boundary.
+The static import above remains in the application import graph even when `myWebMcpEnabled` is false at runtime. Builds that must remove WebMCP bytes should omit the subpath import through an application build-time branch, or dynamically import the extension before constructing the calendar. Litefold Calendar performs no runtime extension discovery. See [first-party extensions](api.md#extension-imports-and-bundles) for the exact bundle boundary.
 
 The two tools either page through presentation-safe events in the currently loaded 42-day range or navigate through existing public paths. `<prefix>-get-events` can cover the allowed range or filter one date; it never fetches to satisfy a read. Neither tool exposes IDs, URLs, metadata, render-hook nodes, raw errors, or application activation commands.
 
@@ -638,7 +636,7 @@ The [action contract](api.md#handle-user-actions-calendaraction) owns callback s
 
 ## Token bridge
 
-Keep application token mapping outside the package and set overrides on the same host passed to `createCalendar()`. [DESIGN.md](../DESIGN.md) owns the canonical roles and defaults; the [CSS token contract](css-tokens.md#apply-token-overrides) provides the single supported bridge example, cascade rules, and CSP implications.
+Keep application token mapping outside the package and set overrides on the same host passed to `createCalendar()`. [DESIGN.md](../DESIGN.md) owns the canonical roles and defaults; the [Styling and customization](styling.md#apply-token-overrides) provides the single supported bridge example, cascade rules, and CSP implications.
 
 Place the calendar in a host whose border box meets the [minimum supported design width](../DESIGN.md#responsive-model). Hosts below that floor receive best-effort graceful degradation only. Above it, allow the host to reflect its actual available width and leave exact responsive behavior to the design contract. Do not override private responsive or pager internals.
 
@@ -687,7 +685,7 @@ An integration is ready when:
   the hook on resize.
 - Lifecycle, validation, replacement, fallback, render-hook, and extension scenarios satisfy the [API reference](api.md) and failures satisfy the [error guide](errors.md).
 - Keyboard, direct-input, RTL, zoom, forced-color, reduced-motion, localization, and screen-reader flows satisfy the [accessibility verification matrix](../ACCESSIBILITY.md#testing).
-- Visual overrides satisfy [DESIGN.md](../DESIGN.md) and the [CSS token contract](css-tokens.md), including affected screenshot evidence.
+- Visual overrides satisfy [DESIGN.md](../DESIGN.md) and the [Styling and customization](styling.md), including affected screenshot evidence.
 - No-JavaScript content and indexing policy satisfy the [progressive-enhancement verification](seo-and-progressive-enhancement.md#verify-progressive-behavior).
 - Any WebMCP extension uses a stable unique prefix when calendars can share a document, preserves the normal UI when unsupported, exposes only authorized event summaries, and unregisters during teardown.
 - A production install adds no transitive runtime dependency or remote asset.

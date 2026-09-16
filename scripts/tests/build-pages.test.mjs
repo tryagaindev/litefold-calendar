@@ -658,7 +658,7 @@ void test("retained snapshots preserve releases, replace main, and reject releas
 		["#my-primary-source-link", `/tree/${FIRST_COMMIT}/examples/basic`],
 		["#my-api-link", `/blob/${FIRST_COMMIT}/docs/api.md`],
 		["#my-integration-link", `/blob/${FIRST_COMMIT}/docs/integration-guide.md`],
-		["#my-quick-start-link", `/blob/${FIRST_COMMIT}/README.md#quick-start`],
+		["#my-quick-start-link", `/blob/${FIRST_COMMIT}/docs/getting-started.md`],
 		["#my-selected-commit", `/commit/${FIRST_COMMIT}`]
 	]) {
 		assert.ok(
@@ -1030,7 +1030,7 @@ void test("developer shell trusts canonical release order and pins commands and 
 		["#my-primary-source-link", `/tree/${FIRST_COMMIT}/examples/basic`],
 		["#my-api-link", `/blob/${FIRST_COMMIT}/docs/api.md`],
 		["#my-integration-link", `/blob/${FIRST_COMMIT}/docs/integration-guide.md`],
-		["#my-quick-start-link", `/blob/${FIRST_COMMIT}/README.md#quick-start`],
+		["#my-quick-start-link", `/blob/${FIRST_COMMIT}/docs/getting-started.md`],
 		["#my-selected-commit", `/commit/${FIRST_COMMIT}`]
 	]) {
 		assert.ok(

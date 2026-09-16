@@ -1,6 +1,6 @@
 # Remote data: load, filter, and refresh
 
-This walkthrough is for an application that already renders a calendar and needs events from an API. It uses JavaScript with optional JSDoc types. Start with the [first render](../README.md#first-render) if you have not created a calendar yet.
+This walkthrough is for an application that already renders a calendar and needs events from an API. It uses JavaScript with optional JSDoc types. Start with [Getting started](getting-started.md) if you have not created a calendar yet.
 
 The [runnable remote-data example](../examples/remote-data/) fetches a same-origin JSON file, offers a category filter, and opens an application-owned event chooser. Its source adapter is small enough to copy and adapt. It deliberately leaves caching and advanced render hooks to the [integration guide](integration-guide.md).
 

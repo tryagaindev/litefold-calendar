@@ -2,82 +2,80 @@
 
 # Features and scope
 
-This guide is the quickest way to determine whether Litefold Calendar fits a project. It maps common calendar terms to the public API and states the package's deliberate boundaries.
+Choose Litefold Calendar for a responsive month grid and selected-day agenda.
+Your application supplies events and handles editing, routing, and permissions.
+It is not a full scheduling platform; check the [boundaries](#deliberate-boundaries)
+before adopting it.
 
 ## Feature map
 
-| Capability | What Litefold Calendar provides | Main public surface |
+| Need | Available capability | Configure with |
 | --- | --- | --- |
-| Calendar presentation | One responsive, fixed six-week Gregorian month grid and a selected-day agenda; adjacent-month dates are fillers, not prefetched pager panels | `createCalendar()`, `render()` |
-| Month-grid layout | Equal-height week rows with common full slots for normally visible compact primary/count/overflow roots by default, or independently content-sized weeks with intrinsic compact sizing; top, center, or bottom stack placement keeps dates top-aligned | `weekRowSizing`, `gridEventPlacement` |
-| Event model | Date-only, local date-time, point, and multi-day events with exclusive ends; optional validated HTTP(S) or relative links; visual time display can differ by surface | `CalendarEventInput`, `eventTimeDisplay` |
-| Event data | A static snapshot or abort-aware provider, shape-based synchronous/PromiseLike timing, complete source replacement, current-range refetch, and typed application metadata | `events`, `CalendarEventSource`, `setEvents()`, `refetchEvents()` |
-| Grid and agenda limits | A configurable grid cap, native overflow action, paged agenda rows, DOM limit, and visible/total progress text | `maxGridEventsPerDay`, `agendaPageSize`, `agendaDomLimit` |
-| Day event counts | Independent compact/wide modes for summaries, total counts on every nonempty day, or counts only on days with multiple events; count activation opens the agenda or an application-owned chooser | `gridEventDisplay`, `onEventOverflowActivate` |
-| Navigation and bounds | Previous, Next, Today, a native month/year jump, public navigation/focus methods, and optional inclusive date limits | `prev()`, `next()`, `today()`, `gotoDate()`, `focusDate()`, `minDate`, `maxDate` |
-| User actions | Separate day selection, event activation, event context action, and day context action callbacks using native links and buttons | `onDaySelect`, `onEventActivate`, `onEventContextMenu`, `onDayContextMenu` |
-| Direct input and keyboard | Managed grid keyboard navigation plus RTL-aware native pull/snap paging for touch, pen, and horizontal precision scrolling; toolbar buttons remain the fallback | `swipe`, native interaction model |
-| Localization and zones | `Intl` formatting, message overrides, locale-derived or explicit week starts, inherited RTL direction, and IANA projection for supplied `Date` instants | `locale`, `messages`, `firstDay`, `timeZone` |
-| Application UI | One owned toolbar element, custom icons, day/event node hooks, mount cleanup, and isolated hook failure | `toolbarEnd`, `icons`, `CalendarRenderHooks` |
-| Styling | Scoped CSS, documented `--lfc-*` tokens, container-query responsiveness, preference-aware themes, and an optional validated event marker color | [Calendar anatomy](component-anatomy.md), [design system](../DESIGN.md), [CSS tokens](css-tokens.md) |
-| State and recovery | Immutable month, selection, range, phase, and issue snapshots; persistent error/Retry UI; application error and announcement bridges | `getState()`, `onStateChange`, `onError`, `onAnnounce` |
-| Progressive fallback | Coordination of application-owned no-JavaScript markup, hidden only after a usable snapshot commits | `fallbackElement` |
-| Optional components | WebMCP is available from an explicit first-party subpath and becomes a no-op when its browser API is unavailable | `extensions`, `@tryagaindev/litefold-calendar/extensions/webmcp` |
-| Packaging | Pure ESM, declarations, DOM-free module evaluation, no remote assets, and no runtime, peer, optional, or bundled dependencies | Package root, `./styles.css`, and `./extensions/webmcp` exports |
+| Month and agenda | One six-week Gregorian grid with the selected day's event list | `createCalendar()` |
+| Local or remote data | Pass an array or a function that loads the visible dates; replace or reload it | `events`, `setEvents()`, `refetchEvents()` |
+| All-day and timed events | Date-only, local date-time, point, and multi-day events with exclusive ends | `CalendarEventInput` |
+| Busy days | Event summaries or day counts, overflow actions, and paged agenda rows | `gridEventDisplay`, `maxGridEventsPerDay`, `agendaPageSize`, `agendaDomLimit` |
+| Navigation | Toolbar controls, a month/year chooser, keyboard navigation, optional swipe, and date bounds | Navigation methods, `swipe`, `minDate`, `maxDate` |
+| Application actions | Separate day, event, overflow, and context actions; native event links | Action callbacks, event `url` |
+| Localization | Localized dates and messages, week starts, RTL, and zone projection for `Date` inputs | `locale`, `messages`, `firstDay`, `timeZone` |
+| Visual customization | Themes, CSS tokens, event markers, toolbar content, and render hooks | Styling and integration guides below |
+| Recovery | Loading state, persistent errors and Retry, state callbacks, and optional fallback content | `onStateChange`, `onError`, `fallbackElement` |
+| Optional site tools | Explicit opt-in to experimental WebMCP | First-party WebMCP extension |
+| Packaging | Pure ESM with TypeScript declarations, a separate stylesheet, and no runtime dependencies | Package root and documented subpaths |
 
 ## Choose an example
 
-Start with the [basic example](../examples/basic/) for a first render. The [examples guide](../examples/README.md) owns the audience and scenario matrix for asynchronous errors, progressive enhancement, migration, advanced integration, and repository coverage.
+Follow [Getting started](getting-started.md) for your first integration, then
+[Remote data](remote-data.md) for an API.  The [examples guide](../examples/README.md)
+includes runnable versions and an explicitly exhaustive advanced API showcase.
 
 ## Calendar display
 
-The package presents one fixed six-week Gregorian month grid plus the selected day's agenda. Its week tracks are equally sized by default, with independent content sizing available, and its event/overflow stack can align to the top, center, or bottom of the space below each top-aligned date. It also supports adjacent-month filler dates, bounded navigation, native event representations, grid overflow, paged agenda rows, and visual time-display choices. Below a `24rem` calendar content width, package CSS shows the locale's abbreviated month with a numeric year in the toolbar and decorative pager lanes; exactly `24rem` and above uses the full month. Complete accessible month naming remains unchanged. Applications must provide the [minimum supported calendar host width](../DESIGN.md#responsive-model); hosts below that floor receive best-effort graceful degradation.
-
-The [API reference](api.md) owns exact grid, occupancy, sorting, limit, and agenda behavior. [DESIGN.md](../DESIGN.md) owns visual composition and responsive behavior; the [accessibility guide](../ACCESSIBILITY.md) owns semantics, naming, targets, keyboard behavior, and focus.
+The layout adapts to its container, not the viewport.  Choose equal-height or
+content-sized weeks and top, center, or bottom event placement without moving
+the dates.  Check the [supported host width and responsive layout](../DESIGN.md#responsive-model)
+before placing it in a narrow sidebar.
 
 ## Events and event fetching
 
-The typed `events` option accepts a local snapshot or an application-owned, abort-aware provider. The same metadata generic flows through normalized events, actions, render hooks, and complete `setEvents()` replacements. Transport, authorization, aggregation, filtering, and caching remain application responsibilities.
-
-The [event and source contracts](api.md#supply-events-calendarevents-and-calendareventsource) own exact input grammar, URL validation, ranges, cancellation, atomic admission, replacement, reentrancy, retained-data behavior, and normalized output. Start with the [remote-data walkthrough](remote-data.md) for fetching and filters; use the [integration guide](integration-guide.md#typed-source-adapter) for typed adapter and caching recipes.
+Pass an event array, or a function that loads events for the visible dates.
+Use `setEvents()` to replace that input and `refetchEvents()` to reload it.
+The application handles networking, authorization, filtering, recurrence
+expansion, and caching.  See the [remote-data walkthrough](remote-data.md).
 
 ## Navigation and actions
 
-Users can navigate through native toolbar controls, the month/year chooser, optional direct-input paging, keyboard commands, and public methods. Day selection, event activation, event-count activation, event context actions, and day context actions remain separate capabilities.
-
-The [API reference](api.md#control-the-calendar-calendar) owns method and callback contracts, bounds, and failure behavior. The [accessibility interaction model](../ACCESSIBILITY.md#interaction-model) owns keyboard, focus, popover, gesture, and RTL interaction; [DESIGN.md](../DESIGN.md) owns their presentation.
+Users can select days, follow event links, open application dialogs, and navigate
+with the toolbar, keyboard, or optional swipe.  Day selection and event activation
+are separate actions.  See [action and navigation contracts](api.md#control-the-calendar-calendar)
+and [keyboard behavior](../ACCESSIBILITY.md#interaction-model).
 
 ## Localization and time zones
 
-Locale-aware `Intl` formatting, locale-derived or explicit week starts, message overrides, IANA-zone projection for supplied `Date` instants, and Gregorian civil event strings are supported. Locale changes presentation and week convention, not the underlying Gregorian calendar system.
-
-The [API configuration contract](api.md#configure-behavior-calendaroptions) owns accepted values, fallbacks, construction-time immutability, and the distinction between projected `Date` instants and unchanged event strings.
+Locale changes presentation and week conventions, not the Gregorian date model.
+Event strings are civil dates or local date-times, not UTC/offset timestamps;
+`timeZone` projects supplied `Date` instants but never converts event strings.
+See [date examples](getting-started.md#understand-event-dates).
 
 ## Custom toolbar, rendering, and styling
 
-Application-owned toolbar content, directional icons, day badges, event content, overflow visuals, and mount behavior are available through public render hooks. Hooks customize documented content slots without transferring ownership of responsive placement or private package DOM. Consumers must not measure widths to reproduce package responsive states or target private title and pager labels; container CSS owns those transitions. Litefold Calendar isolates a failing hook set and restores package defaults for the slots it owned.
-
-The [render-hook API](api.md#customize-rendering-calendarrenderhooks) defines every input, return value, cleanup rule, and failure behavior. The [typed integration recipe](integration-guide.md#add-metadata-driven-visuals-without-private-selectors) shows how to map application metadata to owned classes and nodes.
-
-Import `@tryagaindev/litefold-calendar/styles.css`, follow [DESIGN.md](../DESIGN.md) for visual roles and responsive behavior, and use the [CSS token contract](css-tokens.md) for host overrides, cascade layers, and CSP. Do not depend on private package selectors.
+Use [Styling and customization](styling.md) to apply a theme, choose a content
+slot, or distinguish event marker colors from interface colors.  The
+[render-hook reference](api.md#customize-rendering-calendarrenderhooks) defines exact contracts.
 
 ## Optional first-party extensions
 
-Complete package-owned components use opaque `CalendarExtension` values in `CalendarOptions.extensions`. The current optional component is imported from `@tryagaindev/litefold-calendar/extensions/webmcp`; the root entry does not re-export it. Omitting that subpath import keeps WebMCP outside the application's import graph, while a runtime condition around a static import controls activation rather than bundle inclusion.
-
-Extensions may be headless and own more than one coordinated lifecycle behavior. They are distinct from application-owned `CalendarRenderHooks`. See [first-party extensions](first-party-extensions.md) for composition, ordering, teardown, isolation, bundle behavior, and the intentionally future-facing status of third-party authoring.
+[WebMCP](webmcp.md) is an opt-in, experimental extension with a separate import.
+The calendar works without it, including when the browser API is unavailable.
+See [first-party extensions](api.md#configure-first-party-extensions) for composition and bundle behavior.
 
 ## Errors, state, and recovery
 
-The observable state distinguishes loading, usable empty data, retained-data
-degradation, current failures, partial render-hook failures, and fatal
-unavailability. Registered-extension failures remain diagnostic-only and do not
-alter ordinary state. The [error guide](errors.md) owns classification,
-presentation transfer, announcements, diagnostics, and recovery; the
-[API reference](api.md#observe-state-calendarstate) owns state, source timing,
-and callback shapes.
-
-`fallbackElement` can coordinate application-authored no-JavaScript content. The [API reference owns its exact lifecycle](api.md#application-integration-options); the [progressive-enhancement guide](seo-and-progressive-enhancement.md) owns the server-content, crawlability, metadata, privacy, and verification recipe.
+The calendar distinguishes empty data from failures and provides Retry for source
+errors.  A failed same-range refresh can keep previously loaded events visible.
+See [error handling](errors.md) before replacing its default presentation, or
+[progressive enhancement](seo-and-progressive-enhancement.md) to coordinate
+application-authored fallback content.
 
 <a id="deliberate-alpha-boundaries"></a>
 
