@@ -33,10 +33,12 @@ Resolve the current Node and package-manager selection from repository manifests
 dependency state from the lockfile, script composition from `package.json`, and
 hosted behavior from workflows. Do not freeze those values in this skill.
 
-The contributor command index owns local command sequences. Its complete
-repository gate is the gate run by hosted CI, but hosted CI may add platform
-controls such as dependency review and its exact execution environment. Report
-local and hosted results separately.
+The contributor command index owns local command sequences and the local versus
+hosted browser matrix. The shared gate command checks Chromium, Firefox, and
+WebKit locally; hosted CI and publication select Chromium and WebKit. Hosted CI
+also adds controls such as dependency review and its exact execution environment.
+Report local and hosted results separately, and re-read the command index before
+choosing validation.
 
 ## Repository-specific safeguards
 

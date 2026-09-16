@@ -6,8 +6,9 @@ contexts; they are not names for private CSS selectors.
 
 [![Annotated wide and compact calendar cells showing day, event, and overflow anatomy](assets/calendar-anatomy.svg)](assets/calendar-anatomy.svg)
 
-The diagram is a schematic. Responsive CSS can reflow or visually hide parts,
-but it does not change their public names or ownership.
+The diagram is a schematic showing wide event summaries beside the default
+compact total-count presentation. Responsive CSS can reflow or visually hide
+parts, but it does not change their public names or ownership.
 
 ## Calendar surface
 
@@ -49,7 +50,7 @@ tracks share the tallest intrinsic height or size independently; it does not
 change this DOM structure.
 
 The phrase **day badge** means the `renderDayBadge` slot. Use **Today
-indicator** for the circular treatment applied to today's day number, and use
+indicator** for the rounded treatment applied to today's day number, and use
 **event marker** for the visual attached to an event. These are three different
 parts.
 
@@ -92,23 +93,34 @@ text, a shape, or another non-color cue.
 ## Event overflow
 
 **Event overflow** is the umbrella term for the day-level presentation used
-when the cell cannot show every event summary. It is separate from an individual
-event representation and from the day badge.
+to show a total count or access occurrences beyond the visible summaries. It is
+separate from an individual event representation and from the day badge.
+
+`gridEventDisplay` chooses the presentation independently for compact and wide
+containers. By default, compact days with multiple occurrences show a total-count
+button; wide days show capped individual summaries and an overflow action when
+needed. The [API reference](api.md#configure-behavior-calendaroptions) owns
+all modes, defaults, and count rules.
 
 | Variant | What users see | Action ownership |
 | --- | --- | --- |
-| Compact overflow cue | A social-style count such as `+3`, paired with the compact primary event marker/action, or an unsigned total such as `4` when no marker is visible. | Usually passive with `elements.action === null`. When the overflow button itself is the compact primary control, such as with `maxGridEventsPerDay: 0`, `elements.action` is that native button. |
-| Wide overflow action | Localized text such as `3 more` after the visible grid summaries. | Always presented inside the native overflow button exposed as `elements.action`. |
+| Compact total-count action | A bordered button containing a localized total such as `4`. | `display: "count"`; `elements.action` is the native button. Visual content is decorative; the action announces the exact total and date. |
+| Wide total-count action | A bordered button containing localized text such as `4 events`. | `display: "count"`; the native button is shared with the applicable compact presentation. |
+| Compact overflow cue in `"events"` mode | A signed additional count such as `+3`, paired with the compact primary event marker/action, or an unsigned total such as `4` when no marker is visible. | `display: "overflow"`; usually passive with `elements.action === null`. When the overflow button itself is the compact primary control, such as with `maxGridEventsPerDay: 0`, `elements.action` is that native button. |
+| Wide overflow action in `"events"` mode | Localized text such as `3 more` after the visible grid summaries. | `display: "overflow"`; always presented inside the native overflow button exposed as `elements.action`. |
 
-Both applicable variants are created during a render. Container CSS chooses
-which one is visible; resizing does not rerun `renderEventOverflow`. In compact
-layout with equal week rows, package-owned, normally visible primary-event,
-count, and compact-primary overflow roots use one common full slot. Paired roots
-may share a row or stack while retaining that size. Content-sized weeks keep
-compact roots intrinsic, and later event summaries exposed only on focus remain
-intrinsic in either mode. A markerless total or action-backed fallback uses one
-centered block. The configured `gridEventPlacement` moves the complete summaries
-area, not either compact block independently.
+All applicable variants are created during a render. Container CSS chooses
+which summaries and variant are visible; resizing does not rerun
+`renderEventOverflow`. An already focused action stays visible until blur.
+Normally visible compact primary events and overflow cues can share a row or
+stack, while total counts use one centered button. Equal week rows give count
+buttons a square minimum with rounded borders; wrapped or enlarged count text
+can make them taller. Content-sized weeks keep these buttons intrinsically
+sized without that square minimum. Both modes preserve target size and allow
+text to wrap without shrinking the count typography. Later event summaries
+exposed only on focus remain intrinsic in either mode. The configured
+`gridEventPlacement` moves the complete summaries area. See the
+[responsive design](../DESIGN.md#responsive-model) for the geometry contract.
 
 Every overflow context exposes:
 
@@ -117,8 +129,14 @@ Every overflow context exposes:
 - `elements.action`: the native overflow button, or `null` for a passive compact
   cue.
 - `variant`: `"compact"` or `"wide"`; use this instead of measuring the viewport.
+- `display`: `"count"` for a total or `"overflow"` for remaining occurrences.
 - `eventCount`, `visibleEventCount`, and `overflowCount`: authoritative counts.
 - `text`: the package-formatted visual fallback for that variant.
+
+Count contexts set `visibleEventCount: 0` and `overflowCount: eventCount`.
+`null` retains built-in content inside a native action; it can suppress only a
+passive compact cue. Count actions therefore remain available after visual
+customization.
 
 Return a detached, noninteractive node from `renderEventOverflow` to customize
 the content. The package retains placement, target geometry, accessible naming,
@@ -126,6 +144,12 @@ activation, and focus behavior. Fit compact output within its assigned slot, or
 increase `--lfc-control-min-size` and `--lfc-grid-event-min-block-size` so normal
 package-owned roots grow together. Oversized output remains unclipped but opts
 out of equal visual sizing.
+
+Activating a count or overflow action invokes `onEventOverflowActivate` before
+the default selection and agenda focus transfer. Synchronous cancellation lets
+the application own its event chooser and focus restoration. See the
+[accessibility interaction model](../ACCESSIBILITY.md#interaction-model) for
+the exact callback and focus responsibilities.
 
 ## Three color roles that sound similar
 
@@ -152,7 +176,9 @@ a CSS-token override. Prefer the full terms above instead of saying only
 | Add content immediately after the title | `renderEventDetails` |
 | Add content after all other event content | `renderEventTrailing` |
 | Add a decorative day badge | `renderDayBadge` |
-| Replace compact and wide overflow visuals | `renderEventOverflow`, branching on `context.variant` |
+| Choose total counts or individual summaries | `gridEventDisplay` |
+| Replace compact and wide count/overflow visuals | `renderEventOverflow`, branching on `context.variant` and `context.display` |
+| Open an application-owned event chooser | `onEventOverflowActivate` with synchronous cancellation |
 | Observe or carefully decorate a live day or event representation | `dayDidMount` or `eventDidMount`, with synchronous cleanup |
 
 `renderEventMarker` and `renderEventOverflow` are singleton presentation hooks:

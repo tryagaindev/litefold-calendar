@@ -26,9 +26,13 @@ npm ci --ignore-scripts
 npm run test:browser:install
 ```
 
-That helper installs the pinned browser binaries without changing package dependencies. On a fresh Linux host that lacks browser system dependencies, use `npx --no-install playwright install --with-deps chromium firefox webkit` instead.
+That helper installs all three pinned browser binaries for local checks without changing package dependencies. On a fresh Linux host that lacks browser system dependencies, use `npx --no-install playwright install --with-deps chromium firefox webkit` instead. Hosted CI and publication install only Chromium and WebKit; Firefox checks remain local for now.
 
 ## Explore and build
+
+Use `npm run dev` for Vite's local example development loop. Compatibility,
+screenshot, CSP, and release checks use the built package through the repository
+server; development-server success does not replace those checks.
 
 Build the package and examples, then start the loopback demo server:
 
@@ -98,7 +102,7 @@ npm run test:browser:webkit
 
 ### Run browser checks concurrently
 
-One Playwright invocation starts one repository server on port `4173` by default and shares that origin across every configured browser project and worker. Keep that shared origin for the normal browser matrix so Chromium, Firefox, and WebKit exercise the same server contract.
+One Playwright invocation starts one repository server on port `4173` by default and shares that origin across every configured browser project and worker. Keep that shared origin for the local browser matrix so Chromium, Firefox, and WebKit exercise the same server contract.
 
 When separate Playwright CLI processes must run concurrently in the same checkout, build once, then give each process both a distinct `LFC_PLAYWRIGHT_PORT` value from IANA's [Dynamic/Private range](https://www.rfc-editor.org/rfc/rfc6335.html#section-6) (`49152` through `65535`) and a distinct `--output` directory. There is no dedicated standardized Playwright test port; the examples use the first three ports in that general-purpose range. Launch these commands in separate PowerShell sessions after `npm run build` completes:
 
@@ -119,14 +123,15 @@ npm run test:browser:built -- --project=webkit --output=test-results/playwright-
 
 Ports `49152` through `49154` are unassigned Dynamic/Private ports rather than registered service ports, but they are not reserved for this project or for testing. Confirm that the block is available locally before starting the processes; each process fails explicitly if another listener owns its port. Do not assign separate ports to projects or workers inside one Playwright invocation. Do not scan through arbitrary ports without browser validation; browsers reject some otherwise valid TCP ports.
 
-## Update screenshots intentionally
+## Prepare and review screenshots
 
-When an intentional visual change affects a canonical scene, regenerate the
-tracked screenshot set and manifest, review every diff, and follow the
-[screenshot contract](docs/screenshots/README.md).
+Prepare screenshot evidence after source and build inputs settle. The preparation
+command skips current evidence, otherwise builds and validates a staged capture
+batch and produces a before/after gallery. Review every changed scene using the
+[screenshot contract](docs/screenshots/README.md). CI verification remains read-only.
 
 ```shell
-npm run screenshots:update
+npm run screenshots:prepare
 ```
 
 ```shell
@@ -135,7 +140,7 @@ npm run check:screenshots
 
 ## Run the final gate
 
-Both commands include tarball verification and therefore require the intended changes to be committed and the worktree to be clean. `npm run check` is the complete repository gate invoked by CI; it does not reproduce hosted controls such as dependency review or the workflow's exact environment. `check:fast` omits real-browser scenarios and is only a local fallback when the required Playwright browser binaries are unavailable.
+Both commands include tarball verification and therefore require the intended changes to be committed and the worktree to be clean. `npm run check` is the complete repository gate invoked locally and by CI. Locally, its browser suite includes Chromium, Firefox, and WebKit; when `CI` is set, the Playwright configuration selects Chromium and WebKit. The same selection applies to `test:browser` and `test:browser:built`. Local checks do not reproduce hosted controls such as dependency review or the workflow's exact environment. `check:fast` omits real-browser scenarios and is only a local fallback when the required Playwright browser binaries are unavailable.
 
 ```shell
 npm run check:fast
@@ -147,7 +152,21 @@ Before submission, run the complete gate:
 npm run check
 ```
 
+For additional local Firefox diagnosis, repeat the affected tests 20 times with
+zero retries and run three complete passes. After building, run this optional
+qualification on the current platform with `CI` unset:
+
+```shell
+node scripts/qualify-firefox.mjs
+```
+
+This separate local qualification is not included in `npm run check` and is not a hosted required check. Firefox remains within the [browser support policy](docs/browser-support.md).
+
 ## Deliver a contributor change
+
+For an end-to-end request, follow the [local-to-production checklist](docs/change-delivery.md).
+It connects phase commits, clean-tree checks, review, nightly publication, and the
+separate release Pages verification.
 
 Automation that supports repository skills can invoke [`$commit-and-push`](.agents/skills/commit-and-push/SKILL.md) to audit Git state, validate and commit only the intended files, and push an ordinary feature branch. The skill is operational guidance, not a shell command or additional repository authority.
 

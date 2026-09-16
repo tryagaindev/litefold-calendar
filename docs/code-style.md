@@ -22,6 +22,10 @@ Use diagrams when they make a relationship materially easier to understand, whil
 - Do not use Mermaid frontmatter, embedded HTML, initialization/configuration directives, or `click` directives. Put navigation in ordinary Markdown links so repository checks can validate it.
 - Diagram stable concepts, public vocabulary, and ownership boundaries. Do not duplicate exhaustive module inventories, private selectors, incidental DOM order, or other volatile implementation details that would create a second source of truth.
 
+## Browser compatibility
+
+Apply the [Baseline Widely available policy](browser-support.md) to library code, examples, and published-site code. Resolve the shared `baseline-widely-available` preset through Vite's public API; its support window is fixed per Vite major rather than updated daily. Do not copy resolved browser versions into source or prose. Review Vite dependency updates, including majors, through CI. Check new platform features against the installed preset's effective targets; a current Baseline badge alone is insufficient. Features outside those targets require capability detection and an independently tested supported implementation. Keep compatibility work local to the missing capability and release its listeners during teardown; do not add broad layout-observer systems or global polyfills. WebMCP remains an optional progressive extension.
+
 ## TypeScript contracts
 
 - Keep strict TypeScript and `exactOptionalPropertyTypes`; omit an optional property instead of assigning `undefined`.

@@ -1,7 +1,5 @@
 import semver from "semver";
 
-const ALPHA_BUMPS = new Set(["prerelease", "prepatch", "preminor"]);
-
 /** Parses a strict, normalized Semantic Version. */
 export function parseSemVer(value) {
 	const parsed = typeof value === "string" ? semver.parse(value) : null;
@@ -24,31 +22,4 @@ export function compareSemVer(left, right) {
 	parseSemVer(left);
 	parseSemVer(right);
 	return semver.compareBuild(left, right);
-}
-
-/** Calculates the supported next public alpha version. */
-export function nextAlphaVersion(value, bump) {
-	parseSemVer(value);
-	if (!ALPHA_BUMPS.has(bump)) {
-		throw new Error(`Unsupported alpha version bump: ${String(bump)}`);
-	}
-	const next = semver.inc(value, bump, "alpha");
-	if (next === null || !isAlphaVersion(next)) {
-		throw new Error(`Unable to calculate the next alpha version from ${value}.`);
-	}
-	return next;
-}
-
-/** Identifies the repository's supported 0.x.y-alpha.N release shape. */
-export function isAlphaVersion(value) {
-	try {
-		const parsed = parseSemVer(value);
-		return parsed.major === 0 &&
-			parsed.build.length === 0 &&
-			parsed.prerelease.length === 2 &&
-			parsed.prerelease[0] === "alpha" &&
-			Number.isSafeInteger(parsed.prerelease[1]);
-	} catch {
-		return false;
-	}
 }

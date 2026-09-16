@@ -10,6 +10,7 @@ import {
     SUPPORTED_NODE_SELECTOR
 } from "./lib/node-version.mjs";
 import { normalizeNpmPackResult } from "./lib/npm-pack-result.mjs";
+import { inspectDistributionInventory, inspectPackageBundles } from "./lib/package-bundle-policy.mjs";
 import {
     expectedExtensionExport,
     extractExtensionEntries,
@@ -57,10 +58,10 @@ const EXPECTED_REPOSITORY = "git+https://github.com/tryagaindev/litefold-calenda
 const EXPECTED_PUBLISH_CONFIG = Object.freeze({
     access: "public",
     provenance: true,
-    tag: "alpha"
+    tag: "nightly"
 });
 const WORKFLOW_NODE_VERSION = "24.19.0";
-const ALPHA_VERSION = /^0\.\d+\.\d+-alpha\.\d+$/u;
+const SOURCE_VERSION = /^\d+\.\d+\.\d+-nightly\.0$/u;
 const PUBLIC_ROOT_CLASS = "litefold-calendar";
 const PUBLIC_ROOT_SELECTOR = `:where(.${PUBLIC_ROOT_CLASS})`;
 const ROOT_ATTRIBUTE_SELECTOR = /\[\s*data-(?:lfc|litefold)-calendar\s*(?=\]|[~|^$*]?=)/iu;
@@ -147,20 +148,6 @@ const PACKED_MODULES = (await listFiles(join(REPOSITORY_ROOT, "src")))
     .sort((left, right) => left.localeCompare(right, "en"));
 
 const PACKED_MODULE_SET = new Set(PACKED_MODULES);
-
-const ALLOWED_PACKED_FILES = new Set([
-    "LICENSE",
-    "README.md",
-    "package.json",
-    "dist/styles.css",
-    "dist/styles.css.d.ts",
-    ...PACKED_MODULES.flatMap((moduleName) => [
-        `dist/${moduleName}.d.ts`,
-        `dist/${moduleName}.d.ts.map`,
-        `dist/${moduleName}.js`,
-        `dist/${moduleName}.js.map`
-    ])
-]);
 
 function inspectExtensionCatalog(extensionEntries) {
     const exportedIds = new Set(extensionEntries.map((entry) => entry.id));
@@ -1209,139 +1196,9 @@ async function inspectWorkflowTree(
 }
 
 function inspectPackedFiles(packResult) {
-    for (const file of packResult.files ?? []) {
-        const path =
-            String(file.path)
-                .replaceAll("\\", "/");
-
-        if (!ALLOWED_PACKED_FILES.has(path)) {
-            addError(
-                `Unexpected packed file: ${path}.`
-            );
-        }
-    }
-
-    const packedPaths =
-        new Set(
-            (packResult.files ?? []).map(
-                (file) =>
-                    String(file.path)
-                        .replaceAll("\\", "/")
-            )
-        );
-
-    for (const required of
-        ALLOWED_PACKED_FILES) {
-        if (!packedPaths.has(required)) {
-            addError(
-                `Required packed file is missing: ${required}.`
-            );
-        }
-    }
-}
-
-function inspectSourceMap(path, source) {
-    const packagePath =
-        relative(REPOSITORY_ROOT, path)
-            .replaceAll("\\", "/");
-
-    const mapExtension =
-        packagePath.endsWith(".d.ts.map")
-            ? ".d.ts.map"
-            : packagePath.endsWith(".js.map")
-                ? ".js.map"
-                : "";
-
-    const moduleName =
-        packagePath.startsWith("dist/") &&
-        mapExtension.length > 0
-            ? packagePath.slice(
-                "dist/".length,
-                -mapExtension.length
-            )
-            : "";
-
-    if (!PACKED_MODULE_SET.has(moduleName)) {
-        addError(
-            `${packagePath} is not an expected published source map.`
-        );
-        return;
-    }
-
-    let sourceMap;
-
-    try {
-        sourceMap =
-            JSON.parse(source);
-    } catch {
-        addError(
-            `${packagePath} is not valid JSON.`
-        );
-        return;
-    }
-
-    if (sourceMap === null ||
-        typeof sourceMap !== "object" ||
-        Array.isArray(sourceMap)) {
-        addError(
-            `${packagePath} must contain a source map object.`
-        );
-        return;
-    }
-
-    const expectedSource =
-        relative(
-            dirname(path),
-            join(
-                REPOSITORY_ROOT,
-                "src",
-                `${moduleName}.ts`
-            )
-        ).replaceAll("\\", "/");
-
-    const outputExtension =
-        mapExtension === ".d.ts.map"
-            ? ".d.ts"
-            : ".js";
-
-    const outputFile =
-        `${moduleName.split("/").at(-1) ?? moduleName}${outputExtension}`;
-
-    if (sourceMap.version !== 3) {
-        addError(
-            `${packagePath} must use source map version 3.`
-        );
-    }
-
-    if (sourceMap.file !== outputFile) {
-        addError(
-            `${packagePath} must identify ${outputFile} as its generated file.`
-        );
-    }
-
-    if (sourceMap.sourceRoot !== "") {
-        addError(
-            `${packagePath} must use an empty sourceRoot.`
-        );
-    }
-
-    if (!isExactValue(
-        sourceMap.sources,
-        [expectedSource]
-    )) {
-        addError(
-            `${packagePath} sources must resolve only to ${expectedSource}.`
-        );
-    }
-
-    if (mapExtension === ".js.map" &&
-        (!Array.isArray(sourceMap.sourcesContent) ||
-            sourceMap.sourcesContent.length !== 1 ||
-            typeof sourceMap.sourcesContent[0] !== "string" ||
-            sourceMap.sourcesContent[0].length === 0)) {
-        addError(
-            `${packagePath} must embed sourcesContent for every source.`
-        );
+    const paths = (packResult.files ?? []).map((file) => String(file.path).replaceAll("\\", "/"));
+    for (const error of inspectDistributionInventory(paths, PACKED_MODULES, publicJavaScript, { packed: true })) {
+        addError(error);
     }
 }
 
@@ -1367,6 +1224,8 @@ try {
 
 inspectExtensionCatalog(extensionEntries);
 
+const publicJavaScript = ["dist/index.js", ...extensionEntries.map((entry) => entry.distJavaScript)];
+
 const developmentNodeRange =
     packageJson.devEngines?.runtime?.version;
 
@@ -1387,10 +1246,10 @@ if (packageJson.name !== EXPECTED_PACKAGE_NAME) {
     );
 }
 
-if (!ALPHA_VERSION.test(packageJson.version) ||
+if (!SOURCE_VERSION.test(packageJson.version) ||
     packageJson.private !== false) {
     addError(
-        "The manifest must declare a public 0.x.y-alpha.N prerelease."
+        "The source manifest must declare a public x.y.z-nightly.0 snapshot base."
     );
 }
 
@@ -1579,7 +1438,7 @@ if (!isExactValue(
     EXPECTED_PUBLISH_CONFIG
 )) {
     addError(
-        "Public alpha packages require exact public access, provenance, and alpha dist-tag policy."
+        "Public nightly packages require exact public access, provenance, and nightly dist-tag policy."
     );
 }
 
@@ -1722,13 +1581,7 @@ await inspectWorkflowTree({
         LFC_NPM_VERSION:
             String(referenceNpmVersion)
     },
-    ".github/workflows/prepare-alpha.yml": {
-        LFC_NODE_VERSION:
-        WORKFLOW_NODE_VERSION,
-        LFC_NPM_VERSION:
-            String(referenceNpmVersion)
-    },
-    ".github/workflows/publish-alpha.yml": {
+    ".github/workflows/publish-nightly.yml": {
         LFC_NODE_VERSION:
         WORKFLOW_NODE_VERSION,
         LFC_NPM_VERSION:
@@ -1788,6 +1641,7 @@ if (process.argv.includes("--built")) {
         }
     }
 
+    const builtContent = new Map();
     for (const path of builtFiles) {
         const extension =
             extname(path);
@@ -1798,6 +1652,8 @@ if (process.argv.includes("--built")) {
                 "utf8"
             );
 
+        builtContent.set(relative(REPOSITORY_ROOT, path).replaceAll("\\", "/"), source);
+
         inspectRuntimeLiterals(
             path,
             source
@@ -1805,12 +1661,6 @@ if (process.argv.includes("--built")) {
 
         if (extension === ".js") {
             inspectScript(
-                path,
-                source
-            );
-        } else if (path.endsWith(".js.map") ||
-            path.endsWith(".d.ts.map")) {
-            inspectSourceMap(
                 path,
                 source
             );
@@ -1828,6 +1678,19 @@ if (process.argv.includes("--built")) {
                 source
             );
         }
+    }
+
+    const sourceContent = new Map(await Promise.all(PACKED_MODULES.map(async (moduleName) => {
+        const path = `src/${moduleName}.ts`;
+        return [path, await readFile(join(REPOSITORY_ROOT, path), "utf8")];
+    })));
+    for (const error of inspectPackageBundles({
+        files: builtContent,
+        sources: sourceContent,
+        sourceModules: PACKED_MODULES,
+        publicJavaScript
+    })) {
+        addError(error);
     }
 }
 

@@ -5,9 +5,11 @@ description: Coordinate a maintainer-authorized npm release through repository-o
 
 # Release to npm
 
-Coordinate the repository-owned release process without replacing human
-approvals or widening credential boundaries. Read-only planning and verification
-do not authorize a public mutation.
+Coordinate the repository-owned release process within the user's authorized
+scope and the configured hosted controls. Read-only planning and verification
+do not authorize a public mutation. An explicit request to implement and publish
+through named delivery stages does authorize those stages; preserve that scope
+instead of requesting the same permission again.
 
 ## Load repository authority
 
@@ -37,10 +39,13 @@ workflow runs, the repository's private release record, and fresh read-only
 registry responses. A local branch, tag, worktree, artifact directory, cached
 response, or remembered prior run is not publication authority.
 
-Do not infer a version bump, release role, or permission. Confirm the candidate,
-the release operator, any required reviewer for the `npm` environment, and the
-authenticated npm package maintainer as required by the runbook. One person may
-fill multiple roles only when the hosted policy permits it.
+Derive the candidate strategy, environment names, and required roles from the
+current runbook and hosted state. An authorized nightly start uses unattended
+OIDC trusted publication and does not require a manual environment reviewer, npm
+token, or local npm login. Nightly leaves `latest` unchanged and verifies it
+through public registry reads. Stable publication retains its separately
+configured review controls.
+One person may fill multiple roles only when the hosted policy permits it.
 
 For an authorized start or continuation, create or update the private release
 record defined by the runbook. Keep it outside the repository in an approved,
@@ -51,27 +56,32 @@ conversation, command output, or automation.
 Treat unavailable, stale, malformed, conflicting, or ambiguous identity evidence
 as a stop condition.
 
-## Pause at mutation boundaries
+## Respect mutation boundaries
 
 Immediately before every external mutation:
 
 1. State the exact repository, candidate version, source commit, workflow run,
    and current public identity that are known at that phase.
 2. Explain the expected mutation and its irreversible or protected effects.
-3. Obtain explicit authorization for that mutation.
+3. Confirm that the user's existing authorization covers that mutation; ask only
+   when it does not.
 4. Follow only the corresponding canonical runbook section.
 5. Read back the resulting state and update the private record before advancing.
 
-Separate authorization is required for each applicable preparation dispatch,
-pull-request submission, merge, protected publication approval, registry
-metadata change, workflow rerun, deployment action, and recovery mutation. A
-general request to "release" is not standing approval for later irreversible
-steps.
+Identify the authorized preparation, pull-request, merge, publication, registry,
+deployment, and recovery stages explicitly. Do not widen an ordinary Git request
+into a release or a nightly request into a stable release. Required hosted reviews
+still apply even when the user authorizes a complete delivery. A scheduled nightly
+uses its reviewed unattended workflow; do not insert an interactive approval into
+that workflow or bypass the distinct stable publication controls.
 
-Never publish locally, collect registry credentials, add a long-lived publishing
-token, manufacture a release trigger, push or move a version tag, rewrite a
-shared branch, create public release state from an arbitrary ref, or weaken a
-hosted protection to make progress.
+Never publish locally, collect credentials in conversation or release notes,
+manufacture a release trigger, push or move a version tag, rewrite a shared branch,
+or create public release state from an arbitrary ref. Changes to hosted controls
+or credential policy require an explicitly authorized, reviewed migration; a
+failed release is not permission to improvise one. Do not introduce an npm token
+or a secondary dist-tag write into the nightly path. The first stable release
+owns the future transition of `latest` to stable.
 
 ## Follow the selected phase
 

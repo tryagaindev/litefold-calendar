@@ -7,6 +7,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { JSDOM } from "jsdom";
 
+import { measureReachableJavaScriptGraph } from "./lib/calendar-workflow-measurement.mjs";
+
 import {
 	createEventSnapshots,
 	createDistributionMeasurements,
@@ -21,7 +23,6 @@ import {
 const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST_DIRECTORY = join(REPOSITORY_ROOT, "dist");
 const DIST_ENTRY = join(DIST_DIRECTORY, "index.js");
-const DIST_COORDINATOR = join(DIST_DIRECTORY, "internal", "runtime", "coordinator.js");
 const require = createRequire(import.meta.url);
 const JSDOM_VERSION = require("jsdom/package.json").version;
 const READY_ATTEMPTS = 200;
@@ -350,12 +351,12 @@ async function readRequiredFile(path, correctiveAction) {
 
 async function measureDistribution(baselinePath) {
 	const currentGraph = await readJavaScriptGraph(DIST_DIRECTORY);
-	const [currentEntry, currentCoordinator] = await Promise.all([
+	const [currentEntry, currentCoreGraph] = await Promise.all([
 		readRequiredFile(DIST_ENTRY, "Run npm run build:package before measuring dynamic event updates."),
-		readRequiredFile(DIST_COORDINATOR, "Run npm run build:package before measuring dynamic event updates.")
+		measureReachableJavaScriptGraph(DIST_ENTRY, DIST_DIRECTORY)
 	]);
 	const baseline = await resolveBaseline(baselinePath);
-	const [baselineEntry, baselineCoordinator, baselineGraph] = await Promise.all([
+	const [baselineEntry, baselineCoreGraph, baselineGraph] = await Promise.all([
 		baseline === null
 			? Promise.resolve(null)
 			: readRequiredFile(
@@ -364,10 +365,7 @@ async function measureDistribution(baselinePath) {
 			),
 		baseline?.directory === null || baseline === null
 			? Promise.resolve(null)
-			: readRequiredFile(
-				join(baseline.directory, "internal", "runtime", "coordinator.js"),
-				"The baseline dist directory must contain internal/runtime/coordinator.js."
-			),
+			: measureReachableJavaScriptGraph(baseline.entry, baseline.directory),
 		baseline?.directory === null || baseline === null
 			? Promise.resolve(null)
 			: readJavaScriptGraph(baseline.directory)
@@ -377,19 +375,23 @@ async function measureDistribution(baselinePath) {
 		gzipLevel: 9,
 		measurements: createDistributionMeasurements(
 			{
-				coordinator: currentCoordinator,
+				coreImportGraph: distributionGraphSize(currentCoreGraph),
 				entry: currentEntry,
 				javascript: currentGraph.bytes
 			},
 			baseline === null
 				? null
 				: {
-					coordinator: baselineCoordinator,
+					coreImportGraph: baselineCoreGraph === null ? null : distributionGraphSize(baselineCoreGraph),
 					entry: baselineEntry,
 					javascript: baselineGraph?.bytes ?? null
 				}
 		)
 	};
+}
+
+function distributionGraphSize(graph) {
+	return { fileCount: graph.fileCount, gzipBytes: graph.separateGzipBytes, rawBytes: graph.rawBytes };
 }
 
 async function resolveBaseline(path) {

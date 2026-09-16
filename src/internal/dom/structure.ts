@@ -53,7 +53,7 @@ interface CalendarStructureOptions {
 	readonly minYear: number;
 	readonly monthNameFormatter: Intl.DateTimeFormat;
 	readonly onMonthPickerBeforeToggle: (this: void, event: Event) => void;
-	readonly onMonthPickerCancel: (this: void, event: MouseEvent) => void;
+	readonly onMonthPickerCancel: (this: void, event: Event) => void;
 	readonly onMonthPickerSubmit: (this: void, event: SubmitEvent) => void;
 	readonly onMonthPickerTitleClick: (this: void, event: MouseEvent) => void;
 	readonly onMonthPickerToggle: (this: void, event: Event) => void;

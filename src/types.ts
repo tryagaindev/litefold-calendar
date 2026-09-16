@@ -169,6 +169,9 @@ export type CalendarEventTimeDisplay = "all" | "grid" | "agenda" | "none";
 /** Vertical placement of the event stack within a month-grid day cell. */
 export type CalendarGridEventPlacement = "top" | "center" | "bottom";
 
+/** Presentation of each day's events at one calendar-container size. */
+export type CalendarGridEventDisplay = "events" | "count" | "count-when-multiple";
+
 /** Package-owned element references supplied for event-overflow inspection and placement. */
 export interface CalendarEventOverflowElements<
 	TAction extends HTMLButtonElement | null = HTMLButtonElement | null
@@ -183,6 +186,8 @@ export interface CalendarEventOverflowElements<
 
 /** Values supplied when rendering a compact event-overflow cue. */
 export interface CalendarCompactEventOverflowContext extends CalendarRenderContext<"day"> {
+	/** Whether this visual describes hidden occurrences or the total count for the day. */
+	readonly display: "overflow" | "count";
 	/** Structured Gregorian date for the rendered day. */
 	readonly date: CalendarDate;
 	/** Strict `YYYY-MM-DD` form of `date`. */
@@ -203,6 +208,8 @@ export interface CalendarCompactEventOverflowContext extends CalendarRenderConte
 
 /** Values supplied when rendering wide content for the native grid-overflow action. */
 export interface CalendarWideEventOverflowContext extends CalendarRenderContext<"grid-summary"> {
+	/** Whether this visual describes hidden occurrences or the total count for the day. */
+	readonly display: "overflow" | "count";
 	/** Structured Gregorian date for the rendered day. */
 	readonly date: CalendarDate;
 	/** Strict `YYYY-MM-DD` form of `date`. */
@@ -334,6 +341,22 @@ export interface CalendarEventActivation<TMetadata = unknown> {
 	readonly surface: CalendarEventSurface;
 }
 
+/** Day-count or overflow activation, delivered before calendar selection or DOM replacement. */
+export interface CalendarEventOverflowActivation<TMetadata = unknown> {
+	/** Immutable structured occurrence date represented by the action. */
+	readonly date: CalendarDate;
+	/** Strict `YYYY-MM-DD` form of `date`. */
+	readonly dateString: string;
+	/** Current native count or overflow button; applications own focus when cancelling. */
+	readonly element: HTMLButtonElement;
+	/** Immutable ordered snapshot of all normalized occurrences on the day; metadata remains opaque. */
+	readonly events: readonly CalendarEvent<TMetadata>[];
+	/** Total occurrence count, independent of summary limits and agenda pagination. */
+	readonly eventCount: number;
+	/** Call `preventDefault()` synchronously to replace the default agenda interaction. */
+	readonly nativeEvent: MouseEvent;
+}
+
 /** Information supplied for an application context action on an event occurrence. */
 export interface CalendarEventContextMenu<TMetadata = unknown>
 	extends Omit<CalendarEventActivation<TMetadata>, "nativeEvent"> {
@@ -412,6 +435,13 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly eventTimeDisplay?: CalendarEventTimeDisplay;
 	/** Vertical placement of the month-grid event stack; defaults to `"top"`. */
 	readonly gridEventPlacement?: CalendarGridEventPlacement;
+	/** Container-based presentation; defaults to compact `count-when-multiple` and wide `events`. */
+	readonly gridEventDisplay?: {
+		/** Presentation at calendar-container widths at or below `42rem`. */
+		readonly compact?: CalendarGridEventDisplay;
+		/** Presentation at calendar-container widths above `42rem`. */
+		readonly wide?: CalendarGridEventDisplay;
+	};
 	/** Synchronous bridge to an application-owned live announcer. */
 	readonly onAnnounce?: (this: void, announcement: Readonly<CalendarAnnouncement>) => undefined;
 	/** Handles pointer or keyboard context gestures on a day. */
@@ -420,6 +450,8 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly onDaySelect?: CalendarAction<CalendarDaySelection>;
 	/** Handles activation of a native event link or button on either rendering surface. */
 	readonly onEventActivate?: CalendarAction<CalendarEventActivation<TMetadata>>;
+	/** Count/overflow action before selection; synchronous cancellation transfers interaction ownership. */
+	readonly onEventOverflowActivate?: CalendarAction<CalendarEventOverflowActivation<TMetadata>>;
 	/** Handles context gestures and primary activation when context is an unlinked occurrence's only action. */
 	readonly onEventContextMenu?: CalendarAction<CalendarEventContextMenu<TMetadata>>;
 	/** Immediate static events or an abort-aware provider whose return shape selects each request's timing. */

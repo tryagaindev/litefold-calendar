@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows:
       - CI
-      - Publish npm alpha
+      - Publish npm nightly
     types:
       - completed
     branches:
@@ -29,7 +29,7 @@ jobs:
       ${{
         github.event_name == 'workflow_run' &&
         github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.event == 'push' &&
+        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch') &&
         github.event.workflow_run.head_branch == 'main' &&
         github.event.workflow_run.head_repository.full_name == github.repository
       }}
@@ -38,6 +38,7 @@ jobs:
 
     permissions:
       contents: read
+      actions: read
 
     outputs:
       channel: ${{ steps.identity.outputs.channel }}
@@ -62,6 +63,8 @@ jobs:
           LFC_UPSTREAM_WORKFLOW: ${{ github.event.workflow_run.name }}
           LFC_UPSTREAM_WORKFLOW_PATH: ${{ github.event.workflow_run.path }}
           LFC_WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          LFC_UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          LFC_UPSTREAM_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
         run: |
           set -euo pipefail
 
@@ -77,16 +80,18 @@ jobs:
             "${upstream_workflow_path}" == ".github/workflows/ci.yml" &&
             "${LFC_UPSTREAM_EVENT}" == "push" ]]; then
             channel="main"
-          elif [[ "${LFC_UPSTREAM_WORKFLOW}" == "Publish npm alpha" &&
-            "${upstream_workflow_path}" == ".github/workflows/publish-alpha.yml" &&
-            "${LFC_UPSTREAM_EVENT}" == "push" ]]; then
-            parent_version="$(git show HEAD^1:package.json | jq --exit-status --raw-output '.version')"
-            if [[ "${version}" == "${parent_version}" ]]; then
-              eligible=false
-              channel=""
-            else
-              channel="release"
-            fi
+          elif [[ "${LFC_UPSTREAM_WORKFLOW}" == "Publish npm nightly" &&
+            "${upstream_workflow_path}" == ".github/workflows/publish-nightly.yml" &&
+            ( "${LFC_UPSTREAM_EVENT}" == "schedule" || "${LFC_UPSTREAM_EVENT}" == "workflow_dispatch" ) ]]; then
+            channel="release"
+            base_version="${version}"
+            created_at="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${LFC_UPSTREAM_RUN_ID}" --jq '.created_at')"
+            printf 'LFC_BROWSER_TARGET_DATE=%s\n' "${created_at:0:10}" >> "${GITHUB_ENV}"
+            stamp="$(date -u --date="${created_at}" +%Y%m%d%H%M%S)"
+            version="${base_version%-nightly.0}-nightly.${stamp}.${LFC_UPSTREAM_RUN_ID}"
+            run_jobs="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${LFC_UPSTREAM_RUN_ID}/attempts/${LFC_UPSTREAM_RUN_ATTEMPT}/jobs?per_page=100" --jq '.jobs[] | select(.name == "Publish the verified GitHub prerelease") | .conclusion')"
+            if [[ "${run_jobs}" == "skipped" ]]; then eligible=false; channel="";
+            elif [[ "${run_jobs}" != "success" ]]; then echo 'Publisher finalization is unproven.' >&2; exit 1; fi
           else
             echo "Unexpected upstream workflow identity: ${LFC_UPSTREAM_WORKFLOW} (${LFC_UPSTREAM_WORKFLOW_PATH})" >&2
             exit 1
@@ -95,8 +100,8 @@ jobs:
           if [[ "${eligible}" == "true" && "${channel}" == "release" ]]; then
             release_ref="v${version}"
             channel="release"
-            if [[ ! "${version}" =~ ^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
-              echo "A changed release version must be an exact supported alpha." >&2
+            if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{14}\.[0-9]+$ ]]; then
+              echo "A changed release version must be an exact generated nightly." >&2
               exit 1
             fi
             test "$(git rev-parse --verify "${release_ref}^{commit}")" = "${source_commit}"
@@ -105,6 +110,18 @@ jobs:
               .draft == false and .prerelease == true and .immutable == true and
               .tag_name == $tag and .target_commitish == $commit
             ' <<< "${release}" > /dev/null
+            gh release download "${release_ref}" --repo "${GITHUB_REPOSITORY}" --pattern package-verification.json --dir "${RUNNER_TEMP}/nightly-receipt"
+            receipt="${RUNNER_TEMP}/nightly-receipt/package-verification.json"
+            expected_digest="$(jq -er '.assets[] | select(.name == "package-verification.json") | .digest | sub("^sha256:"; "")' <<< "${release}")"
+            test "$(sha256sum "${receipt}" | cut -d ' ' -f 1)" = "${expected_digest}"
+            jq --exit-status --arg sha "${source_commit}" --arg version "${version}" --arg base "${base_version}" --arg run "${LFC_UPSTREAM_RUN_ID}" '
+              .schemaVersion == 2 and .name == "@tryagaindev/litefold-calendar" and
+              .sourceCommit == $sha and .version == $version and .sourceVersion == $base and
+              .sourceTreeDirty == false and .manifestTransform == "version-only" and
+              .nightly.runId == $run and .nightly.sourceCommit == $sha and .nightly.version == $version and
+              .nightly.workflow == ".github/workflows/publish-nightly.yml"
+            ' "${receipt}" > /dev/null
+            printf 'LFC_NIGHTLY_RECEIPT=%s\n' "${receipt}" >> "${GITHUB_ENV}"
           fi
 
           printf 'eligible=%s\n' "${eligible}" >> "${GITHUB_OUTPUT}"

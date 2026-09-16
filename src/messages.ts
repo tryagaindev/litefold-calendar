@@ -30,6 +30,10 @@ export interface CalendarMessages {
 	readonly renderHookErrorTitle: string;
 	/** Grid overflow template. Supports `{count}`. */
 	readonly gridMore: string;
+	/** Total-count button template. Supports `{count}` and `{eventLabel}`. */
+	readonly gridEventCount: string;
+	/** Accessible total-count label. Supports `{count}`, `{date}`, and `{eventLabel}`. */
+	readonly gridEventCountLabel: string;
 	/** Instructions for entering and leaving visible event actions in the managed grid. */
 	readonly gridEventInstructions: string;
 	/** Accessible grid-overflow label. Supports `{count}`, `{date}`, and `{eventLabel}`. */
@@ -96,6 +100,8 @@ export const DEFAULT_CALENDAR_MESSAGES: Readonly<CalendarMessages> = Object.free
 	renderHookErrorMessage: "Some calendar details could not be displayed.",
 	renderHookErrorTitle: "Some details are unavailable",
 	gridMore: "{count} more",
+	gridEventCount: "{count} {eventLabel}",
+	gridEventCountLabel: "View {count} {eventLabel} for {date}",
 	gridEventInstructions: "Use arrow keys to move between dates and Enter or Space to select. Press F2 on a date to move to its visible event actions; use Up and Down Arrow between actions, and Escape or F2 to return.",
 	gridMoreLabel: "View {count} more {eventLabel} for {date}",
 	internalErrorMessage: "The calendar encountered an unexpected error.",

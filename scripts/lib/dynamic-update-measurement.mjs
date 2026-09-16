@@ -120,8 +120,8 @@ export function compareDistributionSizes(current, baseline = null) {
 /**
  * Creates the three distribution rows emitted by the opt-in measurement command.
  *
- * @param {{coordinator: Uint8Array, entry: Uint8Array, javascript: readonly Uint8Array[]}} current
- * @param {{coordinator: Uint8Array | null, entry: Uint8Array | null, javascript: readonly Uint8Array[] | null} | null} baseline
+ * @param {{coreImportGraph: {fileCount: number, gzipBytes: number, rawBytes: number}, entry: Uint8Array, javascript: readonly Uint8Array[]}} current
+ * @param {{coreImportGraph: {fileCount: number, gzipBytes: number, rawBytes: number} | null, entry: Uint8Array | null, javascript: readonly Uint8Array[] | null} | null} baseline
  * @returns {readonly object[]}
  */
 export function createDistributionMeasurements(current, baseline = null) {
@@ -136,9 +136,9 @@ export function createDistributionMeasurements(current, baseline = null) {
 			...summarizeDistributionSize(current.entry, baseline?.entry ?? null)
 		}),
 		Object.freeze({
-			key: "coordinator",
-			label: "dist/internal/runtime/coordinator.js",
-			...summarizeDistributionSize(current.coordinator, baseline?.coordinator ?? null)
+			key: "coreImportGraph",
+			label: `Core static import graph (${String(current.coreImportGraph.fileCount)} modules)`,
+			...compareDistributionSizes(current.coreImportGraph, baseline?.coreImportGraph ?? null)
 		}),
 		Object.freeze({
 			key: "javascriptTotal",

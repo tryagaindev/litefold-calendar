@@ -2,18 +2,11 @@ import { readFile } from "node:fs/promises";
 
 import { expect, test } from "@playwright/test";
 
+import { EXAMPLE_ROUTES } from "../../scripts/lib/example-routes.mjs";
 import { expectNoAutomatedAccessibilityViolations } from "./helpers.js";
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
 const RELEASE_VERSION = "0.2.0-alpha.0";
-const EXAMPLE_ROUTES = Object.freeze([
-	["basic", "/examples/basic/"],
-	["advanced", "/examples/advanced/"],
-	["asynchronous errors", "/examples/async-errors/"],
-	["classic script", "/examples/classic-script/"],
-	["migration", "/examples/fullcalendar-v6-migration/"],
-	["progressive enhancement", "/examples/progressive-enhancement/"]
-]);
 const PAGES_INDEX = new URL("../../scripts/pages-site/index.html", import.meta.url);
 const PAGES_MARK = new URL("../../docs/assets/litefold-calendar-mark.svg", import.meta.url);
 const PAGES_SCRIPT = new URL("../../scripts/pages-site/site.js", import.meta.url);
@@ -128,21 +121,34 @@ function contrastRatio(first, second) {
 		(Math.min(firstLuminance, secondLuminance) + 0.05);
 }
 
-for (const [name, route] of EXAMPLE_ROUTES) {
+for (const { name, route } of EXAMPLE_ROUTES) {
 	test(`${name} recipe loads and passes automated accessibility checks`, async ({ page }, testInfo) => {
-		const response = await page.goto(route, { waitUntil: "domcontentloaded" });
+		const feed = route === "/examples/remote-data/"
+			? page.waitForResponse((response) => new URL(response.url()).pathname === `${route}events.json`)
+			: Promise.resolve(null);
+		const [response, feedResponse] = await Promise.all([
+			page.goto(route, { waitUntil: "domcontentloaded" }), feed
+		]);
 		expect(response?.ok(), `Expected ${route} to return a successful response.`).toBe(true);
 		const host = page.locator(".litefold-calendar").first();
 		await expect(host).toBeVisible();
+		if (feedResponse !== null) {
+			expect(feedResponse.ok(), "Expected the remote recipe's event feed to load successfully.").toBe(true);
+			await feedResponse.finished();
+			await expect(host.getByRole("grid").getByRole("button", { name: /^View 3 events for /u })).toBeVisible();
+		}
 		await expect(host).not.toHaveAttribute("aria-busy", "true");
 		await expectNoAutomatedAccessibilityViolations(page, testInfo);
 	});
 }
 
-test("examples landing exposes six keyboard-visible task cards", async ({ page }, testInfo) => {
+test("examples landing exposes the expected keyboard-visible task cards including remote data", async ({ page }, testInfo) => {
 	const response = await page.goto("/examples/", { waitUntil: "domcontentloaded" });
 	expect(response?.ok()).toBe(true);
-	await expect(page.locator(".my-card")).toHaveCount(6);
+	await expect(page.locator(".my-card")).toHaveCount(EXAMPLE_ROUTES.length);
+	const remoteData = page.getByRole("link", { exact: true, name: "Load and filter remote events" });
+	await expect(remoteData).toBeVisible();
+	await expect(remoteData).toHaveAttribute("href", "./remote-data/");
 	await page.keyboard.press("Tab");
 	const skipLink = page.getByRole("link", { name: "Skip to examples" });
 	await expect(skipLink).toBeFocused();
@@ -183,7 +189,7 @@ test.describe("large-text developer-page reflow", () => {
 		await page.setViewportSize({ height: 844, width: 320 });
 		const response = await page.goto("/examples/", { waitUntil: "domcontentloaded" });
 		expect(response?.ok()).toBe(true);
-		await expect(page.locator(".my-card")).toHaveCount(6);
+		await expect(page.locator(".my-card")).toHaveCount(EXAMPLE_ROUTES.length);
 		await expect(page.locator("[data-my-metadata-state]"))
 			.toHaveAttribute("data-my-metadata-state", "ready");
 		await page.addStyleTag({ content: "html { font-size: 150%; }" });

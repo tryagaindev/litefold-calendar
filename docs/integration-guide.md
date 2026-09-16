@@ -2,11 +2,13 @@
 
 This guide shows how an existing web application can adopt Litefold Calendar while keeping application policy outside the package.
 
+For the common API-loading path, start with the [remote-data walkthrough](remote-data.md). This guide is the deeper reference for typed adaptation, caching, styling, and composition. Jump directly to [event counts](#choose-event-counts) or [application-owned dialogs](#own-the-event-chooser) when extending an existing integration.
+
 ## Ownership boundary
 
 Litefold Calendar owns:
 
-- Civil-date parsing, interval placement, inclusive instance bounds, the one-current-range month grid, selected-day agenda, and navigation, including the native month/year jump popover.
+- Civil-date parsing, interval placement, inclusive instance bounds, the one-current-range month grid, selected-day agenda, and navigation, including the native month/year chooser.
 - Loading, request cancellation, generation guards, default retry/error UI, managed grid/event focus, progressive fallback coordination, and native pull/snap paging.
 - Generic event, action, consumer render-hook, opaque first-party extension, message, and documented `--lfc-*` token contracts.
 
@@ -138,6 +140,54 @@ requests from viewport or gesture state. The
 [event-source contract](api.md#supply-events-calendarevents-and-calendareventsource)
 owns invocation, range, cancellation, replacement, and commit behavior.
 
+### Yield during expensive response adaptation
+
+If profiling shows that adapting a large validated response blocks interaction,
+yield between records inside the already asynchronous event source. This can
+improve responsiveness while adding elapsed time. Keep the simple mapping above
+for small responses such as the five-record remote-data fixture. The **8 ms**
+budget below is a starting point to profile and tune on your target devices.
+
+```ts
+async function adaptLargeResponse(
+	records: readonly ApplicationRecord[],
+	signal: AbortSignal
+): Promise<CalendarEventInput<EventData>[]> {
+	signal.throwIfAborted();
+	const WORK_BUDGET_MS = 8;
+	const events: CalendarEventInput<EventData>[] = [];
+	let deadline = performance.now() + WORK_BUDGET_MS;
+
+	for (const record of records) {
+		events.push(toCalendarInput(record));
+		if (events.length < records.length && performance.now() >= deadline) {
+			if (typeof globalThis.scheduler?.yield === "function") {
+				await globalThis.scheduler.yield();
+			} else {
+				await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			}
+			signal.throwIfAborted();
+			deadline = performance.now() + WORK_BUDGET_MS;
+		}
+	}
+
+	return events;
+}
+```
+
+After the provider fetches and validates its response, replace
+`return records.map(toCalendarInput)` with `return adaptLargeResponse(records, signal)`.
+The helper returns the whole array only after adaptation succeeds; an adapter
+failure or cancellation rejects the request without publishing a partial result.
+The provider's signal is checked before work and after every yield.
+
+Feature detection uses [`scheduler.yield()`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/yield)
+when available and a timer fallback otherwise. A yield cannot preempt one adapter
+call or split JSON parsing, sorting, or DOM layout into smaller operations; profile
+those separately. See [Optimize long tasks](https://web.dev/articles/optimize-long-tasks)
+for the scheduling tradeoffs. This application-side helper preserves the core's
+synchronous local-array behavior.
+
 ## Bound one calendar instance
 
 Use independently optional, inclusive civil-date bounds when product policy limits navigation or selection:
@@ -222,7 +272,92 @@ cannot fit; the date remains top-aligned. Equal week rows may make the grid tall
 because no content is clipped or constrained to a fixed height. Both options are
 construction-time configuration, so recreate the calendar to change them.
 
+## Choose event counts
+
+Use `gridEventDisplay` when a single marker plus a small additional count hides
+the significance of a busy day. Each width can make its own choice:
+
+```js
+const calendar = createCalendar(host, {
+	events,
+	gridEventDisplay: {
+		compact: "count",
+		wide: "count-when-multiple"
+	}
+});
+```
+
+| Mode | Empty day | One event | Multiple events |
+| --- | --- | --- | --- |
+| `"events"` | Nothing | Existing event representation | Summaries and overflow |
+| `"count"` | Nothing | Total-count button | Total-count button |
+| `"count-when-multiple"` | Nothing | Existing event representation | Total-count button |
+
+The defaults are `compact: "count-when-multiple"` and `wide: "events"`.
+Compact means the calendar container is at most `42rem` wide, including a
+narrow calendar inside a wide application page. Container CSS chooses the
+presentation; resizing neither refetches events nor reruns render hooks.
+
+Counts include every loaded, normalized occurrence for the date, including
+multi-day events. They are independent of `maxGridEventsPerDay`, agenda
+pagination, and render-hook visual suppression. The grid cap still controls
+individual summaries: `0` suppresses those summaries but does not hide a count.
+Compact buttons show localized numbers; wide buttons show localized event
+nouns. Accessible names always include the complete count and date.
+
+**Upgrade note:** Busy compact days now show a total-count action by default.
+To retain the earlier marker-and-additional-count presentation, set
+`gridEventDisplay: { compact: "events" }`. Set both widths to `"count"` to show
+total counts on every nonempty date, or both to `"count-when-multiple"` to keep
+single-event actions at all sizes. Exact hook and focus behavior belongs in the
+[API contract](api.md#handle-user-actions-calendaraction).
+
+## Own the event chooser
+
+Without a callback, activating a count or native overflow button selects that
+date, resets agenda pagination, and focuses the agenda heading. It does not
+invoke `onDaySelect`. This is sufficient when the selected-day agenda is your
+event picker.
+
+Use the same application dialog controller for individual events and complete
+day lists when the application owns scheduling or details:
+
+```js
+const calendar = createCalendar(host, {
+	events,
+	gridEventDisplay: { compact: "count-when-multiple", wide: "count-when-multiple" },
+	onEventActivate({ dateString, element, event, nativeEvent }) {
+		nativeEvent.preventDefault();
+		return eventDialog.open({ events: [event], dateString, invoker: element });
+	},
+	onEventOverflowActivate({ dateString, element, events, nativeEvent }) {
+		nativeEvent.preventDefault();
+		return eventDialog.open({ events, dateString, invoker: element });
+	}
+});
+```
+
+`eventDialog` is your application's dialog controller. The
+[runnable remote-data example](../examples/remote-data/main.js) implements it
+with a native `<dialog>`, accessible heading, event buttons, and Close action.
+Its local choice is a demonstration; your application remains responsible for
+authorization, saving, and [refreshing after a save](remote-data.md#3-change-filters-and-refresh).
+
+Call `preventDefault()` synchronously, before any `await`. The callback runs
+before day selection or DOM replacement; cancelling transfers interaction and
+focus ownership to your application. Return promises so action failures can be
+reported by the library. On dismissal, restore focus to a still-connected
+invoker; if a refresh replaced it, use `calendar.focusDate(dateString)` as the
+public fallback. Close application dialogs during permanent teardown.
+
+The callback receives an immutable ordered array of normalized events for the
+date. Metadata stays application-owned by reference. Do not infer the list from
+visible summaries or a paged agenda, and use `dateString` for multi-day
+occurrences instead of assuming `event.start` is the activated date.
+
 ## Application-owned cache and filters
+
+For a provider without caching, use the [basic filtering and refresh recipe](remote-data.md#3-change-filters-and-refresh). Add a cache only when your application needs one; cache identity must include authorization scope, range, and all filters that change the response.
 
 Key cached raw responses by the requested range and every authorization-relevant input. A filter change can reuse an already validated raw response and call `refetchEvents()` once; the source then returns the currently enabled categories.
 
@@ -363,29 +498,21 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The two singleton presentation hooks have distinct behavior:
+Use one owner for each singleton hook, `renderEventMarker` and
+`renderEventOverflow`. Return new, detached, noninteractive nodes and style
+only your application classes. In the overflow hook, use `context.text` for
+the package-localized visual and inspect `display` (`"count"` or `"overflow"`)
+and `variant` (`"compact"` or `"wide"`) when the design needs different content.
+A total-count action always remains available, including when the hook returns
+`null`.
 
-| Hook | Hook omitted | `null` / `undefined` return | Returned node |
-| --- | --- | --- | --- |
-| `renderEventMarker` | Keeps the built-in marker | `null` suppresses it; `undefined` is invalid | Replaces the built-in marker |
-| `renderEventOverflow` | Keeps the social-style compact number and localized wide text | `undefined` keeps that variant; `null` suppresses only a passive compact cue and otherwise keeps the native action's default | Replaces that variant's visual content |
-
-Only one hook set can own each singleton hook. `renderEventOverflow` owns its compact and wide branches together and receives each applicable variant during the calendar render. When a native overflow action has both responsive presentations, both are pre-rendered before CSS chooses which one to expose. The compact branch has `variant: "compact"`, `surface: "day"`, and package-formatted social text such as `+1` when paired with a visible primary marker or an unsigned total when there is no marker. The wide branch has `variant: "wide"`, `surface: "grid-summary"`, and localized exact text such as `2 more`.
-
-Both contexts expose `eventCount`, `visibleEventCount`, `overflowCount`, `text`, and stable `elements.root` / `elements.content` references. `elements.action` is `null` for a passive compact cue and is the package-owned overflow button for the wide branch or a compact-primary overflow action. Treat those elements as inspection and placement context rather than mutation targets; return the visual node. That button's accessible name, activation, focus transfer, and canonical fallback remain package-owned. Returned nodes must be new, detached, same-document, synchronous, and entirely noninteractive; the package treats them as presentational content.
-
-The package owns the responsive placement and gives each compact visual an
-assigned block. A markerless total uses one centered block, and
-`maxGridEventsPerDay: 0` keeps the fallback inside one package-owned overflow
-action. The hook replaces only visual content; no public overflow-layout
-selector or CSS token overrides placement. Fit returned compact content within
-its assigned slot to preserve equal sizing. If it needs more space, increase
-`--lfc-control-min-size` and `--lfc-grid-event-min-block-size` on the calendar
-root so normal package-owned roots grow together. Oversized output remains
-unclipped but opts out of equal visual sizing. [DESIGN.md](../DESIGN.md#responsive-model)
-owns the exact geometry and width transitions.
-
-Container resizing changes CSS visibility only; it does not invoke the hook again or replace either returned node. A failure in either branch quarantines the complete hook set and restores both compact and wide defaults. See the [render-hook API](api.md#customize-rendering-calendarrenderhooks) for every context field and return rule.
+The package owns the native action, accessible name, focus behavior, and
+responsive placement. Fit compact content inside its assigned slot. Increase
+`--lfc-control-min-size` and `--lfc-grid-event-min-block-size` together when the
+custom content needs more room. Container resizing changes visibility without
+rerunning hooks. The [render-hook API](api.md#customize-rendering-calendarrenderhooks)
+owns context fields, return semantics, singleton rules, and failure behavior;
+[DESIGN.md](../DESIGN.md#responsive-model) owns sizing and width transitions.
 
 ### Style hook output
 

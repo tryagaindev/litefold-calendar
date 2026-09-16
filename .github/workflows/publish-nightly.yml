@@ -1,20 +1,20 @@
-name: Publish npm alpha
+name: Publish npm nightly
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/publish-alpha.yml
-      - CHANGELOG.md
-      - package-lock.json
-      - package.json
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+    inputs:
+      expected-source:
+        description: Optional exact current main commit assertion
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: npm-alpha-${{ github.repository }}
+  group: npm-nightly-${{ github.repository }}
   queue: max
   cancel-in-progress: false
 
@@ -31,62 +31,55 @@ env:
 
 jobs:
   classify:
-    name: Detect a generated release candidate
+    name: Select the exact green main snapshot
+    if: ${{ github.repository == 'tryagaindev/litefold-calendar' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-
     permissions:
+      actions: read
       contents: read
-
     outputs:
       candidate-version: ${{ steps.candidate.outputs.candidate-version }}
+      base-version: ${{ steps.candidate.outputs.base-version }}
+      created-at: ${{ steps.candidate.outputs.created-at }}
       eligible: ${{ steps.candidate.outputs.eligible }}
-      parent-version: ${{ steps.candidate.outputs.parent-version }}
-
     steps:
-      - name: Check out the exact pushed commit and its first parent
+      - name: Check out the exact workflow source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      - name: Classify the exact pushed commit
+      - name: Classify the exact nightly source
         id: candidate
         env:
-          LFC_EVENT_NAME: ${{ github.event_name }}
-          LFC_SOURCE_COMMIT: ${{ github.sha }}
-          LFC_WORKFLOW_COMMIT: ${{ github.workflow_sha }}
-          LFC_WORKFLOW_REF: ${{ github.ref }}
+          GH_TOKEN: ${{ github.token }}
+          LFC_EXPECTED_SOURCE: ${{ inputs.expected-source }}
         run: |
           set -euo pipefail
-
-          if [[ "${LFC_EVENT_NAME}" != "push" ||
-            "${LFC_WORKFLOW_REF}" != "refs/heads/main" ||
-            ! "${LFC_SOURCE_COMMIT}" =~ ^[0-9a-f]{40}$ ||
-            ! "${LFC_WORKFLOW_COMMIT}" =~ ^[0-9a-f]{40}$ ||
-            "${LFC_WORKFLOW_COMMIT}" != "${LFC_SOURCE_COMMIT}" ]]; then
-            echo "The release source must be the exact reviewed workflow commit pushed to main." >&2
-            exit 1
+          test "${GITHUB_WORKFLOW_SHA}" = "${GITHUB_SHA}"
+          test "${GITHUB_REF}" = "refs/heads/main"
+          [[ "${GITHUB_EVENT_NAME}" == "schedule" || "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]
+          [[ -z "${LFC_EXPECTED_SOURCE}" || "${LFC_EXPECTED_SOURCE}" == "${GITHUB_SHA}" ]]
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&event=push&per_page=100" > ci.json
+          jq --exit-status --arg sha "${GITHUB_SHA}" --arg repository "${GITHUB_REPOSITORY}" '
+            [.workflow_runs[] | select(.head_sha == $sha and .head_branch == "main" and
+              .head_repository.full_name == $repository)] | sort_by(.run_number) | last |
+              .conclusion == "success"
+          ' ci.json > /dev/null
+          created_at="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" --jq '.created_at')"
+          base_version="$(jq --exit-status --raw-output '.version' package.json)"
+          [[ "${base_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-nightly\.0$ ]]
+          stamp="$(date -u --date="${created_at}" +%Y%m%d%H%M%S)"
+          version="${base_version%-nightly.0}-nightly.${stamp}.${GITHUB_RUN_ID}"
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "${current_main}" != "${GITHUB_SHA}" ]]; then
+            curl --fail --silent --show-error "https://registry.npmjs.org/@tryagaindev%2Flitefold-calendar/${version}" > "${RUNNER_TEMP}/existing-candidate.json"
+            jq --exit-status --arg version "${version}" '.name == "@tryagaindev/litefold-calendar" and .version == $version' "${RUNNER_TEMP}/existing-candidate.json" > /dev/null
           fi
-          test "$(git rev-parse --verify HEAD^{commit})" = "${LFC_SOURCE_COMMIT}"
-          parent_commit="$(git rev-parse --verify HEAD^1)"
-          candidate_manifest="$(<package.json)"
-          parent_manifest="$(git show "${parent_commit}:package.json")"
-          candidate_version="$(jq -r '.version // empty' <<< "${candidate_manifest}")"
-          parent_version="$(jq -r '.version // empty' <<< "${parent_manifest}")"
-
-          eligible=false
-          if [[ "${candidate_version}" != "${parent_version}" ]]; then
-            if [[ ! "${candidate_version}" =~ ^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
-              echo "A changed release version must be an exact supported alpha." >&2
-              exit 1
-            fi
-            eligible=true
-          fi
-          printf 'candidate-version=%s\n' "${candidate_version}" >> "${GITHUB_OUTPUT}"
-          printf 'eligible=%s\n' "${eligible}" >> "${GITHUB_OUTPUT}"
-          printf 'parent-version=%s\n' "${parent_version}" >> "${GITHUB_OUTPUT}"
+          printf 'candidate-version=%s\nbase-version=%s\ncreated-at=%s\neligible=true\n' \
+            "${version}" "${base_version}" "${created_at}" >> "${GITHUB_OUTPUT}"
+          rm -- ci.json
 
   verify:
     name: Verify exact source and create release evidence
@@ -94,7 +87,7 @@ jobs:
     if: >-
       ${{
         needs.classify.outputs.eligible == 'true' &&
-        github.event_name == 'push' &&
+        (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
         github.ref == 'refs/heads/main' &&
         github.workflow_sha == github.sha
       }}
@@ -103,14 +96,19 @@ jobs:
 
     permissions:
       contents: read
+      actions: read
 
     outputs:
+      eligible: ${{ steps.registry-state.outputs.eligible }}
+      stable-exists: ${{ steps.registry-state.outputs.stable-exists }}
+      base-version: ${{ needs.classify.outputs.base-version }}
       asset-digests: ${{ steps.evidence.outputs.asset-digests }}
       bundle-artifact: ${{ steps.identity.outputs.bundle-artifact }}
       bundle-name: ${{ steps.identity.outputs.bundle-name }}
       notes-artifact: ${{ steps.identity.outputs.notes-artifact }}
       notes-sha256: ${{ steps.evidence.outputs.notes-sha256 }}
-      registry-alpha: ${{ steps.registry-state.outputs.registry-alpha }}
+      registry-predecessor: ${{ steps.registry-state.outputs.registry-predecessor }}
+      registry-latest: ${{ steps.registry-state.outputs.registry-latest }}
       registry-state-sha256: ${{ steps.registry-state.outputs.registry-state-sha256 }}
       source-commit: ${{ steps.identity.outputs.source-commit }}
       tag: ${{ steps.identity.outputs.tag }}
@@ -137,147 +135,128 @@ jobs:
       - name: Install locked development tooling
         run: npm ci --ignore-scripts
 
-      - name: Validate the immutable first-parent release diff
+      - name: Derive and verify immutable nightly artifact identity
         id: identity
         env:
-          LFC_CLASSIFIED_VERSION: ${{ needs.classify.outputs.candidate-version }}
-          LFC_PARENT_VERSION: ${{ needs.classify.outputs.parent-version }}
-          LFC_SOURCE_COMMIT: ${{ github.sha }}
+          LFC_VERSION: ${{ needs.classify.outputs.candidate-version }}
+          LFC_CREATED_AT: ${{ needs.classify.outputs.created-at }}
         run: |
           set -euo pipefail
+          test "$(git rev-parse --verify HEAD^{commit})" = "${GITHUB_SHA}"
+          npm run nightly:plan -- --run-id "${GITHUB_RUN_ID}" --created-at "${LFC_CREATED_AT}" \
+            --event "${GITHUB_EVENT_NAME}" --source-sha "${GITHUB_SHA}" --output "${RUNNER_TEMP}/nightly-plan.json"
+          test "$(jq -r .version "${RUNNER_TEMP}/nightly-plan.json")" = "${LFC_VERSION}"
+          printf 'LFC_BROWSER_TARGET_DATE=%s\n' "${LFC_CREATED_AT:0:10}" >> "${GITHUB_ENV}"
+          tag="v${LFC_VERSION}"
+          printf 'bundle-artifact=npm-release-bundle-%s-%s-%s\n' "${tag}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
+          printf 'bundle-name=tryagaindev-litefold-calendar-%s\n' "${LFC_VERSION}" >> "${GITHUB_OUTPUT}"
+          printf 'notes-artifact=release-notes-%s-%s-%s\n' "${tag}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
+          printf 'source-commit=%s\ntag=%s\nversion=%s\n' "${GITHUB_SHA}" "${tag}" "${LFC_VERSION}" >> "${GITHUB_OUTPUT}"
 
-          source_commit="$(git rev-parse --verify HEAD^{commit})"
-          test "${source_commit}" = "${LFC_SOURCE_COMMIT}"
-          git fetch --force --no-tags origin \
-            refs/heads/main:refs/remotes/origin/main
-          test "$(git rev-parse --verify refs/remotes/origin/main^{commit})" = "${source_commit}"
-
-          version="$(node --input-type=module -e 'import manifest from "./package.json" with { type: "json" }; process.stdout.write(manifest.version);')"
-          test "${version}" = "${LFC_CLASSIFIED_VERSION}"
-          parent_version="$(git show HEAD^1:package.json | jq -r '.version // empty')"
-          test "${parent_version}" = "${LFC_PARENT_VERSION}"
-          test "${parent_version}" != "${version}"
-          tag="v${version}"
-
-          mapfile -t changed_files < <(
-            git diff --name-only HEAD^1 HEAD | LC_ALL=C sort -u
-          )
-          expected_files=(CHANGELOG.md package-lock.json package.json)
-          diff -u \
-            <(printf '%s\n' "${expected_files[@]}") \
-            <(printf '%s\n' "${changed_files[@]}")
-
-          npm run release:verify -- \
-            --version "${version}" \
-            --commit "${source_commit}" \
-            --tag-state either \
-            --require-clean
-
-          printf 'bundle-artifact=npm-release-bundle-%s-%s-%s\n' \
-            "${tag}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
-          printf 'bundle-name=tryagaindev-litefold-calendar-%s\n' "${version}" >> "${GITHUB_OUTPUT}"
-          printf 'notes-artifact=release-notes-%s-%s-%s\n' \
-            "${tag}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
-          printf 'source-commit=%s\n' "${source_commit}" >> "${GITHUB_OUTPUT}"
-          printf 'tag=%s\n' "${tag}" >> "${GITHUB_OUTPUT}"
-          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
-
-      - name: Validate live registry channel before release work
+      - name: Validate live registry and previous completed nightly
         id: registry-state
         env:
+          GH_TOKEN: ${{ github.token }}
           LFC_VERSION: ${{ steps.identity.outputs.version }}
         run: |
           set -euo pipefail
-          registry_raw="${RUNNER_TEMP}/registry.raw.json"
-          registry_json="${RUNNER_TEMP}/registry.json"
-          registry_error="${RUNNER_TEMP}/registry.err"
-          set +e
-          npm view @tryagaindev/litefold-calendar versions dist-tags --json \
-            > "${registry_raw}" 2> "${registry_error}"
-          registry_status=$?
-          set -e
-          if [[ "${registry_status}" -eq 0 ]]; then
-            node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" \
-              "${registry_raw}" "${registry_json}"
-            metadata="$(<"${registry_json}")"
-            registry_state="$(
-              jq --compact-output --sort-keys '
-                {
-                  "dist-tags": ."dist-tags",
-                  versions: (.versions | if type == "string" then [.] else . end | sort)
-                }
-              ' "${registry_json}"
-            )"
-            registry_alpha="$(jq --raw-output '."dist-tags".alpha // empty' "${registry_json}")"
-          elif grep -Eq 'E404|404 Not Found' "${registry_error}"; then
-            echo "The npm package must already exist before the normal alpha release workflow can run." >&2
-            exit 1
-          else
-            cat "${registry_error}" >&2
-            exit "${registry_status}"
-          fi
-          export LFC_REGISTRY_METADATA="${metadata}"
-          # LFC_PRERELEASE_CHANNEL_POLICY_START
+          npm view @tryagaindev/litefold-calendar versions dist-tags --json --registry https://registry.npmjs.org/ > "${RUNNER_TEMP}/registry.raw.json"
+          node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" "${RUNNER_TEMP}/registry.raw.json" "${RUNNER_TEMP}/registry.json"
           node --input-type=module <<'NODE'
-          import semver from "semver";
-
-          const candidate = process.env.LFC_VERSION;
-          const metadata = JSON.parse(process.env.LFC_REGISTRY_METADATA);
-          const versions = typeof metadata.versions === "string"
-            ? [metadata.versions]
-            : metadata.versions;
-          const tags = metadata["dist-tags"];
-          if (!Array.isArray(versions) || tags === null || typeof tags !== "object" ||
-            Array.isArray(tags)) {
-            throw new Error("npm returned malformed release metadata.");
-          }
-          const supportedAlpha = (value) => typeof value === "string" &&
-            /^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$/u.test(value) &&
-            semver.valid(value) === value;
-          for (const version of versions) {
-            if (typeof version !== "string" || semver.valid(version) === null) {
-              throw new Error("npm returned a malformed published version.");
-            }
-            if (version !== candidate && semver.gte(version, candidate)) {
-              throw new Error(`Published version ${version} is not older than ${candidate}.`);
-            }
-          }
-          if (versions.length === 0) {
-            throw new Error("The normal alpha release workflow requires an existing npm package.");
-          }
-          for (const name of ["alpha", "latest"]) {
-            const value = tags[name];
-            if (!supportedAlpha(value) || !versions.includes(value)) {
-              throw new Error(`npm ${name} must select a published supported alpha; found ${String(value)}.`);
-            }
-            if (value !== candidate && semver.gte(value, candidate)) {
-              throw new Error(`npm ${name} ${value} cannot move to ${candidate}.`);
-            }
-          }
-          const publicationInProgress = versions.includes(candidate) &&
-            tags.alpha === candidate && tags.latest !== candidate;
-          if (tags.alpha !== tags.latest && !publicationInProgress) {
-            throw new Error(
-              `npm alpha and latest must match before a release; found alpha=${tags.alpha}, latest=${tags.latest}.`
-            );
-          }
+          import { readFileSync, appendFileSync } from "node:fs";
+          import { readNightlyPlan, validateNightlyRegistryState } from "./scripts/lib/nightly-release.mjs";
+          const metadata = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/registry.json`, "utf8"));
+          const state = validateNightlyRegistryState(metadata, await readNightlyPlan(`${process.env.RUNNER_TEMP}/nightly-plan.json`));
+          appendFileSync(process.env.GITHUB_OUTPUT, `registry-predecessor=${state.predecessor}\nregistry-latest=${state.latest}\nstable-exists=${state.stableExists}\n`);
           NODE
-          # LFC_PRERELEASE_CHANNEL_POLICY_END
+          predecessor="$(jq -r '."dist-tags".nightly // ."dist-tags".alpha' "${RUNNER_TEMP}/registry.json")"
+          eligible=true
+          if [[ "${predecessor}" == *-nightly.* && "${predecessor}" != "${LFC_VERSION}" ]]; then
+            previous="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v${predecessor}")"
+            jq --exit-status --arg tag "v${predecessor}" '.draft == false and .prerelease == true and .immutable == true and .tag_name == $tag' <<< "${previous}" > /dev/null
+            previous_sha="$(jq -er '.target_commitish | select(test("^[0-9a-f]{40}$"))' <<< "${previous}")"
+            curl --fail --silent --show-error "https://tryagaindev.github.io/litefold-calendar/releases/${predecessor}/examples/metadata.json" > "${RUNNER_TEMP}/previous-pages.json"
+            jq --exit-status --arg version "${predecessor}" --arg sha "${previous_sha}" '.version == $version and .commit == $sha and .channel == "release"' "${RUNNER_TEMP}/previous-pages.json" > /dev/null
+            if [[ "${previous_sha}" == "${GITHUB_SHA}" ]]; then eligible=false; fi
+          fi
+          registry_state="$(jq --compact-output --sort-keys '{"dist-tags": ."dist-tags", versions: (.versions | if type == "string" then [.] else . end | sort)}' "${RUNNER_TEMP}/registry.json")"
+          printf 'registry-state-sha256=%s\neligible=%s\n' "$(printf '%s' "${registry_state}" | sha256sum | cut -d ' ' -f 1)" "${eligible}" >> "${GITHUB_OUTPUT}"
+          if [[ "${eligible}" == "false" ]]; then echo 'No new source since the last completely verified nightly.' >> "${GITHUB_STEP_SUMMARY}"; fi
 
-          registry_state_sha256="$(
-            printf '%s' "${registry_state}" | sha256sum | cut -d ' ' -f 1
-          )"
-          printf 'registry-alpha=%s\n' "${registry_alpha}" >> "${GITHUB_OUTPUT}"
-          printf 'registry-state-sha256=%s\n' "${registry_state_sha256}" >> "${GITHUB_OUTPUT}"
+      - name: Restore earlier verified bytes before considering a rebuild
+        id: recovery
+        if: ${{ steps.registry-state.outputs.eligible == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LFC_VERSION: ${{ steps.identity.outputs.version }}
+          LFC_BUNDLE_DIRECTORY: .artifacts/${{ steps.identity.outputs.bundle-name }}
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" > "${RUNNER_TEMP}/prior-artifacts.json"
+          gh api graphql -f query='query($owner:String!,$name:String!,$ref:String!,$tag:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$ref){id} release(tagName:$tag){id}}}' \
+            -F owner="${GITHUB_REPOSITORY_OWNER}" -F name="${GITHUB_REPOSITORY#*/}" \
+            -F ref="refs/tags/v${LFC_VERSION}" -F tag="v${LFC_VERSION}" > "${RUNNER_TEMP}/prior-public-state.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
+          import { readNightlyPlan, selectNightlyRecoveryArtifacts } from "./scripts/lib/nightly-release.mjs";
+          const root = process.env.RUNNER_TEMP;
+          const plan = await readNightlyPlan(`${root}/nightly-plan.json`);
+          const pages = JSON.parse(readFileSync(`${root}/prior-artifacts.json`, "utf8"));
+          const repository = JSON.parse(readFileSync(`${root}/prior-public-state.json`, "utf8"))?.data?.repository;
+          if (!Array.isArray(pages) || !repository) throw new Error("Nightly recovery remote evidence is unavailable.");
+          const registry = JSON.parse(readFileSync(`${root}/registry.json`, "utf8"));
+          const versions = typeof registry.versions === "string" ? [registry.versions] : registry.versions;
+          const selected = selectNightlyRecoveryArtifacts({ artifacts: pages.flatMap((page) => page.artifacts),
+            plan, attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            hasPublicState: repository.ref !== null || repository.release !== null || versions.includes(plan.version) });
+          writeFileSync(`${root}/nightly-recovery.json`, JSON.stringify(selected));
+          appendFileSync(process.env.GITHUB_OUTPUT, `restored=${selected !== null}\n`);
+          NODE
+          if [[ "$(jq -r 'type' "${RUNNER_TEMP}/nightly-recovery.json")" == "null" ]]; then exit 0; fi
+          for kind in bundle notes; do
+            id="$(jq -er --arg kind "${kind}" '.[$kind].id' "${RUNNER_TEMP}/nightly-recovery.json")"
+            digest="$(jq -er --arg kind "${kind}" '.[$kind].digest | sub("^sha256:"; "")' "${RUNNER_TEMP}/nightly-recovery.json")"
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > "${RUNNER_TEMP}/nightly-${kind}.zip"
+            test "$(sha256sum "${RUNNER_TEMP}/nightly-${kind}.zip" | cut -d ' ' -f 1)" = "${digest}"
+          done
+          python3 <<'PYTHON'
+          import os
+          from pathlib import Path
+          from zipfile import ZipFile
+          version = os.environ["LFC_VERSION"]
+          root = Path(os.environ["RUNNER_TEMP"])
+          outputs = {"bundle": (Path(os.environ["LFC_BUNDLE_DIRECTORY"]),
+            {"LICENSE", "SHA256SUMS", "package-verification.json", "sbom.spdx.json", f"tryagaindev-litefold-calendar-{version}.tgz"}),
+            "notes": (root / "release-notes", {"release-notes.md"})}
+          for kind, (destination, expected) in outputs.items():
+            with ZipFile(root / f"nightly-{kind}.zip") as archive:
+              members = archive.infolist()
+              if len(members) != len(expected) or {entry.filename for entry in members} != expected or sum(entry.file_size for entry in members) > 64 * 1024 * 1024:
+                raise ValueError("Retained artifact does not contain the exact bounded evidence files.")
+              destination.mkdir(parents=True, exist_ok=False)
+              for entry in members:
+                with (destination / entry.filename).open("xb") as output:
+                  output.write(archive.read(entry))
+          PYTHON
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          import { readNightlyPlan, verifyRestoredNightlyBundle } from "./scripts/lib/nightly-release.mjs";
+          await verifyRestoredNightlyBundle(process.env.LFC_BUNDLE_DIRECTORY,
+            await readNightlyPlan(`${process.env.RUNNER_TEMP}/nightly-plan.json`),
+            JSON.parse(readFileSync("package.json", "utf8")));
+          NODE
+          echo 'Reusing the original digest-verified package bundle and notes; no rebuild.' >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Install pinned Playwright browsers
-        run: npx playwright install --with-deps chromium firefox webkit
+        if: ${{ steps.registry-state.outputs.eligible == 'true' && steps.recovery.outputs.restored != 'true' }}
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run the complete release quality gate
+        if: ${{ steps.registry-state.outputs.eligible == 'true' && steps.recovery.outputs.restored != 'true' }}
         run: npm run check
 
       - name: Upload browser diagnostics on failure
-        if: failure()
+        if: failure() && steps.registry-state.outputs.eligible == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-browser-diagnostics-${{ github.run_id }}
@@ -288,17 +267,20 @@ jobs:
           retention-days: 7
 
       - name: Create the verified npm release bundle once
-        run: npm run package
+        if: ${{ steps.registry-state.outputs.eligible == 'true' && steps.recovery.outputs.restored != 'true' }}
+        run: npm run package:nightly -- --plan "${RUNNER_TEMP}/nightly-plan.json"
 
       - name: Create normalized release notes and asset digests
+        if: ${{ steps.registry-state.outputs.eligible == 'true' }}
         id: evidence
         env:
           LFC_BUNDLE_DIRECTORY: .artifacts/${{ steps.identity.outputs.bundle-name }}
           LFC_NOTES_DIRECTORY: ${{ runner.temp }}/release-notes
+          LFC_RESTORED: ${{ steps.recovery.outputs.restored }}
           LFC_VERSION: ${{ steps.identity.outputs.version }}
         run: |
           set -euo pipefail
-          mkdir -- "${LFC_NOTES_DIRECTORY}"
+          mkdir -p -- "${LFC_NOTES_DIRECTORY}"
           export LFC_NOTES_PATH="${LFC_NOTES_DIRECTORY}/release-notes.md"
           node --input-type=module <<'NODE'
           import { appendFile, readFile, writeFile } from "node:fs/promises";
@@ -307,14 +289,20 @@ jobs:
 
           const changelog = await readFile("CHANGELOG.md", "utf8");
           const version = process.env.LFC_VERSION;
-          const heading = `## [${version}]`;
+          const heading = "## [Unreleased]";
           const start = changelog.indexOf(heading);
           const next = changelog.indexOf("\n## [", start + heading.length);
           if (start < 0) {
             throw new Error(`CHANGELOG.md is missing ${heading}.`);
           }
-          const notes = changelog.slice(start, next < 0 ? undefined : next).trim() + "\n";
-          await writeFile(process.env.LFC_NOTES_PATH, notes, "utf8");
+          const notes = `# Nightly ${version}\n\nSource: ${process.env.GITHUB_SHA}\n\n` + changelog.slice(start + heading.length, next < 0 ? undefined : next).trim() + "\n";
+          if (process.env.LFC_RESTORED === "true") {
+            if (await readFile(process.env.LFC_NOTES_PATH, "utf8") !== notes) {
+              throw new Error("Retained notes differ from the exact source and nightly identity.");
+            }
+          } else {
+            await writeFile(process.env.LFC_NOTES_PATH, notes, "utf8");
+          }
 
           const directory = process.env.LFC_BUNDLE_DIRECTORY;
           const expected = [
@@ -342,6 +330,7 @@ jobs:
           NODE
 
       - name: Upload the exact npm release bundle
+        if: ${{ steps.registry-state.outputs.eligible == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.identity.outputs.bundle-artifact }}
@@ -351,6 +340,7 @@ jobs:
           retention-days: 30
 
       - name: Upload normalized release notes
+        if: ${{ steps.registry-state.outputs.eligible == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.identity.outputs.notes-artifact }}
@@ -362,6 +352,7 @@ jobs:
   stage-release:
     name: Stage exact tag, draft, and release assets
     needs: verify
+    if: ${{ needs.verify.outputs.eligible == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -394,6 +385,7 @@ jobs:
           LFC_NOTES_PATH: ${{ runner.temp }}/release-notes/release-notes.md
           LFC_NOTES_SHA256: ${{ needs.verify.outputs.notes-sha256 }}
           LFC_SOURCE_COMMIT: ${{ needs.verify.outputs.source-commit }}
+          LFC_BASE_VERSION: ${{ needs.verify.outputs.base-version }}
           LFC_TAG: ${{ needs.verify.outputs.tag }}
         run: |
           set -euo pipefail
@@ -479,13 +471,13 @@ jobs:
           printf 'release-id=%s\n' "${release_id}" >> "${GITHUB_OUTPUT}"
 
   publish:
-    name: Publish or resume the verified npm alpha
+    name: Publish or resume the verified npm nightly
     needs:
       - stage-release
       - verify
     runs-on: ubuntu-latest
     timeout-minutes: 12
-    environment: npm
+    environment: npm-nightly
 
     permissions:
       actions: read
@@ -510,9 +502,10 @@ jobs:
       - name: Validate the serialized registry predecessor
         env:
           GH_TOKEN: ${{ github.token }}
-          LFC_REGISTRY_ALPHA: ${{ needs.verify.outputs.registry-alpha }}
+          LFC_REGISTRY_PREDECESSOR: ${{ needs.verify.outputs.registry-predecessor }}
           LFC_REGISTRY_STATE_SHA256: ${{ needs.verify.outputs.registry-state-sha256 }}
           LFC_SOURCE_COMMIT: ${{ needs.verify.outputs.source-commit }}
+          LFC_BASE_VERSION: ${{ needs.verify.outputs.base-version }}
           LFC_VERSION: ${{ needs.verify.outputs.version }}
         run: |
           set -euo pipefail
@@ -551,18 +544,18 @@ jobs:
             exit 1
           fi
 
-          registry_alpha="$(jq --raw-output '."dist-tags".alpha // empty' channel.json)"
+          registry_predecessor="$(jq --raw-output '."dist-tags".nightly // ."dist-tags".alpha // empty' channel.json)"
           candidate_exists="$(
             jq --arg candidate "${LFC_VERSION}" --raw-output '
               (.versions | if type == "string" then [.] else . end) |
               contains([$candidate])
             ' channel.json
           )"
-          test "${registry_alpha}" = "${LFC_REGISTRY_ALPHA}"
+          test "${registry_predecessor}" = "${LFC_REGISTRY_PREDECESSOR}"
 
           if [[ "${candidate_exists}" == "true" ]]; then
-            if [[ "${registry_alpha}" != "${LFC_VERSION}" ]]; then
-              echo "The candidate exists on npm but alpha does not select it; refusing ambiguous registry state." >&2
+            if [[ "${registry_predecessor}" != "${LFC_VERSION}" ]]; then
+              echo "The candidate exists on npm but nightly does not select it; refusing ambiguous registry state." >&2
               exit 1
             fi
             exit 0
@@ -589,53 +582,53 @@ jobs:
               "repos/${GITHUB_REPOSITORY}/contents/package.json?ref=${main_commit}" |
               jq --exit-status --raw-output '.version'
           )"
-          if [[ "${main_version}" != "${LFC_VERSION}" ]]; then
+          if [[ "${main_version}" != "${LFC_BASE_VERSION}" ]]; then
             echo "main now selects ${main_version}; refusing stale unpublished candidate ${LFC_VERSION}." >&2
             exit 1
           fi
 
-          if [[ ! "${registry_alpha}" =~ ^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ||
-            "${registry_alpha}" == "${LFC_VERSION}" ]]; then
-            echo "The verified npm alpha predecessor is missing or malformed." >&2
+          if [[ ! "${registry_predecessor}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(alpha\.[0-9]+|nightly\.[0-9]{14}\.[0-9]+)$ ||
+            "${registry_predecessor}" == "${LFC_VERSION}" ]]; then
+            echo "The verified npm predecessor is missing or malformed." >&2
             exit 1
           fi
-          tag_ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${registry_alpha}")"
+          tag_ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${registry_predecessor}")"
           tag_object_type="$(jq --exit-status --raw-output '.object.type' <<< "${tag_ref}")"
           tag_object="$(
             jq --exit-status --raw-output '
               if (.object.sha | type == "string" and test("^[0-9a-f]{40}$"))
               then .object.sha
-              else error("The registry alpha tag must identify one Git object.")
+              else error("The registry predecessor tag must identify one Git object.")
               end
             ' <<< "${tag_ref}"
           )"
           if [[ "${tag_object_type}" == "tag" ]]; then
             tag="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}")"
-            registry_alpha_commit="$(
+            registry_predecessor_commit="$(
               jq --exit-status --raw-output '
                 if .object.type == "commit" and
                   (.object.sha | type == "string" and test("^[0-9a-f]{40}$"))
                 then .object.sha
-                else error("The registry alpha tag must peel to one commit.")
+                else error("The registry predecessor tag must peel to one commit.")
                 end
               ' <<< "${tag}"
             )"
           elif [[ "${tag_object_type}" == "commit" ]]; then
-            case "${registry_alpha}:${tag_object}" in
+            case "${registry_predecessor}:${tag_object}" in
               "0.1.0-alpha.0:53cf1fbb5f4176929c3105030a62e1d0c235b54f"|"0.2.0-alpha.0:8250ac4da9ada72a2915b8f810be404667ab47da")
-                registry_alpha_commit="${tag_object}"
+                registry_predecessor_commit="${tag_object}"
                 ;;
               *)
-                echo "The registry alpha tag must be annotated; only the exact historical v0.1.0-alpha.0 and v0.2.0-alpha.0 tags are exempt." >&2
+                echo "The registry predecessor tag must be annotated; only the exact historical v0.1.0-alpha.0 and v0.2.0-alpha.0 tags are exempt." >&2
                 exit 1
                 ;;
             esac
           else
-            echo "The registry alpha tag must be annotated; only the exact historical v0.1.0-alpha.0 and v0.2.0-alpha.0 tags are exempt." >&2
+            echo "The registry predecessor tag must be annotated; only the exact historical v0.1.0-alpha.0 and v0.2.0-alpha.0 tags are exempt." >&2
             exit 1
           fi
           comparison="$(
-            gh api "repos/${GITHUB_REPOSITORY}/compare/${registry_alpha_commit}...${LFC_SOURCE_COMMIT}"
+            gh api "repos/${GITHUB_REPOSITORY}/compare/${registry_predecessor_commit}...${LFC_SOURCE_COMMIT}"
           )"
           jq --exit-status '
             .status == "ahead" or .status == "identical"
@@ -655,6 +648,7 @@ jobs:
           LFC_BUNDLE_DIRECTORY: ${{ runner.temp }}/release-bundle
           LFC_REGISTRY_STATE_SHA256: ${{ needs.verify.outputs.registry-state-sha256 }}
           LFC_SOURCE_COMMIT: ${{ needs.verify.outputs.source-commit }}
+          LFC_BASE_VERSION: ${{ needs.verify.outputs.base-version }}
           LFC_TAG: ${{ needs.verify.outputs.tag }}
           LFC_VERSION: ${{ needs.verify.outputs.version }}
         run: |
@@ -674,6 +668,9 @@ jobs:
           jq --exit-status --argjson expected "${LFC_ASSET_DIGESTS}" \
             '. == $expected' <<< "${local_digests}" > /dev/null
 
+          gh api -H "Accept: application/vnd.github.raw+json" "repos/${GITHUB_REPOSITORY}/contents/package.json?ref=${LFC_SOURCE_COMMIT}" > source-package.json
+          export LFC_SOURCE_MANIFEST="$(<source-package.json)"
+          rm -- source-package.json
           export LFC_RECEIPT="$(<package-verification.json)"
           export LFC_TARBALL="tryagaindev-litefold-calendar-${LFC_VERSION}.tgz"
           tar --extract --gunzip --to-stdout --file "${LFC_TARBALL}" package/package.json > packed-package.json
@@ -684,6 +681,7 @@ jobs:
 
           const receipt = JSON.parse(process.env.LFC_RECEIPT);
           const manifest = JSON.parse(process.env.LFC_MANIFEST);
+          const sourceManifest = JSON.parse(process.env.LFC_SOURCE_MANIFEST);
           const tarball = await readFile(process.env.LFC_TARBALL);
           const sha256 = createHash("sha256").update(tarball).digest("hex");
           const repository = typeof manifest.repository === "string"
@@ -698,16 +696,33 @@ jobs:
             "bundledDependencies",
             "bundleDependencies"
           ];
-          if (receipt.schemaVersion !== 1 ||
+          if (receipt.schemaVersion !== 2 ||
             receipt.name !== "@tryagaindev/litefold-calendar" ||
             receipt.version !== process.env.LFC_VERSION ||
             receipt.sourceCommit !== process.env.LFC_SOURCE_COMMIT ||
             receipt.sourceTreeDirty !== false || receipt.sha256 !== sha256 ||
+            receipt.sourceVersion !== process.env.LFC_BASE_VERSION ||
+            receipt.nightly?.sourceCommit !== receipt.sourceCommit ||
+            receipt.nightly?.version !== receipt.version ||
+            receipt.nightly?.runId !== process.env.GITHUB_RUN_ID ||
+            receipt.nightly?.workflow !== ".github/workflows/publish-nightly.yml" ||
+            receipt.manifestTransform !== "version-only" ||
+            receipt.browserTargets?.resolvedAt !== receipt.nightly.createdAt?.slice(0, 10) ||
+            receipt.browserTargets?.query !== "baseline-widely-available" ||
+            receipt.browserTargets?.dataVersions?.vite !== sourceManifest.devDependencies?.vite ||
+            receipt.browserTargets?.dataVersions?.esbuild !== sourceManifest.devDependencies?.esbuild ||
+            receipt.browserTargets?.effectiveQuery !== `Vite ${sourceManifest.devDependencies?.vite}: baseline-widely-available` ||
+            !Array.isArray(receipt.browserTargets?.javascript) || receipt.browserTargets.javascript.length === 0 ||
+            !Array.isArray(receipt.browserTargets?.css) || receipt.browserTargets.css.length === 0 ||
+            receipt.browserTargetsSha256 !== createHash("sha256").update(JSON.stringify(receipt.browserTargets)).digest("hex") ||
+            receipt.sourceManifestSha256 !== createHash("sha256").update(JSON.stringify(sourceManifest)).digest("hex") ||
+            JSON.stringify({ ...sourceManifest, version: receipt.version }) !== JSON.stringify(manifest) ||
+            receipt.publishedManifestSha256 !== createHash("sha256").update(JSON.stringify(manifest)).digest("hex") ||
             manifest.name !== receipt.name || manifest.version !== receipt.version ||
             manifest.private !== false || manifest.license !== "MIT" ||
             repository !== "git+https://github.com/tryagaindev/litefold-calendar.git" ||
             manifest.publishConfig?.access !== "public" ||
-            manifest.publishConfig?.tag !== "alpha" ||
+            manifest.publishConfig?.tag !== "nightly" ||
             manifest.publishConfig?.provenance !== true ||
             forbiddenDependencyFields.some((field) => Object.hasOwn(manifest, field)) ||
             Object.keys(manifest.scripts ?? {}).some((name) => forbiddenLifecycle.test(name))) {
@@ -798,7 +813,7 @@ jobs:
                 "repos/${GITHUB_REPOSITORY}/contents/package.json?ref=${main_commit}" |
                 jq --exit-status --raw-output '.version'
             )"
-            if [[ "${main_version}" != "${LFC_VERSION}" ]]; then
+            if [[ "${main_version}" != "${LFC_BASE_VERSION}" ]]; then
               echo "main now selects ${main_version}; refusing stale unpublished candidate ${LFC_VERSION}." >&2
               exit 1
             fi
@@ -806,7 +821,7 @@ jobs:
             npm publish "${LFC_TARBALL}" \
               --registry https://registry.npmjs.org/ \
               --access public \
-              --tag alpha \
+              --tag nightly \
               --provenance \
               --ignore-scripts
           else
@@ -816,7 +831,7 @@ jobs:
 
           printf 'expected-integrity=%s\n' "${expected_integrity}" >> "${GITHUB_OUTPUT}"
           printf 'publication=%s\n' "${publication}" >> "${GITHUB_OUTPUT}"
-          echo "::notice::An authenticated npm package maintainer must ensure latest selects this alpha: npm dist-tag add @tryagaindev/litefold-calendar@${LFC_VERSION} latest --registry https://registry.npmjs.org/"
+
 
   verify-registry:
     name: Verify registry integrity, imports, and provenance
@@ -850,6 +865,7 @@ jobs:
       - name: Verify the published package from a clean consumer
         env:
           LFC_EXPECTED_INTEGRITY: ${{ needs.publish.outputs.expected-integrity }}
+          LFC_EXPECTED_LATEST: ${{ needs.verify.outputs.registry-latest }}
           LFC_SOURCE_COMMIT: ${{ needs.verify.outputs.source-commit }}
           LFC_TARBALL: ${{ runner.temp }}/release-bundle/${{ needs.verify.outputs.bundle-name }}.tgz
           LFC_VERSION: ${{ needs.verify.outputs.version }}
@@ -870,31 +886,49 @@ jobs:
               > "${integrity_raw}" 2>/dev/null; then
               node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" \
                 "${integrity_raw}" "${integrity_json}"
-              if npm view @tryagaindev/litefold-calendar dist-tags \
+              if npm view @tryagaindev/litefold-calendar versions dist-tags \
                 --registry https://registry.npmjs.org/ --json \
                 > "${tags_raw}" 2>/dev/null; then
                 node --input-type=module --eval "${LFC_NORMALIZE_NPM_VIEW_JSON}" \
                   "${tags_raw}" "${tags_json}"
-                integrity="$(jq -r 'if type == "string" then . else empty end' "${integrity_json}")"
-                alpha="$(jq -r '.alpha // empty' "${tags_json}")"
-                latest="$(jq -r '.latest // empty' "${tags_json}")"
-                if [[ -n "${integrity}" && "${integrity}" != "${LFC_EXPECTED_INTEGRITY}" ]]; then
-                  echo "npm integrity conflicts with the verified release bundle." >&2
-                  exit 1
-                fi
-                if [[ "${integrity}" == "${LFC_EXPECTED_INTEGRITY}" &&
-                  "${alpha}" == "${LFC_VERSION}" &&
-                  "${latest}" == "${LFC_VERSION}" ]]; then
+                # LFC_NIGHTLY_READBACK_POLICY_START
+                if node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const root = process.env.RUNNER_TEMP;
+          const metadata = JSON.parse(readFileSync(`${root}/registry-tags.json`, "utf8"));
+          const integrity = JSON.parse(readFileSync(`${root}/registry-integrity.json`, "utf8"));
+          const versions = typeof metadata.versions === "string" ? [metadata.versions] : metadata.versions;
+          const tags = metadata["dist-tags"];
+          if (integrity !== null && integrity !== process.env.LFC_EXPECTED_INTEGRITY) {
+            throw new Error("npm integrity conflicts with the verified release bundle.");
+          }
+          if (!Array.isArray(versions) || !versions.includes(process.env.LFC_VERSION) ||
+            tags?.nightly !== process.env.LFC_VERSION || integrity === null) {
+            process.exit(75);
+          }
+          const stable = (version) => typeof version === "string" && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/u.test(version);
+          if (tags.latest !== process.env.LFC_EXPECTED_LATEST || !versions.includes(tags.latest)) {
+            throw new Error("npm latest changed from the verified preflight snapshot; nightly cannot modify it.");
+          }
+          if (versions.some(stable) ? !stable(tags.latest) : tags.latest !== tags.alpha) {
+            throw new Error("npm latest must remain on historical alpha until stable takes ownership.");
+          }
+          NODE
+                # LFC_NIGHTLY_READBACK_POLICY_END
+                then
                   verified=true
                   break
+                else
+                  status=$?
+                  if [[ "${status}" != "75" ]]; then exit "${status}"; fi
                 fi
               fi
             fi
             [[ "${attempt}" -lt 60 ]] && sleep 10
           done
           if [[ "${verified}" != "true" ]]; then
-            echo "npm did not expose the exact package integrity and both required dist-tags within the polling window." >&2
-            echo "Check for pending or blocked publish-time review before changing registry metadata. Advance latest only after the exact candidate is publicly readable with the expected integrity." >&2
+            echo "npm did not expose the exact package integrity, nightly tag, and unchanged latest tag within the polling window." >&2
+            echo "Check for pending or blocked publish-time review before changing registry metadata. Resume this exact attempt after correcting the reported registry or registry verification failure." >&2
             exit 1
           fi
 
@@ -919,6 +953,8 @@ jobs:
           cd "${consumer}"
           node --input-type=module --eval '
             await import("@tryagaindev/litefold-calendar");
+            const { webMcp } = await import("@tryagaindev/litefold-calendar/extensions/webmcp");
+            if (typeof webMcp !== "function") throw new Error("Missing published WebMCP extension factory.");
             const style = import.meta.resolve("@tryagaindev/litefold-calendar/styles.css");
             if (!style.endsWith("/dist/styles.css")) throw new Error(`Unexpected style export ${style}`);
           '
@@ -981,11 +1017,11 @@ jobs:
           # LFC_GH_VERSION_POLICY_END
 
           # The exact workflow identity below binds the signed package to this reviewed source,
-          # whose sole OIDC publisher declares environment: npm. Protection is platform policy.
+          # whose sole OIDC publisher declares environment: npm-nightly. Protection is platform policy.
           gh attestation verify "${LFC_TARBALL}" \
             --bundle provenance.sigstore.json \
             --repo "${GITHUB_REPOSITORY}" \
-            --cert-identity "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/.github/workflows/publish-alpha.yml@refs/heads/main" \
+            --cert-identity "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/.github/workflows/publish-nightly.yml@refs/heads/main" \
             --cert-oidc-issuer https://token.actions.githubusercontent.com \
             --source-ref refs/heads/main \
             --source-digest "${LFC_SOURCE_COMMIT}" \
@@ -1033,14 +1069,14 @@ jobs:
           const sourceCommit = process.env.LFC_SOURCE_COMMIT;
           const sourceRef = "refs/heads/main";
           const eventName = process.env.GITHUB_EVENT_NAME;
-          const workflowPath = ".github/workflows/publish-alpha.yml";
+          const workflowPath = ".github/workflows/publish-nightly.yml";
           const workflowIdentity = `${repositoryUrl}/${workflowPath}@${sourceRef}`;
           const workflowRef = `${repository}/${workflowPath}@${sourceRef}`;
           requireValue(server === "https://github.com" &&
             repository.toLowerCase() === "tryagaindev/litefold-calendar" &&
             process.env.GITHUB_REPOSITORY_OWNER.toLowerCase() === "tryagaindev",
           "Current workflow is not the canonical release repository.");
-          requireValue(eventName === "push" &&
+          requireValue(["schedule", "workflow_dispatch"].includes(eventName) &&
             process.env.GITHUB_REF === sourceRef &&
             process.env.GITHUB_SHA === sourceCommit &&
             process.env.GITHUB_WORKFLOW_REF === workflowRef &&
@@ -1048,8 +1084,8 @@ jobs:
           "Current workflow identity does not match the release source.");
           requireValue(/^[0-9a-f]{40}$/u.test(sourceCommit),
             "Release provenance source commit must be a full lowercase SHA.");
-          requireValue(/^0\.[0-9]+\.[0-9]+-alpha\.[0-9]+$/u.test(process.env.LFC_VERSION),
-            "Release provenance version must be an exact supported alpha.");
+          requireValue(/^[0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{14}\.[0-9]+$/u.test(process.env.LFC_VERSION),
+            "Release provenance version must be an exact generated nightly.");
 
           const integrityMatch = /^sha512-([A-Za-z0-9+/]+={0,2})$/u.exec(
             process.env.LFC_EXPECTED_INTEGRITY
@@ -1166,6 +1202,7 @@ jobs:
           LFC_NOTES_SHA256: ${{ needs.verify.outputs.notes-sha256 }}
           LFC_RELEASE_ID: ${{ needs.stage-release.outputs.release-id }}
           LFC_SOURCE_COMMIT: ${{ needs.verify.outputs.source-commit }}
+          LFC_BASE_VERSION: ${{ needs.verify.outputs.base-version }}
           LFC_TAG: ${{ needs.verify.outputs.tag }}
         run: |
           set -euo pipefail

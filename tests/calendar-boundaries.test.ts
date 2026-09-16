@@ -14,6 +14,7 @@ import {
 	isPopoverOpen,
 	waitFor
 } from "./helpers/dom.js";
+import { getMonthYearPicker } from "./helpers/month-picker.js";
 
 void test("spillover day clicks stop quietly at supported month boundaries", async (context) => {
 	const { dom, host } = setupDom(context);
@@ -460,7 +461,9 @@ void test("the month title opens a localized native popover and jumps with day c
 	assert.ok(gridLabelId !== null && gridLabelId.length > 0);
 	assert.equal(picker.heading.contains(dom.window.document.getElementById(gridLabelId)), true);
 	assert.equal(picker.trigger.type, "button");
-	assert.equal(picker.trigger.textContent, "July 2026");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-full")?.textContent, "July 2026");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Jul 2026");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.getAttribute("aria-hidden"), "true");
 	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently July 2026");
 	assert.equal(picker.popover.getAttribute("popover"), "auto");
 	assert.equal(picker.popover.getAttribute("role"), "dialog");
@@ -547,7 +550,8 @@ void test("the month title opens a localized native popover and jumps with day c
 	assert.equal(isPopoverOpen(picker.popover), false);
 	assert.equal(picker.trigger.getAttribute("aria-expanded"), "false");
 	assert.equal(dom.window.document.activeElement, picker.trigger);
-	assert.equal(picker.trigger.textContent, "February 2027");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-full")?.textContent, "February 2027");
+	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Feb 2027");
 	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently February 2027");
 });
 
@@ -836,23 +840,6 @@ interface TestDom {
 	readonly host: HTMLElement;
 }
 
-interface MonthYearPicker {
-	readonly cancel: HTMLButtonElement;
-	readonly heading: HTMLHeadingElement;
-	readonly jump: HTMLButtonElement;
-	readonly month: HTMLSelectElement;
-	readonly popover: HTMLElement;
-	readonly trigger: HTMLButtonElement;
-	readonly year: HTMLInputElement;
-}
-
-interface MonthYearPickerLabels {
-	readonly cancel: string;
-	readonly jump: string;
-	readonly month: string;
-	readonly year: string;
-}
-
 function setupDom(
 	context: TestContext,
 	markup = '<div id="calendar"></div>'
@@ -872,52 +859,22 @@ async function waitForPhase(
 	await waitFor(() => calendar.getState().phase === phase, `${phase} calendar state`);
 }
 
-function getMonthYearPicker(
-	host: HTMLElement,
-	labels: MonthYearPickerLabels = {
-		cancel: "Cancel",
-		jump: "Jump",
-		month: "Month",
-		year: "Year"
-	}
-): MonthYearPicker {
-	const heading = host.querySelector<HTMLHeadingElement>(".lfc-calendar-title");
-	const trigger = heading?.querySelector<HTMLButtonElement>("button");
-	const popover = host.querySelector<HTMLElement>('[popover="auto"][role="dialog"]');
-	const month = popover?.querySelector<HTMLSelectElement>("select");
-	const year = popover?.querySelector<HTMLInputElement>('input[type="number"]');
-	assert.ok(heading, "Expected the calendar month heading to exist.");
-	assert.ok(trigger, "Expected the month heading to contain a native button.");
-	assert.ok(popover, "Expected the automatic month-and-year popover to exist.");
-	assert.ok(month, "Expected the month chooser to use a native select.");
-	assert.ok(year, "Expected the year chooser to use a numeric input.");
-	assert.equal(getControlLabel(popover, month), labels.month);
-	assert.equal(getControlLabel(popover, year), labels.year);
-	const buttons = [...popover.querySelectorAll<HTMLButtonElement>("button")];
-	const jump = buttons.find((button) => button.textContent?.trim() === labels.jump);
-	const cancel = buttons.find((button) => button.textContent?.trim() === labels.cancel);
-	assert.ok(jump, `Expected a ${labels.jump} button in the month-and-year popover.`);
-	assert.ok(cancel, `Expected a ${labels.cancel} button in the month-and-year popover.`);
-	return { cancel, heading, jump, month, popover, trigger, year };
-}
-
 function getAccessibleName(element: HTMLElement): string {
 	const labelledBy = element.getAttribute("aria-labelledby")?.trim().split(/\s+/u) ?? [];
 	const referenced = labelledBy
-		.map((id) => element.ownerDocument.getElementById(id)?.textContent?.trim() ?? "")
+		.map((id) => {
+			const referencedElement = element.ownerDocument.getElementById(id);
+			if (referencedElement === null) { return ""; }
+			const copy = referencedElement.cloneNode(true) as HTMLElement;
+			for (const hidden of copy.querySelectorAll('[aria-hidden="true"]')) { hidden.remove(); }
+			return copy.textContent?.trim() ?? "";
+		})
 		.filter((value) => value.length > 0)
 		.join(" ");
 	if (referenced.length > 0) {
 		return referenced;
 	}
 	return element.getAttribute("aria-label")?.trim() ?? "";
-}
-
-function getControlLabel(root: HTMLElement, control: HTMLElement): string {
-	const label = [...root.querySelectorAll<HTMLLabelElement>("label")]
-		.find((candidate) => candidate.htmlFor === control.id || candidate.contains(control));
-	assert.ok(label, `Expected a label for ${control.localName}.`);
-	return label.querySelector(":scope > span")?.textContent?.trim() ?? label.textContent?.trim() ?? "";
 }
 
 function getGrid(host: HTMLElement): HTMLElement {

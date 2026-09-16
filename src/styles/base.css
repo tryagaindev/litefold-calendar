@@ -29,6 +29,7 @@
       .lfc-calendar-month-picker-jump,
       .lfc-calendar-month-picker-cancel
     ) {
+    align-items: center;
     align-items: safe center;
     appearance: none;
     background: var(--lfc-surface-background);
@@ -36,6 +37,7 @@
     border-radius: var(--lfc-border-radius);
     cursor: pointer;
     display: inline-flex;
+    justify-content: center;
     justify-content: safe center;
     max-inline-size: 100%;
     min-block-size: max(2.75rem, var(--lfc-control-min-size));

@@ -27,6 +27,7 @@ void test("compact overflow text uses locale-aware social number formatting", as
 		const compactTexts = new Map<string, string>();
 		const calendar = createCalendar(host, {
 			events,
+			gridEventDisplay: { compact: "events" },
 			initialDate: "2026-07-14",
 			locale,
 			maxGridEventsPerDay: 1,
@@ -77,6 +78,7 @@ void test("multi-day occurrences contribute to each day's adaptive overflow coun
 	const { host } = setupDom(context);
 	const compactCounts = new Map<string, readonly [number, number, number, string]>();
 	const calendar = createCalendar(host, {
+		gridEventDisplay: { compact: "events" },
 		events: [
 			{ end: "2026-07-17", id: "spanning", start: "2026-07-14", title: "Spanning" },
 			event("day-14", "2026-07-14T09:00", "Day 14"),
@@ -120,6 +122,7 @@ void test("removed split overflow hook names are rejected as unknown configurati
 	] as const) {
 		assert.throws(
 			() => createCalendar(host, {
+				gridEventDisplay: { compact: "events" },
 				events: [],
 				renderHooks: [{ id: `removed-${removedHook}`, [removedHook]: () => null }]
 			}),
@@ -143,6 +146,7 @@ void test("cross-variant quarantine restores default content removed during conn
 	);
 	let captured: LitefoldCalendarError | undefined;
 	const calendar = createCalendar(host, {
+		gridEventDisplay: { compact: "events" },
 		events: eventsForDate("2026-07-14", 2, "restore-default"),
 		initialDate: "2026-07-14",
 		maxGridEventsPerDay: 1,

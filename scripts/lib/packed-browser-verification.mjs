@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 
 const DOM_GLOBAL_NAMES = [
 	"AbortController",
+	"AbortSignal",
 	"CustomEvent",
 	"DOMException",
 	"Element",
@@ -51,12 +52,31 @@ export async function verifyPackedBrowserInteraction(installedPackage) {
 	if (typeof packageModule.createCalendar !== "function") {
 		throw new Error("Packed root module must export createCalendar().");
 	}
+	const extensionPath = join(installedPackage, "dist", "extensions", "webmcp", "index.js");
+	const { webMcp } = await import(pathToFileURL(extensionPath).href);
+	if (typeof webMcp !== "function") {
+		throw new Error("Packed WebMCP entry must export webMcp().");
+	}
 
 	const dom = new JSDOM('<div id="calendar"></div>', {
 		pretendToBeVisual: true,
 		url: "https://example.test/calendar"
 	});
 	const restoreGlobals = installDomGlobals(dom);
+	const registeredTools = new Map();
+	const registrationSignals = [];
+	Object.defineProperty(dom.window.document, "modelContext", {
+		value: {
+			registerTool(tool, { signal }) {
+				if (signal.aborted || registeredTools.has(tool.name)) {
+					throw new Error("Packed WebMCP registration must be live and unique.");
+				}
+				registeredTools.set(tool.name, tool);
+				registrationSignals.push(signal);
+				signal.addEventListener("abort", () => { registeredTools.delete(tool.name); }, { once: true });
+			}
+		}
+	});
 	try {
 		const host = dom.window.document.querySelector("#calendar");
 		if (!(host instanceof dom.window.HTMLElement)) {
@@ -64,6 +84,7 @@ export async function verifyPackedBrowserInteraction(installedPackage) {
 		}
 		let activation = null;
 		const calendar = packageModule.createCalendar(host, {
+			extensions: [webMcp({ toolNamePrefix: "packed-calendar" })],
 			events: [{
 				id: "packed-byte-event",
 				start: "2026-07-14T09:00",
@@ -83,6 +104,19 @@ export async function verifyPackedBrowserInteraction(installedPackage) {
 		}
 		if (calendar.getState().phase !== "ready") {
 			throw new Error(`Packed calendar did not become ready; phase was ${calendar.getState().phase}.`);
+		}
+		for (let attempt = 0; attempt < 200 && registeredTools.size !== 2; attempt += 1) {
+			await new Promise((resolvePromise) => { setTimeout(resolvePromise, 0); });
+		}
+		if (registeredTools.size !== 2 || !registeredTools.has("packed-calendar-get-events") ||
+			!registeredTools.has("packed-calendar-navigate") || registrationSignals[0] !== registrationSignals[1]) {
+			throw new Error("Packed core and WebMCP must share registration identity and register both tools.");
+		}
+		const getEvents = registeredTools.get("packed-calendar-get-events");
+		const initialEvents = await getEvents.execute({ date: "2026-07-14" });
+		if (initialEvents.ok !== true || initialEvents.events?.length !== 1 ||
+			initialEvents.events[0].title !== "Packed byte interaction") {
+			throw new Error("Packed WebMCP must read the core calendar's loaded events.");
 		}
 
 		const initialAction = host.querySelector(
@@ -116,6 +150,12 @@ export async function verifyPackedBrowserInteraction(installedPackage) {
 		if (!(action instanceof dom.window.HTMLButtonElement)) {
 			throw new Error("Packed calendar did not refetch the latest setEvents() snapshot.");
 		}
+		const replacementEvents = await getEvents.execute({ date: "2026-07-14" });
+		if (replacementEvents.ok !== true || replacementEvents.events?.length !== 1 ||
+			replacementEvents.events[0].title !== "Packed replacement interaction" ||
+			JSON.stringify(replacementEvents.state) !== JSON.stringify(calendar.getState())) {
+			throw new Error("Packed WebMCP must observe the same current state after core setEvents() and refetchEvents().");
+		}
 		const nativeEvent = new dom.window.MouseEvent("click", { bubbles: true, cancelable: true });
 		action.dispatchEvent(nativeEvent);
 		if (activation?.event?.id !== "packed-replacement" || activation.nativeEvent !== nativeEvent ||
@@ -125,6 +165,9 @@ export async function verifyPackedBrowserInteraction(installedPackage) {
 
 		calendar.destroy();
 		calendar.destroy();
+		if (registeredTools.size !== 0 || registrationSignals.some((signal) => !signal.aborted)) {
+			throw new Error("Packed calendar destroy() must release every registered WebMCP tool.");
+		}
 		if (host.childNodes.length !== 0 || host.classList.contains("litefold-calendar") ||
 			host.hasAttribute("data-litefold-calendar") || action.isConnected) {
 			throw new Error("Packed calendar destroy() did not release its rendered host.");

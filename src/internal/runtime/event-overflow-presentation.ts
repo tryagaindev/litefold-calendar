@@ -1,5 +1,5 @@
 import { formatCalendarMessage, type CalendarMessages } from "../../messages.js";
-import type { CalendarDate } from "../../types.js";
+import type { CalendarDate, CalendarGridEventDisplay } from "../../types.js";
 import type { EventRepresentationElements } from "../dom/event-representation.js";
 import { createEventOverflowElements } from "../dom/event-overflow.js";
 
@@ -13,6 +13,7 @@ const COMPACT_NUMBER_FORMAT_OPTIONS = Object.freeze({
 interface EventOverflowPresenterOptions {
 	readonly document: Document;
 	readonly gridEventLimit: number;
+	readonly gridEventDisplay: Readonly<{ compact: CalendarGridEventDisplay; wide: CalendarGridEventDisplay }>;
 	readonly locale: string | undefined;
 	readonly messages: Readonly<CalendarMessages>;
 	readonly numberFormatter: Intl.NumberFormat;
@@ -29,13 +30,14 @@ interface PrepareDayEventOverflowOptions {
 
 interface PreparedGridOverflow {
 	readonly button: HTMLButtonElement;
-	readonly wide: Readonly<PreparedWideEventOverflowVariant>;
+	readonly wide: Readonly<PreparedWideEventOverflowVariant> | null;
 }
 
 interface PreparedEventOverflowVariantBase {
 	readonly content: HTMLElement;
 	readonly date: CalendarDate;
 	readonly dateString: string;
+	readonly display: "overflow" | "count";
 	readonly eventCount: number;
 	readonly overflowCount: number;
 	readonly root: HTMLElement;
@@ -78,20 +80,54 @@ export class CalendarEventOverflowPresenter {
 	public prepareAndPlace(
 		options: Readonly<PrepareDayEventOverflowOptions>
 	): Readonly<PreparedDayEventOverflow> {
+		const compactCount = this.showsCount("compact", options.eventCount);
+		const wideCount = this.showsCount("wide", options.eventCount);
+		options.summaries.setAttribute("data-lfc-compact-display", compactCount ? "count" : "events");
+		options.summaries.setAttribute("data-lfc-wide-display", wideCount ? "count" : "events");
 		options.compactPrimary?.root.classList.add("lfc-is-compact-primary");
 		const grid = this.createGridOverflow(options);
-		const compact = this.createCompactOverflow(options, grid?.button ?? null);
-		if (grid !== null) {
+		const compactAction = compactCount || options.eventCount > this.options.gridEventLimit
+			? grid?.button ?? null : null;
+		const compact = this.createCompactOverflow(options, compactAction);
+		if (grid !== null && grid.wide !== null) {
 			grid.button.append(grid.wide.root);
 		}
+		grid?.button.classList.toggle("lfc-has-wide-overflow", grid.wide !== null);
 		return Object.freeze({ compact, grid });
+	}
+
+	private showsCount(variant: "compact" | "wide", eventCount: number): boolean {
+		const mode = this.options.gridEventDisplay[variant];
+		return eventCount > 0 && (mode === "count" || (mode === "count-when-multiple" && eventCount > 1));
 	}
 
 	private createCompactOverflow(
 		options: Readonly<PrepareDayEventOverflowOptions>,
 		gridAction: HTMLButtonElement | null
 	): Readonly<PreparedCompactEventOverflowVariant> | null {
-		if (options.eventCount <= 1 && (gridAction === null || options.compactPrimary !== null)) {
+		if (this.showsCount("compact", options.eventCount) && gridAction !== null) {
+			const text = this.getCompactNumberFormatter(false).format(options.eventCount);
+			const overflow = createEventOverflowElements(this.options.document, "compact", text);
+			overflow.root.classList.add("lfc-is-count");
+			gridAction.classList.add("lfc-is-compact-primary");
+			gridAction.append(overflow.root);
+			return Object.freeze({
+				action: gridAction,
+				content: overflow.content,
+				date: options.date,
+				dateString: options.dateString,
+				display: "count",
+				eventCount: options.eventCount,
+				overflowCount: options.eventCount,
+				placementBoundary: null,
+				root: overflow.root,
+				text,
+				variant: "compact",
+				visibleEventCount: 0
+			});
+		}
+		if (options.eventCount <= 1 &&
+			(options.eventCount <= this.options.gridEventLimit || options.compactPrimary !== null)) {
 			return null;
 		}
 		const visibleEventCount = options.compactPrimary !== null &&
@@ -108,6 +144,7 @@ export class CalendarEventOverflowPresenter {
 			content: overflow.content,
 			date: options.date,
 			dateString: options.dateString,
+			display: "overflow",
 			eventCount: options.eventCount,
 			overflowCount,
 			placementBoundary: action === null
@@ -123,7 +160,10 @@ export class CalendarEventOverflowPresenter {
 	private createGridOverflow(
 		options: Readonly<PrepareDayEventOverflowOptions>
 	): Readonly<PreparedGridOverflow> | null {
-		if (options.eventCount <= this.options.gridEventLimit) {
+		const compactCount = this.showsCount("compact", options.eventCount);
+		const wideCount = this.showsCount("wide", options.eventCount);
+		const hasOverflow = options.eventCount > this.options.gridEventLimit;
+		if (!compactCount && !wideCount && !hasOverflow) {
 			return null;
 		}
 		const button = this.options.document.createElement("button");
@@ -133,32 +173,49 @@ export class CalendarEventOverflowPresenter {
 		button.setAttribute("aria-keyshortcuts", "F2");
 		button.setAttribute("data-lfc-date", options.dateString);
 		button.classList.toggle("lfc-is-compact-primary", options.compactPrimary === null);
+		button.classList.toggle("lfc-is-wide-count-only", wideCount && !compactCount && !hasOverflow);
 
-		const overflowCount = options.eventCount - this.options.gridEventLimit;
-		const formattedCount = this.options.numberFormatter.format(overflowCount);
-		const text = formatCalendarMessage(this.options.messages.gridMore, { count: formattedCount });
-		const wide = createEventOverflowElements(this.options.document, "wide", text);
-		button.setAttribute("aria-label", formatCalendarMessage(this.options.messages.gridMoreLabel, {
-			count: formattedCount,
+		const overflowCount = wideCount ? options.eventCount : Math.max(0, options.eventCount - this.options.gridEventLimit);
+		const wide = wideCount || hasOverflow
+			? this.createWideOverflow(options, button, wideCount, overflowCount) : null;
+		const accessibleCount = compactCount || wideCount ? options.eventCount : overflowCount;
+		const accessibleLabel = formatCalendarMessage(
+			compactCount || wideCount ? this.options.messages.gridEventCountLabel : this.options.messages.gridMoreLabel, {
+			count: this.options.numberFormatter.format(accessibleCount),
 			date: options.fullDateText,
-			eventLabel: overflowCount === 1
+			eventLabel: accessibleCount === 1
 				? this.options.messages.event
 				: this.options.messages.events
-		}));
+		});
+		button.setAttribute("aria-label", compactCount && !wideCount && wide !== null
+			? `${accessibleLabel}, ${wide.text}` : accessibleLabel);
+		return Object.freeze({ button, wide });
+	}
+
+	private createWideOverflow(
+		options: Readonly<PrepareDayEventOverflowOptions>,
+		button: HTMLButtonElement,
+		wideCount: boolean,
+		overflowCount: number
+	): Readonly<PreparedWideEventOverflowVariant> {
+		const text = formatCalendarMessage(wideCount ? this.options.messages.gridEventCount : this.options.messages.gridMore, {
+			count: this.options.numberFormatter.format(overflowCount),
+			eventLabel: overflowCount === 1 ? this.options.messages.event : this.options.messages.events
+		});
+		const wide = createEventOverflowElements(this.options.document, "wide", text);
+		wide.root.classList.toggle("lfc-is-count", wideCount);
 		return Object.freeze({
-			button,
-			wide: Object.freeze({
-				action: button,
-				content: wide.content,
-				date: options.date,
-				dateString: options.dateString,
-				eventCount: options.eventCount,
-				overflowCount,
-				root: wide.root,
-				text,
-				variant: "wide",
-				visibleEventCount: options.eventCount - overflowCount
-			})
+			action: button,
+			content: wide.content,
+			date: options.date,
+			dateString: options.dateString,
+			display: wideCount ? "count" : "overflow",
+			eventCount: options.eventCount,
+			overflowCount,
+			root: wide.root,
+			text,
+			variant: "wide",
+			visibleEventCount: options.eventCount - overflowCount
 		});
 	}
 

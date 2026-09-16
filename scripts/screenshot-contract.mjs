@@ -8,6 +8,7 @@ import {
 	SUPPORTED_NODE_RANGE
 } from "./lib/node-version.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
+import { browserTargetsFingerprint } from "./lib/browser-targets.mjs";
 
 export const REQUIRED_NPM_VERSION = "12.0.2";
 export const SCREENSHOT_MANIFEST_PATH = resolve(REPOSITORY_ROOT, "screenshots.manifest.json");
@@ -18,7 +19,11 @@ export const EXPECTED_SCENES = Object.freeze([
 	"mobile-month-agenda-dark",
 	"mobile-month-swipe-pull",
 	"event-details-dark",
-	"grid-event-keyboard-focus"
+	"grid-event-keyboard-focus",
+	"compact-default-counts",
+	"compact-all-counts",
+	"wide-all-counts",
+	"count-keyboard-focus"
 ]);
 
 const SOURCE_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".mjs", ".ts"]);
@@ -36,13 +41,17 @@ const SCREENSHOT_PACKAGE_SCRIPTS = Object.freeze([
 	"postbuild:examples:advanced",
 	"prescreenshots:update",
 	"screenshots:update",
-	"postscreenshots:update"
+	"postscreenshots:update",
+	"prescreenshots:prepare",
+	"screenshots:prepare",
+	"postscreenshots:prepare"
 ]);
 export const SCREENSHOT_SOURCE_INPUTS = Object.freeze([
 	"package.json",
 	"package-lock.json",
 	"tsconfig.base.json",
 	"tsconfig.build.json",
+	"vite.config.mjs",
 	"src",
 	"examples/example.css",
 	"examples/advanced/index.html",
@@ -52,10 +61,13 @@ export const SCREENSHOT_SOURCE_INPUTS = Object.freeze([
 	"scripts/build-advanced-example.mjs",
 	"scripts/build-package.mjs",
 	"scripts/lib/advanced-example-build.mjs",
+	"scripts/lib/browser-targets.mjs",
 	"scripts/lib/node-version.mjs",
 	"scripts/lib/package-entries.mjs",
 	"scripts/lib/process.mjs",
 	"scripts/lib/styles.mjs",
+	"scripts/lib/screenshot-preparation.mjs",
+	"scripts/prepare-screenshots.mjs",
 	"scripts/screenshot-contract.mjs",
 	"scripts/screenshot-scenes.mjs",
 	"scripts/serve-repository.mjs",
@@ -150,6 +162,8 @@ export async function computeSourceFingerprint() {
 	const files = (await Promise.all(SCREENSHOT_SOURCE_INPUTS.map((input) =>
 		collectFiles(resolve(REPOSITORY_ROOT, input))))).flat().sort();
 	const hash = createHash("sha256");
+	hash.update(browserTargetsFingerprint());
+	hash.update("\0");
 	for (const file of files) {
 		if (!isRepositoryPath(file)) {
 			throw new Error(`Screenshot source escaped the repository: ${file}`);

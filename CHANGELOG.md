@@ -6,7 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-<!-- Add user-visible changes under an appropriate Keep a Changelog category. -->
+### Added
+
+- Added independent compact and wide `gridEventDisplay` settings for individual summaries, total counts, or counts only on days with multiple events. `onEventOverflowActivate` supports application-owned day choosers with synchronous cancellation of the default agenda action, and `renderEventOverflow` now identifies count presentation.
+- Added an everyday remote-data guide and runnable JavaScript/JSDoc example covering `fetch`, cancellation, filtering, retry, refresh after saving, application-owned dialogs, and cleanup.
+- Added stale-aware screenshot preparation with staged batch validation and a before/after review gallery, plus a canonical delivery checklist.
+
+### Changed
+
+- **Migration:** compact calendars now default to a total-count button when a day contains multiple events. Set `gridEventDisplay: { compact: "events" }` to retain individual compact event presentation. Wide calendars continue to show event summaries by default.
+- Browser support now uses Vite's `baseline-widely-available` preset, maintained through reviewed Vite updates. Build, screenshot, and release evidence records the effective targets and tooling versions.
+- Adopted Vite library mode and example development while retaining explicit CSS loading, ESM imports, TypeScript declarations, and optional WebMCP isolation. Component layout in the examples and published site now responds to container width.
+- Replaced alpha delivery with daily and manually dispatched main-branch nightly snapshots in the next minor series. OIDC publication updates only `nightly`, leaving `latest` on historical alpha until stable publication. Existing alpha packages and release snapshots remain frozen; nightly publication retains exact source, package, and Pages identity without daily version commits or npm tokens.
+- Hosted CI and publication now run Chromium and WebKit. Firefox checks and repeated qualification remain available locally while hosted Firefox automation is paused; Firefox remains supported within the Vite Baseline window.
+
+### Fixed
+
+- Isolated library browser fixtures from advanced-example setup, removed unsupported protocol tests before setup on Firefox/WebKit, and replaced a timing-dependent wheel assertion with deterministic transaction coverage. CI rejects flaky results.
+- Added native dialog and palette fallbacks for supported Baseline browsers without Popover or `light-dark()` support.
+- Kept compact count labels, focus rings, and date decoration within their day cells at narrow widths and enlarged text. Month navigation now reflows without overlapping controls when space is limited; day buttons advertise F2 only when action entry is available in both compact and wide presentations.
 
 ## [0.5.0-alpha.0] - 2026-09-02
 

@@ -37,8 +37,9 @@ The model assumes:
 | Browser agent → WebMCP extension | Tool names, untrusted structured arguments, read/navigation requests | Explicit selection, prefix validation, exact schemas, bounds validation, snapshot-bound opaque cursor validation, existing public navigation paths, no application-action tools |
 | WebMCP extension → browser agent | Paged visible-range state and presentation-safe source-event fields | Same-origin document registry, untrusted-content annotation, allowed-date filtering, no ID/URL/metadata/cause output, fixed result limits, no superseded-snapshot cache, unregister on teardown |
 | Contributor → CI | Source and workflow changes | Read-only pull-request permissions, full-SHA actions, no `pull_request_target`, locked script-disabled install, lint/type/policy/tests |
-| Exact release commit → retained artifacts | Reviewed source and build tooling | Complete gate, clean-source package build, checksums, integrity, receipt, SBOM, license, attempt-scoped artifacts |
-| Verified artifact → npm | Exact tarball and OIDC identity | Protected `npm` environment, source-free publisher, hash/receipt/manifest validation, trusted publishing, provenance, post-publish verification |
+| Validated main snapshot → retained artifacts | Reviewed source and build tooling | Hosted publication gate (Chromium and WebKit), isolated version overlay, immutable workflow identity, checksums, integrity, receipt, SBOM, license, retained artifacts |
+| Verified artifact → npm | Exact tarball and OIDC identity | Main-only `npm-nightly` environment, source-free publisher, hash/receipt/manifest validation, OIDC-only trusted publishing under `nightly`, provenance, no npm token |
+| Published npm state → registry verification | Public registry metadata and retained package evidence | Read-only exact-version/integrity verification, unchanged preflight `latest`, frozen historical alpha before stable, stable ownership of `latest` afterward |
 | Verified release state → Git tag and GitHub prerelease | Tag and release-write authority | Protected exact-SHA tag, draft-first assets, matching-byte reuse only, immutable release setting, public prerelease last |
 | Verified Pages input → retained-state writer | Built automatic channel or authenticated retained rollback state | Exact-source or retained-commit identity, credential-stripped unprivileged assembly, exact root CSP, remote-runtime rejection, immutable release preservation |
 | Exact retained snapshot → GitHub Pages | `pages-content` commit and attempt-scoped Pages artifact | One queued workflow-level lock across writers and deployers, retained-head confirmation, protected Pages authority |
@@ -47,7 +48,7 @@ The model assumes:
 flowchart LR
   accTitle: Litefold Calendar runtime and publication trust paths
   accDescr {
-    At runtime, browser users, application event sources, trusted render hooks, and the optional WebMCP extension interact with the calendar core, DOM, and callbacks. Separately, read-only CI verifies the exact main commit and can update the queued retained-state writer directly. Verified artifacts pass through protected npm and an immutable GitHub prerelease before triggering that writer; an authorized rollback may instead supply an authenticated retained snapshot. The writer hands the exact snapshot to a separately authorized Pages deployment.
+    At runtime, browser users, application event sources, trusted render hooks, and the optional WebMCP extension interact with the calendar core, DOM, and callbacks. Separately, read-only CI verifies the exact main commit and can update the queued retained-state writer directly. Verified artifacts pass through main-only OIDC npm publication, read-only registry and unchanged-latest verification, and an immutable GitHub prerelease before triggering that writer; an authorized rollback may instead supply an authenticated retained snapshot. The writer hands the exact snapshot to a separately authorized Pages deployment.
   }
   U[Browser user] --> C[Calendar core]
   S[Application event source] --> C
@@ -58,10 +59,11 @@ flowchart LR
   C --> W
   E[Trusted consumer render hooks] --> C
   P[Pull request] --> V[Read-only CI]
-  V --> R[Exact main release commit]
+  V --> R[Exact main snapshot]
   R --> B[Verified artifacts]
-  B --> N[Protected source-free npm publish]
-  N --> G[Immutable GitHub prerelease]
+  B --> N[Main-only source-free npm publish]
+  N --> L[Read-only registry verification]
+  L --> G[Immutable GitHub prerelease]
   G --> Q[Native successful-workflow trigger]
   V --> X[Queued retained-state writer]
   Q --> X
@@ -103,8 +105,8 @@ The scenarios below describe what each control must prevent. A scenario becomes 
 | TM-006 | Enabling WebMCP discloses more calendar data than intended | Explicit extension selection, same application source authorization, pages of distinct eligible source events from the allowed portion of the loaded visible range, snapshot-bound continuations, no superseded-payload cache, no metadata/URL/ID output, explicit privacy guidance | Titles and raw normalized start/end civil values are intentionally exposed even when visually hidden; applications must opt in only where appropriate |
 | TM-007 | A model bypasses bounds, forges or replays pagination state, invokes application actions, or causes unbounded fetches | Exact schemas, argument and bounds validation, fixed page size, activation/range/scope/snapshot/offset cursor binding, read-only annotation, one non-read navigation tool, no activation/edit tools, existing source generations | Navigation may request another authorized month; providers must remain safe to repeat |
 | TM-008 | Duplicate, partial, or stale registrations target the wrong calendar | Stable unique prefix, document-wide collision failure, one shared abort signal, rollback after an observed failure, unregister on destroy, pre-wait and pending-wait lifecycle checks | WebMCP has no atomic batch or timeout, so a never-settling registration cannot be made atomic; application code can separately register conflicting names |
-| TM-009 | Pull-request code gains npm, tag, release, or Pages authority | Read-only PR defaults, pinned actions, no `pull_request_target`, separate protected environments/jobs, immutable release checks | Hosted rulesets, approval, and environment configuration remain external controls |
-| TM-010 | Release publishes bytes or identity other than the reviewed commit | Exact `push` SHA, deterministic release-state diff, checksums/integrity/receipt/SBOM, source-free OIDC publisher, registry verification, exact tag and immutable release | npm publication is irreversible; defective versions are deprecated and replaced |
+| TM-009 | Pull-request code gains npm, tag, release, or Pages authority | Read-only PR defaults, pinned actions, no `pull_request_target`, main-only publication environment, source-free privileged jobs, OIDC-only npm publication, immutable release checks | Hosted rulesets and trusted-publisher configuration remain external controls. Keep npm tokens out of the workflow and verify the exact saved binding and environment restrictions |
+| TM-010 | Release publishes bytes or identity other than the reviewed commit | Exact successful main SHA, immutable workflow creation time/run ID, isolated version overlay, target resolution, checksums/integrity/receipt/SBOM, source-free OIDC publisher, registry verification, exact tag and immutable release | npm publication is irreversible; defective versions are deprecated and replaced. Future stable publication retains a separate review boundary and shares publication concurrency |
 | TM-011 | Retried publication, rollback, or Pages deployment creates conflicting public state | Matching-byte/identity recovery, no version/tag reuse, retained Pages history, writer-side rollback reconstruction, immutable release directories, one maximum queued workflow-level lock across Pages writers and deployers, public identity verification | Ambiguous external state or a retained-shell policy failure must fail closed and require maintainer review |
 | TM-012 | A forged, duplicated, or over-privileged extension value gains unintended authority | Package-issued opaque values, synchronous whole-array validation and duplicate-ID rejection, least-privilege capability contexts, per-extension lifecycle guards | Future third-party authoring would create a wider trusted-code boundary and requires a separate lower-stability contract and threat review |
 
@@ -129,12 +131,11 @@ Release-authority paths remain the highest supply-chain priority. Executable ren
 | `src/internal/dom/` | Semantic structure, managed focus, native interaction, non-executable content |
 | `src/errors.ts` | Safe user messages and diagnostic separation |
 | `scripts/check-package-policy.mjs` | Manifest, import, sink, dependency, built-output, and workflow policy |
-| Release preparation and verification scripts | Atomic version/changelog transition, exact source state, collision and resume decisions |
-| `scripts/pack-release.mjs` | Clean-source tarball, integrity, receipt, SBOM, license, consumer verification |
+| Nightly preparation and verification scripts | Immutable candidate identity, exact source state, isolated package-version overlay, unchanged-source classification, collision and retained-byte recovery decisions |
+| `scripts/pack-release.mjs` and `scripts/pack-nightly.mjs` | Clean-source tarball, target evidence, integrity, receipt, SBOM, license, consumer verification |
 | Pages build and assembly scripts | Self-contained assets, exact root CSP, visible identity, retained releases, rolling preview, immutable paths |
 | `.github/workflows/ci.yml` | Pull-request and main verification without publication authority |
-| `.github/workflows/prepare-alpha.yml` | Default-branch preparation and generated release-state branch without publication authority |
-| `.github/workflows/publish-alpha.yml` | Exact-`push` release classification, artifact handoff, isolated trusted publishing, tag and prerelease creation |
+| `.github/workflows/publish-nightly.yml` | Canonical-main scheduled/manual classification, artifact handoff, isolated OIDC-only trusted publishing, read-only latest preservation and stable ownership checks, tag and prerelease creation |
 | `.github/workflows/deploy-examples.yml` | `workflow_run`-only canonical workflow identity, rolling previews, release deployment, retained history, isolated Pages authority, and the shared whole-run deployment queue |
 | `.github/workflows/rollback-examples.yml` | `workflow_dispatch`-only retained-main rollback reconstructed in the writer from authenticated Git objects, current retained shell, trusted default-branch tooling, and immutable releases; shares the whole-run deployment queue |
 
@@ -159,7 +160,7 @@ recreating, or weakening protection for a current release object.
 
 Related operating guidance:
 
-- [Alpha release operations](release-operations.md) defines the step-by-step operator runbook.
+- [Nightly release operations](release-operations.md) defines the step-by-step operator runbook.
 - [Release administration](release-administration.md) defines publication controls and recovery.
 - [Package verification](package-verification.md) defines artifact evidence.
 - [First-party extensions](first-party-extensions.md) defines optional component boundaries.

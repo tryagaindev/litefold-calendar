@@ -94,32 +94,6 @@
     transition-property: none;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :where(.litefold-calendar) {
-      --lfc-color: #eaf7f7;
-      --lfc-muted-color: #a8c8cc;
-      --lfc-background: #061a23;
-      --lfc-surface-background: #0c2a34;
-      --lfc-border-color: #6e929a;
-      --lfc-accent-color: #62e3a8;
-      --lfc-accent-contrast-color: #062a20;
-      --lfc-focus-ring-color: #c0b6ff;
-      --lfc-selected-background: #12483f;
-      --lfc-selected-color: #d5fff1;
-      --lfc-today-border-color: #062a20;
-      --lfc-event-background: #282853;
-      --lfc-event-color: #f1eeff;
-      --lfc-event-border-color: #a39aff;
-      --lfc-event-accent-color: #ff88c8;
-      --lfc-warning-background: #431407;
-      --lfc-warning-color: #ffedd5;
-      --lfc-warning-border-color: #fdba74;
-      --lfc-error-background: #450a0a;
-      --lfc-error-color: #fee2e2;
-      --lfc-error-border-color: #fca5a5;
-    }
-  }
-
   @media (prefers-contrast: more) {
     :where(.litefold-calendar) {
       --lfc-border-color: currentcolor;

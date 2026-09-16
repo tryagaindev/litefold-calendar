@@ -57,6 +57,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-agenda-event {
+    align-items: center;
     align-items: safe center;
     background: var(--lfc-event-background);
     border: var(--lfc-internal-hairline) solid var(--lfc-event-border-color);
@@ -279,12 +280,39 @@
   :where(.litefold-calendar) .lfc-calendar-event-marker:empty,
   :where(.litefold-calendar) .lfc-calendar-time:empty,
   :where(.litefold-calendar) .lfc-calendar-event-details:empty,
-  :where(.litefold-calendar) .lfc-calendar-event-trailing:empty,
+  :where(.litefold-calendar) .lfc-calendar-event-trailing:empty {
+    display: none;
+  }
+
   :where(.litefold-calendar)
     .lfc-calendar-event-leading:has(> .lfc-calendar-event-marker:empty):has(
       > .lfc-calendar-event-leading-content:empty
     ) {
     display: none;
+  }
+
+  @supports not selector(:has(*)) {
+    /* A wrapping row preserves optional roles without relational-selector state or observers. */
+    :where(.litefold-calendar) .lfc-calendar-agenda-list {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    :where(.litefold-calendar) .lfc-calendar-agenda-event {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-agenda-event
+      .lfc-calendar-event-leading:not(.lfc-visually-hidden) {
+      display: contents;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-agenda-event
+      :is(.lfc-calendar-event-details, .lfc-calendar-event-trailing) {
+      flex-basis: 100%;
+    }
   }
 
   :where(.litefold-calendar)[aria-busy="true"] {

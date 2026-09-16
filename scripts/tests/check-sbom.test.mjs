@@ -248,3 +248,24 @@ test("check-sbom rejects invalid or incomplete source identity before invoking n
 		});
 	}
 });
+
+
+test("check-sbom nightly overlay changes all SPDX package identities without changing source", async (t) => {
+	const fixture = await createFixture(t);
+	const version = "0.6.0-nightly.20260912090000.123456789";
+	const { stdout } = await execFileAsync(process.execPath,
+		[CHECK_SBOM_PATH, ...jsonArguments(), "--version", version],
+		{ cwd: REPOSITORY_ROOT, env: fixture.environment });
+	const sbom = JSON.parse(stdout);
+	const runtime = sbom.packages[0];
+	assert.equal(runtime.versionInfo, version);
+	assert.equal(runtime.externalRefs[0].referenceLocator, npmPurl(packageJson.name, version));
+	assert.deepEqual(sbom.documentDescribes, [runtime.SPDXID]);
+	assert.equal(sbom.relationships[0].relatedSpdxElement, runtime.SPDXID);
+	assert.equal(sbom.name, `${packageJson.name}@${version}`);
+	assert.ok(sbom.documentNamespace.includes(version));
+	assert.equal(JSON.parse(await readFile(join(REPOSITORY_ROOT, "package.json"), "utf8")).version, packageJson.version);
+	await assert.rejects(execFileAsync(process.execPath,
+		[CHECK_SBOM_PATH, ...jsonArguments(), "--version", "1.0.0"],
+		{ cwd: REPOSITORY_ROOT, env: fixture.environment }));
+});

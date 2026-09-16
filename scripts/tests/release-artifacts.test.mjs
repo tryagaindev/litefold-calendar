@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
@@ -16,8 +16,12 @@ async function createRepository() {
 	return mkdtemp(join(tmpdir(), "lfc-release-artifacts-test-"));
 }
 
-void test("release arguments accept only one optional verify-only flag", () => {
+void test("release arguments distinguish temporary checks from explicit nightly plans", () => {
 	assert.deepEqual(parseReleaseArguments([]), { verifyOnly: false });
+	assert.deepEqual(parseReleaseArguments(["--nightly-plan", "plan.json"]),
+		{ nightlyPlanPath: resolve("plan.json"), verifyOnly: false });
+	assert.throws(() => parseReleaseArguments(["--nightly-plan"]), /Usage/u);
+	assert.throws(() => parseReleaseArguments(["--nightly-plan", "plan.json", "--verify-only"]), /Usage/u);
 	assert.deepEqual(parseReleaseArguments(["--verify-only"]), { verifyOnly: true });
 	assert.throws(() => parseReleaseArguments(["--unknown"]), /Usage/u);
 	assert.throws(

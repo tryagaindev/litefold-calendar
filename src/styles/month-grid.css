@@ -55,12 +55,24 @@
 
   :where(.litefold-calendar)
     .lfc-calendar-weeks[data-lfc-grid-event-placement="center"] {
-    --lfc-internal-grid-event-block-alignment: safe center;
+    --lfc-internal-grid-event-block-alignment: center;
   }
 
   :where(.litefold-calendar)
     .lfc-calendar-weeks[data-lfc-grid-event-placement="bottom"] {
-    --lfc-internal-grid-event-block-alignment: safe end;
+    --lfc-internal-grid-event-block-alignment: end;
+  }
+
+  @supports (justify-content: safe center) {
+    :where(.litefold-calendar)
+      .lfc-calendar-weeks[data-lfc-grid-event-placement="center"] {
+      --lfc-internal-grid-event-block-alignment: safe center;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-weeks[data-lfc-grid-event-placement="bottom"] {
+      --lfc-internal-grid-event-block-alignment: safe end;
+    }
   }
 
   :where(.litefold-calendar) .lfc-calendar-week {
@@ -216,6 +228,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-event-overflow {
+    align-items: center;
     align-items: safe center;
     background: transparent;
     border: 0;
@@ -244,11 +257,23 @@
     line-height: 1;
   }
 
+  :where(.litefold-calendar)
+    .lfc-calendar-event-overflow.lfc-is-compact.lfc-is-count {
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
   :where(.litefold-calendar) .lfc-calendar-event-overflow-content {
+    align-items: center;
     align-items: safe center;
     display: inline-flex;
+    justify-content: center;
     justify-content: safe center;
     min-inline-size: 0;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-event-overflow.lfc-is-count {
+    color: inherit;
   }
 
   :where(.litefold-calendar)
@@ -258,6 +283,7 @@
   }
 
   :where(.litefold-calendar) .lfc-calendar-event-summary {
+    align-items: center;
     align-items: safe center;
     background: var(--lfc-event-background);
     border: var(--lfc-internal-hairline) solid var(--lfc-event-border-color);
@@ -346,4 +372,14 @@
     min-inline-size: 0;
     overflow-wrap: anywhere;
   }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-day-summaries:is([data-lfc-compact-display="count"], [data-lfc-wide-display="count"])
+    .lfc-calendar-grid-more {
+    background: var(--lfc-event-background);
+    border: var(--lfc-internal-hairline) solid var(--lfc-event-border-color);
+    border-radius: var(--lfc-border-radius);
+    color: var(--lfc-event-color);
+  }
+
 }

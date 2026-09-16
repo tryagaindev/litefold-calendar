@@ -16,17 +16,30 @@ repository internals.
 
 | Goal | Canonical guide |
 | --- | --- |
-| Install and render a calendar | [Install](../README.md#install), [first render](../README.md#first-render), and [basic example](../examples/basic/) |
-| Decide whether the month-and-agenda model fits | [Features and alpha scope](features.md) |
+| Install and render a calendar | [Getting started](getting-started.md), [first render](../README.md#first-render), and [basic example](../examples/basic/) |
+| Decide whether the month-and-agenda model fits | [Features and scope](features.md) |
 | Check browser and platform requirements | [Browser support](browser-support.md) |
 | Choose a runnable starting point | [Examples guide](../examples/README.md) |
 | Get help, report a problem, or evaluate an upgrade | [Support policy](../SUPPORT.md) and [changelog](../CHANGELOG.md) |
 
+### Everyday application integration
+
+Use this lane after the first render, when you need a working data source or
+an application interaction. These recipes use plain JavaScript with optional
+JSDoc and introduce one task at a time.
+
+| Goal | Canonical guide |
+| --- | --- |
+| Fetch events, validate JSON, filter, and refresh after saving | [Remote-data walkthrough](remote-data.md) and [runnable example](../examples/remote-data/) |
+| Make busy days recognizable in a sidebar or full-size calendar | [Choose event counts](integration-guide.md#choose-event-counts) |
+| Open existing application dialogs from events or total counts | [Own the event chooser](integration-guide.md#own-the-event-chooser) |
+| Understand default empty, failure, and Retry behavior | [Remote-data recovery](remote-data.md#4-keep-empty-and-error-states-distinct) |
+
 ### Integration and API
 
-Use this lane when adapting application data, behavior, presentation, or an
-existing integration. It favors precise public contracts, ownership, tradeoffs,
-and failure behavior.
+Use this advanced lane for typed adapters, caching, customization, or exact
+public contracts. The exhaustive advanced example also serves repository
+coverage; everyday integrations do not need its full setup.
 
 | Goal | Canonical guide |
 | --- | --- |
@@ -52,6 +65,7 @@ work, observable verification, and review evidence. Contributor policy lives in
 | Set up the repository and submit a change | [Contributing](../CONTRIBUTING.md) |
 | Run focused checks and the complete repository gate | [Contributor commands](../CONTRIBUTOR_COMMANDS.md) |
 | Commit and push an already-scoped change | [Commit-and-push operation skill](../.agents/skills/commit-and-push/SKILL.md) |
+| Carry a change through validation, screenshots, and delivery | [Local-to-production checklist](change-delivery.md) |
 | Follow source conventions and dependency direction | [Code style](code-style.md) and [internal architecture](architecture.md) |
 | Understand extension lifecycle implementation | [First-party extensions](first-party-extensions.md) |
 | Review the `setEvents()` decision or reproduce measurements | [Dynamic event update decision record](dynamic-event-updates-adr.md) |
@@ -73,7 +87,8 @@ permissions by itself.
 
 | Goal | Canonical guide |
 | --- | --- |
-| Coordinate an authorized npm alpha release | [Release-to-npm operation skill](../.agents/skills/release-to-npm/SKILL.md) and [release operations](release-operations.md) |
+| Coordinate nightly publication | [Release-to-npm operation skill](../.agents/skills/release-to-npm/SKILL.md) and [nightly operations](release-operations.md) |
+| Deliver and verify a completed change | [Local-to-production checklist](change-delivery.md) |
 | Review release policy and invariants | [Release policy](releasing.md) |
 | Configure hosted controls or recover an exceptional release | [Release administration](release-administration.md) |
 | Verify registry and release evidence | [Package verification](package-verification.md) |

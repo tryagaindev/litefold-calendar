@@ -22,6 +22,7 @@ export default defineConfig({
 		timeout: 5_000
 	},
 	forbidOnly: Boolean(process.env["CI"]),
+	failOnFlakyTests: true,
 	fullyParallel: true,
 	globalSetup: "./tests/e2e/global-setup.js",
 	outputDir: "test-results/playwright",
@@ -34,19 +35,26 @@ export default defineConfig({
 		},
 		{
 			name: "firefox",
+			grepInvert: /@chromium-input/u,
 			use: {
 				...devices["Desktop Firefox"]
 			}
 		},
 		{
 			name: "webkit",
+			grepInvert: /@chromium-input/u,
 			use: {
 				...devices["Desktop Safari"]
 			}
 		}
-	],
+	].filter(({ name }) => !process.env["CI"] || name !== "firefox"),
 	reporter: process.env["CI"]
-		? [["github"], ["line"]]
+		? [
+			["github"],
+			["line"],
+			["json", { outputFile: "test-results/browser-results.json" }],
+			["html", { open: "never", outputFolder: "test-results/browser-report" }]
+		]
 		: [["list"]],
 	retries: process.env["CI"] ? 1 : 0,
 	testDir: "./tests/e2e",
@@ -61,5 +69,5 @@ export default defineConfig({
 		trace: "retain-on-failure",
 		video: "off"
 	},
-	workers: 2
+	workers: process.env["CI"] ? 1 : 2
 });

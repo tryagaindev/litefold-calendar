@@ -80,6 +80,8 @@ const ADVANCED_MESSAGES = Object.freeze({
 	renderHookErrorMessage: "Some schedule details could not be displayed.",
 	renderHookErrorTitle: "Some schedule details are unavailable",
 	gridEventInstructions: "Use arrow keys to move between dates and Enter or Space to select. Press F2 on a date to move to its visible event actions; use Up and Down Arrow between actions, and Escape or F2 to return.",
+	gridEventCount: "{count} {eventLabel}",
+	gridEventCountLabel: "View {count} {eventLabel} for {date}",
 	gridMore: "{count} additional",
 	gridMoreLabel: "View {count} more {eventLabel} for {date}",
 	internalErrorMessage: "The schedule encountered an unexpected error.",
@@ -629,6 +631,7 @@ const advancedRenderHooks = Object.freeze({
 	},
 	renderEventOverflow: ({
 		dateString,
+		display,
 		document: ownerDocument,
 		elements,
 		eventCount,
@@ -641,6 +644,7 @@ const advancedRenderHooks = Object.freeze({
 		const content = ownerDocument.createElement("span");
 		content.className = `my-event-overflow-${variant}`;
 		content.dataset["testDate"] = dateString;
+		content.dataset["testDisplay"] = display;
 		content.dataset["testEventCount"] = String(eventCount);
 		content.dataset["testOverflowCount"] = String(overflowCount);
 		content.dataset["testSurface"] = surface;
@@ -674,6 +678,8 @@ const calendarOptions = {
 	extensions: [webMcp({ toolNamePrefix: "my-schedule" })],
 	fallbackElement,
 	firstDay: 1,
+	//Explicitly demonstrate the package defaults; use "count" to include single-item dates too.
+	gridEventDisplay: { compact: "count-when-multiple", wide: "events" },
 	gridEventPlacement: "bottom",
 	headingLevel: 3,
 	icons: {
@@ -747,6 +753,10 @@ const calendarOptions = {
 		reportAction(
 			`Event menu for ${event.title} on ${dateString} from ${surface} with ${nativeEvent.type} on ${element.localName} at ${clientX}, ${clientY}.`
 		);
+	},
+	onEventOverflowActivate: ({ dateString, element, eventCount, nativeEvent }) => {
+		//Observing activation preserves the default agenda behavior; cancellation belongs to an app-owned chooser.
+		reportAction(`Viewing ${String(eventCount)} items on ${dateString} with ${nativeEvent.type} on ${element.localName}.`);
 	},
 	onStateChange: updateState,
 	renderHooks: [advancedRenderHooks],

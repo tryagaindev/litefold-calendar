@@ -30,6 +30,7 @@ void test("screenshot fingerprints select the exact advanced route and build con
 		"package-lock.json",
 		"tsconfig.base.json",
 		"tsconfig.build.json",
+		"vite.config.mjs",
 		"src",
 		"examples/example.css",
 		"examples/advanced/index.html",
@@ -39,10 +40,13 @@ void test("screenshot fingerprints select the exact advanced route and build con
 		"scripts/build-advanced-example.mjs",
 		"scripts/build-package.mjs",
 		"scripts/lib/advanced-example-build.mjs",
+		"scripts/lib/browser-targets.mjs",
 		"scripts/lib/node-version.mjs",
 		"scripts/lib/package-entries.mjs",
 		"scripts/lib/process.mjs",
 		"scripts/lib/styles.mjs",
+		"scripts/lib/screenshot-preparation.mjs",
+		"scripts/prepare-screenshots.mjs",
 		"scripts/screenshot-contract.mjs",
 		"scripts/screenshot-scenes.mjs",
 		"scripts/serve-repository.mjs",
@@ -93,8 +97,9 @@ void test("screenshot update builds only the package and advanced example", asyn
 	);
 	assert.equal(
 		packageManifest.scripts?.["screenshots:update"],
-		"npm run build:package && npm run build:examples:advanced && node scripts/update-screenshots.mjs"
+		"node scripts/prepare-screenshots.mjs --force"
 	);
+	assert.equal(packageManifest.scripts?.["screenshots:prepare"], "node scripts/prepare-screenshots.mjs");
 });
 
 void test("screenshot fingerprints ignore root versions and nonvisual package scripts", () => {

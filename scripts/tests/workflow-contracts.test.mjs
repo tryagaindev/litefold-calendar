@@ -36,88 +36,57 @@ function occurrences(source, pattern) {
 	return [...source.matchAll(pattern)].length;
 }
 
-void test("release preparation creates only the reviewed three-file branch", async () => {
-	const source = await workflow("prepare-alpha.yml");
-	const prepare = job(source, "prepare");
-	const createBranch = job(source, "create-branch");
-	assert.match(trigger(source), /workflow_dispatch:[\s\S]*?Continue alpha[\s\S]*?Next patch alpha[\s\S]*?Next minor alpha/u);
-	assert.match(prepare, /permissions:[\s\S]*?contents: read/u);
-	assert.match(prepare, /persist-credentials: false[\s\S]*?ref: \$\{\{ github\.sha \}\}/u);
-	assert.match(prepare, /npm run release:prepare -- --bump "\$\{bump\}" --json/u);
-	assert.match(prepare, /expected=\(CHANGELOG\.md package-lock\.json package\.json\)/u);
-	assert.match(prepare, /npm run release:verify[\s\S]*?--tag-state absent/u);
-	assert.match(prepare, /branch="release\/v\$\{version\}"/u);
-	assert.doesNotMatch(prepare, /GH_TOKEN|contents: write|git push/u);
-	assert.match(createBranch, /permissions:[\s\S]*?actions: read[\s\S]*?contents: write/u);
-	assert.doesNotMatch(createBranch, /actions\/checkout@|npm ci|npm run |node scripts\//u);
-	assert.match(createBranch, /git -C "\$\{repository\}" -c credential\.helper= fetch[\s\S]*?"\$\{LFC_SOURCE_COMMIT\}"/u);
-	assert.match(createBranch, /expected=\(CHANGELOG\.md package-lock\.json package\.json\)/u);
-	assert.match(createBranch, /GH_TOKEN: \$\{\{ github\.token \}\}[\s\S]*?gh auth setup-git[\s\S]*?git push origin/u);
-	assert.doesNotMatch(source, /--online|NPM_TOKEN|NODE_AUTH_TOKEN|secrets\.|git push[^\n]*--force/u);
-});
-
-void test("alpha publication is classified from the exact push to main", async () => {
-	const source = await workflow("publish-alpha.yml");
+void test("nightly publication uses daily and manual exact-green-main snapshots", async () => {
+	const source = await workflow("publish-nightly.yml");
 	const event = trigger(source);
 	const classify = job(source, "classify");
 	const verify = job(source, "verify");
-	assert.match(event, /push:[\s\S]*?branches:[\s\S]*?- main[\s\S]*?paths:[\s\S]*?- \.github\/workflows\/publish-alpha\.yml[\s\S]*?- CHANGELOG\.md[\s\S]*?- package-lock\.json[\s\S]*?- package\.json/u);
-	assert.doesNotMatch(event, /workflow_run:|workflow_dispatch:|release:/u);
-	assert.doesNotMatch(source, /LFC_RECOVERY_|current_main_commit|needs\.classify\.outputs\.recovery/u);
-	assert.doesNotMatch(classify, /source-commit:/u);
-	assert.match(classify, /fetch-depth: 2[\s\S]*?persist-credentials: false/u);
-	assert.match(classify, /ref: \$\{\{ github\.sha \}\}/u);
-	assert.match(classify, /LFC_EVENT_NAME: \$\{\{ github\.event_name \}\}/u);
-	assert.match(classify, /LFC_SOURCE_COMMIT: \$\{\{ github\.sha \}\}/u);
-	assert.match(classify, /LFC_WORKFLOW_COMMIT: \$\{\{ github\.workflow_sha \}\}/u);
-	assert.match(classify, /LFC_WORKFLOW_REF: \$\{\{ github\.ref \}\}/u);
-	assert.match(classify, /LFC_EVENT_NAME\}" != "push"[\s\S]*?LFC_WORKFLOW_REF\}" != "refs\/heads\/main"/u);
-	assert.match(classify, /! "\$\{LFC_SOURCE_COMMIT\}" =~ \^\[0-9a-f\]\{40\}\$/u);
-	assert.match(classify, /! "\$\{LFC_WORKFLOW_COMMIT\}" =~ \^\[0-9a-f\]\{40\}\$/u);
-	assert.match(classify, /LFC_WORKFLOW_COMMIT\}" != "\$\{LFC_SOURCE_COMMIT\}"/u);
-	assert.match(classify, /git rev-parse --verify HEAD\^\{commit\}[\s\S]*?LFC_SOURCE_COMMIT/u);
-	assert.match(classify, /git rev-parse --verify HEAD\^1/u);
-	assert.match(classify, /git show "\$\{parent_commit\}:package\.json"/u);
-	assert.match(classify, /candidate_version[\s\S]*?parent_version[\s\S]*?eligible=true/u);
-	assert.doesNotMatch(classify, /GH_TOKEN|gh api|origin\/main/u);
-	assert.match(
-		verify,
-		/if: >-[\s\S]*?needs\.classify\.outputs\.eligible == 'true'[\s\S]*?github\.event_name == 'push'[\s\S]*?github\.ref == 'refs\/heads\/main'[\s\S]*?github\.workflow_sha == github\.sha/u
-	);
-	assert.match(verify, /ref: \$\{\{ github\.sha \}\}/u);
-	assert.match(verify, /LFC_SOURCE_COMMIT: \$\{\{ github\.sha \}\}/u);
-	assert.doesNotMatch(verify, /needs\.classify\.outputs\.source-commit/u);
-	assert.match(verify, /persist-credentials: false/u);
-	assert.match(
-		verify,
-		/git fetch --force --no-tags origin[\s\S]*?refs\/heads\/main:refs\/remotes\/origin\/main/u
-	);
-	assert.match(verify, /refs\/remotes\/origin\/main\^\{commit\}[\s\S]*?source_commit/u);
-	assert.match(verify, /git show HEAD\^1:package\.json/u);
-	assert.match(verify, /git diff --name-only HEAD\^1 HEAD/u);
-	assert.match(verify, /expected_files=\(CHANGELOG\.md package-lock\.json package\.json\)/u);
-	assert.match(verify, /npm run release:verify[\s\S]*?--commit "\$\{source_commit\}"[\s\S]*?--require-clean/u);
-	assert.match(verify, /registry_raw="\$\{RUNNER_TEMP\}\/registry\.raw\.json"/u);
-	assert.match(verify, /registry_json="\$\{RUNNER_TEMP\}\/registry\.json"/u);
-	assert.match(verify, /registry_error="\$\{RUNNER_TEMP\}\/registry\.err"/u);
-	assert.match(verify, /> "\$\{registry_raw\}" 2> "\$\{registry_error\}"/u);
-	assert.match(
-		verify,
-		/LFC_NORMALIZE_NPM_VIEW_JSON\}"[\s\S]*?"\$\{registry_raw\}" "\$\{registry_json\}"/u
-	);
-	assert.equal(occurrences(verify, /registry\.raw\.json/gu), 1);
-	assert.equal(occurrences(verify, /registry\.json/gu), 1);
-	assert.equal(occurrences(verify, /registry\.err/gu), 1);
+	assert.match(event, /schedule:[\s\S]*?cron: "0 9 \* \* \*"[\s\S]*?workflow_dispatch:/u);
+	assert.doesNotMatch(event, /push:|release:|workflow_run:/u);
+	assert.match(classify, /github\.repository == 'tryagaindev\/litefold-calendar'[\s\S]*?refs\/heads\/main/u);
+	assert.match(classify, /GITHUB_WORKFLOW_SHA[\s\S]*?GITHUB_SHA/u);
+	assert.match(classify, /actions\/workflows\/ci\.yml\/runs[\s\S]*?head_sha[\s\S]*?\.conclusion == "success"/u);
+	assert.match(classify, /created_at[\s\S]*?GITHUB_RUN_ID/u);
+	assert.match(verify, /npm run nightly:plan[\s\S]*?nightly-plan\.json/u);
+	assert.match(verify, /validateNightlyRegistryState[\s\S]*?previous-pages\.json/u);
 	assert.match(verify, /npm run check/u);
-	assert.match(verify, /npm run package/u);
+	assert.match(verify, /npm run package:nightly -- --plan/u);
+	assert.doesNotMatch(source, /git push|git commit|release:prepare|git diff --name-only HEAD\^1 HEAD/u);
+});
+
+void test("nightly recovery preserves original artifacts and Pages binds the originating attempt", async () => {
+	const source = await workflow("publish-nightly.yml");
+	const verify = job(source, "verify");
+	assert.match(verify, /selectNightlyRecoveryArtifacts/u);
+	assert.match(verify, /actions\/artifacts\/\$\{id\}\/zip[\s\S]*?sha256sum[\s\S]*?\$\{digest\}/u);
+	assert.match(verify, /verifyRestoredNightlyBundle/u);
+	assert.equal(occurrences(verify, /steps\.recovery\.outputs\.restored != 'true'/gu), 3);
+	assert.match(verify, /LFC_BROWSER_TARGET_DATE[\s\S]*?LFC_CREATED_AT/u);
+	assert.match(verify, /Retained notes differ from the exact source/u);
+	const pages = await workflow("deploy-examples.yml");
+	assert.match(pages, /LFC_UPSTREAM_RUN_ATTEMPT: \$\{\{ github\.event\.workflow_run\.run_attempt \}\}/u);
+	assert.match(pages, /actions\/runs\/\$\{LFC_UPSTREAM_RUN_ID\}\/attempts\/\$\{LFC_UPSTREAM_RUN_ATTEMPT\}\/jobs/u);
+});
+
+void test("nightly publication uses only OIDC and preserves the preflight latest tag", async () => {
+	const source = await workflow("publish-nightly.yml");
+	const verify = job(source, "verify");
+	const verifyRegistry = job(source, "verify-registry");
+	assert.doesNotMatch(source, /synchronize-latest|npm-nightly-tags|NPM_TOKEN|NODE_AUTH_TOKEN|NPM_NIGHTLY_TAG_TOKEN|tokenExpiryStatus|npm dist-tag|_authToken/u);
+	assert.match(verify, /registry-latest: \$\{\{ steps\.registry-state\.outputs\.registry-latest \}\}/u);
+	assert.match(verify, /validateNightlyRegistryState[\s\S]*?registry-latest=\$\{state\.latest\}/u);
+	assert.match(verifyRegistry, /needs:\s*\n\s+- publish\s*\n\s+- verify\s*\n/u);
+	assert.match(verifyRegistry, /LFC_EXPECTED_LATEST: \$\{\{ needs\.verify\.outputs\.registry-latest \}\}/u);
+	assert.match(verifyRegistry, /tags\.latest !== process\.env\.LFC_EXPECTED_LATEST/u);
+	assert.doesNotMatch(verifyRegistry, /contents: write|id-token: write|npm publish/u);
 });
 
 void test("the OIDC publisher consumes only the verified five-file bundle", async () => {
-	const source = await workflow("publish-alpha.yml");
+	const source = await workflow("publish-nightly.yml");
 	const publish = job(source, "publish");
-	assert.match(publish, /environment: npm/u);
+	assert.match(publish, /environment: npm-nightly/u);
 	assert.match(publish, /id-token: write/u);
-	assert.equal(occurrences(source, /^\s*environment: npm$/gmu), 1);
+	assert.equal(occurrences(source, /^\s*environment: npm-nightly$/gmu), 1);
 	assert.equal(occurrences(source, /^\s*id-token: write$/gmu), 1);
 	assert.equal(occurrences(publish, /actions\/download-artifact@/gu), 1);
 	assert.match(publish, /find \.[\s\S]*?wc -l\)" -eq 5/u);
@@ -136,20 +105,20 @@ void test("the OIDC publisher consumes only the verified five-file bundle", asyn
 		/forbiddenDependencyFields\.some\(\(field\) => Object\.hasOwn\(manifest, field\)\)/u
 	);
 	assert.equal(occurrences(publish, /^\s*npm publish\b/gmu), 1);
-	assert.match(publish, /--registry https:\/\/registry\.npmjs\.org\/[\s\S]*?--access public[\s\S]*?--tag alpha[\s\S]*?--provenance[\s\S]*?--ignore-scripts/u);
-	assert.match(publish, /manifest\.publishConfig\?\.tag !== "alpha"/u);
+	assert.match(publish, /--registry https:\/\/registry\.npmjs\.org\/[\s\S]*?--access public[\s\S]*?--tag nightly[\s\S]*?--provenance[\s\S]*?--ignore-scripts/u);
+	assert.match(publish, /manifest\.publishConfig\?\.tag !== "nightly"/u);
 	assert.doesNotMatch(publish, /actions\/checkout@|npm ci|npm run |node scripts\//u);
 	assert.doesNotMatch(publish, /LFC_PARENT_VERSION|releases\/tags\/v\$\{LFC_PARENT_VERSION\}/u);
-	assert.doesNotMatch(source, /NPM_TOKEN|NODE_AUTH_TOKEN|registry-release-state\.mjs|release-verification\.mjs|verify-release-state\.mjs/u);
+	assert.doesNotMatch(publish, /NPM_TOKEN|NODE_AUTH_TOKEN|registry-release-state\.mjs|release-verification\.mjs|verify-release-state\.mjs/u);
 });
 
 void test("registry-backed candidates share one lock and only current main may publish", async () => {
-	const source = await workflow("publish-alpha.yml");
+	const source = await workflow("publish-nightly.yml");
 	const verify = job(source, "verify");
 	const publish = job(source, "publish");
 	assert.match(
 		source,
-		/^concurrency:\s*\n\s*group: npm-alpha-\$\{\{ github\.repository \}\}\s*\n\s*queue: max\s*\n\s*cancel-in-progress: false/mu
+		/^concurrency:\s*\n\s*group: npm-nightly-\$\{\{ github\.repository \}\}\s*\n\s*queue: max\s*\n\s*cancel-in-progress: false/mu
 	);
 	assert.doesNotMatch(publish, /^\s*concurrency:|group:[^\n]*(?:version|needs\.verify)/mu);
 	assert.equal(
@@ -157,7 +126,7 @@ void test("registry-backed candidates share one lock and only current main may p
 		2
 	);
 	assert.equal(
-		occurrences(publish, /"\$\{main_version\}" != "\$\{LFC_VERSION\}"/gu),
+		occurrences(publish, /"\$\{main_version\}" != "\$\{LFC_BASE_VERSION\}"/gu),
 		2
 	);
 	assert.equal(
@@ -172,26 +141,20 @@ void test("registry-backed candidates share one lock and only current main may p
 	assert.match(publish, /\.object\.type == "commit"[\s\S]*?\.object\.sha/u);
 	assert.match(
 		verify,
-		/E404\|404 Not Found[\s\S]*?npm package must already exist before the normal alpha release workflow/u
+		/validateNightlyRegistryState/u
 	);
 	assert.doesNotMatch(source, /registry-status|LFC_REGISTRY_STATUS|"status":"absent"/u);
 
-	const currentMainVersion = "0.2.0-alpha.1";
-	const queuedCandidates = ["0.2.0-alpha.0", currentMainVersion];
-	assert.deepEqual(
-		queuedCandidates.map((candidate) => candidate === currentMainVersion),
-		[false, true]
-	);
 });
 
 void test("npm 12 view results pass through one fail-closed normalizer", async () => {
-	const source = await workflow("publish-alpha.yml");
+	const source = await workflow("publish-nightly.yml");
 	const verifyRegistry = job(source, "verify-registry");
 	assert.match(
 		source,
 		/LFC_NORMALIZE_NPM_VIEW_JSON: >-[\s\S]*?!Array\.isArray\(value\) \|\| value\.length !== 1[\s\S]*?JSON\.stringify\(value\[0\]\)/u
 	);
-	assert.equal(occurrences(source, /^\s*(?:if )?npm view\b/gmu), 6);
+	assert.equal(occurrences(source, /^\s*(?:if )?(?:! )?npm view\b/gmu), 6);
 	assert.equal(
 		occurrences(
 			source,
@@ -210,7 +173,7 @@ void test("npm 12 view results pass through one fail-closed normalizer", async (
 		'"${integrity_raw}" "${integrity_json}"'
 	);
 	const tagsView = propagationLoop.indexOf(
-		"npm view @tryagaindev/litefold-calendar dist-tags"
+		"npm view @tryagaindev/litefold-calendar versions dist-tags"
 	);
 	const tagsNormalize = propagationLoop.indexOf('"${tags_raw}" "${tags_json}"');
 	assert.ok(integrityView >= 0 && integrityView < integrityNormalize);
@@ -220,7 +183,7 @@ void test("npm 12 view results pass through one fail-closed normalizer", async (
 	assert.match(verifyRegistry, /pending or blocked publish-time review/u);
 });
 
-void test("greater-alpha recovery follows the published alpha tag rather than the manifest parent", async (context) => {
+void test("nightly recovery follows the published predecessor rather than the source manifest parent", async (context) => {
 	const repository = await mkdtemp(join(tmpdir(), "lfc-workflow-lineage-"));
 	context.after(() => rm(repository, { force: true, recursive: true }));
 	const git = (...arguments_) => execFileAsync("git", arguments_, { cwd: repository });
@@ -243,11 +206,11 @@ void test("greater-alpha recovery follows the published alpha tag rather than th
 	assert.notEqual(releaseCommit, parentOutput.trim());
 	await git("merge-base", "--is-ancestor", releaseCommit, "HEAD");
 
-	const publish = job(await workflow("publish-alpha.yml"), "publish");
+	const publish = job(await workflow("publish-nightly.yml"), "publish");
 	assert.doesNotMatch(publish, /LFC_PARENT_(?:COMMIT|VERSION)|releases\/tags\//u);
 	assert.match(
 		publish,
-		/registry_alpha="\$\(jq[\s\S]*?git\/ref\/tags\/v\$\{registry_alpha\}[\s\S]*?git\/tags\/\$\{tag_object\}[\s\S]*?compare\/\$\{registry_alpha_commit\}\.\.\.\$\{LFC_SOURCE_COMMIT\}/u
+		/registry_predecessor="\$\(jq[\s\S]*?git\/ref\/tags\/v\$\{registry_predecessor\}[\s\S]*?git\/tags\/\$\{tag_object\}[\s\S]*?compare\/\$\{registry_predecessor_commit\}\.\.\.\$\{LFC_SOURCE_COMMIT\}/u
 	);
 	const historicalIdentities = [
 		...publish.matchAll(/"([0-9.]+-alpha\.[0-9]+):([0-9a-f]{40})"/gu)
@@ -267,11 +230,11 @@ void test("greater-alpha recovery follows the published alpha tag rather than th
 });
 
 void test("publisher authorization is bound to one verified registry snapshot", async () => {
-	const source = await workflow("publish-alpha.yml");
+	const source = await workflow("publish-nightly.yml");
 	const verify = job(source, "verify");
 	const publish = job(source, "publish");
 	assert.match(verify, /registry-state-sha256: \$\{\{ steps\.registry-state\.outputs\.registry-state-sha256 \}\}/u);
-	assert.match(verify, /printf 'registry-state-sha256=%s\\n' "\$\{registry_state_sha256\}"/u);
+	assert.match(verify, /printf 'registry-state-sha256=%s\\neligible=%s\\n'/u);
 	assert.equal(
 		occurrences(publish, /LFC_REGISTRY_STATE_SHA256: \$\{\{ needs\.verify\.outputs\.registry-state-sha256 \}\}/gu),
 		2
@@ -285,7 +248,7 @@ void test("publisher authorization is bound to one verified registry snapshot", 
 });
 
 void test("release bundle digest lines become explicit jq entries", async () => {
-	const source = await workflow("publish-alpha.yml");
+	const source = await workflow("publish-nightly.yml");
 	const stage = job(source, "stage-release");
 	const publish = job(source, "publish");
 	const corrected =
@@ -300,7 +263,7 @@ void test("release bundle digest lines become explicit jq entries", async () => 
 });
 
 void test("draft assets and final release publication are digest-bound and source-free", async () => {
-	const source = await workflow("publish-alpha.yml");
+	const source = await workflow("publish-nightly.yml");
 	const stage = job(source, "stage-release");
 	const verifyRegistry = job(source, "verify-registry");
 	const publishRelease = job(source, "publish-release");
@@ -337,13 +300,13 @@ void test("draft assets and final release publication are digest-bound and sourc
 	)?.[1];
 	assert.equal(typeof provenancePolicy, "string");
 	assert.match(provenancePolicy, /const eventName = process\.env\.GITHUB_EVENT_NAME/u);
-	assert.match(provenancePolicy, /eventName === "push"/u);
-	assert.doesNotMatch(provenancePolicy, /workflow_dispatch/u);
+	assert.match(provenancePolicy, /\["schedule", "workflow_dispatch"\]\.includes\(eventName\)/u);
+	assert.doesNotMatch(provenancePolicy, /eventName === "push"/u);
 	assert.match(provenancePolicy, /process\.env\.GITHUB_SHA === sourceCommit/u);
 	assert.match(provenancePolicy, /process\.env\.GITHUB_WORKFLOW_SHA === sourceCommit/u);
 	assert.match(provenancePolicy, /internalGitHub\?\.event_name === eventName/u);
 	assert.match(provenancePolicy, /certificate\.buildTrigger === eventName/u);
-	assert.match(verifyRegistry, /"\$\{alpha\}" == "\$\{LFC_VERSION\}"[\s\S]*?"\$\{latest\}" == "\$\{LFC_VERSION\}"/u);
+	assert.match(verifyRegistry, /tags\?\.nightly !== process\.env\.LFC_VERSION[\s\S]*?tags\.latest !== process\.env\.LFC_EXPECTED_LATEST/u);
 	assert.doesNotMatch(verifyRegistry, /actions\/checkout@|GH_TOKEN|contents: write|id-token: write|npm publish/u);
 	assert.match(publishRelease, /needs:[\s\S]*?- stage-release[\s\S]*?- verify-registry/u);
 	assert.match(publishRelease, /LFC_ASSET_DIGESTS: \$\{\{ needs\.verify\.outputs\.asset-digests \}\}/u);
@@ -360,7 +323,7 @@ void test("draft assets and final release publication are digest-bound and sourc
 });
 
 void test("the publisher relies on the native downstream workflow handoff", async () => {
-	const source = await workflow("publish-alpha.yml");
+	const source = await workflow("publish-nightly.yml");
 	assert.doesNotMatch(source, /dispatch-release-pages|gh workflow run|actions: write/u);
 	assert.match(
 		source,
@@ -376,7 +339,7 @@ void test("automatic Pages deployment is workflow-run-only and exact-source", as
 	const packageSite = job(source, "package-site");
 	const deploy = job(source, "deploy");
 	assert.doesNotMatch(source, /LFC_RECOVERY_/u);
-	assert.match(event, /workflow_run:[\s\S]*?- CI[\s\S]*?- Publish npm alpha[\s\S]*?branches:\s*\n\s+- main/u);
+	assert.match(event, /workflow_run:[\s\S]*?- CI[\s\S]*?- Publish npm nightly[\s\S]*?branches:\s*\n\s+- main/u);
 	assert.doesNotMatch(event, /workflow_dispatch:|snapshot_ref:/u);
 	assert.doesNotMatch(source, /^ {2}(?:prepare-rollback|rollback-snapshot):/mu);
 	assert.doesNotMatch(source, /^ {2}classify:/mu);
@@ -397,7 +360,7 @@ void test("automatic Pages deployment is workflow-run-only and exact-source", as
 	assert.match(build, /upstream_workflow_path="\$\{LFC_UPSTREAM_WORKFLOW_PATH%@\*\}"/u);
 	const ciRouteStart = build.indexOf('if [[ "${LFC_UPSTREAM_WORKFLOW}" == "CI"');
 	const publisherRouteStart = build.indexOf(
-		'elif [[ "${LFC_UPSTREAM_WORKFLOW}" == "Publish npm alpha"'
+		'elif [[ "${LFC_UPSTREAM_WORKFLOW}" == "Publish npm nightly"'
 	);
 	const releaseValidationStart = build.indexOf(
 		'if [[ "${eligible}" == "true" && "${channel}" == "release" ]]'
@@ -409,14 +372,14 @@ void test("automatic Pages deployment is workflow-run-only and exact-source", as
 	assert.match(ciRoute, /upstream_workflow_path\}" == "\.github\/workflows\/ci\.yml"/u);
 	assert.match(ciRoute, /LFC_UPSTREAM_EVENT\}" == "push"/u);
 	assert.doesNotMatch(ciRoute, /workflow_dispatch/u);
-	assert.match(publisherRoute, /upstream_workflow_path\}" == "\.github\/workflows\/publish-alpha\.yml"/u);
+	assert.match(publisherRoute, /upstream_workflow_path\}" == "\.github\/workflows\/publish-nightly\.yml"/u);
 	assert.match(
 		publisherRoute,
-		/LFC_UPSTREAM_EVENT\}" == "push"[\s\S]*?version\}" == "\$\{parent_version\}"[\s\S]*?eligible=false[\s\S]*?channel=""[\s\S]*?channel="release"/u
+		/LFC_UPSTREAM_EVENT\}" == "schedule"[\s\S]*?workflow_dispatch[\s\S]*?created_at[\s\S]*?LFC_UPSTREAM_RUN_ID[\s\S]*?eligible=false/u
 	);
-	assert.doesNotMatch(publisherRoute, /workflow_dispatch/u);
+	assert.match(publisherRoute, /workflow_dispatch/u);
 	assert.match(build, /Unexpected upstream workflow identity:[\s\S]*?LFC_UPSTREAM_WORKFLOW_PATH/u);
-	assert.match(build, /eligible.*channel.*release[\s\S]*?release_ref="v\$\{version\}"[\s\S]*?\^0\\\.\[0-9\]\+\\\.\[0-9\]\+-alpha\\\.\[0-9\]\+\$[\s\S]*?release_ref\}\^\{commit\}[\s\S]*?= "\$\{source_commit\}"/u);
+	assert.match(build, /release_ref="v\$\{version\}"[\s\S]*?nightly[\s\S]*?release_ref\}\^\{commit\}[\s\S]*?source_commit/u);
 	assert.match(build, /Resolve the deployment identity[\s\S]*?Set up exact Node[\s\S]*?Set up exact npm[\s\S]*?npm ci --ignore-scripts[\s\S]*?npm run build/u);
 	assert.equal(
 		occurrences(build, /^\s+if: \$\{\{ steps\.identity\.outputs\.eligible == 'true' \}\}$/gmu),
@@ -500,42 +463,18 @@ void test("automatic deployment and rollback triggers remain physically isolated
 	}
 });
 
-void test("release documentation keeps publication push-only with one procedural owner", async () => {
+void test("release docs distinguish nightly automation from future stable approval", async () => {
 	const [administration, operations, releasing] = await Promise.all([
 		readFile(join(REPOSITORY_ROOT, "docs", "release-administration.md"), "utf8"),
 		readFile(join(REPOSITORY_ROOT, "docs", "release-operations.md"), "utf8"),
 		readFile(join(REPOSITORY_ROOT, "docs", "releasing.md"), "utf8")
 	]);
 	assert.match(administration, /## Publication authority/u);
-	assert.match(
-		administration,
-		/`publish-alpha\.yml` starts only on pushes to `main`[\s\S]*?There is no\s+manual, arbitrary-ref, or non-current-commit publication path\./u
-	);
-	assert.match(operations, /The merge push is the only publication trigger\./u);
-	assert.match(releasing, /merge push to canonical `main`\s+is the only publication trigger\./u);
-	assert.match(releasing, /\[Alpha release operations\]\(release-operations\.md\) owns the normal ordered/u);
-	assert.match(releasing, /\[Release administration\]\(release-administration\.md\) owns hosted controls/u);
 	assert.match(administration, /## Recovery matrix/u);
-	assert.match(administration, /Preparation reports an existing release branch or pull request/u);
-	assert.match(administration, /npm accepts the upload but the version remains unavailable/u);
-	assert.match(
-		administration,
-		/npm accepted the candidate but the `publish`\s+job itself failed[\s\S]*?Re-run all jobs/u
-	);
-	assert.match(
-		administration,
-		/If `publish` succeeded and only a downstream job failed, use \*\*Re-run failed jobs\*\*/u
-	);
-	assert.doesNotMatch(operations, /\| Observed state \| Required action \|/u);
-	assert.match(operations, /npm dist-tag add @tryagaindev\/litefold-calendar@EXACT_VERSION latest/u);
-	assert.doesNotMatch(administration, /npm dist-tag add/u);
-	assert.doesNotMatch(releasing, /npm dist-tag add|## Operator checklist|### 1\./u);
 	for (const guide of [administration, operations, releasing]) {
-		assert.doesNotMatch(
-			guide,
-			/current_main_commit|LFC_RECOVERY_|f35ec0caf6e1557bb7d8d6b80f8a3c207351c51e02832d387109eca80ae77894/u
-		);
-		assert.doesNotMatch(guide, /git push[^\n]*--force/u);
+		assert.match(guide, /nightly/iu);
+		assert.match(guide, /stable/iu);
+		assert.doesNotMatch(guide, /The merge push is the only publication trigger/u);
 	}
 });
 
@@ -543,8 +482,7 @@ void test("all third-party workflow actions are pinned to full commits", async (
 	for (const name of [
 		"ci.yml",
 		"deploy-examples.yml",
-		"prepare-alpha.yml",
-		"publish-alpha.yml",
+				"publish-nightly.yml",
 		"rollback-examples.yml"
 	]) {
 		const source = await workflow(name);
@@ -566,10 +504,10 @@ void test("CI rejects high-severity dependency regressions on pull requests", as
 	assert.doesNotMatch(source, /pull-requests: write|issues: write/u);
 });
 
-void test("release gates and Playwright retain the complete browser-engine matrix", async () => {
+void test("hosted gates run Chromium and WebKit while local Playwright retains Firefox", async () => {
 	const [ciSource, publishSource, packageSource] = await Promise.all([
 		workflow("ci.yml"),
-		workflow("publish-alpha.yml"),
+		workflow("publish-nightly.yml"),
 		readFile(join(REPOSITORY_ROOT, "package.json"), "utf8")
 	]);
 	const packageManifest = JSON.parse(packageSource);
@@ -579,20 +517,39 @@ void test("release gates and Playwright retain the complete browser-engine matri
 	for (const verify of [ciVerify, publishVerify]) {
 		assert.match(
 			verify,
-			/name: Install pinned Playwright browsers[\s\S]*?npx playwright install --with-deps chromium firefox webkit/u
+			/name: Install pinned Playwright browsers[\s\S]*?npx playwright install --with-deps chromium webkit/u
 		);
+		assert.match(verify, /run: npm run check/u);
 	}
+	for (const source of [ciSource, publishSource]) {
+		assert.doesNotMatch(source, /firefox/iu);
+	}
+	const [localProjects, ciProjects] = await Promise.all([false, true].map(async (ci) => {
+		const { stdout } = await execFileAsync(process.execPath, ["--input-type=module", "--eval", `
+			import configuration from "./playwright.config.mjs";
+			process.stdout.write(JSON.stringify(configuration.projects.map(({ grepInvert, name, use }) => ({
+				browserType: use.defaultBrowserType,
+				grepInvert: grepInvert?.source ?? null,
+				name
+			}))));
+		`], {
+			cwd: REPOSITORY_ROOT,
+			env: { ...process.env, CI: ci ? "true" : "" }
+		});
+		return JSON.parse(stdout);
+	}));
 	assert.deepEqual(
-		playwrightConfiguration.projects?.map(({ name, use }) => ({
-			browserType: use?.defaultBrowserType,
-			name
-		})),
+		localProjects,
 		[
-			{ browserType: "chromium", name: "chromium" },
-			{ browserType: "firefox", name: "firefox" },
-			{ browserType: "webkit", name: "webkit" }
+			{ browserType: "chromium", grepInvert: null, name: "chromium" },
+			{ browserType: "firefox", grepInvert: "@chromium-input", name: "firefox" },
+			{ browserType: "webkit", grepInvert: "@chromium-input", name: "webkit" }
 		]
 	);
+	assert.deepEqual(ciProjects, [
+		{ browserType: "chromium", grepInvert: null, name: "chromium" },
+		{ browserType: "webkit", grepInvert: "@chromium-input", name: "webkit" }
+	]);
 	assert.equal(
 		packageManifest.scripts["test:browser:install"],
 		"playwright install chromium firefox webkit"
@@ -610,8 +567,7 @@ void test("workflow artifacts use bounded purpose-specific retention", async () 
 	const expectations = new Map([
 		["ci.yml", [7]],
 		["deploy-examples.yml", [1, 1]],
-		["prepare-alpha.yml", [1]],
-		["publish-alpha.yml", [7, 30, 30]],
+		["publish-nightly.yml", [7, 30, 30]],
 		["rollback-examples.yml", [1]]
 	]);
 	for (const [name, expected] of expectations) {
@@ -624,8 +580,7 @@ void test("workflow artifacts use bounded purpose-specific retention", async () 
 void test("artifact downloads use the official Node 24 action", async () => {
 	const workflows = [
 		"deploy-examples.yml",
-		"prepare-alpha.yml",
-		"publish-alpha.yml",
+				"publish-nightly.yml",
 		"rollback-examples.yml"
 	];
 	const expected =
@@ -638,15 +593,14 @@ void test("artifact downloads use the official Node 24 action", async () => {
 			assert.equal(match[1], expected, name);
 		}
 	}
-	assert.equal(downloads, 6);
+	assert.equal(downloads, 5);
 });
 
 void test("workflow dependency caches stay disabled", async () => {
 	for (const name of [
 		"ci.yml",
 		"deploy-examples.yml",
-		"prepare-alpha.yml",
-		"publish-alpha.yml",
+				"publish-nightly.yml",
 		"rollback-examples.yml"
 	]) {
 		const source = await workflow(name);
@@ -657,4 +611,18 @@ void test("workflow dependency caches stay disabled", async () => {
 			`${name} must explicitly disable setup-node package-manager caching.`
 		);
 	}
+});
+
+void test("browser gates reject flakes and local Firefox qualification retains reproducible evidence", async () => {
+	assert.equal(playwrightConfiguration.failOnFlakyTests, true);
+	const config = await readFile(join(REPOSITORY_ROOT, "playwright.config.mjs"), "utf8");
+	assert.match(config, /workers: process\.env\["CI"\] \? 1 : 2/u);
+	assert.match(config, /retries: process\.env\["CI"\] \? 1 : 0/u);
+	const qualifier = await readFile(join(REPOSITORY_ROOT, "scripts", "qualify-firefox.mjs"), "utf8");
+	assert.match(qualifier, /--repeat-each=20/u);
+	assert.match(qualifier, /length: 3/u);
+	assert.match(qualifier, /--retries=0/u);
+	assert.match(qualifier, /--workers=1/u);
+	assert.match(qualifier, /PLAYWRIGHT_JSON_OUTPUT_FILE/u);
+	assert.match(qualifier, /PLAYWRIGHT_HTML_OUTPUT_DIR/u);
 });

@@ -10,6 +10,7 @@ import {
 	requireSelectedDay,
 	waitFor
 } from "./helpers.mjs";
+import { verifyAdvancedOverflowPresentation } from "./overflow.mjs";
 
 const APPOINTMENT_ID = "appointment:41";
 const APPOINTMENT_TITLE = "Design review";
@@ -169,7 +170,8 @@ export async function runAdvancedSmokeScenarios(environment) {
 		".lfc-calendar-title-button",
 		dom.window.HTMLButtonElement
 	);
-	assert.equal(titleButton.textContent, "August 2026");
+	assert.equal(titleButton.querySelector(".lfc-calendar-title-label-full")?.textContent, "August 2026");
+	assert.equal(titleButton.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Aug 2026");
 	assert.equal(
 		titleButton.getAttribute("aria-label"),
 		"Choose schedule month and year, currently August 2026"
@@ -360,7 +362,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 	const selectedGridActions = [...selectedCell.querySelectorAll(
 		'[data-test-event-surface="grid-summary"], .lfc-calendar-grid-more'
 	)];
-	assert.ok(selectedGridActions.length > 0, "Expected visible grid actions for the selected day.");
+	assert.ok(selectedGridActions.length > 0, "Expected prepared grid actions for the selected day.");
 	assert.equal(
 		selectedGridActions.every((action) => action.getAttribute("tabindex") === "-1"),
 		true,
@@ -397,132 +399,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 		2,
 		"Expected maxGridEventsPerDay to cap visual summaries."
 	);
-	const compactOverflow = requireElement(
-		selectedCell,
-		":scope .lfc-calendar-event-overflow-cluster " +
-			"> .lfc-calendar-event-overflow.lfc-is-compact",
-		dom.window.HTMLSpanElement
-	);
-	assert.equal(
-		compactOverflow.getAttribute("aria-hidden"),
-		"true",
-		"The compact event-overflow number must remain outside the accessibility tree."
-	);
-	assert.equal(
-		compactOverflow.classList.contains("lfc-has-custom-event-overflow"),
-		true,
-		"Expected the unified hook to expose its custom compact state."
-	);
-	const compactOverflowContent = requireElement(
-		compactOverflow,
-		":scope > .lfc-calendar-event-overflow-content " +
-			"> .my-event-overflow-compact",
-		dom.window.HTMLSpanElement
-	);
-	assert.equal(compactOverflowContent.textContent, "+52");
-	assert.deepEqual(
-		{
-			actionBacked: compactOverflowContent.dataset["testActionBacked"],
-			date: compactOverflowContent.dataset["testDate"],
-			eventCount: compactOverflowContent.dataset["testEventCount"],
-			overflowCount: compactOverflowContent.dataset["testOverflowCount"],
-			surface: compactOverflowContent.dataset["testSurface"],
-			variant: compactOverflowContent.dataset["testVariant"],
-			visibleEventCount: compactOverflowContent.dataset["testVisibleEventCount"]
-		},
-		{
-			actionBacked: "false",
-			date: "2026-08-06",
-			eventCount: "53",
-			overflowCount: "52",
-			surface: "day",
-			variant: "compact",
-			visibleEventCount: "1"
-		},
-		"Expected the compact branch to receive the authoritative adaptive count context."
-	);
-	assert.ok(
-		selectedCell.querySelector(
-			'[data-test-event-surface="grid-summary"] .my-event-marker'
-		) instanceof dom.window.HTMLSpanElement,
-		"The compact event-overflow number must coexist with a custom event marker."
-	);
-	const selectedOverflowAction = requireElement(
-		selectedCell,
-		":scope .lfc-calendar-grid-more",
-		dom.window.HTMLButtonElement
-	);
-	const wideOverflow = requireElement(
-		selectedOverflowAction,
-		":scope > .lfc-calendar-event-overflow.lfc-is-wide",
-		dom.window.HTMLSpanElement
-	);
-	const wideOverflowContent = requireElement(
-		wideOverflow,
-		":scope > .lfc-calendar-event-overflow-content",
-		dom.window.HTMLSpanElement
-	);
-	const customOverflowContent = requireElement(
-		wideOverflowContent,
-		":scope > .my-event-overflow-wide",
-		dom.window.HTMLSpanElement
-	);
-	assert.equal(
-		wideOverflowContent.querySelector(".lfc-event-overflow-default-content"),
-		null,
-		"Expected custom wide DOM to replace only the variant's package visual."
-	);
-	assert.equal(wideOverflow.getAttribute("aria-hidden"), "true");
-	assert.equal(customOverflowContent.ownerDocument, document);
-	assert.equal(customOverflowContent.textContent, "51 additionalin agenda");
-	assert.equal(
-		customOverflowContent.querySelector(
-			":scope > .my-event-overflow-wide-count"
-		)?.textContent,
-		"51 additional"
-	);
-	assert.equal(
-		customOverflowContent.querySelector(
-			":scope > .my-event-overflow-wide-destination"
-		)?.textContent,
-		"in agenda"
-	);
-	assert.deepEqual(
-		{
-			actionBacked: customOverflowContent.dataset["testActionBacked"],
-			date: customOverflowContent.dataset["testDate"],
-			eventCount: customOverflowContent.dataset["testEventCount"],
-			overflowCount: customOverflowContent.dataset["testOverflowCount"],
-			surface: customOverflowContent.dataset["testSurface"],
-			variant: customOverflowContent.dataset["testVariant"],
-			visibleEventCount: customOverflowContent.dataset["testVisibleEventCount"]
-		},
-		{
-			actionBacked: "true",
-			date: "2026-08-06",
-			eventCount: "53",
-			overflowCount: "51",
-			surface: "grid-summary",
-			variant: "wide",
-			visibleEventCount: "2"
-		},
-		"Expected the wide branch to receive the authoritative adaptive count context."
-	);
-	assert.equal(
-		customOverflowContent.querySelector("a, button, input, select, textarea, [tabindex]"),
-		null,
-		"Custom overflow content must remain noninteractive."
-	);
-	assert.equal(
-		wideOverflow.classList.contains("lfc-has-custom-event-overflow"),
-		true,
-		"Expected the wide variant root to expose its custom-content state."
-	);
-	assert.match(
-		selectedOverflowAction.getAttribute("aria-label") ?? "",
-		/^View 51 more items for /u,
-		"Custom visual content must not replace the native overflow action's localized name."
-	);
+	verifyAdvancedOverflowPresentation({ document, dom, selectedCell });
 
 	selectedDay.dispatchEvent(new dom.window.KeyboardEvent("keydown", {
 		bubbles: true,
@@ -556,7 +433,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 	);
 	previousDate.click();
 	await waitFor(() => selectedDate.textContent === "2026-08-05", "the overflow test setup selection");
-	const actionBeforeOverflow = actionResult.textContent;
+	assert.equal(actionResult.textContent, "Selected 2026-08-05 with click on button.");
 	const representedDay = requireElement(
 		host,
 		'[role="gridcell"] > button[data-lfc-date="2026-08-06"]',
@@ -573,8 +450,8 @@ export async function runAdvancedSmokeScenarios(environment) {
 	await waitFor(() => selectedDate.textContent === "2026-08-06", "the native grid overflow action");
 	assert.equal(
 		actionResult.textContent,
-		actionBeforeOverflow,
-		"Custom overflow content must not change the native action or call onDaySelect."
+		"Viewing 53 items on 2026-08-06 with click on button.",
+		"The overflow callback must report the full count; default selection must not invoke onDaySelect."
 	);
 	const agendaHeadingId = agenda.getAttribute("aria-labelledby");
 	assert.notEqual(agendaHeadingId, null);

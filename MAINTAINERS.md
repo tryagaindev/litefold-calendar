@@ -43,7 +43,7 @@ Maintainers are expected to:
 
 - Triage issues and pull requests, enforce the documented public, accessibility, security, and package contracts, and explain material tradeoffs.
 - Require repository checks and relevant manual evidence before merge; maintainer-authored changes follow the same gate as community changes.
-- Follow the [alpha release operations runbook](docs/release-operations.md), [release policy](docs/releasing.md), and [release administration guide](docs/release-administration.md) for publication work.
+- Follow the [nightly release operations runbook](docs/release-operations.md), [release policy](docs/releasing.md), and [release administration guide](docs/release-administration.md) for publication work.
 - Handle suspected vulnerabilities through [SECURITY.md](SECURITY.md) and keep sensitive reports out of public issues.
 - Keep [CODEOWNERS](.github/CODEOWNERS), team membership, and repository or registry access aligned with current responsibilities.
 
@@ -51,7 +51,7 @@ Maintainers are expected to:
 
 Community input and evidence are welcome. Eligible maintainers make final
 technical, security, governance, and release decisions. Material decisions
-should preserve documented alpha guarantees and explain important tradeoffs in
+should preserve documented public guarantees and explain important tradeoffs in
 issues or pull requests. Code of Conduct reports follow the separate assignment
 and recusal rules below.
 

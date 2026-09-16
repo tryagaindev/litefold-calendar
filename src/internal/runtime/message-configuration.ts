@@ -26,6 +26,8 @@ const CALENDAR_MESSAGE_TOKENS = Object.freeze({
 	renderHookErrorMessage: [],
 	renderHookErrorTitle: [],
 	gridMore: ["count"],
+	gridEventCount: ["count", "eventLabel"],
+	gridEventCountLabel: ["count", "date", "eventLabel"],
 	gridEventInstructions: [],
 	gridMoreLabel: ["count", "date", "eventLabel"],
 	internalErrorMessage: [],

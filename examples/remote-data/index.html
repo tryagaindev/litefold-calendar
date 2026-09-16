@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="color-scheme" content="light dark">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Remote data and filtering | litefold-calendar</title>
+	<link rel="stylesheet" href="../../dist/styles.css">
+	<link rel="stylesheet" href="../example.css">
+	<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+	<main class="my-shell">
+		<header class="my-intro">
+			<h1>Load and filter remote events</h1>
+			<p>Browse August 2026, filter by category, and activate an event or day count. Each request loads a real JSON file; this demo filters that public fixture in the browser.</p>
+		</header>
+		<div class="my-panel my-remote-controls">
+			<div class="my-control-row">
+				<label for="my-category">Category</label>
+				<select class="my-field" id="my-category" data-my-category>
+					<option value="all">All categories</option>
+					<option value="community">Community</option>
+					<option value="workshop">Workshops</option>
+					<option value="sports">Sports (empty)</option>
+				</select>
+				<button class="my-button" type="button" data-my-refresh>Refresh events</button>
+			</div>
+		</div>
+		<div class="my-calendar" data-my-calendar></div>
+		<p class="my-result" data-my-result role="status" aria-atomic="true"></p>
+		<dialog class="my-event-dialog" data-my-dialog aria-labelledby="my-dialog-title">
+			<h2 id="my-dialog-title" tabindex="-1" autofocus data-my-dialog-title>Choose an event</h2>
+			<p>This application-owned dialog shows every event for the date. Choosing an event records a local selection only.</p>
+			<ul class="my-event-choices" data-my-event-choices></ul>
+			<form method="dialog"><button class="my-button" type="submit">Close</button></form>
+		</dialog>
+	</main>
+	<script type="module" src="./main.js"></script>
+</body>
+</html>

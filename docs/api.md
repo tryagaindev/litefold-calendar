@@ -1,6 +1,6 @@
 # Public API reference
 
-This is the exhaustive reference for the package's public alpha API. Import core values and types from `@tryagaindev/litefold-calendar`, CSS from `@tryagaindev/litefold-calendar/styles.css`, and optional first-party components from their documented `/extensions/<id>` subpaths. Internal modules and `dist/` files are not supported entry points.
+This is the exhaustive reference for the package's public prerelease API. Import core values and types from `@tryagaindev/litefold-calendar`, CSS from `@tryagaindev/litefold-calendar/styles.css`, and optional first-party components from their documented `/extensions/<id>` subpaths. Internal modules and `dist/` files are not supported entry points.
 
 Before `1.0.0`, public names and defaults may still change. Review the
 [changelog](../CHANGELOG.md) for shipped changes and the
@@ -32,9 +32,9 @@ The root module exports exactly the following symbols. Entries in the Types colu
 
 | Area | Runtime values | Types |
 |---|---|---|
-| Construction | `createCalendar` | `Calendar`, `CalendarGridEventPlacement`, `CalendarOptions`, `CalendarEventTimeDisplay`, `CalendarWeekRowSizing` |
+| Construction | `createCalendar` | `Calendar`, `CalendarGridEventDisplay`, `CalendarGridEventPlacement`, `CalendarOptions`, `CalendarEventTimeDisplay`, `CalendarWeekRowSizing` |
 | Dates and events | — | `CalendarDate`, `CalendarDateInput`, `CalendarEvent`, `CalendarEventInput`, `CalendarEvents`, `CalendarEventSource`, `CalendarRange`, `CalendarRangeBounds` |
-| Actions | — | `CalendarAction`, `CalendarDayContextMenu`, `CalendarDaySelection`, `CalendarEventActionElement`, `CalendarEventActivation`, `CalendarEventContextMenu`, `CalendarEventContextMenuAvailability`, `CalendarEventSurface` |
+| Actions | — | `CalendarAction`, `CalendarDayContextMenu`, `CalendarDaySelection`, `CalendarEventActionElement`, `CalendarEventActivation`, `CalendarEventOverflowActivation`, `CalendarEventContextMenu`, `CalendarEventContextMenuAvailability`, `CalendarEventSurface` |
 | State and announcements | — | `CalendarAnnouncement`, `CalendarIssue`, `CalendarPhase`, `CalendarState` |
 | Localization and icons | — | `CalendarFirstDay`, `CalendarHeadingLevel`, `CalendarIconFactory`, `CalendarIcons`, `CalendarMessages` |
 | First-party extensions | — | `CalendarExtension` |
@@ -150,11 +150,11 @@ When replacement data commits, the calendar preserves the displayed month, selec
 
 ### Built-in month-and-year jump
 
-The configured `h1` through `h6` month heading contains a native button showing the localized displayed month and year. Activating it with pointer, Enter, or Space opens a package-owned `popover="auto"` with dialog semantics and focuses its month `<select>`. The required year input follows configured bounds, and changing it disables months that do not intersect those bounds.
+The configured `h1` through `h6` month heading contains a native button showing the localized displayed month and year. Activating it with pointer, Enter, or Space opens a package-owned `popover="auto"` with dialog semantics when Popover is available, or a native modal `<dialog>` fallback otherwise, and focuses its month `<select>`. The modal fallback makes the rest of the document inert. The required year input follows configured bounds, and changing it disables months that do not intersect those bounds. Both presentations support Jump, Cancel, Escape, and pointer light dismissal.
 
 At exactly a `24rem` calendar content width and above, the visible title uses the locale's full month and numeric year. Below `24rem`, package CSS exposes its already-rendered `month: "short", year: "numeric"` form; decorative pull-pager lanes follow the same visual rule. The trigger name, grid name, and live text remain complete, and the compact title and pager lanes are excluded from accessibility. This is package-owned presentation: applications must not measure the viewport or calendar to select a label, or target private title and pager descendants.
 
-Jumping preserves the selected day where possible and otherwise clamps it to the target month and configured range. It never invokes `onDaySelect`. Invalid form input keeps the picker open. Jump, Cancel, and Escape close it and restore focus to the month-title trigger; pointer light-dismiss closes it without moving focus.
+Jumping preserves the selected day where possible and otherwise clamps it to the target month and configured range. It never invokes `onDaySelect`. Invalid form input keeps the picker open. Jump, Cancel, and Escape close it and restore focus to the month-title trigger. Popover pointer light dismissal preserves the user's new focus target; modal-dialog backdrop dismissal restores focus to the trigger.
 
 The picker, day buttons, Previous, Next, Today, native pull/snap pager, and Page Up/Down keyboard navigation all use the same configured bounds. Dates outside the bounds remain present when required by the fixed 42-day layout but their native day buttons are disabled. Previous, Next, and Today remain in the Tab order and expose `aria-disabled="true"` when they have no permitted destination; their handlers are guarded no-ops in that state. Other package-owned interaction quietly stops or clamps at a boundary. Only an out-of-range application call to `gotoDate()` or `focusDate()` throws.
 
@@ -283,6 +283,8 @@ Metadata is optional and opaque. The package preserves it by reference without i
 
 Event IDs must contain a non-whitespace character, remain at most 256 UTF-16 code units, and be unique within one returned snapshot. IDs are preserved without trimming. Titles are trimmed and must then contain 1 through 1,024 UTF-16 code units.
 
+Day occurrences use one canonical order across grid summaries, the agenda, and overflow callbacks: all-day events first, then ascending complete civil start, normalized title, and preserved ID. Title and ID comparisons use UTF-16 code-unit order rather than locale collation.
+
 `accentColor` is the per-event **event marker color** field. It accepts exactly an opaque six-digit hexadecimal color (`#RRGGBB`, case-insensitive input) and normalizes it to uppercase. An invalid value becomes `null` rather than invalidating the event; the built-in marker then uses its CSS-token fallback. This field colors only the built-in SVG marker. It does not tint an event summary or choose its text, background, border, or event leading-rule color. Core rendering does not emit a `style` attribute. See [calendar anatomy and color vocabulary](component-anatomy.md#three-color-roles-that-sound-similar) for the related names. Use `renderEventMarker` when metadata-driven visual treatment needs more than the built-in marker, and keep that application-owned output compatible with the application Content Security Policy.
 
 `url` is optional. It must be unchanged by trimming, contain no control character or credentials, and resolve against the host document to a relative or HTTP(S) destination. Both the supplied string and the resolved destination must be no longer than 2,048 UTF-16 code units. Empty, malformed, unsupported-scheme, credential-bearing, control-character, trim-altered, or oversized values reject the complete snapshot. A normalized event exposes the validated relative reference unchanged, a canonical absolute HTTP(S) string, or `null`; the native anchor resolves a relative reference in the host document.
@@ -326,6 +328,10 @@ interface CalendarOptions<TMetadata = unknown> {
 	readonly headingLevel?: CalendarHeadingLevel;
 	readonly weekRowSizing?: CalendarWeekRowSizing;
 	readonly gridEventPlacement?: CalendarGridEventPlacement;
+	readonly gridEventDisplay?: {
+		readonly compact?: CalendarGridEventDisplay;
+		readonly wide?: CalendarGridEventDisplay;
+	};
 	readonly now?: (this: void) => Date;
 	readonly sourceEventLimit?: number;
 	readonly maxGridEventsPerDay?: number;
@@ -339,6 +345,7 @@ interface CalendarOptions<TMetadata = unknown> {
 	readonly swipe?: boolean;
 	readonly extensions?: readonly CalendarExtension[];
 	readonly onEventActivate?: CalendarAction<CalendarEventActivation<TMetadata>>;
+	readonly onEventOverflowActivate?: CalendarAction<CalendarEventOverflowActivation<TMetadata>>;
 	readonly isEventContextMenuAvailable?: (
 		this: void,
 		context: Readonly<CalendarEventContextMenuAvailability<TMetadata>>
@@ -366,9 +373,10 @@ type CalendarHeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 type CalendarEventTimeDisplay = "all" | "grid" | "agenda" | "none";
 type CalendarWeekRowSizing = "equal" | "content";
 type CalendarGridEventPlacement = "top" | "center" | "bottom";
+type CalendarGridEventDisplay = "events" | "count" | "count-when-multiple";
 ```
 
-The options snapshot is immutable for the life of an instance. `setEvents()` is the one narrow replacement API; mutating `options.events` or the original options object has no effect. Recreate the calendar to change locale, time zone, date bounds, callbacks, extensions, render hooks, messages, icons, limits, integration nodes, or other construction-time configuration. External filter or cache state may change independently; call `refetchEvents()` after changing it. Unknown own string keys on the top-level options object, `messages`, `icons`, or a render-hook definition are rejected as `invalid-configuration`, so misspelled configuration does not fail silently; own symbol keys are ignored. Extension factories validate and snapshot their own options before the calendar mutates its host.
+The options snapshot is immutable for the life of an instance. `setEvents()` is the one narrow replacement API; mutating `options.events` or the original options object has no effect. Recreate the calendar to change locale, time zone, date bounds, callbacks, extensions, render hooks, messages, icons, limits, integration nodes, or other construction-time configuration. External filter or cache state may change independently; call `refetchEvents()` after changing it. Unknown own string keys on the top-level options object, `gridEventDisplay`, `messages`, `icons`, or a render-hook definition are rejected as `invalid-configuration`, so misspelled configuration does not fail silently; own symbol keys are ignored. Extension factories validate and snapshot their own options before the calendar mutates its host.
 
 Every public callback and factory declares `this: void`. Use an arrow function or a function that does not depend on a dynamic receiver.
 
@@ -385,12 +393,13 @@ The [advanced TypeScript example](../examples/advanced/) demonstrates every opti
 | `locale` | Browser-resolved locale | Controls `Intl` full and abbreviated visual months, short/narrow weekdays, full accessible dates and month names, and time labels. | An empty or invalid BCP 47 language tag is `invalid-configuration`. |
 | `timeZone` | None; `Date` inputs use device-local fields | Projects supplied `Date` instants into an IANA zone. It never changes event strings. | An empty or invalid zone identifier is `invalid-configuration`. |
 | `firstDay` | `"locale"` | Uses the locale week convention from either the platform's `Intl.Locale#getWeekInfo()` method or `Intl.Locale#weekInfo` accessor, or accepts explicit `0 = Sunday` through `6 = Saturday`. | Any other value is `invalid-configuration`; locale mode falls back to Sunday when neither platform form yields a valid `firstDay`. |
-| `headingLevel` | `2` | Chooses the native `h1` through `h6` month-title level. Its native title button opens the built-in month-and-year popover. The agenda, popover, and status-panel headings use the next level, capped at `h6`. | A non-integer or value outside `1` through `6` is `invalid-configuration`. |
+| `headingLevel` | `2` | Chooses the native `h1` through `h6` month-title level. Its native title button opens the built-in month-and-year chooser. The agenda, chooser, and status-panel headings use the next level, capped at `h6`. | A non-integer or value outside `1` through `6` is `invalid-configuration`. |
 | `weekRowSizing` | `"equal"` | Controls the six week tracks and normal compact slots. `"equal"` gives every week the intrinsic size required by the tallest week and gives package-owned, normally visible compact primary-event, count, and compact-primary overflow roots one common full slot. Focus-only later summaries remain intrinsic. `"content"` sizes each week independently and keeps compact roots intrinsic. Neither mode fixes the calendar height or clips taller content; equal rows can increase the grid's vertical space. | Any other value is `invalid-configuration`; the diagnostic identifies `weekRowSizing`. |
 | `gridEventPlacement` | `"top"` | Aligns the complete event-summary and overflow stack within the available block space below the top-aligned date at every width. `"center"` and `"bottom"` safely fall back toward the top when the stack cannot fit. It does not affect agenda rows, DOM order, or focus order. | Any other value is `invalid-configuration`; the diagnostic identifies `gridEventPlacement`. |
+| `gridEventDisplay` | `{ compact: "count-when-multiple", wide: "events" }` | Independently chooses `"events"`, `"count"`, or `"count-when-multiple"` for calendar-container widths at most `42rem` and above `42rem`. `"count"` shows a total-count button on every nonempty date; `"count-when-multiple"` does so only above one event. Counts use all loaded, normalized occurrences for that date, independent of summary limits, agenda pagination, and render-hook visuals. Empty days show no count action. Container CSS controls transitions without rerender or refetch. | A non-object, unknown own string key, or unsupported compact/wide mode is `invalid-configuration`. Omitted nested properties keep their defaults. |
 | `now` | `() => new Date()` | Supplies the current instant during construction, every grid render, and Today actions. It may run more than once during one public operation, so keep it synchronous and free of observable side effects. | A construction-time throw/invalid date is `invalid-configuration`; a later failure enters fatal `internal-error`. |
 | `sourceEventLimit` | `10,000` | Caps one complete source snapshot. Allowed range: `1` through `10,000`. | An invalid setting is `invalid-configuration`; an oversized result is `event-limit-exceeded`. |
-| `maxGridEventsPerDay` | `3` | Caps direct event representations in a day cell. Allowed range: `0` through `10`; `0` suppresses individual representations while retaining the accessible day count, agenda events, and native overflow action. Compact presentation follows the [responsive design](../DESIGN.md#responsive-model); the first actionable event remains named and later actions remain available when focused. | An invalid setting is `invalid-configuration`. |
+| `maxGridEventsPerDay` | `3` | Caps direct event representations in a day cell. Allowed range: `0` through `10`; `0` suppresses individual representations while retaining the accessible day count, agenda events, and native overflow action. Count presentation ignores this cap. In `"events"` mode, compact presentation follows the [responsive design](../DESIGN.md#responsive-model); the first actionable event remains named and later actions remain available when focused. | An invalid setting is `invalid-configuration`. |
 | `eventTimeDisplay` | `"all"` | Controls where localized event times are visually exposed: `"all"`, `"grid"`, `"agenda"`, or `"none"`. A time hidden from a surface remains a native `<time datetime>` value with visually hidden text and stays exposed to assistive technology; for actionable occurrences, it remains part of the event action's accessible name. It also remains available as `CalendarEventRenderContext.timeText`. All-day labels follow the same surface policy. | Any other value is `invalid-configuration`; the diagnostic identifies `eventTimeDisplay`. |
 | `agendaPageSize` | `50` | Controls how many agenda rows each Show more action reveals. Allowed range: `10` through `100`. | An invalid setting is `invalid-configuration`. |
 | `agendaDomLimit` | `200` | Caps agenda events retained in the DOM. Allowed range: `50` through `500`; persistent text reports hidden overflow. | An invalid setting is `invalid-configuration`. |
@@ -406,6 +415,7 @@ The [advanced TypeScript example](../examples/advanced/) demonstrates every opti
 | `fallbackElement` | No fallback element | Exclusively leases a same-document element that is DOM-disjoint from the host—neither element may contain the other. A pending initial promise-like result preserves its original `hidden` state; a direct-array result coordinates it before `render()` returns. Later commits follow the rules below without overwriting an application mutation. A sibling is the normal arrangement. | A structurally invalid, cross-document, host-descendant, or host-ancestor element is `invalid-configuration` during construction. An element that is already leased or otherwise unavailable when `render()` claims integration nodes produces `invalid-state`. Both failures leave it untouched. |
 | `extensions` | Empty array | Activates configured opaque first-party components after a successful render. Activation and state delivery use caller order; teardown uses reverse order. Initial direct-array work queues exactly one terminal state delivery after activation. Initial promise-like work activates after the loading transition and does not replay that earlier loading state. | A forged value or duplicate stable ID is synchronous `invalid-configuration` before host mutation. A runtime failure quarantines only that extension and reports diagnostic-only `extension-failed` with `extensionId`. |
 | `onEventActivate` | No callback action | Handles native anchor/button activation on `"grid-summary"` and `"agenda"`; may return `void` or `PromiseLike<void>`. A linked event remains an anchor regardless. | A throw or rejection becomes `action-failed`. A callback may synchronously prevent a link's default navigation. |
+| `onEventOverflowActivate` | Select day and focus agenda | Handles a native total-count or overflow button before day selection or DOM replacement. Receives the occurrence date, ordered immutable full-day events, total count, current button, and native click. Synchronous `preventDefault()` transfers interaction and focus ownership to the application. | A throw or rejection becomes `action-failed`. Async cancellation cannot stop the default interaction; return the action promise for failure reporting. |
 | `isEventContextMenuAvailable` | Every occurrence is eligible when `onEventContextMenu` exists; otherwise none are | Synchronously narrows context-action availability per occurrence and surface. It receives date, event, and surface only. | A throw, non-boolean, or thenable fails closed and reports one recoverable `host-integration-failed` issue per calendar instance. |
 | `onEventContextMenu` | No event context action | Handles right-click, Context Menu, or Shift+F10 on eligible grid/agenda event actions. For an eligible non-link event with no `onEventActivate`, it also handles click, tap, Enter, or Space as the native button's only primary action. | A throw or rejection becomes `action-failed`. No long-press is synthesized; an ineligible link retains the native browser menu. |
 | `onDaySelect` | No day action | Provides a non-cancellable notification after pointer or keyboard selection updates the selected day and agenda. | A throw or rejection becomes `action-failed`; selection remains committed. |
@@ -466,6 +476,15 @@ interface CalendarEventActivation<TMetadata = unknown> {
 	readonly surface: CalendarEventSurface;
 }
 
+interface CalendarEventOverflowActivation<TMetadata = unknown> {
+	readonly date: CalendarDate;
+	readonly dateString: string;
+	readonly element: HTMLButtonElement;
+	readonly events: readonly CalendarEvent<TMetadata>[];
+	readonly eventCount: number;
+	readonly nativeEvent: MouseEvent;
+}
+
 interface CalendarEventContextMenuAvailability<TMetadata = unknown> {
 	readonly date: CalendarDate;
 	readonly dateString: string;
@@ -513,6 +532,7 @@ The selected-day agenda is a native `<ol>` whose event representations are `<li>
 |---|---|---|
 | Click or tap a day; Enter or Space on a focused day | `onDaySelect` | The selected-day agenda is updated before the action runs; returning or throwing does not cancel selection. |
 | Click an event action with an activation callback; Enter or Space | `onEventActivate` | `element` is the native anchor/button and `surface` identifies grid or agenda. Direct event activation never selects a day or calls `onDaySelect`. |
+| Click a total-count or overflow button; Enter or Space | `onEventOverflowActivate` | Runs before selection or replacement with every occurrence on that date; synchronously prevent default to open an application-owned chooser. |
 | Right-click a day; Context Menu or Shift+F10 | `onDayContextMenu` | Coordinates are viewport-relative and suitable for positioning an application-owned context surface. |
 | Right-click an eligible event; Context Menu or Shift+F10 | `onEventContextMenu` | Includes the normalized event, represented occurrence date, surface, action element, native event, and viewport-relative coordinates. |
 | Click or tap an eligible non-link event with no activation callback; Enter or Space | `onEventContextMenu` | Context-only events remain native buttons. Primary activation invokes their only application action and supplies the resulting click event and coordinates. |
@@ -523,9 +543,13 @@ For either context-menu callback, `element` is the current live action or day bu
 
 Day selection commits and rerenders before `onDaySelect` runs. Its `element` is the new live selected-day button in the replacement DOM; `nativeEvent` is the original activation event, whose target and current target may be the detached button that received the gesture. Do not assume `element === nativeEvent.currentTarget`. When motion is allowed, direct activation of a different day in the displayed month may begin presentation-only selection feedback after that commit; it never delays the callback. Reduced motion and every other selection path paint the settled state immediately.
 
-Within the grid, exactly one day proxy has `tabindex="0"`; event and overflow actions remain `-1`. The pager viewport is programmatically focusable only, and its decorative lanes are `aria-hidden` and noninteractive, so Tab continues from the toolbar into the managed grid rather than into paging chrome. F2 enters the current cell's first visible action. Up/Down moves without wrapping; Escape or F2 returns to the day. Tab exits forward toward the agenda, while Shift+Tab returns to the day proxy. Focus restoration identifies an occurrence by surface, date, and event ID rather than retaining a replaced node. Stale or detached elements cannot invoke actions.
+Within the grid, exactly one day proxy has `tabindex="0"`; event and overflow actions remain `-1`. The pager viewport is programmatically focusable only, and its decorative lanes are `aria-hidden` and noninteractive, so Tab continues from the toolbar into the managed grid rather than into paging chrome. F2 enters the current cell's first visible action when available; otherwise focus stays on the day and the key is not consumed. Day buttons advertise the shortcut only when actions are available in both compact and wide presentations; see the [interaction model](../ACCESSIBILITY.md#interaction-model). Up/Down moves without wrapping; Escape or F2 returns to the day. Tab exits forward toward the agenda, while Shift+Tab returns to the day proxy. Focus restoration identifies an occurrence by surface, date, and event ID rather than retaining a replaced node. Stale or detached elements cannot invoke actions.
 
-The native overflow action uses localized `gridMore` visual fallback content and the `gridMoreLabel` date/count accessible name. Custom wide overflow content may replace that visual fallback without replacing the action or its name. Activating the action selects the represented date, resets the agenda expansion, and focuses the agenda heading without invoking `onDaySelect`.
+The native overflow action uses localized `gridMore` visual fallback content and the `gridMoreLabel` date/count accessible name. Total-count actions use a localized number in compact presentation, `gridEventCount` text in wide presentation, and `gridEventCountLabel` for the complete date/count accessible name. When one shared action presents a compact total and wide overflow, its accessible name retains the complete total/date and appends the localized wide overflow text so the visible label remains in the name. Custom visuals do not replace the native action or its name. By default, activation selects the represented date, resets the agenda expansion, and focuses the agenda heading without invoking `onDaySelect`.
+
+`onEventOverflowActivate` receives immutable date and event snapshots before selection or DOM replacement. Its `events` array contains every loaded, normalized occurrence for that date in canonical order; `eventCount` equals its length. Metadata remains application-owned by reference, and DOM/native-event references retain their native behavior. Call `nativeEvent.preventDefault()` synchronously to take ownership of both interaction and focus, including restoration after an application dialog closes. Cancellation after an `await` cannot stop the default action. Destroying the calendar during the callback prevents the default operation. Returned promises use the ordinary action-failure path.
+
+Count presentation excludes individual summaries from new managed focus entry. A summary already focused when its container crosses the breakpoint remains visible until blur. F2 and arrow navigation skip CSS-hidden actions without measuring the container. The compact default intentionally changes busy days to a total-count action; `gridEventDisplay: { compact: "events" }` restores the earlier presentation.
 
 ## Observe state: `CalendarState`
 
@@ -599,6 +623,8 @@ Each icon factory receives the host's `Document` and must return distinct, detac
 | `gridEventInstructions` | `Use arrow keys to move between dates and Enter or Space to select. Press F2 on a date to move to its visible event actions; use Up and Down Arrow between actions, and Escape or F2 to return.` | — |
 | `gridMore` | `{count} more` | `{count}` |
 | `gridMoreLabel` | `View {count} more {eventLabel} for {date}` | `{count}`, `{eventLabel}`, `{date}` |
+| `gridEventCount` | `{count} {eventLabel}` | `{count}`, `{eventLabel}` |
+| `gridEventCountLabel` | `View {count} {eventLabel} for {date}` | `{count}`, `{eventLabel}`, `{date}` |
 | `internalErrorMessage` | `The calendar encountered an unexpected error.` | — |
 | `internalErrorTitle` | `Calendar unavailable` | — |
 | `jump` | `Jump` | — |
@@ -617,7 +643,7 @@ Each icon factory receives the host's `Document` and must return distinct, detac
 | `today` | `Today` | — |
 | `year` | `Year` | — |
 
-Every supplied message must be a string containing at least one non-whitespace character. Any complete `{token}` placeholder must be listed for that key; an unsupported placeholder is rejected as `invalid-configuration` rather than rendered literally. Only the placeholders shown above are substituted. In particular, `agendaTitle` and `chooseMonthYear` accept only `{date}`; the singular/plural event noun supplies `{eventLabel}` in `dayLabel` and `gridMoreLabel`. `gridMore` supplies the default wide visual and `context.text`, while `gridMoreLabel` always names the native action with its date and hidden count. Rendered values remain text, not HTML. Override `event` and `events` together, and test long translations; the package does not download locale data or apply language-specific plural rules.
+Every supplied message must be a string containing at least one non-whitespace character. Any complete `{token}` placeholder must be listed for that key; an unsupported placeholder is rejected as `invalid-configuration` rather than rendered literally. Only the placeholders shown above are substituted. In particular, `agendaTitle` and `chooseMonthYear` accept only `{date}`; the singular/plural event noun supplies `{eventLabel}` in `dayLabel`, `gridMoreLabel`, `gridEventCount`, and `gridEventCountLabel`. `gridMore` supplies the default wide overflow visual and `context.text`, while `gridMoreLabel` names that action with its date and hidden count. Count-mode wide text uses `gridEventCount`, and `gridEventCountLabel` names the native total-count action. Rendered values remain text, not HTML. Override `event` and `events` together, and test long translations; the package does not download locale data or apply language-specific plural rules.
 
 <a id="render-hooks"></a>
 
@@ -666,6 +692,7 @@ interface CalendarEventOverflowElements<
 
 interface CalendarCompactEventOverflowContext
 	extends CalendarRenderContext<"day"> {
+	readonly display: "overflow" | "count";
 	readonly date: CalendarDate;
 	readonly dateString: string;
 	readonly elements: CalendarEventOverflowElements;
@@ -678,6 +705,7 @@ interface CalendarCompactEventOverflowContext
 
 interface CalendarWideEventOverflowContext
 	extends CalendarRenderContext<"grid-summary"> {
+	readonly display: "overflow" | "count";
 	readonly date: CalendarDate;
 	readonly dateString: string;
 	readonly elements: CalendarEventOverflowElements<HTMLButtonElement>;
@@ -778,16 +806,24 @@ Two hooks have singleton ownership because each controls package-owned presentat
 | Singleton hook | No owner | `undefined` | `null` | `Node` |
 |---|---|---|---|---|
 | `renderEventMarker` | Built-in marker | Invalid result | Suppress the marker | Replace the marker |
-| `renderEventOverflow` | Social-style compact count and localized wide text | Keep the built-in content for that variant | Suppress a passive compact cue; keep built-in content inside a native action | Replace that variant's visual content |
+| `renderEventOverflow` | Localized compact number and wide text for the configured count or overflow presentation | Keep the built-in content for that variant | Suppress a passive compact cue; keep built-in content inside a native action | Replace that variant's visual content |
 
-`renderEventOverflow` receives a discriminated `CalendarEventOverflowContext` for each applicable pre-rendered variant. Branch on `variant`; do not infer the responsive state from viewport measurements:
+`renderEventOverflow` receives a discriminated `CalendarEventOverflowContext` for each applicable pre-rendered variant. Branch on `display` for totals versus overflow and `variant` for presentation; do not infer responsive state from viewport measurements. For `display: "overflow"`:
 
 - `variant: "compact"` uses `surface: "day"`. When a primary marker is visible, `visibleEventCount` is `1`, `overflowCount` is the additional count, and `text` is signed, such as `+1`, `+999`, `+1K`, or `+1.3K` in `en-US`. Without a visible primary marker, `visibleEventCount` is `0`, `overflowCount` equals `eventCount`, and `text` is the unsigned total, such as `2`. Formatting uses the configured locale and `Intl.NumberFormat` with `notation: "compact"`, `compactDisplay: "short"`, `maximumFractionDigits: 1`, and `useGrouping: false`; the paired-marker formatter also uses `signDisplay: "always"`. The built-in visual is a bare semibold number. [DESIGN.md](../DESIGN.md#responsive-model) owns its exact responsive placement.
 - `variant: "wide"` uses `surface: "grid-summary"`. `visibleEventCount` is the number of direct grid representations, `overflowCount` is the number omitted from them, and `text` is the localized exact `gridMore` value, such as `51 more`. This variant exists when the native grid-overflow action exists.
 
-`eventCount` is always the authoritative total. `elements.root` is the package-owned variant root and `elements.content` is its visual slot. `elements.action` is `null` for a passive compact cue and is the native `HTMLButtonElement` for the wide variant or when the overflow action itself is the compact primary visual, such as with `maxGridEventsPerDay: 0`. These references are for inspection and placement context: return visual content instead of directly changing, removing, or reparenting package-owned elements. A returned compact node replaces content only and remains within its package-assigned block. In the compact-primary action case, the fallback remains one package-owned action; a returned node stays inside it and `null` keeps the built-in numeric fallback. The native button, accessible name, activation, and focus transfer remain package-owned; `context.text` remains the package-formatted fallback even when a custom node replaces it visually.
+For `display: "count"`, both variants report `visibleEventCount: 0` and
+`overflowCount: eventCount`. The compact `text` is the localized unsigned total
+and wide `text` uses `gridEventCount`. Both have a native button in
+`elements.action`; returning `null` keeps its required built-in count visual.
+Counts are independent of summary caps, agenda pages, and suppressed markers.
+Hooks receive every applicable representation at render time; CSS chooses the
+active compact or wide presentation afterward.
 
-Compact output is presentational, unfocusable, and hidden from the
+`eventCount` is always the authoritative total. `elements.root` is the package-owned variant root and `elements.content` is its visual slot. For `display: "count"`, `elements.action` is always the native `HTMLButtonElement`, including the default compact total on busy days. For `display: "overflow"`, it is `null` for a passive compact cue and is the native button for the wide variant or a compact primary overflow action, such as with `maxGridEventsPerDay: 0`. These references are for inspection and placement context: return visual content instead of directly changing, removing, or reparenting package-owned elements. A returned compact node replaces content only and remains within its package-assigned block. Inside a native compact action, a returned node stays inside that action and `null` keeps the built-in numeric fallback. The native button, accessible name, activation, and focus transfer remain package-owned; `context.text` remains the package-formatted fallback even when a custom node replaces it visually.
+
+Returned compact content is presentational, unfocusable, and hidden from the
 accessibility tree; the day label retains the exact event total. A passive
 compact cue is pointer-transparent, so activating that area selects the day
 instead of activating the first event. The package owns responsive placement;
@@ -798,6 +834,9 @@ space is required, increase `--lfc-control-min-size` and
 compact roots grow together. Oversized output remains unclipped but is outside
 the equal-sizing guarantee. Returned wide content replaces only visual content
 inside the native overflow button and cannot alter its behavior.
+
+Only visual content is hidden from the accessibility tree: a count-mode native
+button remains an accessible action with the complete date and total in its name.
 
 Each applicable variant is created during the calendar render. Compact and
 wide variants coexist, and the container styles select the presentation defined
@@ -903,7 +942,7 @@ For a current operational error accepted into state, returning `"default"` or `u
 
 ## Avoid common integration mistakes
 
-- Use `onEventActivate`, `onEventContextMenu`, `onDaySelect`, and `onDayContextMenu`; these are the action option names.
+- Use `onEventActivate`, `onEventOverflowActivate`, `onEventContextMenu`, `onDaySelect`, and `onDayContextMenu`; these are the action option names.
 - Pass an in-memory event array directly through `events`. Use a provider only when data depends on the requested range or external state, and add `async` only when it actually awaits work.
 - Treat provider `end` bounds and event ends as exclusive, but `minDate` and `maxDate` as inclusive selectable dates. Do not subtract a day before querying or add a day to returned events.
 - Do not put `Z`, offsets, or zone annotations in event strings. Convert application instants to intended civil values before adapting them.

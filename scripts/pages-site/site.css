@@ -97,6 +97,7 @@ main,
 .my-pages-footer {
 	inline-size: min(100% - 2rem, 72rem);
 	margin-inline: auto;
+	container: my-pages-section / inline-size;
 }
 
 .my-pages-project-nav {
@@ -351,10 +352,15 @@ h3 {
 .my-pages-footer {
 	align-items: start;
 	border-block-start: 0.0625rem solid var(--my-pages-border);
-	display: grid;
+	display: flex;
+	flex-wrap: wrap;
 	gap: 1.5rem;
-	grid-template-columns: minmax(12rem, 0.5fr) minmax(0, 1fr);
 	padding-block: 2.5rem;
+}
+
+.my-pages-footer > div {
+	flex: 1 1 12rem;
+	min-inline-size: 0;
 }
 
 .my-pages-footer h2 {
@@ -364,9 +370,11 @@ h3 {
 
 .my-pages-footer dl {
 	display: grid;
+	flex: 2 1 32rem;
 	gap: 1rem;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	margin: 0;
+	min-inline-size: 0;
 }
 
 .my-pages-footer dt {
@@ -396,9 +404,8 @@ h3 {
 	}
 }
 
-@media (max-width: 48rem) {
-	.my-pages-deployment-grid,
-	.my-pages-footer {
+@container my-pages-section (inline-size <= 48rem) {
+	.my-pages-deployment-grid {
 		grid-template-columns: 1fr;
 	}
 
@@ -407,7 +414,7 @@ h3 {
 	}
 }
 
-@media (max-width: 34rem) {
+@container my-pages-section (inline-size <= 34rem) {
 	.my-pages-project-nav {
 		align-items: start;
 		flex-direction: column;

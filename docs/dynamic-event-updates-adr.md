@@ -123,7 +123,7 @@ npm run build:package
 node scripts/measure-calendar-workflows.mjs --json
 ```
 
-The report also includes raw and maximum-compression gzip byte counts for `dist/index.js`, `dist/internal/runtime/coordinator.js`, and every JavaScript module beneath `dist/`. Preserve a complete prior `dist/` directory outside the candidate build, then request baseline deltas:
+The report also includes raw and maximum-compression gzip byte counts for `dist/index.js`, its complete static import graph, and every JavaScript module beneath `dist/`. Graph totals compress each emitted module separately, including Vite's private shared chunks. Preserve a complete prior `dist/` directory outside the candidate build, then request baseline deltas:
 
 ```sh
 npm run measure:dynamic-events -- --baseline .cache/dynamic-update-baseline/dist

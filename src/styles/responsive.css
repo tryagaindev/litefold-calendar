@@ -3,40 +3,43 @@
     :where(.litefold-calendar) .lfc-calendar-toolbar {
       display: grid;
       gap: 0.375rem;
-      grid-template-areas:
-        "navigation"
-        "toolbar-end";
       grid-template-columns: minmax(0, 1fr);
       padding-block: 0.375rem;
       padding-inline: 0.5rem;
     }
 
-    :where(.litefold-calendar)
-      .lfc-calendar-toolbar:not(:has(.lfc-calendar-toolbar-end)) {
-      grid-template-areas: "navigation";
+    :where(.litefold-calendar) .lfc-calendar-navigation {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.375rem;
     }
 
-    :where(.litefold-calendar) .lfc-calendar-navigation {
-      gap: 0.375rem;
-      grid-area: navigation;
+    :where(.litefold-calendar) .lfc-calendar-month-stepper {
+      flex: none;
     }
 
     :where(.litefold-calendar) .lfc-calendar-title {
+      flex: 1 1 max-content;
       font-size: 1.125rem;
       font-weight: var(--lfc-internal-font-weight-medium);
+      max-inline-size: 100%;
       place-self: center stretch;
       text-align: center;
     }
 
     :where(.litefold-calendar) .lfc-calendar-title-button {
       inline-size: 100%;
+      justify-content: center;
       justify-content: safe center;
       padding-inline: 0;
     }
 
+    :where(.litefold-calendar) .lfc-calendar-today-button {
+      margin-inline-start: auto;
+    }
+
     :where(.litefold-calendar) .lfc-calendar-toolbar-end {
       gap: 0.375rem;
-      grid-area: toolbar-end;
       inline-size: 100%;
       justify-content: end;
       margin-inline-start: 0;
@@ -61,6 +64,7 @@
 
     :where(.litefold-calendar) .lfc-calendar-day-button {
       gap: 0.125rem;
+      grid-template-columns: minmax(0, 1fr);
       justify-items: center;
       min-block-size: var(--lfc-compact-day-min-block-size);
       padding: var(--lfc-internal-day-padding);
@@ -70,8 +74,15 @@
       grid-template-rows: minmax(var(--lfc-compact-day-min-block-size), auto);
     }
 
+    /* A definite preferred size avoids the repeated grid layout seen with a percentage min() width. */
     :where(.litefold-calendar) .lfc-calendar-day-number {
+      aspect-ratio: 1;
+      border-width: var(--lfc-internal-hairline);
+      inline-size: 2rem;
       justify-self: center;
+      max-inline-size: calc(100% + 2 * var(--lfc-internal-day-padding));
+      min-inline-size: 0;
+      padding: 0;
     }
 
     :where(.litefold-calendar) .lfc-calendar-day-badge {
@@ -178,6 +189,7 @@
     :where(.litefold-calendar)
       .lfc-calendar-event-overflow-cluster
       > .lfc-calendar-event-overflow.lfc-is-compact {
+      justify-content: center;
       justify-content: safe center;
     }
 
@@ -234,6 +246,12 @@
     }
 
     :where(.litefold-calendar)
+      .lfc-calendar-grid-more.lfc-is-wide-count-only:focus
+      .lfc-calendar-event-overflow.lfc-is-wide {
+      display: inline-flex;
+    }
+
+    :where(.litefold-calendar)
       .lfc-calendar-grid-more:not(.lfc-is-compact-primary):focus
       > .lfc-calendar-event-overflow.lfc-is-wide:not(
         .lfc-is-event-overflow-suppressed
@@ -269,9 +287,11 @@
     }
 
     :where(.litefold-calendar) .lfc-calendar-grid-more.lfc-is-compact-primary {
+      align-items: center;
       align-items: safe center;
       display: inline-flex;
       inline-size: var(--lfc-internal-compact-control-inline-size);
+      justify-content: center;
       justify-content: safe center;
       min-block-size: max(1.5rem, var(--lfc-grid-event-min-block-size));
       min-inline-size: min(100%, 1.5rem);
@@ -283,6 +303,94 @@
       .lfc-calendar-weeks[data-lfc-week-row-sizing="equal"]
       .lfc-calendar-grid-more.lfc-is-compact-primary {
       aspect-ratio: 1;
+    }
+
+    /* A focused summary survives resizing; hidden summaries reject new focus entry. */
+    :where(.litefold-calendar) .lfc-calendar-grid-more.lfc-is-wide-count-only:not(:focus),
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-event-summary:not(:focus) {
+      display: none;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-grid-more {
+      grid-row: auto;
+      max-inline-size: 100%;
+      white-space: normal;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-grid-more.lfc-is-compact-primary {
+      aspect-ratio: auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      padding: 0;
+    }
+
+    /* The decorative square sets a floor; wrapped count content can make the row taller. */
+    :where(.litefold-calendar)
+      .lfc-calendar-weeks[data-lfc-week-row-sizing="equal"]
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-grid-more.lfc-is-compact-primary::before {
+      aspect-ratio: 1;
+      content: "";
+      grid-area: 1 / 1;
+      inline-size: 100%;
+      pointer-events: none;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-grid-more:focus-visible {
+      outline-offset: calc(
+        -1 * min(var(--lfc-internal-focus-size), calc(3 * var(--lfc-internal-hairline)))
+      );
+      outline-width: min(var(--lfc-internal-focus-size), calc(3 * var(--lfc-internal-hairline)));
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-grid-more
+      .lfc-calendar-event-overflow.lfc-is-compact.lfc-is-count,
+    :where(.litefold-calendar)
+      .lfc-calendar-grid-more
+      .lfc-is-compact.lfc-is-count
+      .lfc-calendar-event-overflow-content,
+    :where(.litefold-calendar)
+      .lfc-calendar-grid-more
+      .lfc-is-compact.lfc-is-count
+      .lfc-event-overflow-default-content {
+      inline-size: 100%;
+      max-inline-size: 100%;
+      min-inline-size: 0;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-grid-more
+      > .lfc-calendar-event-overflow.lfc-is-compact.lfc-is-count {
+      align-self: stretch;
+      grid-area: 1 / 1;
+      padding-block: var(--lfc-internal-day-padding);
+      padding-inline: calc(2 * var(--lfc-internal-hairline));
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-event-summary.lfc-is-compact-primary:focus {
+      aspect-ratio: auto;
+      inline-size: 100%;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-compact-display="count"]
+      .lfc-calendar-event-summary.lfc-is-compact-primary:focus
+      > .lfc-calendar-event-title {
+      display: block;
     }
   }
 
@@ -340,6 +448,14 @@
       grid-column: 1 / -1;
     }
 
+    @supports not selector(:has(*)) {
+      :where(.litefold-calendar)
+        .lfc-calendar-agenda-event
+        .lfc-calendar-event-title {
+        flex-basis: 100%;
+      }
+    }
+
     :where(.litefold-calendar)
       .lfc-calendar-agenda-event:where(
         :has(> .lfc-calendar-time:is(:empty, .lfc-visually-hidden))
@@ -364,14 +480,27 @@
     }
 
     :where(.litefold-calendar) .lfc-calendar-navigation {
-      grid-template-areas:
-        "stepper title"
-        "today today";
-      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      row-gap: 0;
+    }
+
+    /* Keep Today on its own row while the steppers and title wrap at their intrinsic widths. */
+    :where(.litefold-calendar) .lfc-calendar-navigation::after {
+      content: "";
+      flex-basis: 100%;
+      order: 1;
     }
 
     :where(.litefold-calendar) .lfc-calendar-month-stepper {
       justify-self: start;
+      margin-block-end: 0.375rem;
+    }
+
+    :where(.litefold-calendar) .lfc-calendar-title {
+      margin-block-end: 0.375rem;
+    }
+
+    :where(.litefold-calendar) .lfc-calendar-today-button {
+      order: 2;
     }
 
     :where(.litefold-calendar) .lfc-calendar-month-picker-fields {
@@ -402,6 +531,20 @@
   }
 
   @container lfc-calendar (inline-size > 42rem) {
+    :where(.litefold-calendar)
+      .lfc-calendar-day-summaries[data-lfc-wide-display="count"]
+      .lfc-calendar-event-summary:not(:focus),
+    :where(.litefold-calendar)
+      .lfc-calendar-grid-more:not(.lfc-has-wide-overflow, :focus) {
+      display: none;
+    }
+
+    :where(.litefold-calendar)
+      .lfc-calendar-grid-more:not(.lfc-has-wide-overflow):focus
+      .lfc-calendar-event-overflow.lfc-is-compact {
+      display: inline-flex;
+    }
+
     :where(.litefold-calendar) .lfc-calendar-toolbar-end {
       flex: 0 1 auto;
       margin-inline-start: auto;

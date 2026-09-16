@@ -9,6 +9,7 @@ Use this page to choose, run, and validate the repository examples. Each recipe 
 | Package user — getting started | Render a static event array and handle activation | [Basic JavaScript](basic/) |
 | Package user — getting started | Preserve useful server-rendered content until the calendar is ready | [Progressive enhancement](progressive-enhancement/) |
 | Package user — getting started | Load the ESM build from an existing classic-script entry point | [Classic-script loader](classic-script/) |
+| Package user — everyday integration | Fetch JSON, filter categories, refresh, and open a count/event dialog | [Remote data JavaScript](remote-data/) |
 | Package user — integration and API | Integrate a range-aware source, typed metadata, application controls, hooks, state, and WebMCP | [Advanced TypeScript](advanced/) |
 | Package user — integration and API | Own source, action, and render-hook failure presentation | [Async errors](async-errors/) |
 | Package user — integration and API | Rewrite a FullCalendar v6 `dayGridMonth` source shape | [FullCalendar v6 migration](fullcalendar-v6-migration/) |
@@ -40,9 +41,13 @@ import "@tryagaindev/litefold-calendar/styles.css";
 
 A browser cannot resolve those bare package specifiers without a build tool or import map. The [classic-script recipe](classic-script/) shows the deployed-URL form.
 
+### Everyday integration
+
+Use [Remote data JavaScript](remote-data/) after the basic example. It demonstrates a real `fetch`, response validation, cancellation, category filtering, total-count actions, native dialogs, and cleanup. The [remote-data walkthrough](../docs/remote-data.md) explains which fixture code changes for a production API and how to refresh after saving. No advanced hook inventory or TypeScript generic setup is required.
+
 ### Integration and API
 
-Use [Advanced TypeScript](advanced/) for reusable integration patterns such as range loading, cancellation, typed metadata, render hooks, external controls, fallback ownership, and optional extensions. Use [Async errors](async-errors/) when deciding whether the package or application owns visible recovery UI. The [FullCalendar v6 migration](fullcalendar-v6-migration/) is a bounded adapter example for that source API shape, not a compatibility layer.
+Use [Advanced TypeScript](advanced/) for typed metadata, caching, render hooks, external controls, fallback ownership, and optional extensions. Use [Async errors](async-errors/) when deciding whether the package or application owns visible recovery UI. The [FullCalendar v6 migration](fullcalendar-v6-migration/) is a bounded adapter example for that source API shape, not a compatibility layer.
 
 Exact public signatures, defaults, and timing belong in the [API reference](../docs/api.md). Application ownership and composition recipes belong in the [integration guide](../docs/integration-guide.md).
 

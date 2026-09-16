@@ -17,6 +17,7 @@ import {
 	parseWorkflowMeasurementArguments
 } from "./lib/calendar-workflow-measurement.mjs";
 import { summarizeDurations } from "./lib/dynamic-update-measurement.mjs";
+import { extensionIdsFromSources, readDistributionSourceProvenance } from "./lib/distribution-provenance.mjs";
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -57,9 +58,11 @@ const [rootImportGraph, stylesheet] = await Promise.all([
 	measureReachableJavaScriptGraph(DIST_ENTRY, DIST_DIRECTORY),
 	measureDistributionAsset(DIST_STYLES)
 ]);
+const rootSources = (await Promise.all(rootImportGraph.files.map((path) =>
+	readDistributionSourceProvenance(join(DIST_DIRECTORY, path), REPOSITORY_ROOT)))).flat();
 assert.equal(
-	rootImportGraph.files.some((path) => path.startsWith("extensions/")),
-	false,
+	extensionIdsFromSources(rootSources).size,
+	0,
 	"The root import graph must exclude optional extensions."
 );
 

@@ -1055,7 +1055,7 @@ void test("developer shell falls back to main and keeps static links on metadata
 	);
 	assert.equal(
 		dom.window.document.querySelector("#my-install-command")?.textContent,
-		"npm install @tryagaindev/litefold-calendar@alpha"
+		"npm install @tryagaindev/litefold-calendar@nightly"
 	);
 	assert.match(dom.window.document.querySelector("#my-main-preview")?.textContent ?? "", new RegExp(SECOND_COMMIT, "u"));
 
@@ -1088,7 +1088,7 @@ void test("developer shell falls back to main and keeps static links on metadata
 	);
 	assert.equal(
 		fallbackDom.window.document.querySelector("#my-install-command")?.textContent,
-		"npm install @tryagaindev/litefold-calendar@alpha"
+		"npm install @tryagaindev/litefold-calendar@nightly"
 	);
 	dom.window.close();
 	fallbackDom.window.close();
@@ -1124,7 +1124,7 @@ void test("developer shell announces copy success and selects code when clipboar
 	assert.equal(await copyCode(button, documentReference, {
 		clipboard: { writeText: async (value) => { copied = value; } }
 	}), "copied");
-	assert.equal(copied, "npm install @tryagaindev/litefold-calendar@alpha");
+	assert.equal(copied, "npm install @tryagaindev/litefold-calendar@nightly");
 	assert.equal(documentReference.querySelector("#my-copy-status")?.textContent, "Install command copied.");
 
 	assert.equal(await copyCode(button, documentReference, {
@@ -1132,7 +1132,7 @@ void test("developer shell announces copy success and selects code when clipboar
 	}), "selected");
 	assert.equal(
 		documentReference.defaultView?.getSelection()?.toString(),
-		"npm install @tryagaindev/litefold-calendar@alpha"
+		"npm install @tryagaindev/litefold-calendar@nightly"
 	);
 	assert.match(documentReference.querySelector("#my-copy-status")?.textContent ?? "", /selected.*Ctrl\+C/u);
 	dom.window.close();
