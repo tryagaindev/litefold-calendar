@@ -17,7 +17,7 @@ The month is one ARIA grid inside a programmatically focusable horizontal paging
 | Shift+Page Up/Page Down | Move one year within the configured range and synchronize the focused/selected day |
 | Enter/Space | Select the focused day and update the agenda |
 | Context Menu / Shift+F10 | Invoke the optional context action for the focused day or eligible focused event action |
-| F2 | From a day, focus its first visible event or overflow action; from an action, return to the day |
+| F2 | From a day, focus its first visible event or overflow action if available; from an action, return to the day |
 | Up/Down while in actions | Move between that cell's visible actions without wrapping |
 | Escape while in actions | Return to the represented day |
 | Tab while in actions | Exit the grid forward toward the agenda |
@@ -26,6 +26,8 @@ The month is one ARIA grid inside a programmatically focusable horizontal paging
 Arrow and Home/End navigation moves focus but does not select; movement stops at the rendered six-week boundary or the configured date bounds. This prevents ordinary focus movement from rebuilding and announcing the agenda. Page Up/Down is the deliberate exception: when an in-range destination exists, it changes the displayed month or year and synchronizes focus, selection, and agenda so the new grid retains one visible selected cell, but it does not invoke `onDaySelect`. Enter, Space, or click is the day-selection action path and invokes `onDaySelect` only for an enabled, in-range day.
 
 F2 enters the focused cell's visible actions without adding another Tab stop. Up and Down Arrow move through those actions without wrapping. Escape or F2 returns to the day; Shift+Tab also returns to the day, while Tab exits forward toward the agenda. Context Menu or Shift+F10 invokes the optional day context action from a focused day, or the optional event context action from an eligible focused grid or agenda event action. The default localized grid instructions are: “Use arrow keys to move between dates and Enter or Space to select. Press F2 on a date to move to its visible event actions; use Up and Down Arrow between actions, and Escape or F2 to return.”
+
+A day advertises `F2` in `aria-keyshortcuts` only when it has an eligible action in both compact and wide presentations. The localized grid instructions still describe entry into visible actions, and F2 works whenever the browser accepts focus on an action at the current width, even if the day's shortcut metadata omits it. If no action accepts focus, focus stays on the day and the key's default behavior is not prevented. This conservative metadata remains stable during resizing without layout measurements or DOM updates.
 
 Event representation follows native semantics:
 

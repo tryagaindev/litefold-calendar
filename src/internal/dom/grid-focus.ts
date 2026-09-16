@@ -47,15 +47,15 @@ export function wasOwnedFocusRemoved(active: Element | null, host: HTMLElement):
 	return active !== null && (!active.isConnected || !host.contains(active));
 }
 
-/** Moves focus to the first action while retaining the day proxy as the grid tab stop. */
+/** Returns whether an action accepted focus while retaining the day proxy as the grid tab stop. */
 export function enterGridActions(
 	dateString: string,
 	elements: Readonly<GridFocusElements>,
 	host: HTMLElement
-): void {
+): boolean {
 	const actions = elements.gridActionsByDate.get(dateString) ?? [];
 	setDayProxyTabStop(dateString, elements);
-	focusFirstEligible(actions, host);
+	return focusFirstEligible(actions, host);
 }
 
 /** Handles action-mode movement and returns whether the key was consumed. */

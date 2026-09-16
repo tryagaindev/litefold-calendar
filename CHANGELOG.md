@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Isolated library browser fixtures from advanced-example setup, removed unsupported protocol tests before setup on Firefox/WebKit, and replaced a timing-dependent wheel assertion with deterministic transaction coverage. CI rejects flaky results.
 - Added native dialog and palette fallbacks for supported Baseline browsers without Popover or `light-dark()` support.
-- Kept compact count labels, focus rings, and date decoration within their day cells at narrow widths and enlarged text. Month navigation now reflows without overlapping controls when space is limited.
+- Kept compact count labels, focus rings, and date decoration within their day cells at narrow widths and enlarged text. Month navigation now reflows without overlapping controls when space is limited; day buttons advertise F2 only when action entry is available in both compact and wide presentations.
 
 ## [0.5.0-alpha.0] - 2026-09-02
 

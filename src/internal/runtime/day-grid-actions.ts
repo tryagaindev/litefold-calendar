@@ -7,10 +7,19 @@ import type {
 } from "../../types.js";
 import { formatCalendarDate } from "../domain/civil-date.js";
 import type { EventRepresentationElements } from "../dom/event-representation.js";
+import type { PreparedDayEventOverflow } from "./event-overflow-presentation.js";
 
-/** Advertises only keyboard actions installed on this day proxy. */
-export function setDayActionShortcuts(button: HTMLButtonElement, hasEvents: boolean, hasContext: boolean): void {
-	const shortcuts = [...(hasEvents ? ["F2"] : []), ...(hasContext ? ["Shift+F10"] : [])];
+/** Advertises day shortcuts that stay available in both container presentations. */
+export function setDayActionShortcuts(
+	button: HTMLButtonElement,
+	hasSummaryAction: boolean,
+	overflow: Readonly<PreparedDayEventOverflow>,
+	hasContext: boolean
+): void {
+	const compactHasAction = hasSummaryAction || (overflow.compact?.action ?? null) !== null;
+	const wideHasAction = hasSummaryAction || (overflow.grid?.wide ?? null) !== null;
+	const hasActionsInBothPresentations = compactHasAction && wideHasAction;
+	const shortcuts = [...(hasActionsInBothPresentations ? ["F2"] : []), ...(hasContext ? ["Shift+F10"] : [])];
 	if (shortcuts.length > 0) {
 		button.setAttribute("aria-keyshortcuts", shortcuts.join(" "));
 	}

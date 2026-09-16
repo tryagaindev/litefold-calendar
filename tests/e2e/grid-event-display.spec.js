@@ -34,18 +34,73 @@ for (const width of [320, 900]) {
 	});
 }
 
-test("a wide-only singleton count creates no empty compact action", async ({ page }) => {
-	await mountCalendar(page, { actionable: false, count: 1, display: { compact: "events", wide: "count" }, width: 320 });
-	const { count, day } = targets(page);
-	await expect(count).toBeHidden();
-	await day.focus();
-	await day.press("F2");
-	await expect(day).toBeFocused();
-	await setContainerWidth(page, 900);
-	await expect(count).toBeVisible();
-	await day.press("F2");
-	await expect(count).toBeFocused();
-});
+for (const total of [1, 2]) {
+	for (const countMode of ["compact", "wide"]) {
+		test(`F2 remains unhandled for ${String(total)} static events when the ${countMode} count is hidden`, { tag: "@firefox-regression" }, async ({ page }) => {
+			const countWidth = countMode === "compact" ? 320 : 900;
+			const staticWidth = countMode === "compact" ? 900 : 320;
+			const contextMenu = total === 2 && countMode === "wide";
+			await mountCalendar(page, {
+				actionable: false,
+				contextMenu,
+				count: total,
+				display: countMode === "compact"
+					? { compact: "count", wide: "events" }
+					: { compact: "events", wide: "count" },
+				width: staticWidth
+			});
+			const { action, count, day, grid } = targets(page);
+			await expect(action).toHaveCount(0);
+			const before = await captureRenderIdentity(page);
+			for (const width of [staticWidth, countWidth, staticWidth]) {
+				await setContainerWidth(page, width);
+				await day.focus();
+				const hasVisibleAction = width === countWidth;
+				if (hasVisibleAction) {
+					await expect(count).toBeVisible();
+				} else {
+					await expect(count).toBeHidden();
+					await expect(day).not.toHaveAttribute("aria-keyshortcuts", /\bF2\b/u);
+					if (contextMenu) {
+						await expect(day).toHaveAttribute("aria-keyshortcuts", "Shift+F10");
+					}
+				}
+				expect(await pressObservedF2(day)).toEqual({ defaultPrevented: hasVisibleAction, isTrusted: true });
+				await expect(hasVisibleAction ? count : day).toBeFocused();
+				await expectOnlyOneGridTabStop(grid);
+				await expectRenderIdentity(page, before);
+			}
+		});
+	}
+}
+
+for (const scenario of [
+	{ actionable: false, limit: 0, name: "static events above a zero cap" },
+	{ actionable: true, limit: 3, name: "actionable events paired with a wide count" }
+]) {
+	test(`F2 stays advertised and usable at both widths for ${scenario.name}`, { tag: "@firefox-regression" }, async ({ page }) => {
+		await mountCalendar(page, {
+			actionable: scenario.actionable,
+			count: 1,
+			display: { compact: "events", wide: "count" },
+			limit: scenario.limit,
+			width: 320
+		});
+		const { action, count, day, grid } = targets(page);
+		const before = await captureRenderIdentity(page);
+		for (const width of [320, 900, 320]) {
+			await setContainerWidth(page, width);
+			await day.focus();
+			const target = scenario.actionable && width === 320 ? action : count;
+			await expect(target).toBeVisible();
+			await expect(day).toHaveAttribute("aria-keyshortcuts", /\bF2\b/u);
+			expect(await pressObservedF2(day)).toEqual({ defaultPrevented: true, isTrusted: true });
+			await expect(target).toBeFocused();
+			await expectOnlyOneGridTabStop(grid);
+			await expectRenderIdentity(page, before);
+		}
+	});
+}
 
 test("resizing preserves an active event until blur and skips hidden actions on re-entry", async ({ page }) => {
 	await mountCalendar(page, { width: 900, suppressMarkers: true });
@@ -413,7 +468,7 @@ async function mountCalendar(page, settings = {}) {
 			},
 			initialDate: settings.dialog ? "2026-07-13" : "2026-07-14",
 			locale: "en-US",
-			maxGridEventsPerDay: 3,
+			maxGridEventsPerDay: settings.limit ?? 3,
 			onError: (error) => { fixture.errors.push({ code: error.code, hook: error.hook, message: error.message, cause: String(error.cause) }); },
 			now: () => new Date("2026-07-14T12:00:00.000Z"),
 			renderHooks: [{
@@ -423,6 +478,7 @@ async function mountCalendar(page, settings = {}) {
 			}]
 		};
 		if (settings.actionable !== false) { options.onEventActivate = () => {}; }
+		if (settings.contextMenu) { options.onDayContextMenu = () => {}; }
 		if (settings.display) { options.gridEventDisplay = settings.display; }
 		if (settings.dialog) {
 			const dialog = document.createElement("dialog");
@@ -462,4 +518,38 @@ function targets(page) {
 
 async function setContainerWidth(page, width) {
 	await page.locator("[data-my-calendar]").evaluate((host, width) => { host.style.inlineSize = `${String(width)}px`; }, width);
+}
+
+async function pressObservedF2(day) {
+	await day.evaluate((button) => {
+		window.gridCountFixture.f2Event = null;
+		button.addEventListener("keydown", (event) => { window.gridCountFixture.f2Event = event; }, { once: true });
+	});
+	await day.press("F2");
+	//Read the retained trusted event after dispatch so ancestor handlers have also finished.
+	return day.evaluate(() => {
+		const event = window.gridCountFixture.f2Event;
+		return { defaultPrevented: event?.defaultPrevented, isTrusted: event?.isTrusted };
+	});
+}
+
+async function captureRenderIdentity(page) {
+	return page.evaluate(() => {
+		const fixture = window.gridCountFixture;
+		fixture.savedNodes = [...fixture.host.querySelectorAll("*")];
+		return { hooks: fixture.hooks, requests: fixture.requests };
+	});
+}
+
+async function expectRenderIdentity(page, before) {
+	expect(await page.evaluate(() => {
+		const fixture = window.gridCountFixture;
+		const nodes = [...fixture.host.querySelectorAll("*")];
+		return {
+			hooks: fixture.hooks,
+			requests: fixture.requests,
+			sameNodes: nodes.length === fixture.savedNodes.length &&
+				nodes.every((node, index) => node === fixture.savedNodes[index])
+		};
+	})).toEqual({ ...before, sameNodes: true });
 }

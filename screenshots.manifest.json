@@ -7,7 +7,7 @@
     "playwright": "1.62.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "d40a3c61db5ed6c7b75500f967077517da3b764aff4adcc131041f6cc29ce3e4",
+  "sourceFingerprint": "d3e79175a972875e5c88c29b0b95b18d2ae5f5e46dfc1b60bfc264cee37c5d2f",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -129,7 +129,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "b844e61bb81953fb0592d207198945c589378bcecf68b3ba13488a4cb362f056"
+      "sha256": "9540be650dc76258b1fdff3352a96a32cdef07802e000763ba62261c1bae6d0b"
     },
     {
       "id": "compact-default-counts",
@@ -211,7 +211,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "bfffb7ca4cf635f00d15217feadc26aecab0a34ed9e429d520974fc89df9f849"
+      "sha256": "1a9c43420466c78bf73f0c7817e7ae4a23504c54768abbcccab9c9bd7a33383a"
     }
   ],
   "browserTargets": {

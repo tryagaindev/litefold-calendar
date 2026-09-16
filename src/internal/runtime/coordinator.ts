@@ -942,13 +942,14 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				return;
 			}
 			if (event.key === "F2" && gridActionSnapshot.length > 0) {
-				event.preventDefault();
-				enterGridActions(dateString, this.getGridFocusElements(), this.host);
+				if (enterGridActions(dateString, this.getGridFocusElements(), this.host)) {
+					event.preventDefault();
+				}
 				return;
 			}
 			this.handleDayKeydown(event, date, button);
 		});
-		setDayActionShortcuts(button, gridActionSnapshot.length > 0, this.options.onDayContextMenu !== undefined);
+		setDayActionShortcuts(button, gridActions.compactPrimary !== null, eventOverflow, this.options.onDayContextMenu !== undefined);
 		if (this.options.onDayContextMenu !== undefined) {
 			button.addEventListener("contextmenu", (jsEvent) => {
 				if (jsEvent.defaultPrevented || !this.canUseRenderedAction(button, renderGeneration) ||
