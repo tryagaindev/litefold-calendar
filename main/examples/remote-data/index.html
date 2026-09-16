@@ -5,57 +5,45 @@
 	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'">
 	<meta name="color-scheme" content="light dark">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Async errors | litefold-calendar</title>
+	<title>Remote data and filtering | litefold-calendar</title>
 	<link rel="stylesheet" href="../../dist/styles.css">
 	<link rel="stylesheet" href="../example.css">
+	<link rel="stylesheet" href="./styles.css">
 	<link rel="stylesheet" href="../../deployment-details.css">
 </head>
 <body>
 	<main class="my-shell">
 		<header class="my-intro">
-			<h1>Handle asynchronous failures</h1>
-			<p>Trigger source, action, and render-hook failures. Compare the package's default presentation with an application-owned source error.</p>
+			<h1>Load and filter remote events</h1>
+			<p>Browse August 2026, filter by category, and activate an event or day count. Each request loads a real JSON file; this demo filters that public fixture in the browser.</p>
 		</header>
-
-		<section class="my-panel" data-my-controls aria-labelledby="my-failure-controls-title">
-			<h2 id="my-failure-controls-title">Failure controls</h2>
-			<p>Source failures retain the last successful events. Changing render-hook mode creates a new calendar instance.</p>
+		<div class="my-panel my-remote-controls">
 			<div class="my-control-row">
-				<label class="my-check">
-					<input type="checkbox" data-my-host-ownership>
-					Use application source-error UI
-				</label>
-				<label class="my-check">
-					<input type="checkbox" data-my-fail-render-hooks>
-					Make render hooks fail
-				</label>
-				<label class="my-check">
-					<input type="checkbox" data-my-fail-action>
-					Make event actions reject
-				</label>
-				<button class="my-button" type="button" data-my-fail-next>Fail next source request</button>
-				<button class="my-button" type="button" data-my-refetch>Refetch events</button>
+				<label for="my-category">Category</label>
+				<select class="my-field" id="my-category" data-my-category>
+					<option value="all">All categories</option>
+					<option value="community">Community</option>
+					<option value="workshop">Workshops</option>
+					<option value="sports">Sports (empty)</option>
+				</select>
+				<button class="my-button" type="button" data-my-refresh>Refresh events</button>
 			</div>
-		</section>
-
-		<section class="my-alert" data-my-host-error aria-labelledby="my-host-error-title" hidden>
-			<h2 id="my-host-error-title" data-my-host-error-title></h2>
-			<span data-my-host-error-message></span>
-			<button class="my-button" type="button" data-my-host-retry>Try again</button>
-		</section>
-
+		</div>
 		<div class="my-calendar" data-my-calendar></div>
-
-		<div class="my-visually-hidden" data-my-announcer-polite role="status" aria-atomic="true"></div>
-		<div class="my-visually-hidden" data-my-announcer-assertive role="alert" aria-atomic="true"></div>
+		<p class="my-result" data-my-result role="status" aria-atomic="true"></p>
+		<dialog class="my-event-dialog" data-my-dialog aria-labelledby="my-dialog-title">
+			<h2 id="my-dialog-title" tabindex="-1" autofocus data-my-dialog-title>Choose an event</h2>
+			<p>This application-owned dialog shows every event for the date. Choosing an event records a local selection only.</p>
+			<ul class="my-event-choices" data-my-event-choices></ul>
+			<form method="dialog"><button class="my-button" type="submit">Close</button></form>
+		</dialog>
 	</main>
-
 	<script type="module" src="./main.js"></script>
 	<footer class="my-developer-footer" data-my-deployment-channel="main">
 		<nav aria-label="Developer resources">
 			<ul class="my-developer-footer-links">
 				<li><a href="../">All examples</a></li>
-				<li><a href="https://github.com/tryagaindev/litefold-calendar/tree/b1745f76b00dce7fd626c4740313c08ea45d7a41/examples/async-errors/">Recipe source</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/tree/b1745f76b00dce7fd626c4740313c08ea45d7a41/examples/remote-data/">Recipe source</a></li>
 				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/b1745f76b00dce7fd626c4740313c08ea45d7a41/docs/api.md">API reference</a></li>
 				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/b1745f76b00dce7fd626c4740313c08ea45d7a41/docs/integration-guide.md">Integration guide</a></li>
 			</ul>

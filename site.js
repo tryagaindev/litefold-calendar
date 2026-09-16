@@ -200,10 +200,10 @@ function renderPrimaryDeployment(documentReference, entry) {
 
 	const isRelease = entry.channel === "release";
 	setText(documentReference, "my-install-command",
-		`npm install ${PACKAGE_NAME}@${isRelease ? entry.version : "alpha"}`);
+		`npm install ${PACKAGE_NAME}@${isRelease ? entry.version : "nightly"}`);
 	setText(documentReference, "my-deployment-summary", isRelease
 		? `Running immutable release ${entry.version}. Source links are pinned to its commit.`
-		: `Running main at ${entry.commit}. The install command follows npm's alpha dist-tag.`);
+		: `Running main at ${entry.commit}. The install command follows npm's nightly dist-tag.`);
 }
 
 function renderUnavailablePrimary(documentReference) {
