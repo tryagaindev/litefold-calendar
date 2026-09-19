@@ -69,6 +69,14 @@ These focused DOM presenters illustrate the boundary; the table is not an exhaus
 
 The coordinator's `MonthCalendar` class is the sole transaction owner, but it remains an orchestrator rather than a policy container. Focused runtime modules own source-shape classification, PromiseLike observation, source-error construction, and other separable concerns; the coordinator retains generation checks and atomic state/DOM commits.
 
+Accepted navigation and explicit data replacement also claim an interaction epoch,
+independent of optional extensions. A committed-render receipt records that epoch,
+DOM identity, render generation, and selected date after mount hooks and focus
+restoration. Reentrant work invalidates older selection/focus completion, including
+accepted same-date navigation. Render-hook recovery remains within its owning
+interaction. The action pipeline observes returned promises using per-hook
+generations; action completion does not own or replay navigation.
+
 ### Instance lifetime
 
 1. Construction snapshots and validates application options, render-hook definitions, and opaque extension values before package DOM is committed.

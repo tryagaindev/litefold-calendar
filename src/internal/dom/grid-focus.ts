@@ -146,7 +146,8 @@ export function restoreCalendarFocus(
 	dom: CalendarDom | null,
 	elements: Readonly<GridFocusElements>,
 	focusedDateString: string,
-	host: HTMLElement
+	host: HTMLElement,
+	isCurrent: () => boolean = () => true
 ): void {
 	if (token === null || dom === null) {
 		return;
@@ -162,25 +163,29 @@ export function restoreCalendarFocus(
 	if (token.date !== undefined && (isGridActionToken(token) || (element === null && dateFallback !== null))) {
 		setDayProxyTabStop(token.date, elements);
 	}
-	focusRestorationTarget(target, token.date, elements, host);
+	focusRestorationTarget(target, token.date, elements, host, isCurrent);
 }
 
 function focusRestorationTarget(
 	target: HTMLElement,
 	date: string | undefined,
 	elements: Readonly<GridFocusElements>,
-	host: HTMLElement
+	host: HTMLElement,
+	isCurrent: () => boolean
 ): void {
 	target.focus({ preventScroll: true });
-	if (target.ownerDocument.activeElement !== target && date !== undefined &&
-		!focusFirstEligible(elements.gridActionsByDate.get(date) ?? [], host)) {
+	if (isCurrent() && target.ownerDocument.activeElement !== target && date !== undefined &&
+		!focusFirstEligible(elements.gridActionsByDate.get(date) ?? [], host, isCurrent) && isCurrent()) {
 		elements.dayButtons.get(date)?.focus({ preventScroll: true });
 	}
 }
 
 /** Lets the browser reject CSS-hidden controls without duplicating responsive layout decisions. */
-function focusFirstEligible(actions: readonly CalendarEventActionElement[], host: HTMLElement): boolean {
+function focusFirstEligible(
+	actions: readonly CalendarEventActionElement[], host: HTMLElement, isCurrent: () => boolean = () => true
+): boolean {
 	for (const action of actions) {
+		if (!isCurrent()) { return false; }
 		if (!action.isConnected || !host.contains(action)) {
 			continue;
 		}
