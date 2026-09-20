@@ -36,6 +36,7 @@ export default defineConfig({
 		{
 			name: "firefox",
 			grepInvert: /@chromium-input/u,
+			workers: 1,
 			use: {
 				...devices["Desktop Firefox"]
 			}

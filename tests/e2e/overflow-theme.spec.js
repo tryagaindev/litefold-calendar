@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { expectExampleReady, expectLibraryFixtureReady } from "./helpers.js";
 
 const ACTION = '.lfc-calendar-grid-more[data-lfc-date="2026-07-14"]';
+const CSS_PIXEL_ROUNDING_TOLERANCE = 1 / 64;
 const TOKENS = ["background", "color", "border-color", "border-width", "border-radius", "font-size", "min-block-size", "compact-inline-size"];
 const THEME = `--lfc-grid-overflow-background: rgb(220, 230, 240); --lfc-grid-overflow-color: rgb(20, 30, 40);
 	--lfc-grid-overflow-border-color: rgb(90, 100, 110); --lfc-grid-overflow-border-width: 3px;
@@ -101,7 +102,9 @@ for (const display of [{ compact: "count", wide: "events" }, { compact: "events"
 			const root = page.locator(`${ACTION} > .lfc-is-${variant}`);
 			if (await root.count()) {
 				const font = Number.parseFloat((await styles(root)).fontSize);
-				expect(font).toBeCloseTo(Number.parseFloat((await styles(button)).fontSize) * .8, 2);
+				const expectedFont = Number.parseFloat((await styles(button)).fontSize) * .8;
+				//Firefox reports computed lengths at 1/64-CSS-pixel precision.
+				expect(Math.abs(font - expectedFont)).toBeLessThanOrEqual(CSS_PIXEL_ROUNDING_TOLERANCE);
 			}
 		}
 	});

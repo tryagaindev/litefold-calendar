@@ -2,12 +2,12 @@
   "version": 1,
   "state": "final",
   "toolchain": {
-    "node": "24.20.0",
+    "browser": "chromium",
+    "node": "24.21.0",
     "npm": "12.0.2",
-    "playwright": "1.62.1",
-    "browser": "chromium"
+    "playwright": "1.63.0"
   },
-  "sourceFingerprint": "07fb5c4557a4f7120337a8090a72017049dce7180d28c7c2d4cdb74837a99ab3",
+  "sourceFingerprint": "3e7af029430a1aea5038371814747f337a383d48aaf43d36c5260f4da077604e",
   "scenes": [
     {
       "id": "desktop-month-grid",

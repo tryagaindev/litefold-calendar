@@ -113,7 +113,7 @@ The screenshot manifest is machine-owned and records, for every scene:
 - Viewport and output dimensions.
 - SHA-256 hash.
 - Source fingerprint covering package source, Vite configuration, the advanced route and shared stylesheet, build/server/capture helpers, locked compiler/browser dependencies, and effective JavaScript/CSS browser targets. The preparation scripts and their automatic `pre`/`post` hooks are included. Browser target evidence records its resolution date, but a date change alone does not require recapture. Other example routes, deployment metadata, Playwright's test configuration, root version metadata, and npm scripts outside that capture lifecycle are excluded.
-- Exact Node patch used for capture; validation accepts that provenance when it belongs to major version 24, while npm, Playwright, and Chromium remain exact-pinned.
+- Exact Node patch used for capture; validation accepts that provenance when it belongs to major version 24, while npm, Playwright, and Chromium remain exact-pinned. The Playwright value is derived from the exact `package.json` development dependency, and preparation rejects a stale local install before capture.
 - Documentation references and exact alt text.
 
 `check:screenshots` fails when a canonical scene is absent, dimensions or hash differ, the source fingerprint is stale, a documented reference or alt text is missing, or an orphaned screenshot asset exists. A deliberate visual change must update implementation, captures, manifest, references, and alt text together.
@@ -122,6 +122,7 @@ The screenshot manifest is machine-owned and records, for every scene:
 
 - If Chromium is missing, rerun `npx --no-install playwright install chromium`; do not substitute a system browser.
 - If tooling reports the wrong npm version, switch to the exact `packageManager` version before capture.
+- If tooling reports the wrong Playwright version, run `npm ci --ignore-scripts` before installing the pinned browser.
 - If hashes or pixels changed unexpectedly, investigate browser/toolchain drift, fixtures, fonts, animation, layout timing, and network requests before updating evidence.
 - If only part of the visual contract intentionally changed, still review all ten images; unchanged scenes should remain byte-identical.
 

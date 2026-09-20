@@ -1483,12 +1483,15 @@ try {
         );
     }
 
-    if (!isExactValue(
-        rootPackage?.devEngines,
-        packageJson.devEngines
+    //npm lockfile package descriptors do not serialize devEngines. Keep the
+    //manifest as the single source so npm and Dependabot produce canonical
+    //lockfiles instead of carrying stale root metadata forward.
+    if (Object.hasOwn(
+        rootPackage ?? {},
+        "devEngines"
     )) {
         addError(
-            "Lockfile root development engines must exactly match package.json."
+            "Lockfile root must not duplicate package.json development engines."
         );
     }
 

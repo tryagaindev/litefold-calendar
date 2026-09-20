@@ -8,8 +8,22 @@ import {
 	canonicalizeScreenshotSource,
 	isScreenshotSourceFile,
 	isScreenshotSourceInput,
+	pinnedPlaywrightVersion,
+	REQUIRED_PLAYWRIGHT_VERSION,
 	SCREENSHOT_SOURCE_INPUTS
 } from "../screenshot-contract.mjs";
+
+void test("screenshot tooling derives the exact Playwright pin from package.json", async () => {
+	const packageManifest = JSON.parse(await readFile(join(REPOSITORY_ROOT, "package.json"), "utf8"));
+	assert.equal(REQUIRED_PLAYWRIGHT_VERSION, packageManifest.devDependencies["@playwright/test"]);
+	assert.equal(pinnedPlaywrightVersion(packageManifest), REQUIRED_PLAYWRIGHT_VERSION);
+	for (const version of ["^1.63.0", "latest", undefined]) {
+		assert.throws(
+			() => pinnedPlaywrightVersion({ devDependencies: { "@playwright/test": version } }),
+			/exact version/u
+		);
+	}
+});
 
 void test("screenshot fingerprints exclude generated example identity and modules", () => {
 	for (const path of [
