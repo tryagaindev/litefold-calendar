@@ -527,10 +527,11 @@ void test("hosted gates run Chromium and WebKit while local Playwright retains F
 	const [localProjects, ciProjects] = await Promise.all([false, true].map(async (ci) => {
 		const { stdout } = await execFileAsync(process.execPath, ["--input-type=module", "--eval", `
 			import configuration from "./playwright.config.mjs";
-			process.stdout.write(JSON.stringify(configuration.projects.map(({ grepInvert, name, use }) => ({
+			process.stdout.write(JSON.stringify(configuration.projects.map(({ grepInvert, name, use, workers }) => ({
 				browserType: use.defaultBrowserType,
 				grepInvert: grepInvert?.source ?? null,
-				name
+				name,
+				workers
 			}))));
 		`], {
 			cwd: REPOSITORY_ROOT,
@@ -542,7 +543,7 @@ void test("hosted gates run Chromium and WebKit while local Playwright retains F
 		localProjects,
 		[
 			{ browserType: "chromium", grepInvert: null, name: "chromium" },
-			{ browserType: "firefox", grepInvert: "@chromium-input", name: "firefox" },
+			{ browserType: "firefox", grepInvert: "@chromium-input", name: "firefox", workers: 1 },
 			{ browserType: "webkit", grepInvert: "@chromium-input", name: "webkit" }
 		]
 	);
@@ -615,10 +616,6 @@ void test("workflow dependency caches stay disabled", async () => {
 
 void test("browser gates reject flakes and local Firefox qualification retains reproducible evidence", async () => {
 	assert.equal(playwrightConfiguration.failOnFlakyTests, true);
-	assert.equal(
-		playwrightConfiguration.projects.find(({ name }) => name === "firefox")?.workers,
-		1
-	);
 	const config = await readFile(join(REPOSITORY_ROOT, "playwright.config.mjs"), "utf8");
 	assert.match(config, /workers: process\.env\["CI"\] \? 1 : 2/u);
 	assert.match(config, /retries: process\.env\["CI"\] \? 1 : 0/u);
