@@ -235,10 +235,13 @@
     box-shadow: none;
     display: none;
     flex: none;
+    font-size: var(--lfc-grid-overflow-font-size, inherit);
+    max-inline-size: 100%;
     min-inline-size: 0;
+    overflow-wrap: anywhere;
     padding: 0;
     pointer-events: none;
-    white-space: nowrap;
+    white-space: normal;
   }
 
   :where(.litefold-calendar)
@@ -250,8 +253,8 @@
 
   :where(.litefold-calendar)
     .lfc-calendar-event-overflow.lfc-is-compact {
-    color: var(--lfc-event-border-color);
-    font-size: clamp(0.625rem, 2.5cqi, 0.8125rem);
+    color: var(--lfc-grid-overflow-color, var(--lfc-event-border-color));
+    font-size: var(--lfc-grid-overflow-font-size, clamp(0.625rem, 2.5cqi, 0.8125rem));
     font-variant-numeric: tabular-nums;
     font-weight: var(--lfc-internal-font-weight-semibold);
     line-height: 1;
@@ -259,7 +262,7 @@
 
   :where(.litefold-calendar)
     .lfc-calendar-event-overflow.lfc-is-compact.lfc-is-count {
-    font-size: 0.875rem;
+    font-size: var(--lfc-grid-overflow-font-size, 0.875rem);
     font-weight: 700;
   }
 
@@ -269,11 +272,19 @@
     display: inline-flex;
     justify-content: center;
     justify-content: safe center;
+    max-inline-size: 100%;
     min-inline-size: 0;
   }
 
   :where(.litefold-calendar) .lfc-calendar-event-overflow.lfc-is-count {
     color: inherit;
+  }
+
+  :where(.litefold-calendar)
+    .lfc-calendar-event-overflow-cluster > .lfc-calendar-event-overflow {
+    background: var(--lfc-grid-overflow-background, transparent);
+    border: var(--lfc-grid-overflow-border-width, 0) solid var(--lfc-grid-overflow-border-color, currentcolor);
+    border-radius: var(--lfc-grid-overflow-border-radius, 0);
   }
 
   :where(.litefold-calendar)
@@ -376,10 +387,10 @@
   :where(.litefold-calendar)
     .lfc-calendar-day-summaries:is([data-lfc-compact-display="count"], [data-lfc-wide-display="count"])
     .lfc-calendar-grid-more {
-    background: var(--lfc-event-background);
-    border: var(--lfc-internal-hairline) solid var(--lfc-event-border-color);
-    border-radius: var(--lfc-border-radius);
-    color: var(--lfc-event-color);
+    background: var(--lfc-grid-overflow-background, var(--lfc-event-background));
+    border: var(--lfc-grid-overflow-border-width, var(--lfc-internal-hairline)) solid var(--lfc-grid-overflow-border-color, var(--lfc-event-border-color));
+    border-radius: var(--lfc-grid-overflow-border-radius, var(--lfc-border-radius));
+    color: var(--lfc-grid-overflow-color, var(--lfc-event-color));
   }
 
 }

@@ -61,7 +61,7 @@
 		--lfc-control-min-size: var(--my-control-min-size);
 		--lfc-day-min-block-size: clamp(3.5rem, 13cqi, 7rem);
 		--lfc-compact-day-min-block-size: 3.75rem;
-		--lfc-day-padding: clamp(0.25rem, 1.5cqi, 0.75rem);
+		--lfc-day-padding: clamp(0.25rem, 0.75cqi, 0.5rem);
 		--lfc-grid-event-gap: 0.125rem;
 		--lfc-grid-event-font-size: 0.75em;
 		--lfc-grid-event-min-block-size: 1.5rem;
@@ -87,6 +87,17 @@
 		--lfc-error-background: var(--my-error-background);
 		--lfc-error-color: var(--my-error-color);
 		--lfc-error-border-color: var(--my-error-border-color);
+	}
+
+	.my-overflow-theme {
+		--lfc-grid-overflow-background: transparent;
+		--lfc-grid-overflow-color: var(--my-color);
+		--lfc-grid-overflow-border-color: var(--my-border-color);
+		--lfc-grid-overflow-border-width: 0;
+		--lfc-grid-overflow-border-radius: 0;
+		--lfc-grid-overflow-font-size: 0.875rem;
+		--lfc-grid-overflow-min-block-size: 1.75rem;
+		--lfc-grid-overflow-compact-inline-size: 2.75rem;
 	}
 
 	.my-layers {
@@ -195,7 +206,9 @@
 	.my-event-overflow-wide {
 		display: inline-flex;
 		align-items: baseline;
+		flex-wrap: wrap;
 		gap: 0.3em;
+		max-inline-size: 100%;
 	}
 
 	.my-event-overflow-wide-count {
@@ -382,6 +395,13 @@
 	}
 
 	@media (forced-colors: active) {
+		.my-overflow-theme {
+			--lfc-grid-overflow-background: canvas;
+			--lfc-grid-overflow-color: canvastext;
+			--lfc-grid-overflow-border-color: buttontext;
+			--lfc-grid-overflow-border-width: 0.0625rem;
+		}
+
 		.my-layers,
 		.my-state > div,
 		.my-dialog {

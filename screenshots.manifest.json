@@ -7,7 +7,7 @@
     "playwright": "1.62.1",
     "browser": "chromium"
   },
-  "sourceFingerprint": "7c7da7e02f095a05bf17ef78acd6d43fda0c8fdc7da926cf12f5f43c1e66f3cc",
+  "sourceFingerprint": "07fb5c4557a4f7120337a8090a72017049dce7180d28c7c2d4cdb74837a99ab3",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -27,7 +27,7 @@
         "README.md",
         "docs/screenshots/README.md"
       ],
-      "sha256": "ad46e85303e93587df067d5dbc7f5cb53a520019739d1d660ddbc150013228b3"
+      "sha256": "e642335bebb86d255ad0d515f6c53bad6dfd09a057a481d05f2f3216a554bc81"
     },
     {
       "id": "month-year-jump",
@@ -47,7 +47,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "aacdf4aa1ee35ff8b2fb7fd6a349d3b05e47c792cae4c85b5420da7d4305a87b"
+      "sha256": "c9d01baca3ea284780f010f67a92034ff30c1167c3c3506c5dc5d177885cb924"
     },
     {
       "id": "mobile-month-agenda-dark",
@@ -68,7 +68,7 @@
         "README.md",
         "docs/screenshots/README.md"
       ],
-      "sha256": "f6125a23bac8d0e82558980dadd3cdfef642b1aa2ab3cb3a48a4d23666913c64"
+      "sha256": "4ad8d6b102f9c93cd930839f77863603d417bcffc70b995a0957b352da79ab1e"
     },
     {
       "id": "mobile-month-swipe-pull",
@@ -88,7 +88,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "601d7c09a370600a81700e3615c2d1ed4d1547b30d1dc8d865f756be68759625"
+      "sha256": "a22a82d5fb49ed9fe5f4f3158171683189357407f5ce5e8ca44d5bba4d334483"
     },
     {
       "id": "event-details-dark",
@@ -108,7 +108,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "2b89afe1a643301884a53ccf59a7dcd932d22fca8b76b79c06fd9d9fe1a9a856"
+      "sha256": "660bab533961a3801be5ec1af80d4bcc36bed33cfb208372f90dd64ae9142cc4"
     },
     {
       "id": "grid-event-keyboard-focus",
@@ -129,7 +129,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "9540be650dc76258b1fdff3352a96a32cdef07802e000763ba62261c1bae6d0b"
+      "sha256": "51e8c1b091dfde5717cc5546aaed3315eb044e127c103b2ba0613af578d04429"
     },
     {
       "id": "compact-default-counts",
@@ -149,7 +149,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "5415fe5b86e34abaaad608ceebc013d6640fd6c541c572b3b99079d647e14422"
+      "sha256": "7cf4a451698388ae1d22c816095093bf4c623fb467051db468cb53243739ac60"
     },
     {
       "id": "compact-all-counts",
@@ -169,7 +169,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "73651a8dc586f24b481484c81ff64ae00c97cb4d60a104ff1fa145a9a6c9280e"
+      "sha256": "ff0314395b26484ceee59fca312817b1b10b963477033fbfdc0b65988efebe62"
     },
     {
       "id": "wide-all-counts",
@@ -189,7 +189,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "3110b2b7c269419f1dc63ae8fd8bb642305c1b335a69d1770f4be5e9c14b9852"
+      "sha256": "196cbb181020f85b0099e92c2bf3f2135b788f19d2e572dfef751790b0d6ab52"
     },
     {
       "id": "count-keyboard-focus",
@@ -211,13 +211,13 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "bfffb7ca4cf635f00d15217feadc26aecab0a34ed9e429d520974fc89df9f849"
+      "sha256": "c9f1127d4e1c64f4684d716265b7328bee51cd8e689abbeda010926fbaf488da"
     }
   ],
   "browserTargets": {
     "query": "baseline-widely-available",
     "effectiveQuery": "Vite 8.3.0: baseline-widely-available",
-    "resolvedAt": "2026-09-16",
+    "resolvedAt": "2026-09-20",
     "dataVersions": {
       "vite": "8.3.0",
       "esbuild": "0.28.2"

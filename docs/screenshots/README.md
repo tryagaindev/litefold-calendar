@@ -92,7 +92,7 @@ All captures go into an ignored staging directory first. The updater validates t
 
 Open the local review gallery and review changed scenes at native dimensions before staging files. CI runs read-only `check:screenshots`; preparation and capture reject attempts to accept stale evidence in CI. A capture lock prevents simultaneous updaters. After a forcibly terminated updater, verify no capture is still running before removing `.cache/screenshots/capture.lock`.
 
-Nine scenes capture settled states. The held-pull scene intentionally captures direct manipulation before release so the decorative adjacent-month/year lane can be reviewed; selection timing and post-release browser physics remain browser-test and supported-device concerns. Review every canonical scene after an intentional source-layout change. The four count scenes mount an application-neutral fixture through the public built-package API, with empty, single-event, and multiple-event days.
+Nine scenes capture settled states. The held-pull scene intentionally captures direct manipulation before release so the decorative adjacent-month/year lane can be reviewed; selection timing and post-release browser physics remain browser-test and supported-device concerns. Review every canonical scene after an intentional source-layout change. The four count scenes mount a fixture through the public built-package API, with empty, single-event, and multiple-event days. They retain the example's general palette but remove its independent overflow-theme class, preserving evidence for the contextual count defaults. The advanced scenes exercise the borderless overflow theme.
 
 ## Review checklist
 

@@ -30,9 +30,10 @@ interface GridOverflowActionListenerOptions<TMetadata> {
 	readonly date: CalendarDate;
 	readonly events: () => readonly CalendarEvent<TMetadata>[];
 	readonly invokeAction: (action: () => unknown) => void;
-	readonly isCurrent: () => boolean;
+	readonly captureCurrent: () => () => boolean;
+	readonly needsContext: boolean;
 	readonly onActivate: CalendarAction<CalendarEventOverflowActivation<TMetadata>> | undefined;
-	readonly onDefault: () => void;
+	readonly onDefault: (context: Readonly<CalendarEventOverflowActivation<TMetadata>> | null) => void;
 	readonly onKeydown: (event: KeyboardEvent) => void;
 }
 
@@ -41,13 +42,15 @@ export function installGridOverflowActionListeners<TMetadata>(
 	options: Readonly<GridOverflowActionListenerOptions<TMetadata>>
 ): void {
 	options.action.addEventListener("click", (event) => {
-		if (!options.isCurrent()) {
+		const isCurrent = options.captureCurrent();
+		if (!isCurrent()) {
 			return;
 		}
 		const onActivate = options.onActivate;
-		if (onActivate !== undefined) {
+		let context: Readonly<CalendarEventOverflowActivation<TMetadata>> | null = null;
+		if (onActivate !== undefined || options.needsContext) {
 			const events = Object.freeze([...options.events()]);
-			const context = Object.freeze({
+			context = Object.freeze({
 				date: Object.freeze({ ...options.date }),
 				dateString: formatCalendarDate(options.date),
 				element: options.action,
@@ -55,10 +58,13 @@ export function installGridOverflowActionListeners<TMetadata>(
 				events,
 				nativeEvent: event
 			});
-			options.invokeAction(() => onActivate(context));
 		}
-		if (!event.defaultPrevented && options.isCurrent()) {
-			options.onDefault();
+		const activation = context;
+		if (onActivate !== undefined && activation !== null) {
+			options.invokeAction(() => onActivate(activation));
+		}
+		if (!event.defaultPrevented && isCurrent()) {
+			options.onDefault(activation);
 		}
 	}, { capture: true });
 	options.action.addEventListener("keydown", (event) => {

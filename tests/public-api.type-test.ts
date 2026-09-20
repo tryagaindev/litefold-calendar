@@ -3,6 +3,7 @@ import type {
 	CalendarCompactEventOverflowContext,
 	CalendarEventOverflowElements,
 	CalendarEventOverflowActivation,
+	CalendarEventOverflowDefaultContext,
 	CalendarGridEventDisplay,
 	CalendarGridEventPlacement,
 	CalendarOptions,
@@ -32,6 +33,20 @@ export function verifyCountApiTypeContracts(): void {
 	const options: CalendarOptions<DetailedMetadata> = {
 		events: [],
 		gridEventDisplay: { compact: "count", wide: "count-when-multiple" },
+		onEventOverflowDefault: (context) => {
+			const completion: CalendarEventOverflowDefaultContext<DetailedMetadata> = context;
+			const detail: string | undefined = context.events[0]?.metadata?.detail;
+			const heading: HTMLHeadingElement = context.agendaHeading;
+			const trigger: HTMLButtonElement = context.triggerElement;
+			//@ts-expect-error The completion snapshot is readonly.
+			context.events.length = 0;
+			//@ts-expect-error The activation date is immutable.
+			context.date.day = 1;
+			//@ts-expect-error Only the explicitly named trigger reference is exposed.
+			consumeTypeAssertions(context.element);
+			consumeTypeAssertions(completion, detail, heading, trigger);
+			return Promise.resolve();
+		},
 		onEventOverflowActivate: (context) => {
 			const activation: CalendarEventOverflowActivation<DetailedMetadata> = context;
 			const detail: string | undefined = context.events[0]?.metadata?.detail;

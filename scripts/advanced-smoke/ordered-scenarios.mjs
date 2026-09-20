@@ -446,7 +446,20 @@ export async function runAdvancedSmokeScenarios(environment) {
 		".lfc-calendar-grid-more",
 		dom.window.HTMLButtonElement
 	);
-	overflowAction.click();
+	const scrolls = [];
+	const scrollDescriptor = Object.getOwnPropertyDescriptor(dom.window.HTMLElement.prototype, "scrollIntoView");
+	Object.defineProperty(dom.window.HTMLElement.prototype, "scrollIntoView", {
+		configurable: true,
+		value(options) { scrolls.push({ target: this, focused: document.activeElement === this, options }); }
+	});
+	try { overflowAction.click(); } finally {
+		if (scrollDescriptor === undefined) { delete dom.window.HTMLElement.prototype.scrollIntoView; }
+		else { Object.defineProperty(dom.window.HTMLElement.prototype, "scrollIntoView", scrollDescriptor); }
+	}
+	assert.equal(scrolls.length, 1, "The example scrolls once during synchronous completion.");
+	assert.equal(scrolls[0].target, document.activeElement);
+	assert.equal(scrolls[0].focused, true);
+	assert.deepEqual(scrolls[0].options, { behavior: "instant", block: "start", inline: "nearest" });
 	await waitFor(() => selectedDate.textContent === "2026-08-06", "the native grid overflow action");
 	assert.equal(
 		actionResult.textContent,

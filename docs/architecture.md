@@ -69,6 +69,22 @@ These focused DOM presenters illustrate the boundary; the table is not an exhaus
 
 The coordinator's `MonthCalendar` class is the sole transaction owner, but it remains an orchestrator rather than a policy container. Focused runtime modules own source-shape classification, PromiseLike observation, source-error construction, and other separable concerns; the coordinator retains generation checks and atomic state/DOM commits.
 
+Accepted navigation and explicit data replacement also claim an interaction epoch,
+independent of optional extensions. A committed-render receipt records that epoch,
+DOM identity, render generation, and selected date after mount hooks and focus
+restoration. Reentrant work invalidates older focus/default completion, including
+accepted same-date navigation. Structural render validity uses DOM identity and
+render generation separately: a same-date navigation that needs no replacement
+must still allow the current grid and its selection state to commit.
+Selection publication compares the winning render's target with the current
+immutable state snapshot, rather than a date staged by an interrupted selection.
+This lets reentrant same-target focus navigation publish once without reviving
+the superseded default completion. Detached hosts also commit render/state changes.
+Overflow completion additionally requires
+connectivity and actual heading focus. Render-hook recovery remains within
+its owning interaction. The action pipeline observes returned promises using per-hook
+generations; action completion does not own or replay navigation.
+
 ### Instance lifetime
 
 1. Construction snapshots and validates application options, render-hook definitions, and opaque extension values before package DOM is committed.
@@ -107,7 +123,7 @@ sequenceDiagram
   Note over Coordinator,DOM: Current-generation checks guard provider work, normalization, callbacks, render hooks, and commits.
 ```
 
-A direct array performs one terminal render without a loading or busy phase. A PromiseLike attaches both settlement handlers before publishing loading, then performs one loading render and one terminal render. Source rejection or invalid payload follows the same ownership and generation gates: a current failure enters the documented error-admission path, while stale work may be reported but cannot update state or DOM. See the [error guide](errors.md) for failure presentation and recovery.
+A direct array performs one terminal render without a loading or busy phase. A PromiseLike attaches both settlement handlers before publishing loading, then performs one loading render and one terminal render. Explicit reentrant navigation can add its own renders and mount hooks, as described in [source timing](api.md#source-timing-and-renders). From request preparation, including previous-request abort callbacks, through provider classification and busy-attribute reactions, the source transaction reserves state publication for its generation. The guard also covers asynchronous success and failure commits. Non-owning state writes, including recoverable hook-error snapshots during reentrant renders, wait for the owning source phase; error delivery and issue admission retain their usual generation checks. This prevents callbacks from pairing a newly selected date with the previous request's range or publishing a duplicate or premature phase. Publication releases after the state snapshot is assigned and before consumer or extension state callbacks run. Nested generations restore their enclosing scope without suppressing a newer request's publication or later navigation. Source rejection or invalid payload follows the same ownership and generation gates: a current failure enters the documented error-admission path, while stale work may be reported but cannot update state or DOM. See the [error guide](errors.md) for failure presentation and recovery.
 
 Configured extensions receive state through their separate queued lifecycle after the consumer callback; see the [extension lifecycle sequence](#extension-lifecycle-implementation).
 

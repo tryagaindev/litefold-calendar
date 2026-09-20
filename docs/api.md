@@ -34,7 +34,7 @@ The root module exports exactly the following symbols. Entries in the Types colu
 |---|---|---|
 | Construction | `createCalendar` | `Calendar`, `CalendarGridEventDisplay`, `CalendarGridEventPlacement`, `CalendarOptions`, `CalendarEventTimeDisplay`, `CalendarWeekRowSizing` |
 | Dates and events | — | `CalendarDate`, `CalendarDateInput`, `CalendarEvent`, `CalendarEventInput`, `CalendarEvents`, `CalendarEventSource`, `CalendarRange`, `CalendarRangeBounds` |
-| Actions | — | `CalendarAction`, `CalendarDayContextMenu`, `CalendarDaySelection`, `CalendarEventActionElement`, `CalendarEventActivation`, `CalendarEventOverflowActivation`, `CalendarEventContextMenu`, `CalendarEventContextMenuAvailability`, `CalendarEventSurface` |
+| Actions | — | `CalendarAction`, `CalendarDayContextMenu`, `CalendarDaySelection`, `CalendarEventActionElement`, `CalendarEventActivation`, `CalendarEventOverflowActivation`, `CalendarEventOverflowDefaultContext`, `CalendarEventContextMenu`, `CalendarEventContextMenuAvailability`, `CalendarEventSurface` |
 | State and announcements | — | `CalendarAnnouncement`, `CalendarIssue`, `CalendarPhase`, `CalendarState` |
 | Localization and icons | — | `CalendarFirstDay`, `CalendarHeadingLevel`, `CalendarIconFactory`, `CalendarIcons`, `CalendarMessages` |
 | First-party extensions | — | `CalendarExtension` |
@@ -93,7 +93,7 @@ calendar.render();
 |---|---|
 | Module import | Does not read `window` or `document`; the ESM entry is safe to evaluate during server rendering. |
 | `createCalendar()` | Validates configuration, resolves package-owned defaults, and retains application callbacks, metadata, and nodes by reference. It does not claim or modify the host. |
-| `render()` | Atomically claims a connected or detached host and its accepted integration nodes, adds `.litefold-calendar` and the presence-only `data-litefold-calendar` discovery marker, and evaluates the initial event input. A direct array produces one terminal full render before `render()` returns; a promise-like result produces a loading render followed by a terminal render. An integration node that became leased, reparented, or otherwise unavailable after construction causes recoverable `invalid-state` without modifying the host. Detached rendering still creates DOM and starts source work; insert the host into its document before relying on focus, pointer, or visual layout behavior. |
+| `render()` | Atomically claims a connected or detached host and its accepted integration nodes, adds `.litefold-calendar` and the presence-only `data-litefold-calendar` discovery marker, and evaluates the initial event input. A direct array produces one terminal full render before `render()` returns; a promise-like result produces a loading render followed by a terminal render. An integration node that became leased, reparented, or otherwise unavailable after construction causes recoverable `invalid-state` without modifying the host. Detached rendering still creates DOM and starts source work, and navigation updates both the rendered selection and observable state while detached. Insert the host into its document before relying on focus, pointer, or visual layout behavior. |
 | Active instance | Owns the host's children. Another live calendar cannot claim the same host. Mutating the original options object does not reconfigure the instance; use `setEvents()` to replace event input and recreate the calendar for other configuration changes. |
 | `destroy()` | If rendered, aborts pending work, removes host listeners and generated content, conditionally restores package-managed `fallbackElement` visibility, detaches an eligible `toolbarEnd` node, removes the root markers, and leaves the owned host empty. Before render, it leaves unclaimed nodes unchanged. Destruction is terminal. |
 
@@ -230,8 +230,10 @@ Each provider invocation is classified independently by the value it returns, no
 
 | Result shape | Observable lifecycle |
 |---|---|
-| Static array or array returned directly by a provider | Normalizes and commits `ready`, `degraded`, or `unavailable` during the initiating method. It performs exactly one full render, never publishes `loading`, and never sets `aria-busy`. |
-| Any `PromiseLike`, including `Promise.resolve(events)`, an `async` function result, an already-fulfilled promise, or a custom thenable | Publishes `loading` with a full render, then publishes the terminal phase with a second full render when it settles. |
+| Static array or array returned directly by a provider | Normalizes and commits `ready`, `degraded`, or `unavailable` during the initiating method. The source transaction performs one full render, never publishes `loading`, and never sets `aria-busy`. |
+| Any `PromiseLike`, including `Promise.resolve(events)`, an `async` function result, an already-fulfilled promise, or a custom thenable | The source transaction publishes `loading` with a full render, then publishes the terminal phase with a second full render when it settles. |
+
+These render counts describe an uninterrupted source transaction. Explicit navigation from a provider, abort listener, or host callback can perform additional renders; for example, one same-month `focusDate()` call adds one full render and its mount hooks. While a source phase is being prepared, that navigation leaves state publication to the source transaction, so it does not add a premature or duplicate phase notification. Recoverable hook failures still invoke `onError` immediately and their admitted issues join the owning source phase. Once the phase is committed, navigation from `onStateChange` can publish its own selection normally. Superseding requests or destruction can interrupt the remaining source renders.
 
 This classification is per call, so one provider may return an array for a cached range and a promise-like value for another range without changing API shape. `render()`, `setEvents()`, `refetchEvents()`, and navigation remain `void`; when their current evaluation yields a direct array, all normalization, state, DOM, and progressive-fallback work completes before the initiating method returns.
 
@@ -346,6 +348,7 @@ interface CalendarOptions<TMetadata = unknown> {
 	readonly extensions?: readonly CalendarExtension[];
 	readonly onEventActivate?: CalendarAction<CalendarEventActivation<TMetadata>>;
 	readonly onEventOverflowActivate?: CalendarAction<CalendarEventOverflowActivation<TMetadata>>;
+	readonly onEventOverflowDefault?: CalendarAction<CalendarEventOverflowDefaultContext<TMetadata>>;
 	readonly isEventContextMenuAvailable?: (
 		this: void,
 		context: Readonly<CalendarEventContextMenuAvailability<TMetadata>>
@@ -416,6 +419,7 @@ The [advanced TypeScript example](../examples/advanced/) demonstrates every opti
 | `extensions` | Empty array | Configures optional package components.  See [extension configuration and lifecycle](#configure-first-party-extensions). | Invalid values or duplicate IDs throw `invalid-configuration`; runtime failures are isolated diagnostic-only `extension-failed`. |
 | `onEventActivate` | No callback action | Handles native anchor/button activation on `"grid-summary"` and `"agenda"`; may return `void` or `PromiseLike<void>`. A linked event remains an anchor regardless. | A throw or rejection becomes `action-failed`. A callback may synchronously prevent a link's default navigation. |
 | `onEventOverflowActivate` | Select day and focus agenda | Handles a native total-count or overflow button before day selection or DOM replacement. Receives the occurrence date, ordered immutable full-day events, total count, current button, and native click. Synchronous `preventDefault()` transfers interaction and focus ownership to the application. | A throw or rejection becomes `action-failed`. Async cancellation cannot stop the default interaction; return the action promise for failure reporting. |
+| `onEventOverflowDefault` | No callback | Observes successful count/overflow selection and agenda focus synchronously; receives the current heading and original activation snapshot. | Throws/rejections use `action-failed`; cancellation or supersession suppresses notification. |
 | `isEventContextMenuAvailable` | Every occurrence is eligible when `onEventContextMenu` exists; otherwise none are | Synchronously narrows context-action availability per occurrence and surface. It receives date, event, and surface only. | A throw, non-boolean, or thenable fails closed and reports one recoverable `host-integration-failed` issue per calendar instance. |
 | `onEventContextMenu` | No event context action | Handles right-click, Context Menu, or Shift+F10 on eligible grid/agenda event actions. For an eligible non-link event with no `onEventActivate`, it also handles click, tap, Enter, or Space as the native button's only primary action. | A throw or rejection becomes `action-failed`. No long-press is synthesized; an ineligible link retains the native browser menu. |
 | `onDaySelect` | No day action | Provides a non-cancellable notification after pointer or keyboard selection updates the selected day and agenda. | A throw or rejection becomes `action-failed`; selection remains committed. |
@@ -555,6 +559,16 @@ interface CalendarEventOverflowActivation<TMetadata = unknown> {
 	readonly nativeEvent: MouseEvent;
 }
 
+interface CalendarEventOverflowDefaultContext<TMetadata = unknown> {
+	readonly date: CalendarDate;
+	readonly dateString: string;
+	readonly events: readonly CalendarEvent<TMetadata>[];
+	readonly eventCount: number;
+	readonly triggerElement: HTMLButtonElement;
+	readonly agendaHeading: HTMLHeadingElement;
+	readonly nativeEvent: MouseEvent;
+}
+
 interface CalendarEventContextMenuAvailability<TMetadata = unknown> {
 	readonly date: CalendarDate;
 	readonly dateString: string;
@@ -620,6 +634,40 @@ The native overflow action uses localized `gridMore` visual fallback content and
 `onEventOverflowActivate` receives immutable date and event snapshots before selection or DOM replacement. Its `events` array contains every loaded, normalized occurrence for that date in canonical order; `eventCount` equals its length. Metadata remains application-owned by reference, and DOM/native-event references retain their native behavior. Call `nativeEvent.preventDefault()` synchronously to take ownership of both interaction and focus, including restoration after an application dialog closes. Cancellation after an `await` cannot stop the default action. Destroying the calendar during the callback prevents the default operation. Returned promises use the ordinary action-failure path.
 
 Count presentation excludes individual summaries from new managed focus entry. A summary already focused when its container crosses the breakpoint remains visible until blur. F2 and arrow navigation skip CSS-hidden actions without measuring the container. The compact default intentionally changes busy days to a total-count action; `gridEventDisplay: { compact: "events" }` restores the earlier presentation.
+
+### Observe completed overflow defaults
+
+`onEventOverflowDefault` runs once, synchronously, after an uncancelled count or
+overflow activation successfully selects its date and focuses the current agenda
+heading. It runs before the initiating click dispatch returns and before any
+microtask queued by the pre-hook. Same-date activations also notify and reset
+agenda pagination. Ordinary day/event activation, public navigation, agenda
+pagination, initial rendering, and provider settlement do not invoke this hook.
+
+The frozen context reuses the pre-hook's date, date string, complete ordered
+occurrence array, count, and native event. `triggerElement` is the original button
+and may already be disconnected. Metadata retains its application-owned identity.
+With only the post-hook configured, the snapshot is still taken before selection.
+
+`agendaHeading` is the exact connected, focused package heading at callback entry.
+It supports immediate focus/scroll integration, not structural mutation or durable
+asynchronous ownership. Later navigation, rendering, or teardown can invalidate
+the reference; connection alone does not establish that it still represents the
+same date. Cancellation, supersession (including accepted same-date navigation),
+an interrupted/fatal render, lost host ownership, or redirected/failed heading
+focus suppresses notification. The library does not steal redirected focus back.
+
+An adjacent-month activation may notify while its provider is still loading.
+The snapshot describes the activated occurrences, not eventual provider results;
+there is no second callback when loading settles. A usable heading may complete
+even when source issues exist. Focus uses `preventScroll: true`; scrolling remains
+an explicit application choice through the supplied heading.
+
+Only the pre-hook can synchronously cancel the library default. Calling
+`preventDefault()` in the post-hook cannot undo it. Returned promises are observed
+for `action-failed` errors under `onEventOverflowDefault`, never awaited for
+interaction timing. Notification failure does not roll back or repeat selection.
+No trailing default focus or selection writes override work done by the post-hook.
 
 ## Observe state: `CalendarState`
 
@@ -1012,7 +1060,7 @@ For a current operational error accepted into state, returning `"default"` or `u
 
 ## Avoid common integration mistakes
 
-- Use `onEventActivate`, `onEventOverflowActivate`, `onEventContextMenu`, `onDaySelect`, and `onDayContextMenu`; these are the action option names.
+- Use `onEventActivate`, `onEventOverflowActivate`, `onEventOverflowDefault`, `onEventContextMenu`, `onDaySelect`, and `onDayContextMenu`; these are the action option names.
 - Pass an in-memory event array directly through `events`. Use a provider only when data depends on the requested range or external state, and add `async` only when it actually awaits work.
 - Treat provider `end` bounds and event ends as exclusive, but `minDate` and `maxDate` as inclusive selectable dates. Do not subtract a day before querying or add a day to returned events.
 - Do not put `Z`, offsets, or zone annotations in event strings. Convert application instants to intended civil values before adapting them.
