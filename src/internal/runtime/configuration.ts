@@ -45,6 +45,7 @@ const CALENDAR_OPTION_SCHEMA = Object.freeze({
 	onError: "callback",
 	onEventActivate: "callback",
 	onEventOverflowActivate: "callback",
+	onEventOverflowDefault: "callback",
 	onEventContextMenu: "callback",
 	onStateChange: "callback",
 	sourceEventLimit: "value",

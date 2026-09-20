@@ -92,6 +92,12 @@ void test("distributed styles are deterministically minified without changing cr
 	assert.match(firstDistribution, /prefers-contrast:more/u);
 	assert.match(firstDistribution, /prefers-reduced-motion:reduce/u);
 	assert.match(firstDistribution, /forced-colors:active/u);
+	for (const suffix of ["background", "color", "border-color", "border-width", "border-radius", "font-size", "min-block-size", "compact-inline-size"]) {
+		assert.match(firstDistribution, new RegExp(`--lfc-grid-overflow-${suffix}:\\s*initial[;}]`, "u"),
+			`Expected distributed overflow ${suffix} to preserve its contextual default.`);
+		assert.ok(firstDistribution.includes(`var(--lfc-grid-overflow-${suffix},`),
+			`Expected distributed overflow ${suffix} to retain its consumer.`);
+	}
 });
 
 void test("style minification rejects non-string input", async () => {

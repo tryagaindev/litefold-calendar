@@ -83,7 +83,10 @@ export async function verifyPackedBrowserInteraction(installedPackage) {
 			throw new Error("Packed-byte browser fixture could not create its host.");
 		}
 		let activation = null;
+		let overflowActivation = null;
+		let overflowCompletion = null;
 		const calendar = packageModule.createCalendar(host, {
+			gridEventDisplay: { compact: "count", wide: "count" },
 			extensions: [webMcp({ toolNamePrefix: "packed-calendar" })],
 			events: [{
 				id: "packed-byte-event",
@@ -94,6 +97,13 @@ export async function verifyPackedBrowserInteraction(installedPackage) {
 			now: () => new Date("2026-07-14T12:00:00Z"),
 			onEventActivate: (context) => {
 				activation = context;
+			},
+			onEventOverflowActivate: (context) => { overflowActivation = context; },
+			onEventOverflowDefault: (context) => {
+				if (context.agendaHeading !== dom.window.document.activeElement) {
+					throw new Error("Packed completion must synchronously expose the focused heading.");
+				}
+				overflowCompletion = context;
 			}
 		});
 		calendar.render();
@@ -161,6 +171,16 @@ export async function verifyPackedBrowserInteraction(installedPackage) {
 		if (activation?.event?.id !== "packed-replacement" || activation.nativeEvent !== nativeEvent ||
 			activation.surface !== "agenda") {
 			throw new Error("Packed calendar did not activate the rendered event through its public callback.");
+		}
+
+		const overflow = host.querySelector(".lfc-calendar-grid-more[data-lfc-date='2026-07-14']");
+		const overflowClick = new dom.window.MouseEvent("click", { bubbles: true, cancelable: true });
+		overflow?.dispatchEvent(overflowClick);
+		if (overflowCompletion === null || overflowActivation === null ||
+			overflowCompletion.triggerElement !== overflow || overflowCompletion.nativeEvent !== overflowClick ||
+			overflowCompletion.events !== overflowActivation.events || overflowCompletion.date !== overflowActivation.date ||
+			overflowCompletion.events[0]?.id !== "packed-replacement" || !Object.isFrozen(overflowCompletion)) {
+			throw new Error("Packed consumer must receive the original immutable overflow snapshot on synchronous completion.");
 		}
 
 		calendar.destroy();

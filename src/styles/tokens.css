@@ -7,12 +7,20 @@
     --lfc-border-radius: 0.5rem;
     --lfc-control-min-size: 2.75rem;
     --lfc-day-min-block-size: clamp(3.5rem, 13cqi, 7rem);
-    --lfc-day-padding: clamp(0.25rem, 1.5cqi, 0.75rem);
+    --lfc-day-padding: clamp(0.25rem, 0.75cqi, 0.5rem);
     --lfc-compact-day-min-block-size: 3.75rem;
     --lfc-event-accent-width: 0.0625rem;
     --lfc-grid-event-gap: 0.125rem;
     --lfc-grid-event-font-size: 0.75em;
     --lfc-grid-event-min-block-size: 1.5rem;
+    --lfc-grid-overflow-background: initial;
+    --lfc-grid-overflow-color: initial;
+    --lfc-grid-overflow-border-color: initial;
+    --lfc-grid-overflow-border-width: initial;
+    --lfc-grid-overflow-border-radius: initial;
+    --lfc-grid-overflow-font-size: initial;
+    --lfc-grid-overflow-min-block-size: initial;
+    --lfc-grid-overflow-compact-inline-size: initial;
     --lfc-color: light-dark(#102a36, #eaf7f7);
     --lfc-muted-color: light-dark(#405f68, #a8c8cc);
     --lfc-background: light-dark(#f7fcfc, #061a23);
@@ -44,6 +52,14 @@
     --lfc-internal-compact-control-inline-size: min(
       100%,
       max(2.75rem, var(--lfc-control-min-size))
+    );
+    --lfc-internal-overflow-min-block-size: max(
+      1.5rem,
+      var(--lfc-grid-overflow-min-block-size, var(--lfc-grid-event-min-block-size))
+    );
+    --lfc-internal-overflow-compact-inline-size: min(
+      100%,
+      max(1.5rem, var(--lfc-grid-overflow-compact-inline-size, max(2.75rem, var(--lfc-control-min-size))))
     );
     --lfc-internal-day-padding: var(--lfc-day-padding);
     --lfc-internal-focus-size: 0.1875rem;

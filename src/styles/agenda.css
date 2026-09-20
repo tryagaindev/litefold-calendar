@@ -269,12 +269,18 @@
 
   :where(.litefold-calendar) .lfc-calendar-grid-more {
     appearance: none;
-    background: transparent;
-    border: 0;
+    background: var(--lfc-grid-overflow-background, transparent);
+    border: var(--lfc-grid-overflow-border-width, 0) solid var(--lfc-grid-overflow-border-color, currentcolor);
+    border-radius: var(--lfc-grid-overflow-border-radius, 0);
+    color: var(--lfc-grid-overflow-color, var(--lfc-muted-color));
     cursor: pointer;
-    min-block-size: max(1.5rem, var(--lfc-grid-event-min-block-size));
+    max-inline-size: 100%;
+    min-block-size: var(--lfc-internal-overflow-min-block-size);
     min-inline-size: 1.5rem;
+    overflow: visible;
+    overflow-wrap: anywhere;
     touch-action: manipulation;
+    white-space: normal;
   }
 
   :where(.litefold-calendar) .lfc-calendar-event-marker:empty,

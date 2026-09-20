@@ -24,7 +24,7 @@ import {
 	createEventContextMenuAvailability
 } from "./actions.js";
 import { createRenderHookRuntimes, type RenderHookRuntime } from "./render-hooks.js";
-import { requestCalendarEvents, resolveCalendarEvents } from "./source.js";
+import { CalendarEventSourcePublication, requestCalendarEvents, resolveCalendarEvents, type CalendarEventRequest } from "./source.js";
 import {
 	createInternalError, createPublicMethodError as createStatePublicMethodError, createState,
 	isRenderHookSurface, isSourceIssue, severityRank,
@@ -64,6 +64,9 @@ import {
 	type VisibleEventRequest
 } from "./event-source-lifecycle.js";
 import { CalendarEventOverflowPresenter } from "./event-overflow-presentation.js";
+import { CalendarActionPipeline } from "./action-pipeline.js";
+import type { CalendarRenderCompletion } from "./interaction-completion.js";
+import { completeEventOverflowDefault } from "./overflow-default.js";
 import { releaseLeasedNodes } from "./node-leases.js";
 import { SwipeGestureController } from "./swipe.js";
 import type { RegisteredExtensionNavigationTarget } from "./registered-extension-contract.js";
@@ -160,6 +163,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private readonly options: ReturnType<typeof snapshotCalendarOptions<TMetadata>>;
 	private readonly registeredExtensions: RegisteredExtensionHost<TMetadata> | null;
 	private readonly sourceEventLimit: number;
+	private readonly sourcePublication = new CalendarEventSourcePublication();
 	private readonly swipeEnabled: boolean;
 	private readonly swipeGesture: SwipeGestureController;
 	private readonly timeZone: string | null;
@@ -171,7 +175,17 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private activeController: AbortController | null = null;
 	private announcementGeneration = 0;
 	private announcementPresenter: CalendarAnnouncementPresenter | null = null;
-	private readonly actionGenerations = new Map<string, number>();
+	private readonly actionPipeline = new CalendarActionPipeline({
+		canInvoke: () => this.canContinueInteraction(),
+		isLive: () => !this.isDestroyed && !this.hasFatalError,
+		messages: () => this.messages,
+		clearIssue: (name) => { this.clearIssues((entry) => entry.key === `action-failed:${name}`, true); },
+		report: (name, error, isCurrent) => {
+			if (error.stale) { this.deliverError(error); return; }
+			this.acceptError(error, { key: `action-failed:${name}`, politeness: "assertive", retryable: false },
+				true, "default", isCurrent);
+		}
+	});
 	private agendaVisibleCount: number;
 	private currentEventsByDate: ReadonlyMap<string, readonly NormalizedCalendarEvent<TMetadata>[]> = new Map();
 	private currentRange: CalendarRangeBounds | null = null;
@@ -197,6 +211,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private agendaMoreButton: HTMLButtonElement | null = null;
 	private selectedDate: CalendarDate;
 	private renderGeneration = 0;
+	private interactionEpoch = 0;
+	private committedRender: Readonly<CalendarRenderCompletion> | null = null;
 	private selectionEntryDate: string | null = null;
 	private state: CalendarState;
 
@@ -485,13 +501,15 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		}
 
 		this.isDestroyed = true;
+		this.interactionEpoch += 1;
+		this.committedRender = null;
 		this.isRendered = false;
 		this.monthPickerController.hide(false);
 		this.palette?.disconnect();
 		this.palette = null;
 		this.generation += 1;
 		this.registeredExtensions?.stop();
-		this.actionGenerations.clear();
+		this.actionPipeline.clear();
 		this.resetInternalAnnouncement();
 		this.activeController?.abort();
 		this.activeController = null;
@@ -554,6 +572,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			return;
 		}
 		this.latestAcceptedEventReplacement = replacementSequence;
+		this.interactionEpoch += 1;
 		this.eventSource = resolvedEvents;
 		this.swipeGesture.clear();
 		this.loadVisibleEvents(false);
@@ -562,6 +581,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	/** Forces the current visible range to be loaded again. */
 	public refetchEvents(): void {
 		this.requireLive("refetchEvents");
+		this.interactionEpoch += 1;
 		this.swipeGesture.clear();
 		this.loadVisibleEvents(true);
 	}
@@ -659,11 +679,18 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	}
 
 	private claimNavigation(navigationRevision?: number): number | null {
-		return this.registeredExtensions === null ? 0 :
-			this.registeredExtensions.claimNavigation(navigationRevision); }
+		if (!this.canContinueInteraction()) { return null; }
+		const revision = this.registeredExtensions?.claimNavigation(navigationRevision) ??
+			(this.registeredExtensions === null ? 0 : null);
+		if (revision !== null) { this.interactionEpoch += 1; }
+		return revision;
+	}
 
 	private isNavigationCurrent(navigationRevision: number): boolean { return this.registeredExtensions?.isNavigationCurrent(navigationRevision) ?? true; }
-	private canCompleteNavigation(navigationRevision: number): boolean { return this.canContinueInteraction() && this.isNavigationCurrent(navigationRevision); }
+	private canCompleteNavigation(navigationRevision: number, interactionEpoch: number): boolean {
+		return this.canContinueInteraction() && this.interactionEpoch === interactionEpoch &&
+			this.isNavigationCurrent(navigationRevision);
+	}
 
 	private createStructure(): CalendarDom {
 		const dom = createCalendarStructure(this.options, {
@@ -713,20 +740,21 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			return false;
 		}
 		const activeBefore = getOwnedActiveElement(this.document, this.host);
+		this.committedRender = null;
 		try {
-			this.renderCalendarUnsafe();
-			return true;
+			return this.renderCalendarUnsafe();
 		} catch (cause: unknown) {
 			this.handleFatalError(cause, wasOwnedFocusRemoved(activeBefore, this.host));
 			return false;
 		}
 	}
 
-	private renderCalendarUnsafe(): void {
+	private renderCalendarUnsafe(): boolean {
 		const dom = this.dom;
 		if (!this.isRendered || this.isDestroyed || dom === null) {
-			return;
+			return false;
 		}
+		const interactionEpoch = this.interactionEpoch;
 		this.swipeGesture.prepareForRender(dom);
 
 		const focus = captureCalendarFocus(
@@ -738,7 +766,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			const renderGeneration = ++this.renderGeneration;
 			this.prepareRenderHooksForRender(renderGeneration);
 			if (this.wasRenderInterrupted(dom, renderGeneration)) {
-				return;
+				return false;
 			}
 			this.updateMonthTitle(dom);
 			dom.titleButton.removeAttribute("aria-disabled");
@@ -759,17 +787,17 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 					dom.weeks, weeks, [dom.grid, dom.swipeViewport, this.host], 2);
 			});
 			if (!renderedGrid || this.wasRenderInterrupted(dom, renderGeneration)) {
-				return;
+				return false;
 			}
 			this.selectionEntryDate = null;
 			this.renderAgenda(dom, eventActions, eventMounts, renderGeneration);
 			if (this.wasRenderInterrupted(dom, renderGeneration)) {
-				return;
+				return false;
 			}
 			let newlyQuarantined = this.getQuarantinedRenderHookCount() - quarantinedBeforeAttempt;
 			if (newlyQuarantined === 0) { newlyQuarantined = this.validateMountedRenderHookNodes(); }
 			if (this.wasRenderInterrupted(dom, renderGeneration)) {
-				return;
+				return false;
 			}
 			if (newlyQuarantined > 0) {
 				remainingRecoveryAttempts -= newlyQuarantined;
@@ -783,12 +811,18 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				this.runMountHooks(dayMounts, eventMounts);
 			}
 			if (this.wasRenderInterrupted(dom, renderGeneration)) {
-				return;
+				return false;
 			}
 			this.renderIssues();
+			if (this.wasRenderInterrupted(dom, renderGeneration)) { return false; }
 			restoreCalendarFocus(focus, this.dom, this.getGridFocusElements(),
-				formatCalendarDate(this.focusedDate), this.host);
-			return;
+				formatCalendarDate(this.focusedDate), this.host,
+				() => this.interactionEpoch === interactionEpoch && !this.wasRenderInterrupted(dom, renderGeneration));
+			if (this.wasRenderInterrupted(dom, renderGeneration)) { return false; }
+			this.committedRender = Object.freeze({
+				dateString: formatCalendarDate(this.selectedDate), dom, interactionEpoch, renderGeneration
+			});
+			return true;
 		}
 		throw new TypeError("Render-hook recovery exceeded the configured hook-set bound.");
 	}
@@ -886,15 +920,21 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				action: gridMore,
 				date,
 				events: () => events.map((event) => event.event),
-				invokeAction: (action) => { this.invokeAction("onEventOverflowActivate", action); },
-				isCurrent: () => this.canUseRenderedAction(gridMore, renderGeneration),
+				invokeAction: (action) => { this.actionPipeline.invoke("onEventOverflowActivate", action); },
+				captureCurrent: () => {
+					const epoch = this.interactionEpoch;
+					return () => epoch === this.interactionEpoch && this.canUseRenderedAction(gridMore, renderGeneration);
+				},
+				needsContext: this.options.onEventOverflowDefault !== undefined,
 				onActivate: this.options.onEventOverflowActivate,
-				onDefault: () => {
+				onDefault: (activation) => {
 					if (this.bounds.getDateNavigationFailure(date) !== null) { return; }
-					this.selectDate(date, "gridMore");
-					if (this.canContinueInteraction()) {
-						this.dom?.agendaTitle.focus({ preventScroll: true });
-					}
+					completeEventOverflowDefault(this.selectDate(date, "gridMore"), activation, {
+						host: this.host, isCurrent: (completion) => this.interactionEpoch === completion.interactionEpoch &&
+							this.isRenderCommitCurrent(completion),
+						onDefault: this.options.onEventOverflowDefault,
+						invokeAction: (action) => { this.actionPipeline.invoke("onEventOverflowDefault", action); }
+					});
 				},
 				onKeydown: (event) => {
 					this.handleRenderedGridActionKeydown(
@@ -934,7 +974,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			const context = createDaySelection(jsEvent, date, selectedButton);
 			const onDaySelect = this.options.onDaySelect;
 			if (onDaySelect !== undefined) {
-				this.invokeAction("onDaySelect", () => onDaySelect(context));
+				this.actionPipeline.invoke("onDaySelect", () => onDaySelect(context));
 			}
 		});
 		button.addEventListener("keydown", (event) => {
@@ -1075,7 +1115,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			isCurrent: () => this.canUseRenderedAction(action, renderGeneration),
 			onActivate: onEventActivate === undefined ? null : (nativeEvent) => {
 				const context = createEventActivation(nativeEvent, date, action, calendarEvent, surface);
-				this.invokeAction("onEventActivate", () => onEventActivate(context));
+				this.actionPipeline.invoke("onEventActivate", () => onEventActivate(context));
 			},
 			onContext: hasContextAction ? (nativeEvent, clientX, clientY) => {
 				this.invokeEventContextMenu(
@@ -1646,13 +1686,14 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			if (navigationRevision === null) {
 				return;
 			}
+			const interactionEpoch = this.interactionEpoch;
 			this.monthPickerController.hide(false);
 			this.focusedDate = target;
 			this.displayedMonth = { day: 1, month: target.month, year: target.year };
 			this.selectedDate = target;
 			this.agendaVisibleCount = Math.min(this.agendaPageSize, this.agendaDomLimit);
 			this.loadVisibleEvents(false);
-			if (this.canContinueInteraction() && this.isNavigationCurrent(navigationRevision)) {
+			if (this.canCompleteNavigation(navigationRevision, interactionEpoch)) {
 				this.dayButtons.get(formatCalendarDate(target))?.focus({ preventScroll: true });
 			}
 			return;
@@ -1660,6 +1701,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		if (!isVisible) {
 			return;
 		}
+		this.interactionEpoch += 1;
 		this.focusedDate = target;
 		for (const candidate of this.dayButtons.values()) {
 			candidate.tabIndex = candidate.getAttribute("data-lfc-date") === formatCalendarDate(target) ? 0 : -1;
@@ -1681,7 +1723,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			return;
 		}
 		const context = createEventContextMenu(nativeEvent, date, element, event, surface, clientX, clientY);
-		this.invokeAction("onEventContextMenu", () => onEventContextMenu(context));
+		this.actionPipeline.invoke("onEventContextMenu", () => onEventContextMenu(context));
 	}
 
 	private invokeDayContextMenu(
@@ -1697,68 +1739,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		const context = createDayContextMenu(nativeEvent, date, element, clientX, clientY);
 		const onDayContextMenu = this.options.onDayContextMenu;
 		if (onDayContextMenu !== undefined) {
-			this.invokeAction("onDayContextMenu", () => onDayContextMenu(context));
+			this.actionPipeline.invoke("onDayContextMenu", () => onDayContextMenu(context));
 		}
-	}
-
-	private invokeAction(name: string, action: () => unknown): void {
-		if (!this.canContinueInteraction()) {
-			return;
-		}
-		const generation = (this.actionGenerations.get(name) ?? 0) + 1;
-		this.actionGenerations.set(name, generation);
-		let result: unknown;
-		try {
-			result = action();
-		} catch (cause: unknown) {
-			this.handleActionFailure(name, cause, generation);
-			return;
-		}
-		if (result === undefined) {
-			if (this.isCurrentAction(name, generation)) {
-				this.clearActionIssue(name);
-			}
-			return;
-		}
-		void Promise.resolve(result).then(
-			() => {
-				if (this.isCurrentAction(name, generation)) {
-					this.clearActionIssue(name);
-				}
-			},
-			(cause: unknown) => {
-				this.handleActionFailure(name, cause, generation);
-			}
-		);
-	}
-
-	private clearActionIssue(name: string): void {
-		this.clearIssues((entry) => entry.key === `action-failed:${name}`, true);
-	}
-
-	private isCurrentAction(name: string, generation: number): boolean { return !this.isDestroyed && !this.hasFatalError && this.actionGenerations.get(name) === generation; }
-
-	private handleActionFailure(name: string, cause: unknown, generation: number): void {
-		const stale = !this.isCurrentAction(name, generation);
-		const error = createInternalError({
-			cause,
-			code: "action-failed",
-			hook: name,
-			recoverable: true,
-			severity: "error",
-			stale,
-			userMessage: this.messages.actionErrorMessage,
-			userTitle: this.messages.actionErrorTitle
-		});
-		if (stale) {
-			this.deliverError(error);
-			return;
-		}
-		this.acceptError(error, {
-			key: `action-failed:${name}`,
-			politeness: "assertive",
-			retryable: false
-		}, true, "default", () => this.isCurrentAction(name, generation));
 	}
 
 	private selectDate(
@@ -1766,21 +1748,20 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		invalidHook: string,
 		animateSelection = false,
 		navigationRevision?: number, moveFocus = true
-	): void {
+	): Readonly<CalendarRenderCompletion> | null {
 		this.assertNavigableDate(date, invalidHook);
-		if (!this.canContinueInteraction()) {
-			return;
-		}
 		const changesMonth = date.year * 12 + date.month !== this.displayedMonth.year * 12 + this.displayedMonth.month;
 		const changesSelection = compareCalendarDates(date, this.selectedDate) !== 0;
 		const stateBeforeNavigation = this.state;
 		const generationBeforeNavigation = this.generation;
 		const claimedNavigationRevision = this.claimNavigation(navigationRevision);
 		if (claimedNavigationRevision === null) {
-			return;
+			return null;
 		}
+		const interactionEpoch = this.interactionEpoch;
 		this.swipeGesture.clear();
 		this.monthPickerController.hide(false);
+		if (!this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) { return null; }
 		this.selectionEntryDate = animateSelection && changesSelection && !changesMonth
 			? formatCalendarDate(date)
 			: null;
@@ -1793,23 +1774,41 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		} else {
 			this.renderCalendar();
 		}
-		if (!this.canCompleteNavigation(claimedNavigationRevision)) {
-			return;
-		}
-		if (moveFocus) {
+		//A newer same-date interaction can supersede focus while this render still owns the state commit.
+		const completion = this.getSelectionCommit(interactionEpoch);
+		if (completion === null) { return null; }
+		if (moveFocus && this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) {
 			this.dayButtons.get(formatCalendarDate(date))?.focus({ preventScroll: true });
 		}
-		if (!this.canCompleteNavigation(claimedNavigationRevision)) {
-			return;
-		}
-		if (!changesMonth && changesSelection) {
+		if (!this.isRenderCommitCurrent(completion)) { return null; }
+		//Reentrant focus can inherit a staged date that no winning render has published yet.
+		if (!changesMonth && compareCalendarDates(date, this.state.selectedDate) !== 0) {
 			this.setState(this.derivePhase());
-		} else if (navigationRevision === undefined &&
-			!changesMonth &&
-			this.state === stateBeforeNavigation &&
-			this.generation === generationBeforeNavigation) {
+		}
+		if (!this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) { return null; }
+		if (!changesMonth) {
+			this.notifyUnchangedSelection(navigationRevision, stateBeforeNavigation, generationBeforeNavigation);
+		}
+		return this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)
+			? this.getSelectionCommit(interactionEpoch) : null;
+	}
+
+	private notifyUnchangedSelection(navigationRevision: number | undefined, state: CalendarState, generation: number): void {
+		if (navigationRevision === undefined && this.state === state && this.generation === generation && !this.sourcePublication.isPending(generation)) {
 			this.registeredExtensions?.notifyStateChanged();
 		}
+	}
+
+	private getSelectionCommit(interactionEpoch: number): Readonly<CalendarRenderCompletion> | null {
+		const completion = this.committedRender;
+		return completion?.interactionEpoch === interactionEpoch && this.isRenderCommitCurrent(completion) ? completion : null;
+	}
+
+	private isRenderCommitCurrent(completion: Readonly<CalendarRenderCompletion>): boolean {
+		return this.canContinueInteraction() &&
+			this.committedRender === completion && this.renderGeneration === completion.renderGeneration &&
+			this.dom === completion.dom && HOST_OWNERS.get(this.host) === this &&
+			formatCalendarDate(this.selectedDate) === completion.dateString;
 	}
 
 	private shiftMonth(
@@ -1876,7 +1875,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				}
 				this.swipeGesture.clear();
 				this.monthPickerController.hide(false);
-				if (navigationRevision === undefined) {
+				if (navigationRevision === undefined && !this.sourcePublication.isPending(this.generation)) {
 					this.registeredExtensions?.notifyStateChanged();
 				}
 				return;
@@ -1908,18 +1907,18 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	}
 
 	private loadVisibleEvents(userRetry: boolean): void {
-		const request = this.beginVisibleEventRequest(userRetry);
-		if (request === null) {
-			return;
-		}
-		let result: ReturnType<typeof requestCalendarEvents<TMetadata>>;
+		if (!this.isRendered || this.isDestroyed || this.dom === null) { return; }
+		this.sourcePublication.run(++this.generation, () => { this.evaluateVisibleEvents(userRetry); });
+	}
+
+	private evaluateVisibleEvents(userRetry: boolean): void {
+		const request = this.beginVisibleEventRequest(userRetry, this.generation);
+		if (request === null) { return; }
+		let result: Readonly<CalendarEventRequest<TMetadata>>;
 		try {
-			result = requestCalendarEvents(
-				this.eventSource,
+			result = requestCalendarEvents(this.eventSource,
 				Object.freeze({ ...request.bounds, signal: request.controller.signal }),
-				this.sourceEventLimit,
-				this.eventBaseUrl
-			);
+				this.sourceEventLimit, this.eventBaseUrl);
 		} catch (cause: unknown) {
 			this.handleSourceRequestFailure(cause, request);
 			return;
@@ -1932,16 +1931,13 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		}
 
 		observeVisibleEventRequest(result.events,
-			(values) => { this.commitSourceRequestSuccess(values, request); },
-			(cause) => { this.handleSourceRequestFailure(cause, request); },
+			(values) => { this.sourcePublication.run(request.generation, () => { this.commitSourceRequestSuccess(values, request); }); },
+			(cause) => { this.sourcePublication.run(request.generation, () => { this.handleSourceRequestFailure(cause, request); }); },
 			(cause) => { this.handleFatalError(cause); });
 		this.publishSourceLoading(request);
 	}
 
-	private beginVisibleEventRequest(userRetry: boolean): VisibleEventRequest | null {
-		if (!this.isRendered || this.isDestroyed || this.dom === null) {
-			return null;
-		}
+	private beginVisibleEventRequest(userRetry: boolean, generation: number): VisibleEventRequest | null {
 		const range = getCalendarMonthRange(this.displayedMonth, this.firstDay);
 		const bounds = Object.freeze({
 			end: formatCalendarDate(range.end),
@@ -1949,7 +1945,6 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		});
 		const rangeKey = `${bounds.start}/${bounds.end}`;
 		const hasRetainedSnapshot = this.loadedRangeKey === rangeKey && this.hasCurrentSnapshot;
-		const generation = ++this.generation;
 		const previousController = this.activeController;
 		this.activeController = null;
 		previousController?.abort();
@@ -1995,7 +1990,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		if (!setVisibleEventBusyState(this.host, dom.grid, true, () => this.canApplyRequest(request.generation, request.controller))) {
 			return;
 		}
-		this.setState("loading");
+		this.setState("loading", request.generation);
 		if (!this.canApplyRequest(request.generation, request.controller)) {
 			return;
 		}
@@ -2056,7 +2051,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			() => this.canApplyRequest(request.generation, request.controller))) {
 			return false;
 		}
-		this.setState(this.internalIssues.length > 0 ? "degraded" : "ready");
+		this.setState(this.internalIssues.length > 0 ? "degraded" : "ready", request.generation);
 		return this.canApplyRequest(request.generation, request.controller);
 	}
 
@@ -2080,7 +2075,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		this.acceptError(error, {
 			key: "event-source",
 			politeness: request.hasRetainedSnapshot ? "polite" : "assertive",
-			retryable: true
+			retryable: true,
+			sourceGeneration: request.generation
 		});
 		if (!this.canApplyRequest(request.generation, request.controller)) {
 			return;
@@ -2102,9 +2098,11 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 
 	private canContinueInteraction(): boolean { return this.isRendered && !this.isDestroyed && !this.hasFatalError; }
 
-	private wasRenderInterrupted(dom: CalendarDom, renderGeneration: number): boolean { return this.isDestroyed || this.dom !== dom || this.renderGeneration !== renderGeneration; }
+	private wasRenderInterrupted(dom: CalendarDom, renderGeneration: number): boolean { return this.dom !== dom || !this.isRenderGenerationCurrent(renderGeneration); }
 
-	private isRenderGenerationCurrent(renderGeneration: number): boolean { return !this.isDestroyed && this.renderGeneration === renderGeneration; }
+	private isRenderGenerationCurrent(renderGeneration: number): boolean {
+		return !this.isDestroyed && this.renderGeneration === renderGeneration;
+	}
 
 	private canUseRenderedAction(element: HTMLElement, renderGeneration: number): boolean { return this.canContinueInteraction() && this.renderGeneration === renderGeneration && element.isConnected && this.host.contains(element) && HOST_OWNERS.get(this.host) === this; }
 
@@ -2126,6 +2124,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			this.isRetrying || this.activeController !== null) {
 			return;
 		}
+		this.interactionEpoch += 1;
 		this.isRetrying = true;
 		this.renderIssues();
 		this.loadVisibleEvents(true);
@@ -2137,6 +2136,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			readonly key: string;
 			readonly politeness: CalendarAnnouncement["politeness"];
 			readonly retryable: boolean;
+			readonly sourceGeneration?: number;
 		},
 		notifyState = true,
 		announcementMode: "default" | "internal" | "none" = "default",
@@ -2162,8 +2162,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			entry
 		].slice(-ISSUE_LIMIT));
 		if (notifyState) {
-			this.setState(this.derivePhase());
-		} else {
+			this.setState(this.derivePhase(), presentation.sourceGeneration);
+		} else if (!this.sourcePublication.isPending(generation)) {
 			this.state = createState(
 				this.derivePhase(),
 				this.currentRange,
@@ -2343,7 +2343,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		return this.hasCurrentSnapshot ? "ready" : "idle";
 	}
 
-	private setState(phase: CalendarPhase): void {
+	private setState(phase: CalendarPhase, sourceGeneration?: number): void {
+		if (sourceGeneration !== this.generation && this.sourcePublication.isPending(this.generation)) { return; }
 		const callback = this.options.onStateChange;
 		if (callback !== undefined && this.internalIssues.some((entry) =>
 			entry.key === "host-integration:onStateChange")) {
@@ -2361,6 +2362,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			this.displayedMonth,
 			this.selectedDate
 		);
+		this.sourcePublication.didPublish(sourceGeneration);
 		if (callback === undefined) {
 			this.registeredExtensions?.notifyStateChanged();
 			return;
@@ -2507,7 +2509,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private stopForFatalError(generation: number): readonly [Element | null, boolean] | null {
 		this.registeredExtensions?.stop();
 		if (!this.isFatalGenerationCurrent(generation)) { return null; }
-		this.actionGenerations.clear();
+		this.actionPipeline.clear();
 		const activeBeforeFallback = getOwnedActiveElement(this.document, this.host);
 		const focusWasInPicker = activeBeforeFallback !== null &&
 			this.dom?.monthPicker.contains(activeBeforeFallback) === true;

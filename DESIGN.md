@@ -343,7 +343,7 @@ The spacing rhythm is built from the YAML scale: `0.125rem`, `0.25rem`, `0.375re
 | Grid events | `0.125rem` block padding, `0.25rem` inline padding, `1.5rem` minimum block size |
 | Wide day rows | `--lfc-day-min-block-size: clamp(3.5rem, 13cqi, 7rem)` |
 | Compact day rows | `--lfc-compact-day-min-block-size: 3.75rem` |
-| Day padding | `--lfc-day-padding: clamp(0.25rem, 1.5cqi, 0.75rem)` |
+| Day padding | `--lfc-day-padding: clamp(0.25rem, 0.75cqi, 0.5rem)` |
 
 Package layout uses logical properties. Use `rem` for component layout and target size, `em` for type-relative details, and `cqi` for fluid container-relative sizing. Pixel-unit exceptions are deliberate one-CSS-pixel hairlines, the canonical `1px` / `-1px` visually hidden sentinel, and the `318px` content-box threshold that distinguishes the 320 CSS-pixel host design floor from sub-floor layouts. Each exception is constrained and documented by the repository's CSS conventions.
 
@@ -447,10 +447,18 @@ The following package custom properties are the stable bridge from an applicatio
 | `--lfc-control-min-size` | `2.75rem` |
 | `--lfc-day-min-block-size` | `clamp(3.5rem, 13cqi, 7rem)` |
 | `--lfc-compact-day-min-block-size` | `3.75rem` |
-| `--lfc-day-padding` | `clamp(0.25rem, 1.5cqi, 0.75rem)` |
+| `--lfc-day-padding` | `clamp(0.25rem, 0.75cqi, 0.5rem)` |
 | `--lfc-grid-event-gap` | `{spacing.micro}` |
 | `--lfc-grid-event-font-size` | `0.75em` |
 | `--lfc-grid-event-min-block-size` | `1.5rem` |
+| `--lfc-grid-overflow-background` | `initial`; event background for decorated counts, otherwise transparent |
+| `--lfc-grid-overflow-color` | `initial`; event color for decorated counts, muted wide overflow, event-border color for passive compact cues |
+| `--lfc-grid-overflow-border-color` | `initial`; event border for decorated counts, otherwise current text color |
+| `--lfc-grid-overflow-border-width` | `initial`; hairline for decorated counts, otherwise zero; positive values use a solid border |
+| `--lfc-grid-overflow-border-radius` | `initial`; component radius for decorated counts, otherwise zero |
+| `--lfc-grid-overflow-font-size` | `initial`; wide inherited action text, compact count `0.875rem`, compact additional cue responsive `0.625rem`–`0.8125rem` |
+| `--lfc-grid-overflow-min-block-size` | `initial`; grid-event minimum with the `1.5rem` target floor |
+| `--lfc-grid-overflow-compact-inline-size` | `initial`; control minimum with a `2.75rem` preferred width, constrained by the cell and preserving the target floor |
 | `--lfc-event-accent-width` | `{spacing.event-accent-width}` |
 | `--lfc-color` | `{colors.on-surface}` / `{colors.dark-on-surface}` |
 | `--lfc-muted-color` | `{colors.muted}` / `{colors.dark-muted}` |
@@ -473,6 +481,10 @@ The following package custom properties are the stable bridge from an applicatio
 | `--lfc-error-background` | `{colors.error-background}` / `{colors.dark-error-background}` |
 | `--lfc-error-color` | `{colors.error-color}` / `{colors.dark-error-color}` |
 | `--lfc-error-border-color` | `{colors.error-border}` / `{colors.dark-error-border}` |
+
+All eight overflow tokens use host defaults of `initial`, allowing contextual fallbacks to preserve existing themes. Resetting them to `initial` restores those fallbacks. A shared native action is decorated when either configured presentation is a count; changing width does not change this predicate. Paint belongs to that button or a standalone passive cue, never both a button and its nested visual spans. Font size belongs to each variant root once, so relative units do not compound. Explicit styles on custom visual content remain application-owned. The family does not style real event summaries, agenda rows, toolbar controls, or agenda pagination.
+
+Count/overflow sizing can independently increase through the minimum block size and compact inline size. These are floors and cell-constrained preferred sizes, not fixed heights: summary slots and cluster tracks accommodate the cue, equal rows retain their square floor, and long text can grow taller. Real events keep their own sizing. Hidden representations retain their existing visibility rules, including focus preservation across resize.
 
 ## Do's and Don'ts
 

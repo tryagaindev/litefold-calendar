@@ -24,6 +24,28 @@ export type CalendarEventRequest<TMetadata> =
 		readonly timing: "asynchronous";
 	};
 
+/** Reserves state publication for a source phase through preparation and DOM reactions. */
+export class CalendarEventSourcePublication {
+	private generation: number | null = null;
+
+	public isPending(generation: number): boolean { return this.generation === generation; }
+
+	public didPublish(generation: number | undefined): void {
+		if (this.generation === generation) { this.generation = null; }
+	}
+
+	public run<T>(generation: number, action: () => T): T {
+		const previousGeneration = this.generation;
+		this.generation = generation;
+		try {
+			return action();
+		} finally {
+			//A superseding request can publish while an older invocation remains on the stack.
+			this.generation = previousGeneration;
+		}
+	}
+}
+
 const EVENT_INPUT_KEYS = Object.freeze([
 	"accentColor",
 	"end",

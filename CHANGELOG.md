@@ -8,12 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added `onEventOverflowDefault` and `CalendarEventOverflowDefaultContext` for synchronous observation of successful count/overflow selection and agenda focus. The callback receives the actual heading and original occurrence snapshot; applications can scroll directly without a timing or focus-discovery bridge.
+- Added eight independent `--lfc-grid-overflow-*` tokens for count and overflow paint, typography, and sizing. Contextual defaults preserve existing themes; the advanced example demonstrates adaptive borderless counts and application-owned instant agenda scrolling.
 - Added independent compact and wide `gridEventDisplay` settings for individual summaries, total counts, or counts only on days with multiple events. `onEventOverflowActivate` supports application-owned day choosers with synchronous cancellation of the default agenda action, and `renderEventOverflow` now identifies count presentation.
 - Added an everyday remote-data guide and runnable JavaScript/JSDoc example covering `fetch`, cancellation, filtering, retry, refresh after saving, application-owned dialogs, and cleanup.
 - Added stale-aware screenshot preparation with staged batch validation and a before/after review gallery, plus a canonical delivery checklist.
 
 ### Changed
 
+- Reduced the default day padding to `clamp(0.25rem, 0.75cqi, 0.5rem)` for a more compact grid while retaining control target floors and intrinsic content growth.
 - Consolidated anatomy and CSS integration into one styling guide; moved generic extension contracts into the API reference, extension implementation guidance into architecture, and delivery steps into contributor/release procedures. Removed obsolete move-notice pages and their references.
 - Made Getting started a self-contained install, render, update, and cleanup tutorial; surfaced civil-date and exclusive-end warnings before the first event example, shortened feature and integration summaries, and distinguished the advanced API showcase from application starters. Public API and accessibility contracts are unchanged.
 - Published a generated minimum-browser table in the support guide. `browsers:report -- --write-docs` updates it from the shared Vite resolver; `check:docs` rejects stale targets or toolchain provenance without rewriting files.
@@ -24,6 +27,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Hosted CI and publication now run Chromium and WebKit. Firefox checks and repeated qualification remain available locally while hosted Firefox automation is paused; Firefox remains supported within the Vite Baseline window.
 
 ### Fixed
+
+- Preserved direct-provider and promise-like loading semantics when request-abort callbacks, event providers, or custom-element busy reactions synchronously reenter focus navigation, including retained refreshes, detached hosts, and source failures. Replacement callbacks cannot publish a new selection paired with the previous request's range or a duplicate or premature phase. Clarified that explicit reentrant navigation adds its own renders and mount hooks.
+- Preserved complete grid renders and selection-state updates when render hooks accept same-date navigation, including same-target `focusDate()` and `focusToday()` calls before the outer selection publishes state. Detached hosts also keep same-month navigation state aligned with their rendered selection, while superseded or detached overflow actions cannot report successful focus.
+- Superseded count/overflow defaults no longer move focus after a reentrant navigation, event replacement, or teardown, including calendars without extensions.
 
 - Isolated library browser fixtures from advanced-example setup, removed unsupported protocol tests before setup on Firefox/WebKit, and replaced a timing-dependent wheel assertion with deterministic transaction coverage. CI rejects flaky results.
 - Added native dialog and palette fallbacks for supported Baseline browsers without Popover or `light-dark()` support.

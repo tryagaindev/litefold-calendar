@@ -124,6 +124,49 @@ suppressed.  The [overflow API](api.md#customize-rendering-calendarrenderhooks)
 defines all fields and return rules.  Container CSS chooses among the variants
 already rendered; resizing does not rerun the hook.
 
+### Theme counts independently
+
+Use the eight `--lfc-grid-overflow-*` properties from the
+[token map](../DESIGN.md#public-css-token-map) to style total counts and additional
+event cues independently of real events and agenda pagination. For example,
+this borderless theme uses the application's adaptive semantic colors:
+
+```css
+.litefold-calendar.my-calendar-theme {
+	--lfc-grid-overflow-background: transparent;
+	--lfc-grid-overflow-color: var(--my-calendar-color);
+	--lfc-grid-overflow-border-color: var(--my-calendar-border-color);
+	--lfc-grid-overflow-border-width: 0;
+	--lfc-grid-overflow-border-radius: 0;
+	--lfc-grid-overflow-font-size: 0.875rem;
+	--lfc-grid-overflow-min-block-size: 1.75rem;
+	--lfc-grid-overflow-compact-inline-size: 2.75rem;
+}
+
+@media (forced-colors: active) {
+	.litefold-calendar.my-calendar-theme {
+		--lfc-grid-overflow-background: Canvas;
+		--lfc-grid-overflow-color: CanvasText;
+		--lfc-grid-overflow-border-color: ButtonText;
+		--lfc-grid-overflow-border-width: 0.0625rem;
+	}
+}
+```
+
+Keep `--my-calendar-*` mapped to your application's light/dark palette. Leave
+tokens unset, or reset them to `initial`, to retain the package's contextual
+appearance. Relative fonts such as `.8em` apply once to each visual variant;
+custom content with its own font declarations still owns those declarations.
+Minimum block size and compact preferred width allow intrinsic growth and
+retain the target floor. Compact count text can wrap beyond the square floor;
+passive cues can force a marker/cue cluster to stack without resizing the event
+theme. Hidden representations stay hidden until the existing focus rules expose
+them. Removing borders does not remove the keyboard outline.
+
+Use `onEventOverflowDefault` for application scrolling after successful agenda
+focus; the [integration recipe](integration-guide.md#scroll-after-the-default-agenda-action)
+uses the supplied heading directly. It is independent of visual hooks and tokens.
+
 ## Three color roles that sound similar
 
 | Role | Public name | Effect |
