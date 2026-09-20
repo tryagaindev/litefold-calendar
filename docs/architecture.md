@@ -75,8 +75,12 @@ DOM identity, render generation, and selected date after mount hooks and focus
 restoration. Reentrant work invalidates older focus/default completion, including
 accepted same-date navigation. Structural render validity uses DOM identity and
 render generation separately: a same-date navigation that needs no replacement
-must still allow the current grid and its selection state to commit. Detached
-hosts also commit render/state changes. Overflow completion additionally requires
+must still allow the current grid and its selection state to commit.
+Selection publication compares the winning render's target with the current
+immutable state snapshot, rather than a date staged by an interrupted selection.
+This lets reentrant same-target focus navigation publish once without reviving
+the superseded default completion. Detached hosts also commit render/state changes.
+Overflow completion additionally requires
 connectivity and actual heading focus. Render-hook recovery remains within
 its owning interaction. The action pipeline observes returned promises using per-hook
 generations; action completion does not own or replay navigation.

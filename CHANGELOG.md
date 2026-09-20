@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- Preserved complete grid renders and selection-state updates when render hooks accept same-date navigation. Detached hosts also keep same-month navigation state aligned with their rendered selection, while superseded or detached overflow actions cannot report successful focus.
+- Preserved complete grid renders and selection-state updates when render hooks accept same-date navigation, including same-target `focusDate()` and `focusToday()` calls before the outer selection publishes state. Detached hosts also keep same-month navigation state aligned with their rendered selection, while superseded or detached overflow actions cannot report successful focus.
 - Superseded count/overflow defaults no longer move focus after a reentrant navigation, event replacement, or teardown, including calendars without extensions.
 
 - Isolated library browser fixtures from advanced-example setup, removed unsupported protocol tests before setup on Firefox/WebKit, and replaced a timing-dependent wheel assertion with deterministic transaction coverage. CI rejects flaky results.

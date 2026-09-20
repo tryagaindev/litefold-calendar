@@ -1780,7 +1780,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			this.dayButtons.get(formatCalendarDate(date))?.focus({ preventScroll: true });
 		}
 		if (!this.isRenderCommitCurrent(completion)) { return null; }
-		if (!changesMonth && changesSelection) {
+		//Reentrant focus can inherit a staged date that no winning render has published yet.
+		if (!changesMonth && compareCalendarDates(date, this.state.selectedDate) !== 0) {
 			this.setState(this.derivePhase());
 		}
 		if (!this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) { return null; }

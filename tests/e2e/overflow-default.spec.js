@@ -179,3 +179,60 @@ for (const navigation of ["gotoDate", "focusDate"]) {
 		await expect(page.locator(".lfc-calendar-agenda-title")).toBeFocused();
 	});
 }
+
+for (const navigation of ["focusDate", "focusToday"]) {
+	for (const boundary of ["badge", "cleanup", "mount", "day-focus", "restore-focus"]) {
+		test(`same-target ${navigation} at ${boundary} publishes the winning selection once`, async ({ page }) => {
+			await expectLibraryFixtureReady(page);
+			await page.evaluate(async ({ navigation, boundary }) => {
+				const { createCalendar } = await import("/dist/index.js");
+				const host = document.querySelector("[data-my-calendar]");
+				const outside = document.createElement("button");
+				outside.textContent = "Application focus";
+				document.body.prepend(outside);
+				const fixture = { armed: false, states: [], completions: 0 };
+				const supersede = () => {
+					if (!fixture.armed) { return; }
+					fixture.armed = false;
+					if (navigation === "focusDate") { calendar.focusDate("2026-07-15"); }
+					else { calendar.focusToday(); }
+					outside.focus();
+				};
+				const calendar = createCalendar(host, {
+					initialDate: "2026-07-14", now: () => new Date("2026-07-15T12:00:00Z"),
+					gridEventDisplay: { compact: "count", wide: "count" },
+					events: [0, 1, 2, 3].map((id) => ({ id: String(id), start: "2026-07-15", title: "An occurrence" })),
+					onStateChange: (state) => { fixture.states.push(state.selectedDate.day); },
+					onEventOverflowDefault: () => { fixture.completions += 1; },
+					renderHooks: [{
+						id: "same-target",
+						renderDayBadge: () => { if (boundary === "badge") { supersede(); } },
+						dayDidMount: () => {
+							if (boundary === "mount") { supersede(); }
+							return () => { if (boundary === "cleanup") { supersede(); } };
+						}
+					}]
+				});
+				calendar.render();
+				fixture.states.length = 0;
+				host.addEventListener("focusin", ({ target }) => {
+					if ((boundary === "day-focus" && target.classList.contains("lfc-calendar-day-button")) ||
+						(boundary === "restore-focus" && target.classList.contains("lfc-calendar-grid-more"))) { supersede(); }
+				});
+				window.sameTargetFixture = fixture;
+				window.ownershipCalendar = calendar;
+			}, { navigation, boundary });
+			const overflow = page.locator('.lfc-calendar-grid-more[data-lfc-date="2026-07-15"]');
+			await overflow.focus();
+			await page.evaluate(() => { window.sameTargetFixture.armed = true; });
+			await overflow.press("Enter");
+			expect(await page.evaluate(() => ({
+				...window.sameTargetFixture, selected: window.ownershipCalendar.getState().selectedDate.day
+			}))).toEqual({ armed: false, states: [15], completions: 0, selected: 15 });
+			await expect(page.getByRole("gridcell")).toHaveCount(42);
+			await expect(page.locator(".lfc-calendar-day-button")).toHaveCount(42);
+			await expect(page.locator('[aria-selected="true"] .lfc-calendar-day-button')).toHaveAttribute("data-lfc-date", "2026-07-15");
+			await expect(page.getByRole("button", { name: "Application focus" })).toBeFocused();
+		});
+	}
+}

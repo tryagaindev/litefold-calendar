@@ -12,7 +12,7 @@ const EVENTS: readonly CalendarEventInput[] = [0, 1].map((id) => ({
 
 for (const extensions of [false, true]) {
 	for (const boundary of ["badge", "cleanup", "mount", "state", "day-focus", "restore-focus"] as const) {
-		for (const replacement of ["same-date", "away-back", "events", "refetch", "destroy"] as const) {
+		for (const replacement of ["same-date", "today", "focus-date", "focus-today", "away-back", "events", "refetch", "destroy"] as const) {
 			void test(`${boundary} ${replacement} supersedes overflow focus (extensions: ${String(extensions)})`, (context) => {
 				const dom = createDom();
 				context.after(installDom(dom));
@@ -21,11 +21,15 @@ for (const extensions of [false, true]) {
 				dom.window.document.body.append(appButton);
 				let armed = false;
 				let completions = 0;
+				const states: number[] = [];
 				const supersede = (): void => {
 					if (!armed) { return; }
 					armed = false;
 					switch (replacement) {
 						case "same-date": calendar.gotoDate(TARGET_DATE); break;
+						case "today": calendar.today(); break;
+						case "focus-date": calendar.focusDate(TARGET_DATE); break;
+						case "focus-today": calendar.focusToday(); break;
 						case "away-back": calendar.gotoDate("2026-07-16"); calendar.gotoDate(TARGET_DATE); break;
 						case "events": calendar.setEvents(EVENTS); break;
 						case "refetch": calendar.refetchEvents(); break;
@@ -37,8 +41,12 @@ for (const extensions of [false, true]) {
 					events: EVENTS,
 					...(extensions ? { extensions: [createRegisteredExtensionProbe({ id: "ownership" })] } : {}),
 					initialDate: "2026-07-14",
+					now: () => new Date("2026-07-15T12:00:00Z"),
 					onEventOverflowDefault: () => { completions += 1; },
-					onStateChange: () => { if (boundary === "state") { supersede(); } },
+					onStateChange: (state) => {
+						states.push(state.selectedDate.day);
+						if (boundary === "state") { supersede(); }
+					},
 					renderHooks: [{
 						id: "ownership",
 						renderDayBadge: () => { if (boundary === "badge") { supersede(); } },
@@ -50,6 +58,7 @@ for (const extensions of [false, true]) {
 				});
 				context.after(() => { calendar.destroy(); });
 				calendar.render();
+				states.length = 0;
 				host.addEventListener("focusin", (event) => {
 					if (event.target instanceof dom.window.HTMLButtonElement && (
 						(boundary === "day-focus" && event.target.classList.contains("lfc-calendar-day-button")) ||
@@ -70,6 +79,12 @@ for (const extensions of [false, true]) {
 					assert.equal(host.querySelectorAll('[role="gridcell"]').length, 42);
 					assert.equal(host.querySelectorAll(".lfc-calendar-day-button").length, 42);
 					assert.equal(host.querySelector('[aria-selected="true"] .lfc-calendar-day-button')?.getAttribute("data-lfc-date"), TARGET_DATE);
+					if (["same-date", "today", "focus-date", "focus-today"].includes(replacement)) {
+						assert.deepEqual(states, [15], "Exactly one operation publishes the committed target.");
+						calendar.focusDate(TARGET_DATE);
+						calendar.focusToday();
+						assert.deepEqual(states, [15], "Focusing the published selection does not notify again.");
+					}
 				}
 			});
 		}
