@@ -123,7 +123,7 @@ sequenceDiagram
   Note over Coordinator,DOM: Current-generation checks guard provider work, normalization, callbacks, render hooks, and commits.
 ```
 
-A direct array performs one terminal render without a loading or busy phase. A PromiseLike attaches both settlement handlers before publishing loading, then performs one loading render and one terminal render. Source rejection or invalid payload follows the same ownership and generation gates: a current failure enters the documented error-admission path, while stale work may be reported but cannot update state or DOM. See the [error guide](errors.md) for failure presentation and recovery.
+A direct array performs one terminal render without a loading or busy phase. A PromiseLike attaches both settlement handlers before publishing loading, then performs one loading render and one terminal render. During provider invocation and result classification, same-generation focus navigation leaves state publication to that source transaction. The invocation guard follows nested request generations and releases before terminal error handling, so it cannot suppress publication by a superseding request or later navigation. Source rejection or invalid payload follows the same ownership and generation gates: a current failure enters the documented error-admission path, while stale work may be reported but cannot update state or DOM. See the [error guide](errors.md) for failure presentation and recovery.
 
 Configured extensions receive state through their separate queued lifecycle after the consumer callback; see the [extension lifecycle sequence](#extension-lifecycle-implementation).
 

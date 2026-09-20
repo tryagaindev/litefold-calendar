@@ -24,7 +24,7 @@ import {
 	createEventContextMenuAvailability
 } from "./actions.js";
 import { createRenderHookRuntimes, type RenderHookRuntime } from "./render-hooks.js";
-import { requestCalendarEvents, resolveCalendarEvents } from "./source.js";
+import { CalendarEventSourceInvocation, resolveCalendarEvents, type CalendarEventRequest } from "./source.js";
 import {
 	createInternalError, createPublicMethodError as createStatePublicMethodError, createState,
 	isRenderHookSurface, isSourceIssue, severityRank,
@@ -163,6 +163,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private readonly options: ReturnType<typeof snapshotCalendarOptions<TMetadata>>;
 	private readonly registeredExtensions: RegisteredExtensionHost<TMetadata> | null;
 	private readonly sourceEventLimit: number;
+	private readonly sourceInvocation = new CalendarEventSourceInvocation();
 	private readonly swipeEnabled: boolean;
 	private readonly swipeGesture: SwipeGestureController;
 	private readonly timeZone: string | null;
@@ -1781,7 +1782,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		}
 		if (!this.isRenderCommitCurrent(completion)) { return null; }
 		//Reentrant focus can inherit a staged date that no winning render has published yet.
-		if (!changesMonth && compareCalendarDates(date, this.state.selectedDate) !== 0) {
+		if (!changesMonth && !this.sourceInvocation.isInvoking(this.generation) &&
+			compareCalendarDates(date, this.state.selectedDate) !== 0) {
 			this.setState(this.derivePhase());
 		}
 		if (!this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) { return null; }
@@ -1910,14 +1912,11 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		if (request === null) {
 			return;
 		}
-		let result: ReturnType<typeof requestCalendarEvents<TMetadata>>;
+		let result: Readonly<CalendarEventRequest<TMetadata>>;
 		try {
-			result = requestCalendarEvents(
-				this.eventSource,
+			result = this.sourceInvocation.request(request.generation, this.eventSource,
 				Object.freeze({ ...request.bounds, signal: request.controller.signal }),
-				this.sourceEventLimit,
-				this.eventBaseUrl
-			);
+				this.sourceEventLimit, this.eventBaseUrl);
 		} catch (cause: unknown) {
 			this.handleSourceRequestFailure(cause, request);
 			return;

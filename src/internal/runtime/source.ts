@@ -24,6 +24,30 @@ export type CalendarEventRequest<TMetadata> =
 		readonly timing: "asynchronous";
 	};
 
+/** Tracks which source evaluation still owns classification of its initial public phase. */
+export class CalendarEventSourceInvocation {
+	private generation: number | null = null;
+
+	public isInvoking(generation: number): boolean { return this.generation === generation; }
+
+	public request<TMetadata>(
+		generation: number,
+		events: CalendarEvents<TMetadata>,
+		range: Readonly<CalendarRange>,
+		maximum: number,
+		baseUrl: string
+	): Readonly<CalendarEventRequest<TMetadata>> {
+		const previousGeneration = this.generation;
+		this.generation = generation;
+		try {
+			return requestCalendarEvents(events, range, maximum, baseUrl);
+		} finally {
+			//A superseding request can publish while an older invocation remains on the stack.
+			this.generation = previousGeneration;
+		}
+	}
+}
+
 const EVENT_INPUT_KEYS = Object.freeze([
 	"accentColor",
 	"end",

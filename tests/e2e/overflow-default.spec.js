@@ -236,3 +236,44 @@ for (const navigation of ["focusDate", "focusToday"]) {
 		});
 	}
 }
+
+for (const navigation of ["focusDate", "focusToday"]) {
+	for (const timing of ["array", "promise"]) {
+		test(`${navigation} inside a ${timing} provider preserves source phases`, async ({ page }) => {
+			await expectLibraryFixtureReady(page);
+			await page.evaluate(async ({ navigation, timing }) => {
+				const { createCalendar } = await import("/dist/index.js");
+				const fixture = { states: [], duringSource: [], completions: 0, requests: 0 };
+				const events = [0, 1].map((id) => ({ id: String(id), start: "2026-08-01", title: "An occurrence" }));
+				const calendar = createCalendar(document.querySelector("[data-my-calendar]"), {
+					initialDate: "2026-07-14", now: () => new Date("2026-08-01T12:00:00Z"),
+					gridEventDisplay: { compact: "count", wide: "count" },
+					events: () => {
+						fixture.requests += 1;
+						if (fixture.requests === 1) { return events; }
+						if (navigation === "focusDate") { calendar.focusDate("2026-08-01"); }
+						else { calendar.focusToday(); }
+						fixture.duringSource = [...fixture.states];
+						return timing === "array" ? events : Promise.resolve(events);
+					},
+					onStateChange: (state) => { fixture.states.push(`${state.phase}:${state.selectedDate.month}-${state.selectedDate.day}`); },
+					onEventOverflowDefault: () => { fixture.completions += 1; }
+				});
+				calendar.render();
+				fixture.states.length = 0;
+				window.sourceFocusFixture = fixture;
+				window.ownershipCalendar = calendar;
+			}, { navigation, timing });
+			await page.locator('.lfc-calendar-grid-more[data-lfc-date="2026-08-01"]').click();
+			await expect.poll(() => page.evaluate(() => window.ownershipCalendar.getState().phase)).toBe("ready");
+			expect(await page.evaluate(() => window.sourceFocusFixture)).toEqual({
+				states: timing === "array" ? ["ready:8-1"] : ["loading:8-1", "ready:8-1"],
+				duringSource: [], completions: 0, requests: 2
+			});
+			expect(await page.evaluate(() => window.ownershipCalendar.getState().selectedDate)).toEqual({ year: 2026, month: 8, day: 1 });
+			await expect(page.getByRole("gridcell")).toHaveCount(42);
+			await expect(page.locator('[aria-selected="true"] .lfc-calendar-day-button')).toHaveAttribute("data-lfc-date", "2026-08-01");
+			await expect(page.locator("[data-my-calendar]")).not.toHaveAttribute("aria-busy", "true");
+		});
+	}
+}
