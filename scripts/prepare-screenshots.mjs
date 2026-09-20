@@ -1,9 +1,12 @@
 import { run, runNpm } from "./lib/process.mjs";
 import { prepareScreenshots } from "./lib/screenshot-preparation.mjs";
-import { assertPinnedNpm, assertSupportedNode, computeSourceFingerprint } from "./screenshot-contract.mjs";
+import {
+	assertPinnedNpm, assertPinnedPlaywright, assertSupportedNode, computeSourceFingerprint
+} from "./screenshot-contract.mjs";
 
 assertSupportedNode();
 assertPinnedNpm();
+await assertPinnedPlaywright();
 const arguments_ = process.argv.slice(2);
 if (arguments_.some((argument) => argument !== "--force")) {
 	throw new Error("Usage: npm run screenshots:prepare [-- --force]");

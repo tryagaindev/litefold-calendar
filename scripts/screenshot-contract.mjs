@@ -9,8 +9,11 @@ import {
 } from "./lib/node-version.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
 import { browserTargetsFingerprint } from "./lib/browser-targets.mjs";
+import { parseSemVer } from "./lib/semver.mjs";
 
 export const REQUIRED_NPM_VERSION = "12.0.2";
+const PACKAGE_MANIFEST = JSON.parse(await readFile(resolve(REPOSITORY_ROOT, "package.json"), "utf8"));
+export const REQUIRED_PLAYWRIGHT_VERSION = pinnedPlaywrightVersion(PACKAGE_MANIFEST);
 export const SCREENSHOT_MANIFEST_PATH = resolve(REPOSITORY_ROOT, "screenshots.manifest.json");
 export const SCREENSHOT_DIRECTORY = resolve(REPOSITORY_ROOT, "docs", "screenshots");
 export const EXPECTED_SCENES = Object.freeze([
@@ -86,6 +89,36 @@ export function assertPinnedNpm() {
 		throw new Error(
 			`Screenshot tooling requires npm ${REQUIRED_NPM_VERSION}; received ${npmVersion ?? "unknown"}. ` +
 			"Run it through the manifest-pinned package manager."
+		);
+	}
+}
+
+export function pinnedPlaywrightVersion(packageManifest) {
+	const version = packageManifest?.devDependencies?.["@playwright/test"];
+	try {
+		parseSemVer(version);
+	} catch (error) {
+		throw new Error("package.json must pin @playwright/test to an exact version.", { cause: error });
+	}
+	return version;
+}
+
+export async function assertPinnedPlaywright() {
+	let installedVersion;
+	try {
+		const installedManifest = JSON.parse(await readFile(resolve(
+			REPOSITORY_ROOT, "node_modules", "@playwright", "test", "package.json"
+		), "utf8"));
+		installedVersion = installedManifest.version;
+	} catch (error) {
+		throw new Error("Screenshot tooling requires the package.json-pinned @playwright/test install. Run npm ci.", {
+			cause: error
+		});
+	}
+	if (installedVersion !== REQUIRED_PLAYWRIGHT_VERSION) {
+		throw new Error(
+			`Screenshot tooling requires @playwright/test ${REQUIRED_PLAYWRIGHT_VERSION}; ` +
+			`received ${installedVersion ?? "unknown"}. Run npm ci.`
 		);
 	}
 }
@@ -196,7 +229,8 @@ export function validateScreenshotManifest(manifest, { final = false } = {}) {
 	}
 	if (!isSupportedNodeVersion(manifest.toolchain?.node) ||
 		manifest.toolchain?.npm !== REQUIRED_NPM_VERSION ||
-		manifest.toolchain?.playwright !== "1.62.1" || manifest.toolchain?.browser !== "chromium") {
+		manifest.toolchain?.playwright !== REQUIRED_PLAYWRIGHT_VERSION ||
+		manifest.toolchain?.browser !== "chromium") {
 		errors.push(
 			`Manifest toolchain must record an exact Node ${SUPPORTED_NODE_RANGE} runtime and the pinned ` +
 			"npm, Playwright, and Chromium inputs."

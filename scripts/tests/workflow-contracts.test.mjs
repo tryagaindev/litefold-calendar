@@ -615,6 +615,10 @@ void test("workflow dependency caches stay disabled", async () => {
 
 void test("browser gates reject flakes and local Firefox qualification retains reproducible evidence", async () => {
 	assert.equal(playwrightConfiguration.failOnFlakyTests, true);
+	assert.equal(
+		playwrightConfiguration.projects.find(({ name }) => name === "firefox")?.workers,
+		1
+	);
 	const config = await readFile(join(REPOSITORY_ROOT, "playwright.config.mjs"), "utf8");
 	assert.match(config, /workers: process\.env\["CI"\] \? 1 : 2/u);
 	assert.match(config, /retries: process\.env\["CI"\] \? 1 : 0/u);

@@ -9,15 +9,17 @@ import {
 	replaceScreenshotBatch, validateScreenshotBatch, writeScreenshotReview
 } from "./lib/screenshot-preparation.mjs";
 import {
-	assertSupportedNode, assertPinnedNpm, computeSourceFingerprint, readPngDimensions,
-	readScreenshotManifest, SCREENSHOT_DIRECTORY, SCREENSHOT_MANIFEST_PATH,
-	sha256File, validateScreenshotManifest
+	assertSupportedNode, assertPinnedNpm, assertPinnedPlaywright, computeSourceFingerprint,
+	readPngDimensions, readScreenshotManifest, REQUIRED_NPM_VERSION,
+	REQUIRED_PLAYWRIGHT_VERSION, SCREENSHOT_DIRECTORY, SCREENSHOT_MANIFEST_PATH, sha256File,
+	validateScreenshotManifest
 } from "./screenshot-contract.mjs";
 import { ADDITIONAL_SCREENSHOT_SCENES, prepareScreenshotScene } from "./screenshot-scenes.mjs";
 import { startRepositoryServer } from "./serve-repository.mjs";
 
 assertSupportedNode();
 assertPinnedNpm();
+await assertPinnedPlaywright();
 if (process.env["CI"]) {
 	throw new Error("CI must verify screenshot evidence; canonical captures can only be prepared locally.");
 }
@@ -25,6 +27,12 @@ if (process.env["CI"]) {
 const previousManifest = await readScreenshotManifest();
 const manifest = {
 	...previousManifest,
+	toolchain: {
+		browser: "chromium",
+		node: process.versions.node,
+		npm: REQUIRED_NPM_VERSION,
+		playwright: REQUIRED_PLAYWRIGHT_VERSION
+	},
 	scenes: [...previousManifest.scenes, ...ADDITIONAL_SCREENSHOT_SCENES.filter((scene) =>
 		!previousManifest.scenes.some((previous) => previous.id === scene.id))]
 };
@@ -83,7 +91,6 @@ try {
 	}
 	const updatedManifest = {
 		...manifest, state: "final",
-		toolchain: { ...manifest.toolchain, node: process.versions.node },
 		browserTargets: resolveBrowserTargets(), sourceFingerprint, scenes: updatedScenes
 	};
 	const finalErrors = validateScreenshotManifest(updatedManifest, { final: true });
