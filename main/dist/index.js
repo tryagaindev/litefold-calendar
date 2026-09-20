@@ -686,6 +686,7 @@ var CALENDAR_OPTION_SCHEMA = Object.freeze({
 	onError: "callback",
 	onEventActivate: "callback",
 	onEventOverflowActivate: "callback",
+	onEventOverflowDefault: "callback",
 	onEventContextMenu: "callback",
 	onStateChange: "callback",
 	sourceEventLimit: "value",
@@ -998,6 +999,25 @@ function createRenderHookRuntimes(renderHooks, AbortControllerConstructor) {
 }
 //#endregion
 //#region src/internal/runtime/source.ts
+/** Reserves state publication for a source phase through preparation and DOM reactions. */
+var CalendarEventSourcePublication = class {
+	generation = null;
+	isPending(generation) {
+		return this.generation === generation;
+	}
+	didPublish(generation) {
+		if (this.generation === generation) this.generation = null;
+	}
+	run(generation, action) {
+		const previousGeneration = this.generation;
+		this.generation = generation;
+		try {
+			return action();
+		} finally {
+			this.generation = previousGeneration;
+		}
+	}
+};
 var EVENT_INPUT_KEYS = Object.freeze([
 	"accentColor",
 	"end",
@@ -2169,6 +2189,11 @@ function getEventActionKey(surface, dateString, eventId) {
 		eventId
 	]);
 }
+/** Tests a known target in its own document or shadow tree, without realm assumptions. */
+function hasElementFocus(element) {
+	const root = element.getRootNode();
+	return "activeElement" in root && root.activeElement === element;
+}
 /** Returns focus only when it is still owned by this calendar host. */
 function getOwnedActiveElement(document, host) {
 	const active = document.activeElement;
@@ -2228,23 +2253,24 @@ function captureCalendarFocus(active, host, dom, elements) {
 	return active === elements.agendaMoreButton ? { kind: "agenda-more" } : null;
 }
 /** Restores focus to the same occurrence, its day, or the calendar's current fallback. */
-function restoreCalendarFocus(token, dom, elements, focusedDateString, host) {
-	if (token === null || dom === null) return;
+function restoreCalendarFocus(token, dom, elements, focusedDateString, host, isCurrent = () => true) {
+	if (token === null || dom === null || !isCurrent()) return;
 	const resolvedElement = resolveFocusElement(token, dom, elements);
 	const element = resolvedElement !== null && resolvedElement.isConnected && host.contains(resolvedElement) ? resolvedElement : null;
 	const resolvedDateFallback = token.date === void 0 ? null : elements.dayButtons.get(token.date) ?? null;
 	const dateFallback = resolvedDateFallback !== null && resolvedDateFallback.isConnected && host.contains(resolvedDateFallback) ? resolvedDateFallback : null;
 	const target = element ?? dateFallback ?? elements.dayButtons.get(focusedDateString) ?? dom.titleButton;
 	if (token.date !== void 0 && (isGridActionToken(token) || element === null && dateFallback !== null)) setDayProxyTabStop(token.date, elements);
-	focusRestorationTarget(target, token.date, elements, host);
+	focusRestorationTarget(target, token.date, elements, host, isCurrent);
 }
-function focusRestorationTarget(target, date, elements, host) {
+function focusRestorationTarget(target, date, elements, host, isCurrent) {
 	target.focus({ preventScroll: true });
-	if (target.ownerDocument.activeElement !== target && date !== void 0 && !focusFirstEligible(elements.gridActionsByDate.get(date) ?? [], host)) elements.dayButtons.get(date)?.focus({ preventScroll: true });
+	if (isCurrent() && target.ownerDocument.activeElement !== target && date !== void 0 && !focusFirstEligible(elements.gridActionsByDate.get(date) ?? [], host, isCurrent) && isCurrent()) elements.dayButtons.get(date)?.focus({ preventScroll: true });
 }
 /** Lets the browser reject CSS-hidden controls without duplicating responsive layout decisions. */
-function focusFirstEligible(actions, host) {
+function focusFirstEligible(actions, host, isCurrent = () => true) {
 	for (const action of actions) {
+		if (!isCurrent()) return false;
 		if (!action.isConnected || !host.contains(action)) continue;
 		action.focus({ preventScroll: true });
 		if (action.ownerDocument.activeElement === action) return true;
@@ -2441,11 +2467,13 @@ function setDayActionShortcuts(button, hasSummaryAction, overflow, hasContext) {
 /** Installs package-owned overflow behavior before consumer visual hooks inspect the action. */
 function installGridOverflowActionListeners(options) {
 	options.action.addEventListener("click", (event) => {
-		if (!options.isCurrent()) return;
+		const isCurrent = options.captureCurrent();
+		if (!isCurrent()) return;
 		const onActivate = options.onActivate;
-		if (onActivate !== void 0) {
+		let context = null;
+		if (onActivate !== void 0 || options.needsContext) {
 			const events = Object.freeze([...options.events()]);
-			const context = Object.freeze({
+			context = Object.freeze({
 				date: Object.freeze({ ...options.date }),
 				dateString: formatCalendarDate(options.date),
 				element: options.action,
@@ -2453,9 +2481,10 @@ function installGridOverflowActionListeners(options) {
 				events,
 				nativeEvent: event
 			});
-			options.invokeAction(() => onActivate(context));
 		}
-		if (!event.defaultPrevented && options.isCurrent()) options.onDefault();
+		const activation = context;
+		if (onActivate !== void 0 && activation !== null) options.invokeAction(() => onActivate(activation));
+		if (!event.defaultPrevented && isCurrent()) options.onDefault(activation);
 	}, { capture: true });
 	options.action.addEventListener("keydown", (event) => {
 		options.onKeydown(event);
@@ -2869,6 +2898,75 @@ var CalendarEventOverflowPresenter = class {
 		options.summaries.append(overflowCluster);
 	}
 };
+//#endregion
+//#region src/internal/runtime/action-pipeline.ts
+/** Runs synchronous action bodies and observes promises with per-hook stale-error ownership. */
+var CalendarActionPipeline = class {
+	generations = /* @__PURE__ */ new Map();
+	options;
+	constructor(options) {
+		this.options = options;
+	}
+	/** Invalidates retained asynchronous actions at teardown or fatal failure. */
+	clear() {
+		this.generations.clear();
+	}
+	/** Invokes without awaiting; successful current actions clear only their own issue. */
+	invoke(name, action) {
+		if (!this.options.canInvoke()) return;
+		const generation = (this.generations.get(name) ?? 0) + 1;
+		this.generations.set(name, generation);
+		const isCurrent = () => this.options.isLive() && this.generations.get(name) === generation;
+		const succeed = () => {
+			if (isCurrent()) this.options.clearIssue(name);
+		};
+		const fail = (cause) => {
+			const messages = this.options.messages();
+			this.options.report(name, createInternalError({
+				cause,
+				code: "action-failed",
+				hook: name,
+				recoverable: true,
+				severity: "error",
+				stale: !isCurrent(),
+				userMessage: messages.actionErrorMessage,
+				userTitle: messages.actionErrorTitle
+			}), isCurrent);
+		};
+		let result;
+		try {
+			result = action();
+		} catch (cause) {
+			fail(cause);
+			return;
+		}
+		if (result === void 0) {
+			succeed();
+			return;
+		}
+		Promise.resolve(result).then(succeed, fail);
+	}
+};
+//#endregion
+//#region src/internal/runtime/overflow-default.ts
+/** Focuses only a current committed agenda and reports successful focus synchronously. */
+function completeEventOverflowDefault(completion, activation, options) {
+	if (completion === null || !options.isCurrent(completion)) return;
+	const agendaHeading = completion.dom.agendaTitle;
+	const isCurrent = () => options.isCurrent(completion) && completion.dom.agendaTitle === agendaHeading && agendaHeading.isConnected && options.host.contains(agendaHeading);
+	if (!isCurrent()) return;
+	agendaHeading.focus({ preventScroll: true });
+	if (!isCurrent() || !hasElementFocus(agendaHeading)) return;
+	const onDefault = options.onDefault;
+	if (onDefault === void 0 || activation === null) return;
+	const { element: triggerElement, ...snapshot } = activation;
+	const context = Object.freeze({
+		...snapshot,
+		agendaHeading,
+		triggerElement
+	});
+	options.invokeAction(() => onDefault(context));
+}
 //#endregion
 //#region src/internal/runtime/swipe.ts
 var CLICK_SUPPRESSION_RELEASE_DELAY = 400;
@@ -4399,6 +4497,7 @@ var MonthCalendar = class {
 	options;
 	registeredExtensions;
 	sourceEventLimit;
+	sourcePublication = new CalendarEventSourcePublication();
 	swipeEnabled;
 	swipeGesture;
 	timeZone;
@@ -4409,7 +4508,25 @@ var MonthCalendar = class {
 	activeController = null;
 	announcementGeneration = 0;
 	announcementPresenter = null;
-	actionGenerations = /* @__PURE__ */ new Map();
+	actionPipeline = new CalendarActionPipeline({
+		canInvoke: () => this.canContinueInteraction(),
+		isLive: () => !this.isDestroyed && !this.hasFatalError,
+		messages: () => this.messages,
+		clearIssue: (name) => {
+			this.clearIssues((entry) => entry.key === `action-failed:${name}`, true);
+		},
+		report: (name, error, isCurrent) => {
+			if (error.stale) {
+				this.deliverError(error);
+				return;
+			}
+			this.acceptError(error, {
+				key: `action-failed:${name}`,
+				politeness: "assertive",
+				retryable: false
+			}, true, "default", isCurrent);
+		}
+	});
 	agendaVisibleCount;
 	currentEventsByDate = /* @__PURE__ */ new Map();
 	currentRange = null;
@@ -4435,6 +4552,8 @@ var MonthCalendar = class {
 	agendaMoreButton = null;
 	selectedDate;
 	renderGeneration = 0;
+	interactionEpoch = 0;
+	committedRender = null;
 	selectionEntryDate = null;
 	state;
 	constructor(host, options) {
@@ -4640,13 +4759,15 @@ var MonthCalendar = class {
 	destroy() {
 		if (this.isDestroyed) return;
 		this.isDestroyed = true;
+		this.interactionEpoch += 1;
+		this.committedRender = null;
 		this.isRendered = false;
 		this.monthPickerController.hide(false);
 		this.palette?.disconnect();
 		this.palette = null;
 		this.generation += 1;
 		this.registeredExtensions?.stop();
-		this.actionGenerations.clear();
+		this.actionPipeline.clear();
 		this.resetInternalAnnouncement();
 		this.activeController?.abort();
 		this.activeController = null;
@@ -4696,6 +4817,7 @@ var MonthCalendar = class {
 		}
 		if (!this.canContinueInteraction() || replacementSequence < this.latestAcceptedEventReplacement) return;
 		this.latestAcceptedEventReplacement = replacementSequence;
+		this.interactionEpoch += 1;
 		this.eventSource = resolvedEvents;
 		this.swipeGesture.clear();
 		this.loadVisibleEvents(false);
@@ -4703,6 +4825,7 @@ var MonthCalendar = class {
 	/** Forces the current visible range to be loaded again. */
 	refetchEvents() {
 		this.requireLive("refetchEvents");
+		this.interactionEpoch += 1;
 		this.swipeGesture.clear();
 		this.loadVisibleEvents(true);
 	}
@@ -4779,13 +4902,16 @@ var MonthCalendar = class {
 		}
 	}
 	claimNavigation(navigationRevision) {
-		return this.registeredExtensions === null ? 0 : this.registeredExtensions.claimNavigation(navigationRevision);
+		if (!this.canContinueInteraction()) return null;
+		const revision = this.registeredExtensions?.claimNavigation(navigationRevision) ?? (this.registeredExtensions === null ? 0 : null);
+		if (revision !== null) this.interactionEpoch += 1;
+		return revision;
 	}
 	isNavigationCurrent(navigationRevision) {
 		return this.registeredExtensions?.isNavigationCurrent(navigationRevision) ?? true;
 	}
-	canCompleteNavigation(navigationRevision) {
-		return this.canContinueInteraction() && this.isNavigationCurrent(navigationRevision);
+	canCompleteNavigation(navigationRevision, interactionEpoch) {
+		return this.canContinueInteraction() && this.interactionEpoch === interactionEpoch && this.isNavigationCurrent(navigationRevision);
 	}
 	createStructure() {
 		const dom = createCalendarStructure(this.options, {
@@ -4825,9 +4951,9 @@ var MonthCalendar = class {
 	renderCalendar() {
 		if (this.hasFatalError) return false;
 		const activeBefore = getOwnedActiveElement(this.document, this.host);
+		this.committedRender = null;
 		try {
-			this.renderCalendarUnsafe();
-			return true;
+			return this.renderCalendarUnsafe();
 		} catch (cause) {
 			this.handleFatalError(cause, wasOwnedFocusRemoved(activeBefore, this.host));
 			return false;
@@ -4835,7 +4961,8 @@ var MonthCalendar = class {
 	}
 	renderCalendarUnsafe() {
 		const dom = this.dom;
-		if (!this.isRendered || this.isDestroyed || dom === null) return;
+		if (!this.isRendered || this.isDestroyed || dom === null) return false;
+		const interactionEpoch = this.interactionEpoch;
 		this.swipeGesture.prepareForRender(dom);
 		const focus = captureCalendarFocus(this.document.activeElement, this.host, this.dom, this.getGridFocusElements());
 		let remainingRecoveryAttempts = this.renderHooks.filter((runtime) => !runtime.quarantined).length;
@@ -4844,7 +4971,7 @@ var MonthCalendar = class {
 			this.renderHookNodes.beginRenderPass();
 			const renderGeneration = ++this.renderGeneration;
 			this.prepareRenderHooksForRender(renderGeneration);
-			if (this.wasRenderInterrupted(dom, renderGeneration)) return;
+			if (this.wasRenderInterrupted(dom, renderGeneration)) return false;
 			this.updateMonthTitle(dom);
 			dom.titleButton.removeAttribute("aria-disabled");
 			const today = this.getTodayDate(false);
@@ -4862,13 +4989,13 @@ var MonthCalendar = class {
 					dom.swipeViewport,
 					this.host
 				], 2);
-			}) || this.wasRenderInterrupted(dom, renderGeneration)) return;
+			}) || this.wasRenderInterrupted(dom, renderGeneration)) return false;
 			this.selectionEntryDate = null;
 			this.renderAgenda(dom, eventActions, eventMounts, renderGeneration);
-			if (this.wasRenderInterrupted(dom, renderGeneration)) return;
+			if (this.wasRenderInterrupted(dom, renderGeneration)) return false;
 			let newlyQuarantined = this.getQuarantinedRenderHookCount() - quarantinedBeforeAttempt;
 			if (newlyQuarantined === 0) newlyQuarantined = this.validateMountedRenderHookNodes();
-			if (this.wasRenderInterrupted(dom, renderGeneration)) return;
+			if (this.wasRenderInterrupted(dom, renderGeneration)) return false;
 			if (newlyQuarantined > 0) {
 				remainingRecoveryAttempts -= newlyQuarantined;
 				continue;
@@ -4878,10 +5005,18 @@ var MonthCalendar = class {
 			this.gridActionsByDate = gridActionsByDate;
 			this.gridMoreButtons = gridMoreButtons;
 			if (dayMounts !== null && eventMounts !== null) this.runMountHooks(dayMounts, eventMounts);
-			if (this.wasRenderInterrupted(dom, renderGeneration)) return;
+			if (this.wasRenderInterrupted(dom, renderGeneration)) return false;
 			this.renderIssues();
-			restoreCalendarFocus(focus, this.dom, this.getGridFocusElements(), formatCalendarDate(this.focusedDate), this.host);
-			return;
+			if (this.wasRenderInterrupted(dom, renderGeneration)) return false;
+			restoreCalendarFocus(focus, this.dom, this.getGridFocusElements(), formatCalendarDate(this.focusedDate), this.host, () => this.interactionEpoch === interactionEpoch && !this.wasRenderInterrupted(dom, renderGeneration));
+			if (this.wasRenderInterrupted(dom, renderGeneration)) return false;
+			this.committedRender = Object.freeze({
+				dateString: formatCalendarDate(this.selectedDate),
+				dom,
+				interactionEpoch,
+				renderGeneration
+			});
+			return true;
 		}
 		throw new TypeError("Render-hook recovery exceeded the configured hook-set bound.");
 	}
@@ -4956,14 +5091,24 @@ var MonthCalendar = class {
 				date,
 				events: () => events.map((event) => event.event),
 				invokeAction: (action) => {
-					this.invokeAction("onEventOverflowActivate", action);
+					this.actionPipeline.invoke("onEventOverflowActivate", action);
 				},
-				isCurrent: () => this.canUseRenderedAction(gridMore, renderGeneration),
+				captureCurrent: () => {
+					const epoch = this.interactionEpoch;
+					return () => epoch === this.interactionEpoch && this.canUseRenderedAction(gridMore, renderGeneration);
+				},
+				needsContext: this.options.onEventOverflowDefault !== void 0,
 				onActivate: this.options.onEventOverflowActivate,
-				onDefault: () => {
+				onDefault: (activation) => {
 					if (this.bounds.getDateNavigationFailure(date) !== null) return;
-					this.selectDate(date, "gridMore");
-					if (this.canContinueInteraction()) this.dom?.agendaTitle.focus({ preventScroll: true });
+					completeEventOverflowDefault(this.selectDate(date, "gridMore"), activation, {
+						host: this.host,
+						isCurrent: (completion) => this.interactionEpoch === completion.interactionEpoch && this.isRenderCommitCurrent(completion),
+						onDefault: this.options.onEventOverflowDefault,
+						invokeAction: (action) => {
+							this.actionPipeline.invoke("onEventOverflowDefault", action);
+						}
+					});
 				},
 				onKeydown: (event) => {
 					this.handleRenderedGridActionKeydown(event, dateString, gridMore, renderGeneration);
@@ -4994,7 +5139,7 @@ var MonthCalendar = class {
 			if (selectedButton === void 0) return;
 			const context = createDaySelection(jsEvent, date, selectedButton);
 			const onDaySelect = this.options.onDaySelect;
-			if (onDaySelect !== void 0) this.invokeAction("onDaySelect", () => onDaySelect(context));
+			if (onDaySelect !== void 0) this.actionPipeline.invoke("onDaySelect", () => onDaySelect(context));
 		});
 		button.addEventListener("keydown", (event) => {
 			if (!this.canUseRenderedAction(button, renderGeneration)) return;
@@ -5079,7 +5224,7 @@ var MonthCalendar = class {
 			isCurrent: () => this.canUseRenderedAction(action, renderGeneration),
 			onActivate: onEventActivate === void 0 ? null : (nativeEvent) => {
 				const context = createEventActivation(nativeEvent, date, action, calendarEvent, surface);
-				this.invokeAction("onEventActivate", () => onEventActivate(context));
+				this.actionPipeline.invoke("onEventActivate", () => onEventActivate(context));
 			},
 			onContext: hasContextAction ? (nativeEvent, clientX, clientY) => {
 				this.invokeEventContextMenu(nativeEvent, date, action, calendarEvent, surface, clientX, clientY);
@@ -5433,6 +5578,7 @@ var MonthCalendar = class {
 		if (changesDisplayedMonth) {
 			const navigationRevision = this.claimNavigation();
 			if (navigationRevision === null) return;
+			const interactionEpoch = this.interactionEpoch;
 			this.monthPickerController.hide(false);
 			this.focusedDate = target;
 			this.displayedMonth = {
@@ -5443,10 +5589,11 @@ var MonthCalendar = class {
 			this.selectedDate = target;
 			this.agendaVisibleCount = Math.min(this.agendaPageSize, this.agendaDomLimit);
 			this.loadVisibleEvents(false);
-			if (this.canContinueInteraction() && this.isNavigationCurrent(navigationRevision)) this.dayButtons.get(formatCalendarDate(target))?.focus({ preventScroll: true });
+			if (this.canCompleteNavigation(navigationRevision, interactionEpoch)) this.dayButtons.get(formatCalendarDate(target))?.focus({ preventScroll: true });
 			return;
 		}
 		if (!isVisible) return;
+		this.interactionEpoch += 1;
 		this.focusedDate = target;
 		for (const candidate of this.dayButtons.values()) candidate.tabIndex = candidate.getAttribute("data-lfc-date") === formatCalendarDate(target) ? 0 : -1;
 		this.dayButtons.get(formatCalendarDate(target))?.focus({ preventScroll: true });
@@ -5455,74 +5602,26 @@ var MonthCalendar = class {
 		const onEventContextMenu = this.options.onEventContextMenu;
 		if (onEventContextMenu === void 0) return;
 		const context = createEventContextMenu(nativeEvent, date, element, event, surface, clientX, clientY);
-		this.invokeAction("onEventContextMenu", () => onEventContextMenu(context));
+		this.actionPipeline.invoke("onEventContextMenu", () => onEventContextMenu(context));
 	}
 	invokeDayContextMenu(nativeEvent, date, element, clientX, clientY) {
 		if (!this.bounds.isDateAllowed(date)) return;
 		const context = createDayContextMenu(nativeEvent, date, element, clientX, clientY);
 		const onDayContextMenu = this.options.onDayContextMenu;
-		if (onDayContextMenu !== void 0) this.invokeAction("onDayContextMenu", () => onDayContextMenu(context));
-	}
-	invokeAction(name, action) {
-		if (!this.canContinueInteraction()) return;
-		const generation = (this.actionGenerations.get(name) ?? 0) + 1;
-		this.actionGenerations.set(name, generation);
-		let result;
-		try {
-			result = action();
-		} catch (cause) {
-			this.handleActionFailure(name, cause, generation);
-			return;
-		}
-		if (result === void 0) {
-			if (this.isCurrentAction(name, generation)) this.clearActionIssue(name);
-			return;
-		}
-		Promise.resolve(result).then(() => {
-			if (this.isCurrentAction(name, generation)) this.clearActionIssue(name);
-		}, (cause) => {
-			this.handleActionFailure(name, cause, generation);
-		});
-	}
-	clearActionIssue(name) {
-		this.clearIssues((entry) => entry.key === `action-failed:${name}`, true);
-	}
-	isCurrentAction(name, generation) {
-		return !this.isDestroyed && !this.hasFatalError && this.actionGenerations.get(name) === generation;
-	}
-	handleActionFailure(name, cause, generation) {
-		const stale = !this.isCurrentAction(name, generation);
-		const error = createInternalError({
-			cause,
-			code: "action-failed",
-			hook: name,
-			recoverable: true,
-			severity: "error",
-			stale,
-			userMessage: this.messages.actionErrorMessage,
-			userTitle: this.messages.actionErrorTitle
-		});
-		if (stale) {
-			this.deliverError(error);
-			return;
-		}
-		this.acceptError(error, {
-			key: `action-failed:${name}`,
-			politeness: "assertive",
-			retryable: false
-		}, true, "default", () => this.isCurrentAction(name, generation));
+		if (onDayContextMenu !== void 0) this.actionPipeline.invoke("onDayContextMenu", () => onDayContextMenu(context));
 	}
 	selectDate(date, invalidHook, animateSelection = false, navigationRevision, moveFocus = true) {
 		this.assertNavigableDate(date, invalidHook);
-		if (!this.canContinueInteraction()) return;
 		const changesMonth = date.year * 12 + date.month !== this.displayedMonth.year * 12 + this.displayedMonth.month;
 		const changesSelection = compareCalendarDates(date, this.selectedDate) !== 0;
 		const stateBeforeNavigation = this.state;
 		const generationBeforeNavigation = this.generation;
 		const claimedNavigationRevision = this.claimNavigation(navigationRevision);
-		if (claimedNavigationRevision === null) return;
+		if (claimedNavigationRevision === null) return null;
+		const interactionEpoch = this.interactionEpoch;
 		this.swipeGesture.clear();
 		this.monthPickerController.hide(false);
+		if (!this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) return null;
 		this.selectionEntryDate = animateSelection && changesSelection && !changesMonth ? formatCalendarDate(date) : null;
 		this.selectedDate = date;
 		this.focusedDate = date;
@@ -5535,11 +5634,24 @@ var MonthCalendar = class {
 			};
 			this.loadVisibleEvents(false);
 		} else this.renderCalendar();
-		if (!this.canCompleteNavigation(claimedNavigationRevision)) return;
-		if (moveFocus) this.dayButtons.get(formatCalendarDate(date))?.focus({ preventScroll: true });
-		if (!this.canCompleteNavigation(claimedNavigationRevision)) return;
-		if (!changesMonth && changesSelection) this.setState(this.derivePhase());
-		else if (navigationRevision === void 0 && !changesMonth && this.state === stateBeforeNavigation && this.generation === generationBeforeNavigation) this.registeredExtensions?.notifyStateChanged();
+		const completion = this.getSelectionCommit(interactionEpoch);
+		if (completion === null) return null;
+		if (moveFocus && this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) this.dayButtons.get(formatCalendarDate(date))?.focus({ preventScroll: true });
+		if (!this.isRenderCommitCurrent(completion)) return null;
+		if (!changesMonth && compareCalendarDates(date, this.state.selectedDate) !== 0) this.setState(this.derivePhase());
+		if (!this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) return null;
+		if (!changesMonth) this.notifyUnchangedSelection(navigationRevision, stateBeforeNavigation, generationBeforeNavigation);
+		return this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch) ? this.getSelectionCommit(interactionEpoch) : null;
+	}
+	notifyUnchangedSelection(navigationRevision, state, generation) {
+		if (navigationRevision === void 0 && this.state === state && this.generation === generation && !this.sourcePublication.isPending(generation)) this.registeredExtensions?.notifyStateChanged();
+	}
+	getSelectionCommit(interactionEpoch) {
+		const completion = this.committedRender;
+		return completion?.interactionEpoch === interactionEpoch && this.isRenderCommitCurrent(completion) ? completion : null;
+	}
+	isRenderCommitCurrent(completion) {
+		return this.canContinueInteraction() && this.committedRender === completion && this.renderGeneration === completion.renderGeneration && this.dom === completion.dom && HOST_OWNERS.get(this.host) === this && formatCalendarDate(this.selectedDate) === completion.dateString;
 	}
 	shiftMonth(amount, fromPager = false, navigationRevision) {
 		if (!fromPager) this.swipeGesture.clear();
@@ -5577,7 +5689,7 @@ var MonthCalendar = class {
 				if (this.claimNavigation(navigationRevision) === null) return;
 				this.swipeGesture.clear();
 				this.monthPickerController.hide(false);
-				if (navigationRevision === void 0) this.registeredExtensions?.notifyStateChanged();
+				if (navigationRevision === void 0 && !this.sourcePublication.isPending(this.generation)) this.registeredExtensions?.notifyStateChanged();
 				return;
 			}
 			this.selectDate(date, invalidHook, false, navigationRevision, false);
@@ -5601,7 +5713,13 @@ var MonthCalendar = class {
 		if (failure !== null) throw this.createPublicMethodError("invalid-argument", invalidHook, failure === "out-of-bounds" ? `${invalidHook}(date) must fall within minDate and maxDate.` : `${invalidHook}(date) cannot display a month whose complete six-week grid falls outside years 0001-9999.`);
 	}
 	loadVisibleEvents(userRetry) {
-		const request = this.beginVisibleEventRequest(userRetry);
+		if (!this.isRendered || this.isDestroyed || this.dom === null) return;
+		this.sourcePublication.run(++this.generation, () => {
+			this.evaluateVisibleEvents(userRetry);
+		});
+	}
+	evaluateVisibleEvents(userRetry) {
+		const request = this.beginVisibleEventRequest(userRetry, this.generation);
 		if (request === null) return;
 		let result;
 		try {
@@ -5618,16 +5736,19 @@ var MonthCalendar = class {
 			return;
 		}
 		observeVisibleEventRequest(result.events, (values) => {
-			this.commitSourceRequestSuccess(values, request);
+			this.sourcePublication.run(request.generation, () => {
+				this.commitSourceRequestSuccess(values, request);
+			});
 		}, (cause) => {
-			this.handleSourceRequestFailure(cause, request);
+			this.sourcePublication.run(request.generation, () => {
+				this.handleSourceRequestFailure(cause, request);
+			});
 		}, (cause) => {
 			this.handleFatalError(cause);
 		});
 		this.publishSourceLoading(request);
 	}
-	beginVisibleEventRequest(userRetry) {
-		if (!this.isRendered || this.isDestroyed || this.dom === null) return null;
+	beginVisibleEventRequest(userRetry, generation) {
 		const range = getCalendarMonthRange(this.displayedMonth, this.firstDay);
 		const bounds = Object.freeze({
 			end: formatCalendarDate(range.end),
@@ -5635,7 +5756,6 @@ var MonthCalendar = class {
 		});
 		const rangeKey = `${bounds.start}/${bounds.end}`;
 		const hasRetainedSnapshot = this.loadedRangeKey === rangeKey && this.hasCurrentSnapshot;
-		const generation = ++this.generation;
 		const previousController = this.activeController;
 		this.activeController = null;
 		previousController?.abort();
@@ -5670,7 +5790,7 @@ var MonthCalendar = class {
 		const dom = this.getDomAfterCallback();
 		if (dom === null) return;
 		if (!setVisibleEventBusyState(this.host, dom.grid, true, () => this.canApplyRequest(request.generation, request.controller))) return;
-		this.setState("loading");
+		this.setState("loading", request.generation);
 		if (!this.canApplyRequest(request.generation, request.controller)) return;
 		if (!this.renderCalendar()) return;
 		if (!this.canApplyRequest(request.generation, request.controller)) return;
@@ -5700,7 +5820,7 @@ var MonthCalendar = class {
 		this.activeController = null;
 		this.isRetrying = false;
 		if (!setVisibleEventBusyState(this.host, this.dom?.grid ?? null, false, () => this.canApplyRequest(request.generation, request.controller))) return false;
-		this.setState(this.internalIssues.length > 0 ? "degraded" : "ready");
+		this.setState(this.internalIssues.length > 0 ? "degraded" : "ready", request.generation);
 		return this.canApplyRequest(request.generation, request.controller);
 	}
 	handleSourceRequestFailure(cause, request) {
@@ -5716,7 +5836,8 @@ var MonthCalendar = class {
 		this.acceptError(error, {
 			key: "event-source",
 			politeness: request.hasRetainedSnapshot ? "polite" : "assertive",
-			retryable: true
+			retryable: true,
+			sourceGeneration: request.generation
 		});
 		if (!this.canApplyRequest(request.generation, request.controller)) return;
 		if (!this.renderCalendar() || !this.canApplyRequest(request.generation, request.controller)) return;
@@ -5738,7 +5859,7 @@ var MonthCalendar = class {
 		return this.isRendered && !this.isDestroyed && !this.hasFatalError;
 	}
 	wasRenderInterrupted(dom, renderGeneration) {
-		return this.isDestroyed || this.dom !== dom || this.renderGeneration !== renderGeneration;
+		return this.dom !== dom || !this.isRenderGenerationCurrent(renderGeneration);
 	}
 	isRenderGenerationCurrent(renderGeneration) {
 		return !this.isDestroyed && this.renderGeneration === renderGeneration;
@@ -5763,6 +5884,7 @@ var MonthCalendar = class {
 	}
 	handleRetry = () => {
 		if (!this.canContinueInteraction() || this.isRetrying || this.activeController !== null) return;
+		this.interactionEpoch += 1;
 		this.isRetrying = true;
 		this.renderIssues();
 		this.loadVisibleEvents(true);
@@ -5780,8 +5902,8 @@ var MonthCalendar = class {
 		});
 		this.resetInternalAnnouncementForIssues(this.internalIssues.filter((candidate) => candidate.key === presentation.key));
 		this.internalIssues = Object.freeze([...this.internalIssues.filter((candidate) => candidate.key !== presentation.key), entry].slice(-12));
-		if (notifyState) this.setState(this.derivePhase());
-		else this.state = createState(this.derivePhase(), this.currentRange, this.internalIssues.map((candidate) => candidate.issue), this.displayedMonth, this.selectedDate);
+		if (notifyState) this.setState(this.derivePhase(), presentation.sourceGeneration);
+		else if (!this.sourcePublication.isPending(generation)) this.state = createState(this.derivePhase(), this.currentRange, this.internalIssues.map((candidate) => candidate.issue), this.displayedMonth, this.selectedDate);
 		if (!this.isCallbackGenerationCurrent(generation) || !isCurrent()) return;
 		this.renderIssues();
 		if (!handled) {
@@ -5886,7 +6008,8 @@ var MonthCalendar = class {
 		if (this.internalIssues.length > 0) return "degraded";
 		return this.hasCurrentSnapshot ? "ready" : "idle";
 	}
-	setState(phase) {
+	setState(phase, sourceGeneration) {
+		if (sourceGeneration !== this.generation && this.sourcePublication.isPending(this.generation)) return;
 		const callback = this.options.onStateChange;
 		if (callback !== void 0 && this.internalIssues.some((entry) => entry.key === "host-integration:onStateChange")) {
 			const removed = this.internalIssues.filter((entry) => entry.key === "host-integration:onStateChange");
@@ -5895,6 +6018,7 @@ var MonthCalendar = class {
 			phase = this.derivePhase();
 		}
 		this.state = createState(phase, this.currentRange, this.internalIssues.map((entry) => entry.issue), this.displayedMonth, this.selectedDate);
+		this.sourcePublication.didPublish(sourceGeneration);
 		if (callback === void 0) {
 			this.registeredExtensions?.notifyStateChanged();
 			return;
@@ -6012,7 +6136,7 @@ var MonthCalendar = class {
 	stopForFatalError(generation) {
 		this.registeredExtensions?.stop();
 		if (!this.isFatalGenerationCurrent(generation)) return null;
-		this.actionGenerations.clear();
+		this.actionPipeline.clear();
 		const activeBeforeFallback = getOwnedActiveElement(this.document, this.host);
 		const focusWasInPicker = activeBeforeFallback !== null && this.dom?.monthPicker.contains(activeBeforeFallback) === true;
 		this.activeController?.abort();

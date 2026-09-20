@@ -624,6 +624,10 @@ const calendarOptions = {
         reportAction(`Viewing ${String(eventCount)} items on ${dateString} with ${nativeEvent.type} on ${element.localName}.`);
     },
     onStateChange: updateState,
+    onEventOverflowDefault: ({ agendaHeading }) => {
+        //The library supplies the focused destination synchronously; scrolling belongs to this example.
+        agendaHeading.scrollIntoView({ behavior: "instant", block: "start", inline: "nearest" });
+    },
     renderHooks: [advancedRenderHooks],
     sourceEventLimit: 100,
     swipe: true,
