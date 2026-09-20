@@ -72,9 +72,13 @@ The coordinator's `MonthCalendar` class is the sole transaction owner, but it re
 Accepted navigation and explicit data replacement also claim an interaction epoch,
 independent of optional extensions. A committed-render receipt records that epoch,
 DOM identity, render generation, and selected date after mount hooks and focus
-restoration. Reentrant work invalidates older selection/focus completion, including
-accepted same-date navigation. Render-hook recovery remains within its owning
-interaction. The action pipeline observes returned promises using per-hook
+restoration. Reentrant work invalidates older focus/default completion, including
+accepted same-date navigation. Structural render validity uses DOM identity and
+render generation separately: a same-date navigation that needs no replacement
+must still allow the current grid and its selection state to commit. Detached
+hosts also commit render/state changes. Overflow completion additionally requires
+connectivity and actual heading focus. Render-hook recovery remains within
+its owning interaction. The action pipeline observes returned promises using per-hook
 generations; action completion does not own or replay navigation.
 
 ### Instance lifetime

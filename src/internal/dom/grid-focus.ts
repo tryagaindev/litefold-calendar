@@ -155,7 +155,7 @@ export function restoreCalendarFocus(
 	host: HTMLElement,
 	isCurrent: () => boolean = () => true
 ): void {
-	if (token === null || dom === null) {
+	if (token === null || dom === null || !isCurrent()) {
 		return;
 	}
 	const resolvedElement = resolveFocusElement(token, dom, elements);

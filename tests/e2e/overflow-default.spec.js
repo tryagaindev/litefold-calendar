@@ -110,3 +110,72 @@ test("completion validates focus in the heading's iframe document", async ({ pag
 	await page.frameLocator("iframe").locator('.lfc-calendar-grid-more[data-lfc-date="2026-07-14"]').click();
 	expect(await page.evaluate(() => window.frameCompletions)).toEqual([true]);
 });
+
+for (const navigation of ["gotoDate", "today"]) {
+	test(`early same-date ${navigation} preserves the complete usable grid`, async ({ page }) => {
+		await expectLibraryFixtureReady(page);
+		expect(await page.evaluate(async (navigation) => {
+			const { createCalendar } = await import("/dist/index.js");
+			const host = document.querySelector("[data-my-calendar]");
+			let armed = true;
+			let mounts = 0;
+			const calendar = createCalendar(host, {
+				events: [], initialDate: "2026-07-14", now: () => new Date("2026-07-14T12:00:00Z"),
+				renderHooks: [{
+					id: "same-date",
+					renderDayBadge: () => {
+						if (!armed) { return; }
+						armed = false;
+						if (navigation === "gotoDate") { calendar.gotoDate("2026-07-14"); }
+						else { calendar.today(); }
+					},
+					dayDidMount: () => { mounts += 1; }
+				}]
+			});
+			window.ownershipCalendar = calendar;
+			calendar.render();
+			return { armed, mounts, phase: calendar.getState().phase };
+		}, navigation)).toEqual({ armed: false, mounts: 42, phase: "ready" });
+		await expect(page.getByRole("gridcell")).toHaveCount(42);
+		await expect(page.locator(".lfc-calendar-day-button")).toHaveCount(42);
+		await page.locator('.lfc-calendar-day-button[data-lfc-date="2026-07-15"]').click();
+		expect(await page.evaluate(() => window.ownershipCalendar.getState().selectedDate.day)).toBe(15);
+		await expect(page.locator('[aria-selected="true"] .lfc-calendar-day-button')).toHaveAttribute("data-lfc-date", "2026-07-15");
+	});
+}
+
+for (const navigation of ["gotoDate", "focusDate"]) {
+	test(`detached ${navigation} keeps DOM and state aligned before insertion`, async ({ page }) => {
+		await expectLibraryFixtureReady(page);
+		expect(await page.evaluate(async (navigation) => {
+			const { createCalendar } = await import("/dist/index.js");
+			const host = document.querySelector("[data-my-calendar]");
+			host.remove();
+			const states = [];
+			window.detachedCompletions = 0;
+			const calendar = createCalendar(host, {
+				initialDate: "2026-07-14", gridEventDisplay: { compact: "count", wide: "count" },
+				events: [{ id: "one", start: "2026-07-15", title: "One" }],
+				onStateChange: (state) => { states.push(state.selectedDate.day); },
+				onEventOverflowDefault: () => { window.detachedCompletions += 1; }
+			});
+			calendar.render();
+			states.length = 0;
+			calendar[navigation]("2026-07-15");
+			host.querySelector('.lfc-calendar-grid-more[data-lfc-date="2026-07-15"]').click();
+			const result = {
+				states, day: calendar.getState().selectedDate.day, connected: host.isConnected,
+				cells: host.querySelectorAll('[role="gridcell"]').length,
+				selected: host.querySelector('[aria-selected="true"] .lfc-calendar-day-button').getAttribute("data-lfc-date"),
+				completions: window.detachedCompletions
+			};
+			document.querySelector("main").append(host);
+			return result;
+		}, navigation)).toEqual({
+			states: [15], day: 15, connected: false, cells: 42, selected: "2026-07-15", completions: 0
+		});
+		await page.locator('.lfc-calendar-grid-more[data-lfc-date="2026-07-15"]').click();
+		expect(await page.evaluate(() => window.detachedCompletions)).toBe(1);
+		await expect(page.locator(".lfc-calendar-agenda-title")).toBeFocused();
+	});
+}

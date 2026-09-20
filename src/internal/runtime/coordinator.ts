@@ -211,7 +211,6 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private selectedDate: CalendarDate;
 	private renderGeneration = 0;
 	private interactionEpoch = 0;
-	private renderInteractionEpoch = 0;
 	private committedRender: Readonly<CalendarRenderCompletion> | null = null;
 	private selectionEntryDate: string | null = null;
 	private state: CalendarState;
@@ -764,7 +763,6 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			const quarantinedBeforeAttempt = this.getQuarantinedRenderHookCount();
 			this.renderHookNodes.beginRenderPass();
 			const renderGeneration = ++this.renderGeneration;
-			this.renderInteractionEpoch = interactionEpoch;
 			this.prepareRenderHooksForRender(renderGeneration);
 			if (this.wasRenderInterrupted(dom, renderGeneration)) {
 				return false;
@@ -818,7 +816,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			if (this.wasRenderInterrupted(dom, renderGeneration)) { return false; }
 			restoreCalendarFocus(focus, this.dom, this.getGridFocusElements(),
 				formatCalendarDate(this.focusedDate), this.host,
-				() => !this.wasRenderInterrupted(dom, renderGeneration));
+				() => this.interactionEpoch === interactionEpoch && !this.wasRenderInterrupted(dom, renderGeneration));
 			if (this.wasRenderInterrupted(dom, renderGeneration)) { return false; }
 			this.committedRender = Object.freeze({
 				dateString: formatCalendarDate(this.selectedDate), dom, interactionEpoch, renderGeneration
@@ -931,7 +929,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				onDefault: (activation) => {
 					if (this.bounds.getDateNavigationFailure(date) !== null) { return; }
 					completeEventOverflowDefault(this.selectDate(date, "gridMore"), activation, {
-						host: this.host, isCurrent: (completion) => this.isRenderCompletionCurrent(completion),
+						host: this.host, isCurrent: (completion) => this.interactionEpoch === completion.interactionEpoch &&
+							this.isRenderCommitCurrent(completion),
 						onDefault: this.options.onEventOverflowDefault,
 						invokeAction: (action) => { this.actionPipeline.invoke("onEventOverflowDefault", action); }
 					});
@@ -1774,35 +1773,39 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		} else {
 			this.renderCalendar();
 		}
-		if (this.getSelectionCompletion(claimedNavigationRevision, interactionEpoch) === null) {
-			return null;
-		}
-		if (moveFocus) {
+		//A newer same-date interaction can supersede focus while this render still owns the state commit.
+		const completion = this.getSelectionCommit(interactionEpoch);
+		if (completion === null) { return null; }
+		if (moveFocus && this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) {
 			this.dayButtons.get(formatCalendarDate(date))?.focus({ preventScroll: true });
 		}
-		if (!this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) {
-			return null;
-		}
+		if (!this.isRenderCommitCurrent(completion)) { return null; }
 		if (!changesMonth && changesSelection) {
 			this.setState(this.derivePhase());
-		} else if (navigationRevision === undefined &&
-			!changesMonth &&
-			this.state === stateBeforeNavigation &&
-			this.generation === generationBeforeNavigation) {
-			this.registeredExtensions?.notifyStateChanged();
 		}
-		return this.getSelectionCompletion(claimedNavigationRevision, interactionEpoch);
-	}
-	private getSelectionCompletion(navigationRevision: number, interactionEpoch: number): Readonly<CalendarRenderCompletion> | null {
-		const completion = this.committedRender;
-		return this.canCompleteNavigation(navigationRevision, interactionEpoch) && completion !== null &&
-			this.isRenderCompletionCurrent(completion) ? completion : null;
+		if (!this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) { return null; }
+		if (!changesMonth) {
+			this.notifyUnchangedSelection(navigationRevision, stateBeforeNavigation, generationBeforeNavigation);
+		}
+		return this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)
+			? this.getSelectionCommit(interactionEpoch) : null;
 	}
 
-	private isRenderCompletionCurrent(completion: Readonly<CalendarRenderCompletion>): boolean {
-		return this.canContinueInteraction() && this.interactionEpoch === completion.interactionEpoch &&
+	private notifyUnchangedSelection(navigationRevision: number | undefined, state: CalendarState, generation: number): void {
+		if (navigationRevision === undefined && this.state === state && this.generation === generation) {
+			this.registeredExtensions?.notifyStateChanged();
+		}
+	}
+
+	private getSelectionCommit(interactionEpoch: number): Readonly<CalendarRenderCompletion> | null {
+		const completion = this.committedRender;
+		return completion?.interactionEpoch === interactionEpoch && this.isRenderCommitCurrent(completion) ? completion : null;
+	}
+
+	private isRenderCommitCurrent(completion: Readonly<CalendarRenderCompletion>): boolean {
+		return this.canContinueInteraction() &&
 			this.committedRender === completion && this.renderGeneration === completion.renderGeneration &&
-			this.dom === completion.dom && this.host.isConnected && HOST_OWNERS.get(this.host) === this &&
+			this.dom === completion.dom && HOST_OWNERS.get(this.host) === this &&
 			formatCalendarDate(this.selectedDate) === completion.dateString;
 	}
 
@@ -2099,8 +2102,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private wasRenderInterrupted(dom: CalendarDom, renderGeneration: number): boolean { return this.dom !== dom || !this.isRenderGenerationCurrent(renderGeneration); }
 
 	private isRenderGenerationCurrent(renderGeneration: number): boolean {
-		return !this.isDestroyed && this.renderGeneration === renderGeneration &&
-			this.renderInteractionEpoch === this.interactionEpoch;
+		return !this.isDestroyed && this.renderGeneration === renderGeneration;
 	}
 
 	private canUseRenderedAction(element: HTMLElement, renderGeneration: number): boolean { return this.canContinueInteraction() && this.renderGeneration === renderGeneration && element.isConnected && this.host.contains(element) && HOST_OWNERS.get(this.host) === this; }
