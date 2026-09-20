@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- Preserved direct-provider and promise-like loading semantics when an event provider synchronously reenters focus navigation, including retained refreshes, detached hosts, and source failures.
+- Preserved direct-provider and promise-like loading semantics when request-abort callbacks, event providers, or custom-element busy reactions synchronously reenter focus navigation, including retained refreshes, detached hosts, and source failures. Replacement callbacks cannot publish a new selection paired with the previous request's range or a duplicate or premature phase. Clarified that explicit reentrant navigation adds its own renders and mount hooks.
 - Preserved complete grid renders and selection-state updates when render hooks accept same-date navigation, including same-target `focusDate()` and `focusToday()` calls before the outer selection publishes state. Detached hosts also keep same-month navigation state aligned with their rendered selection, while superseded or detached overflow actions cannot report successful focus.
 - Superseded count/overflow defaults no longer move focus after a reentrant navigation, event replacement, or teardown, including calendars without extensions.
 

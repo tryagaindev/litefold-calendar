@@ -24,7 +24,7 @@ import {
 	createEventContextMenuAvailability
 } from "./actions.js";
 import { createRenderHookRuntimes, type RenderHookRuntime } from "./render-hooks.js";
-import { CalendarEventSourceInvocation, resolveCalendarEvents, type CalendarEventRequest } from "./source.js";
+import { CalendarEventSourcePublication, requestCalendarEvents, resolveCalendarEvents, type CalendarEventRequest } from "./source.js";
 import {
 	createInternalError, createPublicMethodError as createStatePublicMethodError, createState,
 	isRenderHookSurface, isSourceIssue, severityRank,
@@ -163,7 +163,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private readonly options: ReturnType<typeof snapshotCalendarOptions<TMetadata>>;
 	private readonly registeredExtensions: RegisteredExtensionHost<TMetadata> | null;
 	private readonly sourceEventLimit: number;
-	private readonly sourceInvocation = new CalendarEventSourceInvocation();
+	private readonly sourcePublication = new CalendarEventSourcePublication();
 	private readonly swipeEnabled: boolean;
 	private readonly swipeGesture: SwipeGestureController;
 	private readonly timeZone: string | null;
@@ -1782,8 +1782,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		}
 		if (!this.isRenderCommitCurrent(completion)) { return null; }
 		//Reentrant focus can inherit a staged date that no winning render has published yet.
-		if (!changesMonth && !this.sourceInvocation.isInvoking(this.generation) &&
-			compareCalendarDates(date, this.state.selectedDate) !== 0) {
+		if (!changesMonth && compareCalendarDates(date, this.state.selectedDate) !== 0) {
 			this.setState(this.derivePhase());
 		}
 		if (!this.canCompleteNavigation(claimedNavigationRevision, interactionEpoch)) { return null; }
@@ -1795,7 +1794,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	}
 
 	private notifyUnchangedSelection(navigationRevision: number | undefined, state: CalendarState, generation: number): void {
-		if (navigationRevision === undefined && this.state === state && this.generation === generation) {
+		if (navigationRevision === undefined && this.state === state && this.generation === generation && !this.sourcePublication.isPending(generation)) {
 			this.registeredExtensions?.notifyStateChanged();
 		}
 	}
@@ -1876,7 +1875,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				}
 				this.swipeGesture.clear();
 				this.monthPickerController.hide(false);
-				if (navigationRevision === undefined) {
+				if (navigationRevision === undefined && !this.sourcePublication.isPending(this.generation)) {
 					this.registeredExtensions?.notifyStateChanged();
 				}
 				return;
@@ -1908,13 +1907,16 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	}
 
 	private loadVisibleEvents(userRetry: boolean): void {
-		const request = this.beginVisibleEventRequest(userRetry);
-		if (request === null) {
-			return;
-		}
+		if (!this.isRendered || this.isDestroyed || this.dom === null) { return; }
+		this.sourcePublication.run(++this.generation, () => { this.evaluateVisibleEvents(userRetry); });
+	}
+
+	private evaluateVisibleEvents(userRetry: boolean): void {
+		const request = this.beginVisibleEventRequest(userRetry, this.generation);
+		if (request === null) { return; }
 		let result: Readonly<CalendarEventRequest<TMetadata>>;
 		try {
-			result = this.sourceInvocation.request(request.generation, this.eventSource,
+			result = requestCalendarEvents(this.eventSource,
 				Object.freeze({ ...request.bounds, signal: request.controller.signal }),
 				this.sourceEventLimit, this.eventBaseUrl);
 		} catch (cause: unknown) {
@@ -1929,16 +1931,13 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		}
 
 		observeVisibleEventRequest(result.events,
-			(values) => { this.commitSourceRequestSuccess(values, request); },
-			(cause) => { this.handleSourceRequestFailure(cause, request); },
+			(values) => { this.sourcePublication.run(request.generation, () => { this.commitSourceRequestSuccess(values, request); }); },
+			(cause) => { this.sourcePublication.run(request.generation, () => { this.handleSourceRequestFailure(cause, request); }); },
 			(cause) => { this.handleFatalError(cause); });
 		this.publishSourceLoading(request);
 	}
 
-	private beginVisibleEventRequest(userRetry: boolean): VisibleEventRequest | null {
-		if (!this.isRendered || this.isDestroyed || this.dom === null) {
-			return null;
-		}
+	private beginVisibleEventRequest(userRetry: boolean, generation: number): VisibleEventRequest | null {
 		const range = getCalendarMonthRange(this.displayedMonth, this.firstDay);
 		const bounds = Object.freeze({
 			end: formatCalendarDate(range.end),
@@ -1946,7 +1945,6 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		});
 		const rangeKey = `${bounds.start}/${bounds.end}`;
 		const hasRetainedSnapshot = this.loadedRangeKey === rangeKey && this.hasCurrentSnapshot;
-		const generation = ++this.generation;
 		const previousController = this.activeController;
 		this.activeController = null;
 		previousController?.abort();
@@ -1992,7 +1990,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		if (!setVisibleEventBusyState(this.host, dom.grid, true, () => this.canApplyRequest(request.generation, request.controller))) {
 			return;
 		}
-		this.setState("loading");
+		this.setState("loading", request.generation);
 		if (!this.canApplyRequest(request.generation, request.controller)) {
 			return;
 		}
@@ -2053,7 +2051,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			() => this.canApplyRequest(request.generation, request.controller))) {
 			return false;
 		}
-		this.setState(this.internalIssues.length > 0 ? "degraded" : "ready");
+		this.setState(this.internalIssues.length > 0 ? "degraded" : "ready", request.generation);
 		return this.canApplyRequest(request.generation, request.controller);
 	}
 
@@ -2077,7 +2075,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		this.acceptError(error, {
 			key: "event-source",
 			politeness: request.hasRetainedSnapshot ? "polite" : "assertive",
-			retryable: true
+			retryable: true,
+			sourceGeneration: request.generation
 		});
 		if (!this.canApplyRequest(request.generation, request.controller)) {
 			return;
@@ -2137,6 +2136,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			readonly key: string;
 			readonly politeness: CalendarAnnouncement["politeness"];
 			readonly retryable: boolean;
+			readonly sourceGeneration?: number;
 		},
 		notifyState = true,
 		announcementMode: "default" | "internal" | "none" = "default",
@@ -2162,8 +2162,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			entry
 		].slice(-ISSUE_LIMIT));
 		if (notifyState) {
-			this.setState(this.derivePhase());
-		} else {
+			this.setState(this.derivePhase(), presentation.sourceGeneration);
+		} else if (!this.sourcePublication.isPending(generation)) {
 			this.state = createState(
 				this.derivePhase(),
 				this.currentRange,
@@ -2343,7 +2343,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		return this.hasCurrentSnapshot ? "ready" : "idle";
 	}
 
-	private setState(phase: CalendarPhase): void {
+	private setState(phase: CalendarPhase, sourceGeneration?: number): void {
+		if (sourceGeneration !== this.generation && this.sourcePublication.isPending(this.generation)) { return; }
 		const callback = this.options.onStateChange;
 		if (callback !== undefined && this.internalIssues.some((entry) =>
 			entry.key === "host-integration:onStateChange")) {
@@ -2361,6 +2362,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			this.displayedMonth,
 			this.selectedDate
 		);
+		this.sourcePublication.didPublish(sourceGeneration);
 		if (callback === undefined) {
 			this.registeredExtensions?.notifyStateChanged();
 			return;

@@ -24,23 +24,21 @@ export type CalendarEventRequest<TMetadata> =
 		readonly timing: "asynchronous";
 	};
 
-/** Tracks which source evaluation still owns classification of its initial public phase. */
-export class CalendarEventSourceInvocation {
+/** Reserves state publication for a source phase through preparation and DOM reactions. */
+export class CalendarEventSourcePublication {
 	private generation: number | null = null;
 
-	public isInvoking(generation: number): boolean { return this.generation === generation; }
+	public isPending(generation: number): boolean { return this.generation === generation; }
 
-	public request<TMetadata>(
-		generation: number,
-		events: CalendarEvents<TMetadata>,
-		range: Readonly<CalendarRange>,
-		maximum: number,
-		baseUrl: string
-	): Readonly<CalendarEventRequest<TMetadata>> {
+	public didPublish(generation: number | undefined): void {
+		if (this.generation === generation) { this.generation = null; }
+	}
+
+	public run<T>(generation: number, action: () => T): T {
 		const previousGeneration = this.generation;
 		this.generation = generation;
 		try {
-			return requestCalendarEvents(events, range, maximum, baseUrl);
+			return action();
 		} finally {
 			//A superseding request can publish while an older invocation remains on the stack.
 			this.generation = previousGeneration;

@@ -230,8 +230,10 @@ Each provider invocation is classified independently by the value it returns, no
 
 | Result shape | Observable lifecycle |
 |---|---|
-| Static array or array returned directly by a provider | Normalizes and commits `ready`, `degraded`, or `unavailable` during the initiating method. It performs exactly one full render, never publishes `loading`, and never sets `aria-busy`. |
-| Any `PromiseLike`, including `Promise.resolve(events)`, an `async` function result, an already-fulfilled promise, or a custom thenable | Publishes `loading` with a full render, then publishes the terminal phase with a second full render when it settles. |
+| Static array or array returned directly by a provider | Normalizes and commits `ready`, `degraded`, or `unavailable` during the initiating method. The source transaction performs one full render, never publishes `loading`, and never sets `aria-busy`. |
+| Any `PromiseLike`, including `Promise.resolve(events)`, an `async` function result, an already-fulfilled promise, or a custom thenable | The source transaction publishes `loading` with a full render, then publishes the terminal phase with a second full render when it settles. |
+
+These render counts describe an uninterrupted source transaction. Explicit navigation from a provider, abort listener, or host callback can perform additional renders; for example, one same-month `focusDate()` call adds one full render and its mount hooks. While a source phase is being prepared, that navigation leaves state publication to the source transaction, so it does not add a premature or duplicate phase notification. Recoverable hook failures still invoke `onError` immediately and their admitted issues join the owning source phase. Once the phase is committed, navigation from `onStateChange` can publish its own selection normally. Superseding requests or destruction can interrupt the remaining source renders.
 
 This classification is per call, so one provider may return an array for a cached range and a promise-like value for another range without changing API shape. `render()`, `setEvents()`, `refetchEvents()`, and navigation remain `void`; when their current evaluation yields a direct array, all normalization, state, DOM, and progressive-fallback work completes before the initiating method returns.
 

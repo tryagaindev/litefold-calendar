@@ -101,6 +101,8 @@ for (const extensions of [false, true]) {
 						let observedDuringSource: readonly string[] = [];
 						let requests = 0;
 						let completions = 0;
+						let mounts = 0;
+						let mountsDuringSource = 0;
 						const errors: string[] = [];
 						const calendar: Calendar = createCalendar(host, {
 							initialDate: "2026-07-14",
@@ -113,6 +115,7 @@ for (const extensions of [false, true]) {
 								if (navigation === "focusDate") { calendar.focusDate(target); }
 								else { calendar.focusToday(); }
 								observedDuringSource = [...states];
+								mountsDuringSource = mounts;
 								if (result === "throw") { throw new Error("Source failed synchronously"); }
 								if (result === "promise") { return Promise.resolve(EVENTS); }
 								if (result === "thenable") {
@@ -122,6 +125,7 @@ for (const extensions of [false, true]) {
 								return EVENTS;
 							},
 							onStateChange: (state) => { states.push(stateLabel(state)); },
+							renderHooks: [{ id: "source-render-count", dayDidMount: () => { mounts += 1; } }],
 							onError: (error) => { errors.push(error.code); return "handled"; },
 							onEventOverflowActivate: () => { if (operation === "refresh") { calendar.refetchEvents(); } },
 							onEventOverflowDefault: () => { completions += 1; }
@@ -129,11 +133,13 @@ for (const extensions of [false, true]) {
 						context.after(() => { calendar.destroy(); });
 						calendar.render();
 						states.length = 0;
+						mounts = 0;
 						const action = host.querySelector<HTMLButtonElement>(`.lfc-calendar-grid-more[data-lfc-date='${target}']`);
 						assert.ok(action);
 						dispatchClick(dom, action);
 						assert.equal(requests, 2);
 						assert.deepEqual(observedDuringSource, [], "Source classification owns selection-state publication.");
+						assert.equal(mountsDuringSource, 42, "Explicit focus navigation performs its own full render.");
 						const asynchronous = result === "promise" || result === "thenable";
 						const terminal = result === "throw" ? operation === "refresh" ? "degraded" : "unavailable" : "ready";
 						assert.deepEqual(states, [`${asynchronous ? "loading" : terminal}:${target}`]);
@@ -143,6 +149,7 @@ for (const extensions of [false, true]) {
 							assert.deepEqual(states, [`loading:${target}`, `ready:${target}`]);
 						}
 						assert.equal(stateLabel(calendar.getState()), `${terminal}:${target}`);
+						assert.equal(mounts, 42 * (asynchronous ? 3 : 2), "The source adds one direct or two asynchronous renders.");
 						assert.equal(host.hasAttribute("aria-busy"), false);
 						assert.equal(host.isConnected, !detached);
 						assert.equal(host.querySelectorAll('[role="gridcell"]').length, 42);
