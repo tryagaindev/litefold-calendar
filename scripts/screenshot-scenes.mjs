@@ -27,6 +27,8 @@ async function mountCountFixture(page, id) {
 		const { createCalendar } = await import("/dist/index.js");
 		const previous = document.querySelector("[data-my-calendar]");
 		const host = previous.cloneNode(false);
+		//Count references keep contextual defaults; the advanced scenes exercise independent overflow tokens.
+		host.classList.remove("my-overflow-theme");
 		previous.replaceWith(host);
 		const gridEventDisplay = sceneId === "compact-all-counts"
 			? { compact: "count" }
