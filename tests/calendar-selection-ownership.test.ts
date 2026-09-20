@@ -20,6 +20,7 @@ for (const extensions of [false, true]) {
 				const appButton = dom.window.document.createElement("button");
 				dom.window.document.body.append(appButton);
 				let armed = false;
+				let completions = 0;
 				const supersede = (): void => {
 					if (!armed) { return; }
 					armed = false;
@@ -36,6 +37,7 @@ for (const extensions of [false, true]) {
 					events: EVENTS,
 					...(extensions ? { extensions: [createRegisteredExtensionProbe({ id: "ownership" })] } : {}),
 					initialDate: "2026-07-14",
+					onEventOverflowDefault: () => { completions += 1; },
 					onStateChange: () => { if (boundary === "state") { supersede(); } },
 					renderHooks: [{ id: "ownership", dayDidMount: () => {
 						if (boundary === "mount") { supersede(); }
@@ -53,6 +55,7 @@ for (const extensions of [false, true]) {
 				dispatchClick(dom, action);
 				assert.equal(armed, false, "The chosen reentrancy boundary was exercised.");
 				assert.equal(dom.window.document.activeElement, appButton, "The superseded default must not steal focus.");
+				assert.equal(completions, 0, "The interrupted operation cannot report successful focus.");
 			});
 		}
 	}

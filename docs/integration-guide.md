@@ -310,6 +310,31 @@ total counts on every nonempty date, or both to `"count-when-multiple"` to keep
 single-event actions at all sizes. Exact hook and focus behavior belongs in the
 [API contract](api.md#handle-user-actions-calendaraction).
 
+## Scroll after the default agenda action
+
+Use `onEventOverflowDefault` when the calendar should select the date and focus
+its agenda before your application scrolls:
+
+```ts
+const calendar = createCalendar(host, {
+	events,
+	onEventOverflowDefault({ agendaHeading }) {
+		agendaHeading.scrollIntoView({
+			behavior: "instant",
+			block: "start",
+			inline: "nearest"
+		});
+	}
+});
+calendar.render();
+```
+
+Replace a microtask/active-element bridge with this supplied destination. For
+application-owned offsets or scroll containers, pass the heading to your own
+scroll routine. Keep normal teardown. The callback is synchronous and the heading
+is current at entry; it is not a durable handle for delayed work or a provider-ready
+signal. See the [completion contract](api.md#observe-completed-overflow-defaults).
+
 ## Own the event chooser
 
 Without a callback, activating a count or native overflow button selects that

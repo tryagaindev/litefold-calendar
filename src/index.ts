@@ -32,6 +32,7 @@ export type {
 	CalendarEventElements,
 	CalendarEventOverflowContext,
 	CalendarEventOverflowActivation,
+	CalendarEventOverflowDefaultContext,
 	CalendarEventOverflowElements,
 	CalendarEventRenderContext,
 	CalendarEventSource,

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added `onEventOverflowDefault` and `CalendarEventOverflowDefaultContext` for synchronous observation of successful count/overflow selection and agenda focus. The callback receives the actual heading and original occurrence snapshot; applications can scroll directly without a timing or focus-discovery bridge.
 - Added independent compact and wide `gridEventDisplay` settings for individual summaries, total counts, or counts only on days with multiple events. `onEventOverflowActivate` supports application-owned day choosers with synchronous cancellation of the default agenda action, and `renderEventOverflow` now identifies count presentation.
 - Added an everyday remote-data guide and runnable JavaScript/JSDoc example covering `fetch`, cancellation, filtering, retry, refresh after saving, application-owned dialogs, and cleanup.
 - Added stale-aware screenshot preparation with staged batch validation and a before/after review gallery, plus a canonical delivery checklist.

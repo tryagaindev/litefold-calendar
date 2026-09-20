@@ -41,6 +41,14 @@ Day counts and grid overflow share a native action. Whenever either container-si
 
 Activation invokes `onEventOverflowActivate` with an immutable occurrence snapshot before selection or DOM replacement. Synchronous `nativeEvent.preventDefault()` transfers interaction and focus ownership to the application, which may open its own event chooser and restore focus when it closes. Without cancellation, activation selects the day, resets agenda expansion, focuses the agenda heading, and does not invoke `onDaySelect`. Application navigation, rerendering, or destruction during the callback invalidates the original action and prevents stale default work; asynchronous failures use the action-error channel.
 
+After successful default focus, `onEventOverflowDefault` synchronously exposes the
+current agenda heading. Cancellation, supersession, unusable DOM, or redirected
+heading focus suppresses this notification. Focus retains `preventScroll: true`;
+applications may explicitly scroll using the supplied heading. Retained heading
+references can become stale after callback entry. Test pointer, Enter, and Space
+activation, synchronous callback focus, cancellation, focus redirection, and
+reentrant navigation both with and without extensions.
+
 At the supported year limits, a spillover occurrence may belong to a month whose complete six-week grid cannot be rendered. Its application callback still runs, but default navigation leaves selection unchanged, matching the day proxy's boundary behavior.
 
 Replacing or refetching event input keeps package-owned focus on the same day or event occurrence when its replacement remains available for focus. An event preserved visually while focused across a container-size change may become hidden after a data rerender; focus then moves to the day's available action, normally its total-count button in count presentation, or falls back to the day proxy. If a focused event disappears, focus returns to its owning day. Focus outside the calendar is not moved.

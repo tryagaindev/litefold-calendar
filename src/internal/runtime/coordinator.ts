@@ -66,6 +66,7 @@ import {
 import { CalendarEventOverflowPresenter } from "./event-overflow-presentation.js";
 import { CalendarActionPipeline } from "./action-pipeline.js";
 import type { CalendarRenderCompletion } from "./interaction-completion.js";
+import { completeEventOverflowDefault } from "./overflow-default.js";
 import { releaseLeasedNodes } from "./node-leases.js";
 import { SwipeGestureController } from "./swipe.js";
 import type { RegisteredExtensionNavigationTarget } from "./registered-extension-contract.js";
@@ -920,15 +921,20 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				action: gridMore,
 				date,
 				events: () => events.map((event) => event.event),
-				invokeAction: (action) => { this.invokeAction("onEventOverflowActivate", action); },
-				isCurrent: () => this.canUseRenderedAction(gridMore, renderGeneration),
+				invokeAction: (action) => { this.actionPipeline.invoke("onEventOverflowActivate", action); },
+				captureCurrent: () => {
+					const epoch = this.interactionEpoch;
+					return () => epoch === this.interactionEpoch && this.canUseRenderedAction(gridMore, renderGeneration);
+				},
+				needsContext: this.options.onEventOverflowDefault !== undefined,
 				onActivate: this.options.onEventOverflowActivate,
-				onDefault: () => {
+				onDefault: (activation) => {
 					if (this.bounds.getDateNavigationFailure(date) !== null) { return; }
-					const completion = this.selectDate(date, "gridMore");
-					if (completion !== null && this.isRenderCompletionCurrent(completion)) {
-						completion.dom.agendaTitle.focus({ preventScroll: true });
-					}
+					completeEventOverflowDefault(this.selectDate(date, "gridMore"), activation, {
+						host: this.host, isCurrent: (completion) => this.isRenderCompletionCurrent(completion),
+						onDefault: this.options.onEventOverflowDefault,
+						invokeAction: (action) => { this.actionPipeline.invoke("onEventOverflowDefault", action); }
+					});
 				},
 				onKeydown: (event) => {
 					this.handleRenderedGridActionKeydown(
@@ -968,7 +974,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			const context = createDaySelection(jsEvent, date, selectedButton);
 			const onDaySelect = this.options.onDaySelect;
 			if (onDaySelect !== undefined) {
-				this.invokeAction("onDaySelect", () => onDaySelect(context));
+				this.actionPipeline.invoke("onDaySelect", () => onDaySelect(context));
 			}
 		});
 		button.addEventListener("keydown", (event) => {
@@ -1109,7 +1115,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			isCurrent: () => this.canUseRenderedAction(action, renderGeneration),
 			onActivate: onEventActivate === undefined ? null : (nativeEvent) => {
 				const context = createEventActivation(nativeEvent, date, action, calendarEvent, surface);
-				this.invokeAction("onEventActivate", () => onEventActivate(context));
+				this.actionPipeline.invoke("onEventActivate", () => onEventActivate(context));
 			},
 			onContext: hasContextAction ? (nativeEvent, clientX, clientY) => {
 				this.invokeEventContextMenu(
@@ -1717,7 +1723,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			return;
 		}
 		const context = createEventContextMenu(nativeEvent, date, element, event, surface, clientX, clientY);
-		this.invokeAction("onEventContextMenu", () => onEventContextMenu(context));
+		this.actionPipeline.invoke("onEventContextMenu", () => onEventContextMenu(context));
 	}
 
 	private invokeDayContextMenu(
@@ -1733,12 +1739,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		const context = createDayContextMenu(nativeEvent, date, element, clientX, clientY);
 		const onDayContextMenu = this.options.onDayContextMenu;
 		if (onDayContextMenu !== undefined) {
-			this.invokeAction("onDayContextMenu", () => onDayContextMenu(context));
+			this.actionPipeline.invoke("onDayContextMenu", () => onDayContextMenu(context));
 		}
-	}
-
-	private invokeAction(name: string, action: () => unknown): void {
-		this.actionPipeline.invoke(name, action);
 	}
 
 	private selectDate(
@@ -2094,9 +2096,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 
 	private canContinueInteraction(): boolean { return this.isRendered && !this.isDestroyed && !this.hasFatalError; }
 
-	private wasRenderInterrupted(dom: CalendarDom, renderGeneration: number): boolean {
-		return this.dom !== dom || !this.isRenderGenerationCurrent(renderGeneration);
-	}
+	private wasRenderInterrupted(dom: CalendarDom, renderGeneration: number): boolean { return this.dom !== dom || !this.isRenderGenerationCurrent(renderGeneration); }
 
 	private isRenderGenerationCurrent(renderGeneration: number): boolean {
 		return !this.isDestroyed && this.renderGeneration === renderGeneration &&

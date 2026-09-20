@@ -410,6 +410,24 @@ export interface CalendarDayContextMenu extends Omit<CalendarDaySelection, "nati
 	readonly nativeEvent: MouseEvent | KeyboardEvent;
 }
 
+/** Successful package-owned count/overflow selection and agenda focus. */
+export interface CalendarEventOverflowDefaultContext<TMetadata = unknown> {
+	/** Immutable activation-time occurrence date, shared with the pre-hook. */
+	readonly date: CalendarDate;
+	/** Strict YYYY-MM-DD occurrence date. */
+	readonly dateString: string;
+	/** All original normalized occurrences in order, independent of pagination; metadata remains opaque. */
+	readonly events: readonly CalendarEvent<TMetadata>[];
+	/** Total occurrence count in the activation snapshot. */
+	readonly eventCount: number;
+	/** Original native button; selection may have disconnected it before notification. */
+	readonly triggerElement: HTMLButtonElement;
+	/** Current connected, focused agenda heading at callback entry; not a durable DOM or mutation handle. */
+	readonly agendaHeading: HTMLHeadingElement;
+	/** Original native click, including keyboard activation; preventDefault cannot undo the completed default. */
+	readonly nativeEvent: MouseEvent;
+}
+
 /** A synchronous or asynchronous application action. */
 export type CalendarAction<TContext> = (
 	this: void,
@@ -452,6 +470,8 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly onEventActivate?: CalendarAction<CalendarEventActivation<TMetadata>>;
 	/** Count/overflow action before selection; synchronous cancellation transfers interaction ownership. */
 	readonly onEventOverflowActivate?: CalendarAction<CalendarEventOverflowActivation<TMetadata>>;
+	/** Synchronously observes an uncancelled, still-current default after agenda focus; promises are observed, not awaited. */
+	readonly onEventOverflowDefault?: CalendarAction<CalendarEventOverflowDefaultContext<TMetadata>>;
 	/** Handles context gestures and primary activation when context is an unlinked occurrence's only action. */
 	readonly onEventContextMenu?: CalendarAction<CalendarEventContextMenu<TMetadata>>;
 	/** Immediate static events or an abort-aware provider whose return shape selects each request's timing. */

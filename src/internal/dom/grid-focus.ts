@@ -36,6 +36,12 @@ export function getEventActionKey(
 	return JSON.stringify([surface, dateString, eventId]);
 }
 
+/** Tests a known target in its own document or shadow tree, without realm assumptions. */
+export function hasElementFocus(element: HTMLElement): boolean {
+	const root = element.getRootNode();
+	return "activeElement" in root && root.activeElement === element;
+}
+
 /** Returns focus only when it is still owned by this calendar host. */
 export function getOwnedActiveElement(document: Document, host: HTMLElement): Element | null {
 	const active = document.activeElement;
