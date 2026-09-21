@@ -27,27 +27,17 @@ export async function expectLibraryFixtureReady(page, { calendar = false } = {})
 		const response = await route.fetch();
 		await route.fulfill({ body: LIBRARY_FIXTURE_DOCUMENT, response });
 	}, { times: 1 });
-	let stylesheetResponse = null;
-	const captureStylesheetResponse = (response) => {
-		if (response.request().resourceType() === "stylesheet" &&
-			new URL(response.url()).pathname === "/dist/styles.css") {
-			stylesheetResponse = response;
-		}
-	};
-	page.on("response", captureStylesheetResponse);
-	let response;
-	try {
-		response = await page.goto(LIBRARY_FIXTURE_ROUTE, { waitUntil: "load" });
-	} finally {
-		page.off("response", captureStylesheetResponse);
-	}
+	const response = await page.goto(LIBRARY_FIXTURE_ROUTE, { waitUntil: "commit" });
+	const stylesheetResponse = await page.request.get("/dist/styles.css");
 	expect(response?.ok(), "Expected the isolated library document to load.").toBe(true);
-	expect(stylesheetResponse?.ok(),
-		`Expected /dist/styles.css to load successfully; received ${stylesheetResponse === null ? "no response" : `HTTP ${String(stylesheetResponse.status())}`}. Finish the package build before browser tests and keep dist unchanged during the run.`
+	expect(stylesheetResponse.ok(),
+		`Expected /dist/styles.css to load successfully; received HTTP ${String(stylesheetResponse.status())}. Finish the package build before browser tests and keep dist unchanged during the run.`
 	).toBe(true);
-	expect(await page.locator('link[rel="stylesheet"][href="/dist/styles.css"]').evaluate((link) =>
+	const stylesheet = page.locator('link[rel="stylesheet"][href="/dist/styles.css"]');
+	await expect(stylesheet).toHaveCount(1);
+	await expect.poll(() => stylesheet.evaluate((link) =>
 		link.sheet !== null && !link.sheet.disabled && link.sheet.cssRules.length > 0
-	), "Expected the library stylesheet to be parsed and enabled before running browser assertions.").toBe(true);
+	), { message: "Expected the library stylesheet to be parsed and enabled before running browser assertions." }).toBe(true);
 	await expect(page.locator(READY_SELECTOR)).toHaveCount(1);
 	if (calendar) {
 		await page.evaluate(async () => {
