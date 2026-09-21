@@ -9,7 +9,7 @@ import {
 	rm,
 	writeFile
 } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
@@ -33,6 +33,7 @@ const SHELL_FILES = Object.freeze([
 	"site.js"
 ]);
 const STAGED_SHELL_FILES = Object.freeze(["deployment-details.css", ...SHELL_FILES]);
+const LEGACY_CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'";
 
 function isSemanticVersion(value) {
 	try {
@@ -267,55 +268,87 @@ async function stampSiteIndex(siteDirectory, manifest) {
 }
 
 async function validateSiteRuntimePolicy(siteDirectory) {
-	for (const shellFile of SHELL_FILES) {
-		const shellPath = join(siteDirectory, shellFile);
+	for (const path of await listTree(siteDirectory)) {
+		const source = await readFile(path, "utf8");
 		assertNoRemoteRuntimeAssets(
-			await readFile(shellPath, "utf8"),
-			displayPath(shellPath, siteDirectory)
+			source,
+			displayPath(path, siteDirectory)
 		);
-	}
-
-	const indexPath = join(siteDirectory, "index.html");
-	const dom = new JSDOM(await readFile(indexPath, "utf8"));
-	try {
-		const policies = [...dom.window.document.querySelectorAll("meta[http-equiv]")]
-			.filter((meta) =>
-				meta.getAttribute("http-equiv")?.toLowerCase() === "content-security-policy");
-		if (policies.length !== 1 ||
-			policies[0].parentElement !== dom.window.document.head ||
-			policies[0].getAttribute("content") !== CONTENT_SECURITY_POLICY) {
-			throw new Error("The retained Pages shell must declare the exact Content Security Policy once in head.");
+		if (extname(path).toLowerCase() === ".html") {
+			const dom = new JSDOM(source);
+			try {
+				assertRecognizedContentSecurityPolicy(dom);
+			} finally {
+				dom.window.close();
+			}
 		}
-		const firstRuntimeResource = dom.window.document.head?.querySelector(
-			"base[href], embed[src], iframe[src], img[src], link[href], object[data], script[src], source[src], style"
-		);
-		if (firstRuntimeResource !== null &&
-			(policies[0].compareDocumentPosition(firstRuntimeResource) &
-				dom.window.Node.DOCUMENT_POSITION_FOLLOWING) === 0) {
-			throw new Error("The retained Pages Content Security Policy must precede runtime resources.");
-		}
-	} finally {
-		dom.window.close();
 	}
 }
 
-async function retainedShellSupportsCurrentRenderer(siteDirectory) {
+function classifyContentSecurityPolicy(content) {
+	if (content === CONTENT_SECURITY_POLICY) {
+		return "current";
+	}
+	if (content === LEGACY_CONTENT_SECURITY_POLICY) {
+		return "legacy";
+	}
+	return "invalid";
+}
+
+function assertRecognizedContentSecurityPolicy(dom) {
+	const policies = [...dom.window.document.querySelectorAll("meta[http-equiv]")]
+		.filter((meta) =>
+			meta.getAttribute("http-equiv")?.toLowerCase() === "content-security-policy");
+	const policyKind = policies.length === 1
+		? classifyContentSecurityPolicy(policies[0].getAttribute("content"))
+		: "invalid";
+	if (policies.length !== 1 ||
+		policies[0].parentElement !== dom.window.document.head ||
+		policyKind === "invalid") {
+		throw new Error(
+			"Every retained Pages document must declare a recognized exact Content Security Policy once in head."
+		);
+	}
+	const firstRuntimeResource = dom.window.document.head?.querySelector(
+		"base[href], embed[src], iframe[src], img[src], link[href], object[data], script[src], source[src], style"
+	);
+	if (firstRuntimeResource !== null &&
+		(policies[0].compareDocumentPosition(firstRuntimeResource) &
+			dom.window.Node.DOCUMENT_POSITION_FOLLOWING) === 0) {
+		throw new Error("Every retained Pages Content Security Policy must precede runtime resources.");
+	}
+	return policyKind;
+}
+
+async function inspectRetainedShell(siteDirectory) {
 	const indexPath = join(siteDirectory, "index.html");
 	if (!await pathExists(indexPath)) {
-		return false;
+		return { policyKind: "invalid", rendererCompatible: false };
 	}
 	const dom = new JSDOM(await readFile(indexPath, "utf8"), {
 		url: "https://tryagaindev.github.io/litefold-calendar/"
 	});
 	try {
-		renderDeploymentManifest(dom.window.document, {
-			main: null,
-			releases: [],
-			schemaVersion: 1
-		});
-		return true;
-	} catch {
-		return false;
+		const policyKind = (() => {
+			try {
+				return assertRecognizedContentSecurityPolicy(dom);
+			} catch {
+				return "invalid";
+			}
+		})();
+		const rendererCompatible = (() => {
+			try {
+				renderDeploymentManifest(dom.window.document, {
+					main: null,
+					releases: [],
+					schemaVersion: 1
+				});
+				return true;
+			} catch {
+				return false;
+			}
+		})();
+		return { policyKind, rendererCompatible };
 	} finally {
 		dom.window.close();
 	}
@@ -385,20 +418,25 @@ export async function assemblePagesSnapshot(options) {
 		}
 
 		if (!exactReleaseRerun) {
-			const retainedShellIsCompatible = await retainedShellSupportsCurrentRenderer(siteDirectory);
+			const retainedShell = await inspectRetainedShell(siteDirectory);
 			const incomingReleaseIsNewer = metadata.channel === "release" &&
 				previousManifest.releases.every((release) =>
 					compareSemVer(metadata.version, release.version) > 0) &&
 				(previousManifest.main === null ||
 					compareSemVer(metadata.version, previousManifest.main.version) >= 0);
-			if (metadata.channel === "main" || (!retainedShellIsCompatible && incomingReleaseIsNewer)) {
+			const retainedShellNeedsUpgrade = !retainedShell.rendererCompatible ||
+				retainedShell.policyKind !== "current";
+			const retainedShellCanBePreserved = retainedShell.rendererCompatible &&
+				retainedShell.policyKind !== "invalid";
+			if (metadata.channel === "main" ||
+				(retainedShellNeedsUpgrade && incomingReleaseIsNewer)) {
 				for (const shellFile of SHELL_FILES) {
 					await copyFile(
 						join(resolve(channelDirectory), "shell", shellFile),
 						join(siteDirectory, shellFile)
 					);
 				}
-			} else if (!retainedShellIsCompatible) {
+			} else if (!retainedShellCanBePreserved) {
 				throw new Error(
 					`Immutable release ${metadata.version} cannot safely replace a newer retained Pages shell.`
 				);

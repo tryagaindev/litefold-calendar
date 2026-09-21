@@ -33,7 +33,7 @@ export interface CalendarEventInput<TMetadata = unknown> {
 	readonly metadata?: TMetadata;
 	/** Strict Gregorian civil date or local date-time string used to place the event. */
 	readonly start: string;
-	/** User-visible event title; surrounding whitespace is removed during normalization. */
+	/** Non-empty user-visible event title preserved exactly, including whitespace. */
 	readonly title: string;
 	/** Optional relative or HTTP(S) destination resolved against the host document. */
 	readonly url?: string;
@@ -53,7 +53,7 @@ export interface CalendarEvent<TMetadata = unknown> {
 	readonly metadata: TMetadata | undefined;
 	/** Validated strict Gregorian civil start value preserved from the source. */
 	readonly start: string;
-	/** Trimmed user-visible event title. */
+	/** User-visible event title preserved exactly from the source. */
 	readonly title: string;
 	/** Validated relative or absolute HTTP(S) destination, or `null` when the event has no link. */
 	readonly url: string | null;

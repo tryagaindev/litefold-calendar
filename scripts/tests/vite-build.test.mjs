@@ -27,6 +27,7 @@ void test("Vite preserves public ESM entries, shared chunks, and standalone CSS"
 });
 
 void test("Vite examples resolve source modules and refresh styles without prebuilt output", async () => {
+	assert.equal(examplesConfig.server.headers["Content-Security-Policy"], "worker-src 'none'");
 	const root = await mkdtemp(join(tmpdir(), "lfc-vite-examples-"));
 	assert.deepEqual(await readdir(root), [], "The served root must start without dist or other generated files.");
 	const plugin = sourceExamplesPlugin();

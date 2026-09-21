@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Migration:** Event titles are no longer trimmed. Any nonempty string of at most 1,024 UTF-16 code units is preserved exactly, including whitespace-only titles; applications are responsible for supplying meaningful visible and accessible text.
 - Reduced the default day padding to `clamp(0.25rem, 0.75cqi, 0.5rem)` for a more compact grid while retaining control target floors and intrinsic content growth.
 - Consolidated anatomy and CSS integration into one styling guide; moved generic extension contracts into the API reference, extension implementation guidance into architecture, and delivery steps into contributor/release procedures. Removed obsolete move-notice pages and their references.
 - Made Getting started a self-contained install, render, update, and cleanup tutorial; surfaced civil-date and exclusive-end warnings before the first event example, shortened feature and integration summaries, and distinguished the advanced API showcase from application starters. Public API and accessibility contracts are unchanged.
@@ -28,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Bounded event identifiers before whitespace validation, disabled workers in newly generated Pages documents and upgraded root shells while preserving exact legacy policies on immutable historical pages, and validated decoded meta-refresh destinations in staged and retained HTML.
 - Preserved direct-provider and promise-like loading semantics when request-abort callbacks, event providers, or custom-element busy reactions synchronously reenter focus navigation, including retained refreshes, detached hosts, and source failures. Replacement callbacks cannot publish a new selection paired with the previous request's range or a duplicate or premature phase. Clarified that explicit reentrant navigation adds its own renders and mount hooks.
 - Preserved complete grid renders and selection-state updates when render hooks accept same-date navigation, including same-target `focusDate()` and `focusToday()` calls before the outer selection publishes state. Detached hosts also keep same-month navigation state aligned with their rendered selection, while superseded or detached overflow actions cannot report successful focus.
 - Superseded count/overflow defaults no longer move focus after a reentrant navigation, event replacement, or teardown, including calendars without extensions.

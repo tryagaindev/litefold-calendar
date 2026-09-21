@@ -12,6 +12,8 @@ import {
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { JSDOM } from "jsdom";
+
 import { parseExampleMetadata, serializeExampleMetadata } from "./lib/example-metadata.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
 import { parseSemVer } from "./lib/semver.mjs";
@@ -23,7 +25,7 @@ const SHELL_MARK_FILENAME = "litefold-calendar-mark.svg";
 const EXAMPLE_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js", ".json"]);
 const PACKAGE_RUNTIME_EXTENSIONS = new Set([".css", ".js"]);
 const SHELL_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js"]);
-export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'";
+export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'none'";
 
 function displayPath(path, root) {
 	return relative(root, path).replaceAll(sep, "/");
@@ -120,13 +122,41 @@ function assertNoRemoteHtmlAssets(source, path) {
 			}
 		}
 	}
-	for (const meta of source.matchAll(/<meta\b[^>]*>/giu)) {
-		if (/\bhttp-equiv\s*=\s*["']?\s*refresh\b/iu.test(meta[0]) &&
-			/(?:https?:)?\/\//iu.test(meta[0])) {
-			throw new Error(`${path} redirects to a remote runtime resource.`);
+	const dom = new JSDOM(source);
+	try {
+		for (const meta of dom.window.document.querySelectorAll("meta[http-equiv]")) {
+			if (meta.getAttribute("http-equiv")?.trim().toLowerCase() === "refresh" &&
+				isRemoteMetaRefresh(meta.getAttribute("content") ?? "")) {
+				throw new Error(`${path} redirects to a remote runtime resource.`);
+			}
 		}
+	} finally {
+		dom.window.close();
 	}
 	assertNoRemoteCssAssets(source, path);
+}
+
+function isRemoteMetaRefresh(content) {
+	if (/(?:https?:)?\/\//iu.test(content)) {
+		return true;
+	}
+	const separatorIndex = content.search(/[;,]/u);
+	if (separatorIndex < 0) {
+		return false;
+	}
+	let destination = content.slice(separatorIndex + 1).trim();
+	destination = destination.replace(/^url\s*=\s*/iu, "");
+	if ((destination.startsWith('"') && destination.endsWith('"')) ||
+		(destination.startsWith("'") && destination.endsWith("'"))) {
+		destination = destination.slice(1, -1);
+	}
+	try {
+		const first = new URL(destination, "https://pages-a.invalid/base/");
+		const second = new URL(destination, "https://pages-b.invalid/base/");
+		return (first.protocol === "http:" || first.protocol === "https:") && first.href === second.href;
+	} catch {
+		return false;
+	}
 }
 
 function assertNoRemoteCssAssets(source, path) {
