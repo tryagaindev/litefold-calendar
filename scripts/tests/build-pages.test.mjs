@@ -390,6 +390,10 @@ void test("Pages staging rejects ambiguous identity and remote runtime assets", 
 		['<meta http-equiv="refresh" content="0; url=&sol;&sol;cdn.invalid/">', "example.html"],
 		['<meta http-equiv="refresh" content="0; url=&#47;&#9;&#47;cdn.invalid/">', "example.html"],
 		['<meta http-equiv="refresh" content="0; url=\\\\cdn.invalid/">', "example.html"],
+		[`<meta http-equiv="refresh" content='0; "&#92;&#92;cdn.invalid/" ignored'>`, "example.html"],
+		['<meta http-equiv="refresh" content="0; \'&#92;&#92;cdn.invalid/\' ignored">', "example.html"],
+		['<meta http-equiv="refresh" content="0 &#92;&#92;cdn.invalid/">', "example.html"],
+		['<meta http-equiv="refresh" content="0 URL = &#92;&#9;/cdn.invalid/">', "example.html"],
 		['<meta http-equiv="ref&#x72;esh" content="15; url=&#47;&#47;cdn.invalid/">', "example.html"],
 		['<meta http-equiv=" ReFrEsH " content="15; URL=h&#116;tps://cdn.invalid/">', "example.html"],
 		['.hero { background-image: image-set("https://cdn.invalid/image.png" 1x); }', "example.css"]
@@ -405,6 +409,13 @@ void test("Pages staging rejects ambiguous identity and remote runtime assets", 
 			`<meta http-equiv="refresh" content="15; url=${destination}">`,
 			"example.html"
 		));
+	}
+	for (const source of [
+		`<meta http-equiv="refresh" content='15; url="./next/" ignored'>`,
+		'<meta http-equiv="refresh" content="15; url=\'./next/\' ignored">',
+		'<meta http-equiv="refresh" content="15 ./next/">'
+	]) {
+		assert.doesNotThrow(() => assertNoRemoteRuntimeAssets(source, "example.html"));
 	}
 	for (const source of [
 		'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
@@ -591,7 +602,7 @@ void test("retained assembly rejects decoded remote refreshes in nested HTML", a
 		retainedHtmlPath,
 		(await readFile(retainedHtmlPath, "utf8")).replace(
 			"</head>",
-			'<meta http-equiv="ref&#x72;esh" content="0; url=https:&#x2f;&#x2f;cdn.invalid/">\n</head>'
+			`<meta http-equiv="ref&#x72;esh" content='0; "&#92;&#92;cdn.invalid/" ignored'>\n</head>`
 		),
 		"utf8"
 	);

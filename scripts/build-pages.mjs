@@ -140,15 +140,9 @@ function isRemoteMetaRefresh(content) {
 	if (/(?:https?:)?\/\//iu.test(content)) {
 		return true;
 	}
-	const separatorIndex = content.search(/[;,]/u);
-	if (separatorIndex < 0) {
+	const destination = readMetaRefreshDestination(content);
+	if (destination === null) {
 		return false;
-	}
-	let destination = content.slice(separatorIndex + 1).trim();
-	destination = destination.replace(/^url\s*=\s*/iu, "");
-	if ((destination.startsWith('"') && destination.endsWith('"')) ||
-		(destination.startsWith("'") && destination.endsWith("'"))) {
-		destination = destination.slice(1, -1);
 	}
 	try {
 		const first = new URL(destination, "https://pages-a.invalid/base/");
@@ -157,6 +151,55 @@ function isRemoteMetaRefresh(content) {
 	} catch {
 		return false;
 	}
+}
+
+function readMetaRefreshDestination(content) {
+	let position = 0;
+	const skipAsciiWhitespace = () => {
+		while (/[\t\n\f\r ]/u.test(content[position] ?? "")) {
+			position += 1;
+		}
+	};
+	skipAsciiWhitespace();
+	const timeStart = position;
+	while (/[0-9]/u.test(content[position] ?? "")) {
+		position += 1;
+	}
+	if (position === timeStart && content[position] !== ".") {
+		return null;
+	}
+	while (/[0-9.]/u.test(content[position] ?? "")) {
+		position += 1;
+	}
+	if (position >= content.length) {
+		return null;
+	}
+	const separator = content[position];
+	if (separator !== ";" && separator !== "," && !/[\t\n\f\r ]/u.test(separator ?? "")) {
+		return null;
+	}
+	skipAsciiWhitespace();
+	if (content[position] === ";" || content[position] === ",") {
+		position += 1;
+	}
+	skipAsciiWhitespace();
+	if (position >= content.length) {
+		return null;
+	}
+	const urlPrefix = /^[Uu][Rr][Ll][\t\n\f\r ]*=/u.exec(content.slice(position));
+	if (urlPrefix !== null) {
+		position += urlPrefix[0].length;
+		skipAsciiWhitespace();
+	}
+	const quote = content[position] === "\"" || content[position] === "'"
+		? content[position]
+		: null;
+	if (quote !== null) {
+		position += 1;
+		const quoteIndex = content.indexOf(quote, position);
+		return content.slice(position, quoteIndex < 0 ? content.length : quoteIndex);
+	}
+	return content.slice(position);
 }
 
 function assertNoRemoteCssAssets(source, path) {
