@@ -214,12 +214,10 @@ function toCalendarDateKey(value) {
 	return (value.year * 12 + value.month - 1) * 31 + value.day;
 }
 function normalizeIdentifier(value) {
-	return typeof value === "string" && value.trim().length > 0 && value.length <= 256 ? value : null;
+	return typeof value === "string" && value.length > 0 && value.length <= 256 && value.trim().length > 0 ? value : null;
 }
 function normalizeTitle(value) {
-	if (typeof value !== "string") return null;
-	const title = value.trim();
-	return title.length > 0 && title.length <= 1024 ? title : null;
+	return typeof value === "string" && value.length > 0 && value.length <= 1024 ? value : null;
 }
 function normalizeAccentColor(value) {
 	return typeof value === "string" && ACCENT_COLOR_PATTERN.test(value) ? value.toUpperCase() : null;
