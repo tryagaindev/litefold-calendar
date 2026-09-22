@@ -283,9 +283,9 @@ type CalendarDateInput = Date | string | Readonly<CalendarDate>;
 
 Metadata is optional and opaque. The package preserves it by reference without inspecting, serializing, or copying it into DOM attributes. Treat callback metadata as potentially absent unless the source adapter establishes a stronger application invariant.
 
-Event IDs must contain a non-whitespace character, remain at most 256 UTF-16 code units, and be unique within one returned snapshot. IDs are preserved without trimming. Titles are trimmed and must then contain 1 through 1,024 UTF-16 code units.
+Event IDs must contain a non-whitespace character, remain at most 256 UTF-16 code units, and be unique within one returned snapshot. IDs are preserved without trimming. Titles must contain 1 through 1,024 UTF-16 code units and are preserved exactly, including leading, trailing, or whitespace-only content. Supply a meaningful title when the event must remain visually and accessibly identifiable.
 
-Day occurrences use one canonical order across grid summaries, the agenda, and overflow callbacks: all-day events first, then ascending complete civil start, normalized title, and preserved ID. Title and ID comparisons use UTF-16 code-unit order rather than locale collation.
+Day occurrences use one canonical order across grid summaries, the agenda, and overflow callbacks: all-day events first, then ascending complete civil start, preserved title, and preserved ID. Title and ID comparisons use UTF-16 code-unit order rather than locale collation.
 
 `accentColor` is the per-event **event marker color** field. It accepts exactly an opaque six-digit hexadecimal color (`#RRGGBB`, case-insensitive input) and normalizes it to uppercase. An invalid value becomes `null` rather than invalidating the event; the built-in marker then uses its CSS-token fallback. This field colors only the built-in SVG marker. It does not tint an event summary or choose its text, background, border, or event leading-rule color. Core rendering does not emit a `style` attribute. See [calendar anatomy and color vocabulary](styling.md#three-color-roles-that-sound-similar) for the related names. Use `renderEventMarker` when metadata-driven visual treatment needs more than the built-in marker, and keep that application-owned output compatible with the application Content Security Policy.
 

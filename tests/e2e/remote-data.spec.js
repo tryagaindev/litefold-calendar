@@ -6,7 +6,7 @@ const EXAMPLE = "/examples/remote-data/";
 const FEED = "**/examples/remote-data/events.json?*";
 
 async function openExample(page) {
-	await page.goto(EXAMPLE);
+	await page.goto(EXAMPLE, { waitUntil: "commit" });
 	await expect(page.getByRole("grid").getByRole("button", { name: /^View 3 events for /u })).toBeVisible();
 }
 

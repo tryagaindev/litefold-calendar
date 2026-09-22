@@ -71,5 +71,11 @@ export function sourceExamplesPlugin() {
 export default defineConfig({
 	root: REPOSITORY_ROOT,
 	plugins: [sourceExamplesPlugin()],
-	server: { host: "127.0.0.1", open: "/examples/", port: 4173, strictPort: true }
+	server: {
+		headers: { "Content-Security-Policy": "worker-src 'none'" },
+		host: "127.0.0.1",
+		open: "/examples/",
+		port: 4173,
+		strictPort: true
+	}
 });
