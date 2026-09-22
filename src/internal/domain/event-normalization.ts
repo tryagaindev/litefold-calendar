@@ -21,7 +21,7 @@ export const MAX_SOURCE_EVENT_LIMIT = 10_000;
 /** Maximum UTF-16 code units accepted for a normalized event identifier. */
 export const MAX_EVENT_ID_CODE_UNITS = 256;
 
-/** Maximum UTF-16 code units accepted for a normalized event title. */
+/** Maximum UTF-16 code units accepted for an event title. */
 export const MAX_EVENT_TITLE_CODE_UNITS = 1_024;
 
 /** Maximum UTF-16 code units accepted for an input or resolved event destination. */
@@ -400,17 +400,16 @@ function toCalendarDateKey(value: CalendarDate): number {
 }
 
 function normalizeIdentifier(value: unknown): string | null {
-	return typeof value === "string" && value.trim().length > 0 && value.length <= MAX_EVENT_ID_CODE_UNITS
+	return typeof value === "string" && value.length > 0 && value.length <= MAX_EVENT_ID_CODE_UNITS &&
+		value.trim().length > 0
 		? value
 		: null;
 }
 
 function normalizeTitle(value: unknown): string | null {
-	if (typeof value !== "string") {
-		return null;
-	}
-	const title = value.trim();
-	return title.length > 0 && title.length <= MAX_EVENT_TITLE_CODE_UNITS ? title : null;
+	return typeof value === "string" && value.length > 0 && value.length <= MAX_EVENT_TITLE_CODE_UNITS
+		? value
+		: null;
 }
 
 function normalizeAccentColor(value: unknown): string | null {

@@ -22,7 +22,7 @@ const CONTENT_TYPES = Object.freeze({
 });
 const SECURITY_HEADERS = Object.freeze({
 	"Cache-Control": "no-store",
-	"Content-Security-Policy": "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'",
+	"Content-Security-Policy": "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'none'",
 	"Cross-Origin-Opener-Policy": "same-origin",
 	"Cross-Origin-Resource-Policy": "same-origin",
 	"Permissions-Policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",

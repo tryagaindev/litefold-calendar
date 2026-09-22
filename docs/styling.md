@@ -93,7 +93,7 @@ inside the leading group, before any content added by `renderEventLeading`.
 | Leading group | `elements.leading`; `renderEventLeading` adds content after the marker. |
 | Event marker | `elements.marker` is the container.  `renderEventMarker` replaces the built-in SVG circle, or suppresses it with `null`; the container remains. |
 | Time | `elements.time` is a native `<time>` element.  `eventTimeDisplay` controls visual exposure; `timeText` remains available to hooks and hidden times remain accessible. |
-| Title | `elements.title` contains the normalized title.  There is no title-replacement hook. |
+| Title | `elements.title` contains the exact source title, including whitespace.  There is no title-replacement hook. |
 | Details | `elements.details`; add content with `renderEventDetails`. |
 | Trailing content | `elements.trailing`; add content with `renderEventTrailing`. |
 

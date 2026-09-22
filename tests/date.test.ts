@@ -258,7 +258,7 @@ void test("single-event normalization derives representation and contains the co
 		isAllDay: true,
 		metadata,
 		start: "2026-07-13",
-		title: "Two days",
+		title: "  Two days  ",
 		url: null
 	});
 	assert.equal(allDay.metadata, metadata);
@@ -320,7 +320,23 @@ void test("snapshot normalization is atomic for invalid data, duplicates, and li
 void test("event text caps, explicit null ends, and hostile getters reject atomically", () => {
 	const identifier = "i".repeat(MAX_EVENT_ID_CODE_UNITS);
 	const title = "t".repeat(MAX_EVENT_TITLE_CODE_UNITS);
-	assert.notEqual(normalizeCalendarEvent({ id: identifier, start: "2026-07-14", title }), null);
+	assert.equal(normalizeCalendarEvent({ id: identifier, start: "2026-07-14", title })?.title, title);
+	assert.equal(normalizeCalendarEvent({
+		id: "whitespace-title",
+		start: "2026-07-14",
+		title: " \t "
+	})?.title, " \t ");
+	assert.equal(normalizeCalendarEvent({
+		id: "preserved-title",
+		start: "2026-07-14",
+		title: "  Preserved  "
+	})?.title, "  Preserved  ");
+	assert.equal(normalizeCalendarEvent({ id: "empty-title", start: "2026-07-14", title: "" }), null);
+	assert.notEqual(normalizeCalendarEvent({
+		id: "astral-title",
+		start: "2026-07-14",
+		title: "\u{1F4C5}".repeat(MAX_EVENT_TITLE_CODE_UNITS / 2)
+	}), null);
 	assert.equal(normalizeCalendarEvent({
 		id: `${identifier}x`,
 		start: "2026-07-14",
@@ -332,11 +348,45 @@ void test("event text caps, explicit null ends, and hostile getters reject atomi
 		title: `${title}x`
 	}), null);
 	assert.equal(normalizeCalendarEvent({
+		id: identifier,
+		start: "2026-07-14",
+		title: `${" ".repeat(MAX_EVENT_TITLE_CODE_UNITS)}x`
+	}), null);
+	assert.equal(normalizeCalendarEvent({
 		end: null,
 		id: "null-end",
 		start: "2026-07-14",
 		title: "Null end"
 	}), null);
+
+	const trimDescriptor = Object.getOwnPropertyDescriptor(String.prototype, "trim");
+	assert.ok(trimDescriptor);
+	const originalTrim: unknown = trimDescriptor.value;
+	if (typeof originalTrim !== "function") {
+		throw new TypeError("String.prototype.trim must be callable.");
+	}
+	const trimLengths: number[] = [];
+	Object.defineProperty(String.prototype, "trim", {
+		...trimDescriptor,
+		value(this: string): string {
+			trimLengths.push(this.length);
+			const result: unknown = Reflect.apply(originalTrim, this, []);
+			if (typeof result !== "string") {
+				throw new TypeError("String.prototype.trim must return a string.");
+			}
+			return result;
+		}
+	});
+	try {
+		assert.equal(normalizeCalendarEvent({
+			id: " ".repeat(MAX_EVENT_ID_CODE_UNITS + 1),
+			start: "2026-07-14",
+			title: "Bounded"
+		}), null);
+	} finally {
+		restoreProperty(String.prototype, "trim", trimDescriptor);
+	}
+	assert.deepEqual(trimLengths, [], "Oversized identifiers must reject before trimming.");
 
 	const getterFailure = new Error("getter failure");
 	const hostileEvent = Object.create(null) as Record<string, unknown>;

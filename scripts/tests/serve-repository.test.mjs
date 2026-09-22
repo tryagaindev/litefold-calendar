@@ -39,6 +39,7 @@ function assertSecurityHeaders(response) {
 	}
 	assert.match(response.headers.get("content-security-policy") ?? "", /default-src 'self'/u);
 	assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/u);
+	assert.match(response.headers.get("content-security-policy") ?? "", /worker-src 'none'/u);
 	assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\)/u);
 }
 

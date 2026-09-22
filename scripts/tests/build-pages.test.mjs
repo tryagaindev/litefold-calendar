@@ -254,6 +254,27 @@ async function snapshotOutput(context) {
 	return join(parent, "snapshot");
 }
 
+async function readDocumentContentSecurityPolicy(path) {
+	const dom = new JSDOM(await readFile(path, "utf8"));
+	try {
+		const policies = dom.window.document.querySelectorAll(
+			'meta[http-equiv="Content-Security-Policy"]'
+		);
+		assert.equal(policies.length, 1);
+		return policies[0]?.getAttribute("content");
+	} finally {
+		dom.window.close();
+	}
+}
+
+async function replaceWorkerPolicy(path, expected, replacement) {
+	const source = await readFile(path, "utf8");
+	const updated = source.replace(expected, replacement);
+	assert.notEqual(updated, source, `${path} must contain ${expected}.`);
+	await writeFile(path, updated, "utf8");
+	return updated;
+}
+
 void test("Pages staging includes self-contained assets and commit-pinned developer navigation", async (context) => {
 	const artifact = await buildFixtureArtifact(context, { canonicalMetadata: false });
 	const nestedHtml = await readFile(join(artifact, "content", "examples", "basic", "index.html"), "utf8");
@@ -314,6 +335,13 @@ void test("Pages staging includes self-contained assets and commit-pinned develo
 		shellHtml.indexOf("Content-Security-Policy") < shellHtml.indexOf('<link rel="stylesheet"'),
 		"Shell Content Security Policy must precede stylesheets"
 	);
+	for (const path of [
+		join(artifact, "content", "examples", "index.html"),
+		join(artifact, "content", "examples", "basic", "index.html"),
+		join(artifact, "shell", "index.html")
+	]) {
+		assert.equal(await readDocumentContentSecurityPolicy(path), CONTENT_SECURITY_POLICY);
+	}
 	assert.equal(await readFile(join(artifact, "content", "examples", "basic", "main.js"), "utf8"),
 		'export const marker = "first";\n');
 	await assert.rejects(readFile(join(artifact, "content", "examples", "README.md")), /ENOENT/u);
@@ -331,6 +359,7 @@ void test("Pages staging includes self-contained assets and commit-pinned develo
 });
 
 void test("Pages staging rejects ambiguous identity and remote runtime assets", async (context) => {
+	assert.match(CONTENT_SECURITY_POLICY, /(?:^|;) worker-src 'none'(?:;|$)/u);
 	assert.throws(
 		() => validateDeploymentMetadata({ channel: "local", commit: null, version: "1.0.0" }, "1.0.0"),
 		/main or release/u
@@ -357,6 +386,16 @@ void test("Pages staging rejects ambiguous identity and remote runtime assets", 
 		['<img srcset="./local.png 1x, https://cdn.invalid/image.png 2x" alt="">', "example.html"],
 		['<base href="https://cdn.invalid/">', "example.html"],
 		['<meta http-equiv="refresh" content="0; url=https://cdn.invalid/">', "example.html"],
+		['<meta http-equiv="refresh" content="0; url=https&#x3A;&#x2F;&#x2F;cdn.invalid/">', "example.html"],
+		['<meta http-equiv="refresh" content="0; url=&sol;&sol;cdn.invalid/">', "example.html"],
+		['<meta http-equiv="refresh" content="0; url=&#47;&#9;&#47;cdn.invalid/">', "example.html"],
+		['<meta http-equiv="refresh" content="0; url=\\\\cdn.invalid/">', "example.html"],
+		[`<meta http-equiv="refresh" content='0; "&#92;&#92;cdn.invalid/" ignored'>`, "example.html"],
+		['<meta http-equiv="refresh" content="0; \'&#92;&#92;cdn.invalid/\' ignored">', "example.html"],
+		['<meta http-equiv="refresh" content="0 &#92;&#92;cdn.invalid/">', "example.html"],
+		['<meta http-equiv="refresh" content="0 URL = &#92;&#9;/cdn.invalid/">', "example.html"],
+		['<meta http-equiv="ref&#x72;esh" content="15; url=&#47;&#47;cdn.invalid/">', "example.html"],
+		['<meta http-equiv=" ReFrEsH " content="15; URL=h&#116;tps://cdn.invalid/">', "example.html"],
 		['.hero { background-image: image-set("https://cdn.invalid/image.png" 1x); }', "example.css"]
 	]) {
 		assert.throws(
@@ -364,6 +403,19 @@ void test("Pages staging rejects ambiguous identity and remote runtime assets", 
 			/remote runtime/u,
 			`${path} should reject ${source}`
 		);
+	}
+	for (const destination of ["./next/", "../next/", "/next/", "?page=2", "#details"]) {
+		assert.doesNotThrow(() => assertNoRemoteRuntimeAssets(
+			`<meta http-equiv="refresh" content="15; url=${destination}">`,
+			"example.html"
+		));
+	}
+	for (const source of [
+		`<meta http-equiv="refresh" content='15; url="./next/" ignored'>`,
+		'<meta http-equiv="refresh" content="15; url=\'./next/\' ignored">',
+		'<meta http-equiv="refresh" content="15 ./next/">'
+	]) {
+		assert.doesNotThrow(() => assertNoRemoteRuntimeAssets(source, "example.html"));
 	}
 	for (const source of [
 		'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
@@ -520,6 +572,205 @@ void test("retained snapshot assembly enforces the exact shell runtime policy", 
 	);
 });
 
+void test("retained assembly rejects decoded remote refreshes in nested HTML", async (context) => {
+	const empty = await emptyPreviousDirectory(context);
+	const retainedArtifact = await buildFixtureArtifact(context, {
+		channel: "release",
+		version: "1.0.0"
+	});
+	const retainedSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: retainedArtifact,
+		outputDirectory: retainedSnapshot,
+		previousDirectory: empty
+	});
+	const retainedHtmlPath = join(
+		retainedSnapshot,
+		"site",
+		"releases",
+		"1.0.0",
+		"examples",
+		"basic",
+		"index.html"
+	);
+	await replaceWorkerPolicy(
+		retainedHtmlPath,
+		"worker-src 'none'",
+		"worker-src 'self'"
+	);
+	await writeFile(
+		retainedHtmlPath,
+		(await readFile(retainedHtmlPath, "utf8")).replace(
+			"</head>",
+			`<meta http-equiv="ref&#x72;esh" content='0; "&#92;&#92;cdn.invalid/" ignored'>\n</head>`
+		),
+		"utf8"
+	);
+	const nextArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: SECOND_COMMIT,
+		version: "1.1.0"
+	});
+	await assert.rejects(
+		assemblePagesSnapshot({
+			channelDirectory: nextArtifact,
+			outputDirectory: await snapshotOutput(context),
+			previousDirectory: join(retainedSnapshot, "site")
+		}),
+		/redirects to a remote runtime resource/u
+	);
+});
+
+void test("retained assembly preserves exact legacy worker policies and rejects policy drift", async (context) => {
+	const empty = await emptyPreviousDirectory(context);
+	const retainedArtifact = await buildFixtureArtifact(context, {
+		channel: "release",
+		version: "1.0.0"
+	});
+	const retainedSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: retainedArtifact,
+		outputDirectory: retainedSnapshot,
+		previousDirectory: empty
+	});
+	const retainedHtmlPath = join(
+		retainedSnapshot,
+		"site",
+		"releases",
+		"1.0.0",
+		"examples",
+		"basic",
+		"index.html"
+	);
+	const legacyHtml = await replaceWorkerPolicy(
+		retainedHtmlPath,
+		"worker-src 'none'",
+		"worker-src 'self'"
+	);
+	const nextArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: SECOND_COMMIT,
+		version: "1.1.0"
+	});
+	const nextSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: nextArtifact,
+		outputDirectory: nextSnapshot,
+		previousDirectory: join(retainedSnapshot, "site")
+	});
+	const preservedHtmlPath = join(
+		nextSnapshot,
+		"site",
+		"releases",
+		"1.0.0",
+		"examples",
+		"basic",
+		"index.html"
+	);
+	assert.equal(await readFile(preservedHtmlPath, "utf8"), legacyHtml);
+
+	const laterArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		version: "1.2.0"
+	});
+	const legacyPolicy = CONTENT_SECURITY_POLICY.replace("worker-src 'none'", "worker-src 'self'");
+	for (const [description, invalidHtml] of [
+		["a wildcard worker source", legacyHtml.replace("worker-src 'self'", "worker-src *")],
+		["a missing worker directive", legacyHtml.replace("; worker-src 'self'", "")],
+		[
+			"a modified script directive",
+			legacyHtml.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")
+		],
+		["an unknown policy", legacyHtml.replace(legacyPolicy, "default-src 'none'")]
+	]) {
+		await writeFile(preservedHtmlPath, invalidHtml, "utf8");
+		await assert.rejects(
+			assemblePagesSnapshot({
+				channelDirectory: laterArtifact,
+				outputDirectory: await snapshotOutput(context),
+				previousDirectory: join(nextSnapshot, "site")
+			}),
+			/exact Content Security Policy once in head/u,
+			description
+		);
+	}
+});
+
+void test("legacy shells survive reruns and backfills before a newer release upgrades them", async (context) => {
+	const empty = await emptyPreviousDirectory(context);
+	const firstArtifact = await buildFixtureArtifact(context, {
+		channel: "release",
+		version: "1.0.0"
+	});
+	const firstSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: firstArtifact,
+		outputDirectory: firstSnapshot,
+		previousDirectory: empty
+	});
+	const retainedIndexPath = join(firstSnapshot, "site", "index.html");
+	const legacyShell = await replaceWorkerPolicy(
+		retainedIndexPath,
+		"worker-src 'none'",
+		"worker-src 'self'"
+	);
+	const mainArtifact = await buildFixtureArtifact(context, {
+		channel: "main",
+		commit: SECOND_COMMIT,
+		version: "1.0.1"
+	});
+	const mainSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: mainArtifact,
+		outputDirectory: mainSnapshot,
+		previousDirectory: join(firstSnapshot, "site")
+	});
+	assert.equal(
+		await readDocumentContentSecurityPolicy(join(mainSnapshot, "site", "index.html")),
+		CONTENT_SECURITY_POLICY
+	);
+
+	const rerunSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: firstArtifact,
+		outputDirectory: rerunSnapshot,
+		previousDirectory: join(firstSnapshot, "site")
+	});
+	assert.equal(await readFile(join(rerunSnapshot, "site", "index.html"), "utf8"), legacyShell);
+
+	const backfillArtifact = await buildFixtureArtifact(context, {
+		channel: "release",
+		commit: SECOND_COMMIT,
+		version: "0.9.0"
+	});
+	const backfillSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: backfillArtifact,
+		outputDirectory: backfillSnapshot,
+		previousDirectory: join(rerunSnapshot, "site")
+	});
+	assert.equal(
+		await readDocumentContentSecurityPolicy(join(backfillSnapshot, "site", "index.html")),
+		CONTENT_SECURITY_POLICY.replace("worker-src 'none'", "worker-src 'self'")
+	);
+
+	const nextArtifact = await buildFixtureArtifact(context, {
+		channel: "release",
+		commit: SECOND_COMMIT,
+		version: "1.1.0"
+	});
+	const nextSnapshot = await snapshotOutput(context);
+	await assemblePagesSnapshot({
+		channelDirectory: nextArtifact,
+		outputDirectory: nextSnapshot,
+		previousDirectory: join(backfillSnapshot, "site")
+	});
+	assert.equal(
+		await readDocumentContentSecurityPolicy(join(nextSnapshot, "site", "index.html")),
+		CONTENT_SECURITY_POLICY
+	);
+});
+
 void test("retained rollback inputs restore main while preserving the current shell and releases", async (context) => {
 	const empty = await emptyPreviousDirectory(context);
 	const releaseArtifact = await buildFixtureArtifact(context, {
@@ -567,6 +818,23 @@ void test("retained rollback inputs restore main while preserving the current sh
 		marker: "historical-main",
 		version: "1.1.0"
 	});
+	const historicalMainHtml = new Map();
+	for (const relativePath of ["examples/index.html", "examples/basic/index.html"]) {
+		const historicalPath = join(historicalSnapshot, "site", "main", ...relativePath.split("/"));
+		const rollbackPath = join(rollbackChannel, "content", ...relativePath.split("/"));
+		const historicalSource = await replaceWorkerPolicy(
+			historicalPath,
+			"worker-src 'none'",
+			"worker-src 'self'"
+		);
+		const rollbackSource = await replaceWorkerPolicy(
+			rollbackPath,
+			"worker-src 'none'",
+			"worker-src 'self'"
+		);
+		assert.equal(rollbackSource, historicalSource);
+		historicalMainHtml.set(relativePath, historicalSource);
+	}
 	for (const shellFile of ["index.html", SHELL_MARK_FILENAME, "site.css", "site.js"]) {
 		await copyFile(
 			join(currentSnapshot, "site", shellFile),
@@ -584,9 +852,25 @@ void test("retained rollback inputs restore main while preserving the current sh
 		await readFile(join(rollbackSnapshot, "site", "main", "examples", "basic", "main.js"), "utf8"),
 		'export const marker = "historical-main";\n'
 	);
+	for (const [relativePath, expectedSource] of historicalMainHtml) {
+		assert.equal(
+			await readFile(join(rollbackSnapshot, "site", "main", ...relativePath.split("/")), "utf8"),
+			expectedSource
+		);
+	}
 	assert.equal(
 		await readFile(join(rollbackSnapshot, "site", "releases", "1.0.0", "examples", "basic", "main.js"), "utf8"),
 		'export const marker = "retained-release";\n'
+	);
+	assert.equal(
+		await readFile(
+			join(rollbackSnapshot, "site", "releases", "1.0.0", "examples", "basic", "index.html"),
+			"utf8"
+		),
+		await readFile(
+			join(currentSnapshot, "site", "releases", "1.0.0", "examples", "basic", "index.html"),
+			"utf8"
+		)
 	);
 	for (const shellFile of [SHELL_MARK_FILENAME, "site.css", "site.js"]) {
 		assert.equal(

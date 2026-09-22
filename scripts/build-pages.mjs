@@ -12,6 +12,8 @@ import {
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { JSDOM } from "jsdom";
+
 import { parseExampleMetadata, serializeExampleMetadata } from "./lib/example-metadata.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
 import { parseSemVer } from "./lib/semver.mjs";
@@ -23,7 +25,7 @@ const SHELL_MARK_FILENAME = "litefold-calendar-mark.svg";
 const EXAMPLE_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js", ".json"]);
 const PACKAGE_RUNTIME_EXTENSIONS = new Set([".css", ".js"]);
 const SHELL_RUNTIME_EXTENSIONS = new Set([".css", ".html", ".js"]);
-export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'";
+export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-src 'none'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'none'";
 
 function displayPath(path, root) {
 	return relative(root, path).replaceAll(sep, "/");
@@ -120,13 +122,84 @@ function assertNoRemoteHtmlAssets(source, path) {
 			}
 		}
 	}
-	for (const meta of source.matchAll(/<meta\b[^>]*>/giu)) {
-		if (/\bhttp-equiv\s*=\s*["']?\s*refresh\b/iu.test(meta[0]) &&
-			/(?:https?:)?\/\//iu.test(meta[0])) {
-			throw new Error(`${path} redirects to a remote runtime resource.`);
+	const dom = new JSDOM(source);
+	try {
+		for (const meta of dom.window.document.querySelectorAll("meta[http-equiv]")) {
+			if (meta.getAttribute("http-equiv")?.trim().toLowerCase() === "refresh" &&
+				isRemoteMetaRefresh(meta.getAttribute("content") ?? "")) {
+				throw new Error(`${path} redirects to a remote runtime resource.`);
+			}
 		}
+	} finally {
+		dom.window.close();
 	}
 	assertNoRemoteCssAssets(source, path);
+}
+
+function isRemoteMetaRefresh(content) {
+	if (/(?:https?:)?\/\//iu.test(content)) {
+		return true;
+	}
+	const destination = readMetaRefreshDestination(content);
+	if (destination === null) {
+		return false;
+	}
+	try {
+		const first = new URL(destination, "https://pages-a.invalid/base/");
+		const second = new URL(destination, "https://pages-b.invalid/base/");
+		return (first.protocol === "http:" || first.protocol === "https:") && first.href === second.href;
+	} catch {
+		return false;
+	}
+}
+
+function readMetaRefreshDestination(content) {
+	let position = 0;
+	const skipAsciiWhitespace = () => {
+		while (/[\t\n\f\r ]/u.test(content[position] ?? "")) {
+			position += 1;
+		}
+	};
+	skipAsciiWhitespace();
+	const timeStart = position;
+	while (/[0-9]/u.test(content[position] ?? "")) {
+		position += 1;
+	}
+	if (position === timeStart && content[position] !== ".") {
+		return null;
+	}
+	while (/[0-9.]/u.test(content[position] ?? "")) {
+		position += 1;
+	}
+	if (position >= content.length) {
+		return null;
+	}
+	const separator = content[position];
+	if (separator !== ";" && separator !== "," && !/[\t\n\f\r ]/u.test(separator ?? "")) {
+		return null;
+	}
+	skipAsciiWhitespace();
+	if (content[position] === ";" || content[position] === ",") {
+		position += 1;
+	}
+	skipAsciiWhitespace();
+	if (position >= content.length) {
+		return null;
+	}
+	const urlPrefix = /^[Uu][Rr][Ll][\t\n\f\r ]*=/u.exec(content.slice(position));
+	if (urlPrefix !== null) {
+		position += urlPrefix[0].length;
+		skipAsciiWhitespace();
+	}
+	const quote = content[position] === "\"" || content[position] === "'"
+		? content[position]
+		: null;
+	if (quote !== null) {
+		position += 1;
+		const quoteIndex = content.indexOf(quote, position);
+		return content.slice(position, quoteIndex < 0 ? content.length : quoteIndex);
+	}
+	return content.slice(position);
 }
 
 function assertNoRemoteCssAssets(source, path) {
