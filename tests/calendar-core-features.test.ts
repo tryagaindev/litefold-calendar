@@ -284,6 +284,10 @@ void test("F2 action mode is non-wrapping and exits to the day proxy or agenda h
 		":scope > .lfc-calendar-day-summaries :is(a, button)"
 	)];
 	assert.equal(actions.length, 3, "Two capped events and the overflow action must be reachable.");
+	const [firstAction, secondAction, overflowAction] = actions;
+	assert.ok(firstAction);
+	assert.ok(secondAction);
+	assert.ok(overflowAction);
 	assert.equal(actions[0]?.classList.contains("lfc-is-compact-primary"), true);
 	assert.ok(actions.every((action) => action.tabIndex === -1));
 
@@ -292,16 +296,16 @@ void test("F2 action mode is non-wrapping and exits to the day proxy or agenda h
 	assert.equal(dom.window.document.activeElement, actions[0]);
 	assert.equal(actions[0]?.tabIndex, -1);
 	assert.equal(dayButton.tabIndex, 0);
-	assert.equal(dispatchKey(dom, actions[0] as Element, "ArrowDown").defaultPrevented, true);
+	assert.equal(dispatchKey(dom, firstAction, "ArrowDown").defaultPrevented, true);
 	assert.equal(dom.window.document.activeElement, actions[1]);
-	dispatchKey(dom, actions[1] as Element, "ArrowDown");
+	dispatchKey(dom, secondAction, "ArrowDown");
 	assert.equal(dom.window.document.activeElement, actions[2]);
-	dispatchKey(dom, actions[2] as Element, "ArrowDown");
+	dispatchKey(dom, overflowAction, "ArrowDown");
 	assert.equal(dom.window.document.activeElement, actions[2], "Down Arrow must not wrap.");
-	dispatchKey(dom, actions[2] as Element, "ArrowUp");
+	dispatchKey(dom, overflowAction, "ArrowUp");
 	assert.equal(dom.window.document.activeElement, actions[1]);
 	assert.ok(actions.every((action) => action.tabIndex === -1));
-	dispatchKey(dom, actions[1] as Element, "Tab", true);
+	dispatchKey(dom, secondAction, "Tab", true);
 	assert.equal(dom.window.document.activeElement, dayButton);
 	assert.equal(dayButton.tabIndex, 0);
 
@@ -322,7 +326,7 @@ void test("F2 action mode is non-wrapping and exits to the day proxy or agenda h
 		new RegExp(`^Open ${new Intl.NumberFormat("ar-EG").format(1)} event`, "u")
 	);
 	actions[2]?.focus();
-	dispatchClick(dom, actions[2] as Element);
+	dispatchClick(dom, overflowAction);
 	assert.equal(daySelections, 0, "The overflow action must not invoke onDaySelect.");
 	assert.equal(dom.window.document.activeElement, host.querySelector(".lfc-calendar-agenda-title"));
 	assert.equal(findDayButton(host, "2026-07-14").tabIndex, 0);

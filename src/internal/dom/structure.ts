@@ -3,7 +3,8 @@ import {
 	type CalendarMonthPickerElements
 } from "./month-picker.js";
 import type { CalendarMessages } from "../../messages.js";
-import type { CalendarOptions } from "../../types.js";
+import type { CalendarHeadingLevel, CalendarOptions } from "../../types.js";
+import { createHeading, getChildHeadingLevel } from "./heading.js";
 
 /** Package-owned DOM references used by the calendar renderer. */
 export interface CalendarDom extends CalendarMonthPickerElements {
@@ -43,7 +44,7 @@ export interface CalendarDom extends CalendarMonthPickerElements {
 
 interface CalendarStructureOptions {
 	readonly document: Document;
-	readonly headingLevel: number;
+	readonly headingLevel: CalendarHeadingLevel;
 	readonly host: HTMLElement;
 	readonly iconNodes: Readonly<Record<"next" | "previous", Node>>;
 	readonly instanceName: string;
@@ -60,7 +61,7 @@ interface CalendarStructureOptions {
 	readonly onMonthPickerYearInput: (this: void, event: Event) => void;
 	readonly onNavigate: (this: void, direction: "next" | "previous") => void;
 	readonly onRetry: (this: void, event: MouseEvent) => void;
-	readonly onToday: (this: void, event: MouseEvent) => void;
+	readonly onToday: (this: void, button: HTMLButtonElement) => void;
 	readonly toolbarEnd: HTMLElement | null;
 }
 
@@ -105,7 +106,7 @@ export function createCalendarStructure(
 	todayButton.className = "lfc-calendar-nav-button lfc-calendar-today-button";
 	todayButton.type = "button";
 	todayButton.textContent = options.messages.today;
-	todayButton.addEventListener("click", options.onToday);
+	todayButton.addEventListener("click", () => { options.onToday(todayButton); });
 	navigation.append(monthStepper, picker.title, todayButton);
 	toolbar.append(navigation, picker.monthPicker);
 	appendToolbarEnd(options, toolbar);
@@ -118,7 +119,7 @@ export function createCalendarStructure(
 	const panelIcon = options.document.createElement("span");
 	panelIcon.className = "lfc-calendar-status-icon";
 	panelIcon.setAttribute("aria-hidden", "true");
-	const panelTitle = createHeading(options.document, Math.min(6, options.headingLevel + 1));
+	const panelTitle = createHeading(options.document, getChildHeadingLevel(options.headingLevel));
 	panelTitle.className = "lfc-calendar-status-title";
 	const panelMessage = options.document.createElement("p");
 	panelMessage.className = "lfc-calendar-status-message";
@@ -178,7 +179,7 @@ export function createCalendarStructure(
 
 	const agenda = options.document.createElement("section");
 	agenda.className = "lfc-calendar-agenda";
-	const agendaTitle = createHeading(options.document, Math.min(6, options.headingLevel + 1));
+	const agendaTitle = createHeading(options.document, getChildHeadingLevel(options.headingLevel));
 	agendaTitle.className = "lfc-calendar-agenda-title";
 	agendaTitle.id = `${options.instanceName}-agenda-title`;
 	agendaTitle.tabIndex = -1;
@@ -286,10 +287,6 @@ function appendToolbarEnd(options: Readonly<CalendarStructureOptions>, toolbar: 
 		options.integrationParents.set(options.toolbarEnd, toolbarEnd);
 	}
 	toolbar.append(toolbarEnd);
-}
-
-function createHeading(document: Document, level: number): HTMLHeadingElement {
-	return document.createElement(`h${level.toString()}`) as HTMLHeadingElement;
 }
 
 function createLiveRegion(

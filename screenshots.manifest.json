@@ -7,7 +7,7 @@
     "npm": "12.0.2",
     "playwright": "1.63.0"
   },
-  "sourceFingerprint": "0f2412f9f2f65e6d4f551977a3aaa19df8c6a42049630640d1be282d0abf549a",
+  "sourceFingerprint": "cef1fa0da8340c99f6f6b923d3334776842767c67480ef576fafe942350b227a",
   "scenes": [
     {
       "id": "desktop-month-grid",

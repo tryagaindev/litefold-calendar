@@ -16,7 +16,7 @@ import {
 	type CalendarRangeBounds
 } from "../../errors.js";
 import {
-	createConfigurationError, getFallbackOption, normalizeIntegerOption, normalizeLocale, normalizeTimeZone,
+	createConfigurationError, getFallbackOption, normalizeHeadingLevel, normalizeIntegerOption, normalizeLocale, normalizeTimeZone,
 	resolveFallbackElement, resolveFirstDay, resolveIconNodes, resolveToolbarEnd, snapshotCalendarOptions
 } from "./configuration.js";
 import {
@@ -89,7 +89,7 @@ import {
 } from "./safety.js";
 import type {
 	Calendar, CalendarAnnouncement, CalendarDate, CalendarDateInput, CalendarEvent,
-	CalendarEventActionElement, CalendarEvents, CalendarEventSurface, CalendarExtension, CalendarOptions,
+	CalendarEventActionElement, CalendarEvents, CalendarEventSurface, CalendarExtension, CalendarHeadingLevel, CalendarOptions,
 	CalendarPhase, CalendarState
 } from "../../types.js";
 
@@ -147,7 +147,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private readonly firstDay: number;
 	private readonly fullDateFormatter: Intl.DateTimeFormat;
 	private readonly gridEventLimit: number;
-	private readonly headingLevel: number;
+	private readonly headingLevel: CalendarHeadingLevel;
 	private readonly host: HTMLElement;
 	private readonly iconNodes: Readonly<Record<"next" | "previous", Node>>;
 	private readonly integrationNodes: IntegrationNodeController;
@@ -267,7 +267,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 			"agendaDomLimit"
 		);
 		this.agendaVisibleCount = Math.min(this.agendaPageSize, this.agendaDomLimit);
-		this.headingLevel = normalizeIntegerOption(resolvedOptions.headingLevel, 2, 1, 6, "headingLevel");
+		this.headingLevel = normalizeHeadingLevel(resolvedOptions.headingLevel);
 		if (resolvedOptions.swipe !== undefined && typeof resolvedOptions.swipe !== "boolean") {
 			throw createConfigurationError("swipe must be a boolean.");
 		}
@@ -716,9 +716,8 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 				}
 			},
 			onRetry: this.handleRetry,
-			onToday: (event) => {
-				const target = event.currentTarget as HTMLButtonElement | null;
-				if (this.canContinueInteraction() && target?.getAttribute("aria-disabled") !== "true") {
+			onToday: (button) => {
+				if (this.canContinueInteraction() && button.getAttribute("aria-disabled") !== "true") {
 					this.navigateToToday(false);
 				}
 			},
@@ -2669,11 +2668,11 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 		}
 	}
 
-	private projectDateInput(value: unknown): CalendarDate | null {
+	private projectDateInput(value: CalendarDateInput): CalendarDate | null {
 		if (isDateInstance(value)) {
 			return this.projectDateInstant(value);
 		}
-		return parseCalendarDate(value as CalendarDateInput);
+		return parseCalendarDate(value);
 	}
 
 	private projectDateInstant(value: unknown): CalendarDate | null {

@@ -15,10 +15,6 @@ interface SwipeGestureOptions {
 	readonly window: HostWindow | null;
 }
 
-interface SourceCapabilityEvent extends Event {
-	readonly sourceCapabilities?: { readonly firesTouchEvents?: boolean } | null;
-}
-
 interface SnapCandidate {
 	readonly amount: -1 | 0 | 1;
 	readonly offset: number;
@@ -107,16 +103,17 @@ export class SwipeGestureController {
 		if (!this.suppressNextClick) {
 			return;
 		}
-		const pointerId = "pointerId" in event ? (event as Partial<PointerEvent>).pointerId : undefined;
-		const firesTouchEvents = "sourceCapabilities" in event &&
-			(event as SourceCapabilityEvent).sourceCapabilities?.firesTouchEvents === true;
+		const pointerId = "pointerId" in event ? event.pointerId : undefined;
+		const capabilities = "sourceCapabilities" in event ? event.sourceCapabilities : null;
+		const firesTouchEvents = capabilities !== null && typeof capabilities === "object" &&
+			"firesTouchEvents" in capabilities && capabilities.firesTouchEvents === true;
 		if (typeof pointerId === "number" && pointerId >= 0 &&
 			this.suppressedPointerId !== null && pointerId !== this.suppressedPointerId) {
 			return;
 		}
 		if ((typeof pointerId !== "number" || pointerId < 0) && !firesTouchEvents &&
 			"detail" in event &&
-			(event as Partial<MouseEvent>).detail === 0) {
+			event.detail === 0) {
 			return;
 		}
 		this.clearClickSuppression();

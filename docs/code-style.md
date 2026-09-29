@@ -30,6 +30,9 @@ Apply the [Baseline Widely available policy](browser-support.md) to library code
 
 - Keep strict TypeScript and `exactOptionalPropertyTypes`; omit an optional property instead of assigning `undefined`.
 - Prefer discriminated contexts and precise platform element types. Do not hide ambiguity with `any`, unchecked casts, non-null assertions, or parallel callback combinations with surprising behavior.
+- Preserve type information at its source: prefer inference, checked type annotations, `satisfies`, and literal types over assertions. Use generics when they retain a real relationship between inputs, callbacks, and returned values.
+- Narrow uncertain values with runtime checks and carry the validated type through helper signatures. Tests should assert required elements and values before using them rather than casting away missing or invalid cases.
+- Keep useful `as const` and justified assertions at dynamic validation, opaque metadata, third-party, and type-erasure boundaries, including intentionally invalid test fixtures. Explain non-obvious boundary assumptions; do not relocate assertions into unchecked generic helpers or suppress lint to remove a cast.
 - Validate configuration and application data at the boundary. Diagnostics identify the option or field and corrective action without echoing private event values.
 - Treat browser-agent tool arguments as untrusted boundary input. Keep WebMCP schemas structural and JSON-safe, use the current `document.modelContext` API behind feature detection, and do not add ambient experimental browser globals to consumer-facing types.
 

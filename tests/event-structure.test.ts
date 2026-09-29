@@ -162,7 +162,7 @@ function captureListenerRegistrations(
 	install: () => void
 ): readonly string[] {
 	const registrations: string[] = [];
-	const nativeAddEventListener = action.addEventListener.bind(action) as EventTarget["addEventListener"];
+	const nativeAddEventListener: EventTarget["addEventListener"] = action.addEventListener.bind(action);
 	Object.defineProperty(action, "addEventListener", {
 		configurable: true,
 		value: (

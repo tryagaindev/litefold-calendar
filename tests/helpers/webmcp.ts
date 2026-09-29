@@ -151,8 +151,9 @@ export function assertErrorEnvelope(value: unknown, code: string): void {
 	const error = requireRecord(result["error"]);
 	assert.equal(result["ok"], false);
 	assert.equal(error["code"], code);
-	assert.equal(typeof error["message"], "string");
-	assert.equal((error["message"] as string).length > 0, true);
+	const message = error["message"];
+	assert.ok(typeof message === "string");
+	assert.equal(message.length > 0, true);
 	requireRecord(result["state"]);
 }
 

@@ -89,10 +89,10 @@ export function resolveCalendarMessages(
 }
 
 function validateCalendarMessageTokens(key: keyof CalendarMessages, template: string): void {
-	const supportedTokens = CALENDAR_MESSAGE_TOKENS[key];
+	const supportedTokens: readonly string[] = CALENDAR_MESSAGE_TOKENS[key];
 	for (const match of template.matchAll(/\{([^{}]+)\}/g)) {
 		const token = match[1];
-		if (token !== undefined && !(supportedTokens as readonly string[]).includes(token)) {
+		if (token !== undefined && !supportedTokens.includes(token)) {
 			throw createConfigurationError(`messages.${key} contains unsupported template token "{${token}}".`);
 		}
 	}

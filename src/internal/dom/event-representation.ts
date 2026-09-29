@@ -45,11 +45,17 @@ export function createEventRepresentation<TMetadata>(
 	input: Readonly<EventRepresentationInput<TMetadata>>
 ): Readonly<EventRepresentation> {
 	const event = input.event.event;
-	const isLink = event.url !== null;
-	const isActionable = isLink || input.hasApplicationAction;
-	const root = input.document.createElement(
-		isLink ? "a" : isActionable ? "button" : input.surface === "agenda" ? "div" : "span"
-	);
+	let action: CalendarEventActionElement | null = null;
+	if (event.url !== null) {
+		const link = input.document.createElement("a");
+		link.href = event.url;
+		action = link;
+	} else if (input.hasApplicationAction) {
+		const button = input.document.createElement("button");
+		button.type = "button";
+		action = button;
+	}
+	const root = action ?? input.document.createElement(input.surface === "agenda" ? "div" : "span");
 	root.className = input.surface === "agenda"
 		? "lfc-calendar-agenda-event"
 		: "lfc-calendar-event-summary";
@@ -57,14 +63,8 @@ export function createEventRepresentation<TMetadata>(
 	root.setAttribute("data-lfc-event-id", event.id);
 	root.setAttribute("data-lfc-surface", input.surface);
 
-	const action = isActionable ? root as CalendarEventActionElement : null;
 	if (action !== null) {
 		action.classList.add("lfc-calendar-event-button");
-		if (action.tagName === "BUTTON") {
-			(action as HTMLButtonElement).type = "button";
-		} else if (event.url !== null) {
-			(action as HTMLAnchorElement).href = event.url;
-		}
 		if (input.surface === "grid-summary") {
 			action.tabIndex = -1;
 			action.setAttribute("aria-label", input.accessibleLabel);

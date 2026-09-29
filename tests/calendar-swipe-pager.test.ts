@@ -324,11 +324,21 @@ void test("touch contacts guard clicks and multi-touch or touchcancel returns to
 	dispatchPointer(dom, pager.viewport, "pointerdown", 7, 100, 100);
 	dispatchTouchContacts(dom, pager.viewport, "touchstart", 1);
 	setPagerScroll(dom, pager.viewport, geometry.nextOffset);
-	dispatchClick(dom, toolbarAction);
-	assert.equal(actionActivations, 1, "Keyboard/programmatic activation must not be swallowed.");
+	for (const sourceCapabilities of [undefined, null, {}, { firesTouchEvents: false }]) {
+		const click = new dom.window.MouseEvent("click", { bubbles: true, cancelable: true });
+		if (sourceCapabilities !== undefined) {
+			Object.defineProperty(click, "sourceCapabilities", { value: sourceCapabilities });
+		}
+		toolbarAction.dispatchEvent(click);
+		assert.equal(click.defaultPrevented, false);
+	}
+	assert.equal(actionActivations, 4, "Keyboard/programmatic activation must not be swallowed.");
 	const day = host.querySelector<HTMLButtonElement>("[data-lfc-date='2026-08-10']");
 	assert.ok(day);
-	dispatchClick(dom, day, 1);
+	const touchClick = new dom.window.MouseEvent("click", { bubbles: true, cancelable: true });
+	Object.defineProperty(touchClick, "sourceCapabilities", { value: { firesTouchEvents: true } });
+	day.dispatchEvent(touchClick);
+	assert.equal(touchClick.defaultPrevented, true);
 	assert.equal(selections, 0, "The touch-generated click from a horizontal pan must be suppressed.");
 
 	dispatchPointer(dom, pager.viewport, "pointerdown", 8, 100, 100);
@@ -399,12 +409,12 @@ void test("a fresh toolbar touch clears stale suppression while refetch retains 
 
 void test("refetch, event replacement, navigation, resize, reentrancy, and destroy cancel pending paging", async (context) => {
 	const { dom, host } = setupDom(context);
-	let resizeCallback: ResizeObserverCallback | null = null;
+	const resizeObservers: TestResizeObserver[] = [];
 	let resizeDisconnects = 0;
 	let resizeObservations = 0;
-	class TestResizeObserver {
-		public constructor(callback: ResizeObserverCallback) {
-			resizeCallback = callback;
+	class TestResizeObserver implements ResizeObserver {
+		public constructor(public readonly callback: ResizeObserverCallback) {
+			resizeObservers.push(this);
 		}
 		public disconnect(): void { resizeDisconnects += 1; }
 		public observe(): void { resizeObservations += 1; }
@@ -453,15 +463,16 @@ void test("refetch, event replacement, navigation, resize, reentrancy, and destr
 	assert.equal(requests, 3, "setEvents() must cancel the pending pager fallback.");
 
 	setPagerScroll(dom, pager.viewport, geometry.nextOffset);
-	const triggerResize = resizeCallback as ResizeObserverCallback | null;
-	assert.ok(triggerResize);
-	triggerResize([], {} as ResizeObserver);
+	const resizeObserver = resizeObservers[0];
+	assert.ok(resizeObserver);
+	const triggerResize = resizeObserver.callback;
+	triggerResize([], resizeObserver);
 	assert.equal(pager.viewport.scrollLeft, geometry.nextOffset);
 	assert.equal(host.getAttribute("data-lfc-swipe-state"), "scrolling");
-	triggerResize([resizeEntry(pager.grid)], {} as ResizeObserver);
+	triggerResize([resizeEntry(pager.grid)], resizeObserver);
 	assert.equal(pager.viewport.scrollLeft, geometry.nextOffset);
 	assert.equal(host.getAttribute("data-lfc-swipe-state"), "scrolling");
-	triggerResize([resizeEntry(pager.viewport)], {} as ResizeObserver);
+	triggerResize([resizeEntry(pager.viewport)], resizeObserver);
 	assert.equal(pager.viewport.scrollLeft, geometry.centerOffset);
 	assert.equal(host.hasAttribute("data-lfc-swipe-state"), false);
 	await delay(150);
@@ -479,7 +490,7 @@ void test("refetch, event replacement, navigation, resize, reentrancy, and destr
 	setPagerScroll(dom, pager.viewport, geometry.nextOffset);
 	calendar.destroy();
 	await delay(150);
-	triggerResize([resizeEntry(pager.viewport)], {} as ResizeObserver);
+	triggerResize([resizeEntry(pager.viewport)], resizeObserver);
 	assert.equal(calendar.getState().phase, "destroyed");
 	assert.equal(resizeDisconnects, 1);
 	assert.equal(host.childElementCount, 0);
@@ -596,7 +607,13 @@ function rangeLength(request: SourceRequest | undefined): number {
 }
 
 function resizeEntry(target: Element): ResizeObserverEntry {
-	return { target } as unknown as ResizeObserverEntry;
+	return {
+		borderBoxSize: [],
+		contentBoxSize: [],
+		contentRect: target.getBoundingClientRect(),
+		devicePixelContentBoxSize: [],
+		target
+	};
 }
 
 function requireHost(dom: ReturnType<typeof createDom>, selector: string): HTMLElement {

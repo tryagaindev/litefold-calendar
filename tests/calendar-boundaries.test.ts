@@ -420,6 +420,36 @@ void test("a single-date range keeps one selectable grid day and suppresses out-
 	}]);
 });
 
+for (const headingLevel of [1, 2, 3, 4, 5, 6] as const) {
+	void test(`heading level ${headingLevel} preserves native subordinate headings`, async (context) => {
+		const { host } = setupDom(context);
+		const calendar = createCalendar(host, { events: [], headingLevel, initialDate: "2026-07-14" });
+		calendar.render();
+		await waitForPhase(calendar, "ready");
+		assert.equal(host.querySelector(".lfc-calendar-title")?.tagName, `H${headingLevel}`);
+		const subordinateHeadings = host.querySelectorAll(
+			".lfc-calendar-agenda-title, .lfc-calendar-status-title, .lfc-calendar-month-picker-title"
+		);
+		assert.equal(subordinateHeadings.length, 3);
+		for (const heading of subordinateHeadings) {
+			assert.equal(heading.tagName, `H${Math.min(6, headingLevel + 1)}`);
+		}
+	});
+}
+
+void test("invalid heading levels keep their configuration error and leave the host untouched", (context) => {
+	const { host } = setupDom(context);
+	for (const headingLevel of [0, 7, 1.5, NaN, Infinity, "2", null, {}]) {
+		assert.throws(() => createCalendar(host, { events: [], headingLevel } as never), (error: unknown) => {
+			assert.ok(error instanceof LitefoldCalendarError);
+			assert.equal(error.code, "invalid-configuration");
+			assert.equal(error.message, "headingLevel must be an integer from 1 through 6.");
+			return true;
+		});
+		assert.equal(host.childElementCount, 0);
+	}
+});
+
 void test("the month title opens a localized native popover and jumps with day clamping", async (context) => {
 	const { dom, host } = setupDom(context);
 	const ranges: Readonly<{ readonly end: string; readonly start: string }>[] = [];
@@ -471,6 +501,8 @@ void test("the month title opens a localized native popover and jumps with day c
 	assert.equal(isPopoverOpen(picker.popover), false);
 	assert.equal(picker.trigger.getAttribute("aria-expanded"), "false");
 	assert.equal(picker.month.autofocus, true);
+	picker.popover.dispatchEvent(new dom.window.Event("beforetoggle", { cancelable: true }));
+	assert.equal(picker.trigger.getAttribute("aria-expanded"), "false");
 
 	picker.trigger.click();
 	assert.equal(isPopoverOpen(picker.popover), true);
