@@ -760,6 +760,12 @@ function snapshotCalendarOptions(options) {
 	snapshot["weekRowSizing"] = normalizeWeekRowSizing(snapshot["weekRowSizing"]);
 	return Object.freeze(snapshot);
 }
+/** Validates a heading level without widening the native heading tag union. */
+function normalizeHeadingLevel(value) {
+	if (value === void 0) return 2;
+	if (value !== 1 && value !== 2 && value !== 3 && value !== 4 && value !== 5 && value !== 6) throw createConfigurationError("headingLevel must be an integer from 1 through 6.");
+	return value;
+}
 function normalizeIntegerOption(value, defaultValue, minimum, maximum, name) {
 	if (value === void 0) return defaultValue;
 	if (!Number.isInteger(value) || value < minimum || value > maximum) throw createConfigurationError(`${name} must be an integer from ${minimum.toString()} through ${maximum.toString()}.`);
@@ -851,8 +857,7 @@ function getFallbackOption(fallbackElement) {
 	return fallbackElement === null ? {} : { fallbackElement };
 }
 function resolveIconNodes(document, host, icons) {
-	const nodes = {};
-	for (const direction of ["previous", "next"]) {
+	const resolve = (direction) => {
 		if (typeof icons[direction] !== "function") throw createConfigurationError(`${direction} icon must be a factory function.`);
 		let node;
 		try {
@@ -860,15 +865,19 @@ function resolveIconNodes(document, host, icons) {
 		} catch (cause) {
 			throw createConfigurationError(`${direction} icon factory failed.`, cause);
 		}
-		let isValid = false;
+		let validatedNode = null;
 		try {
-			isValid = isSameDocumentNode(document, node) && isAppendableNode(node) && node.parentNode === null && !node.contains(host) && !containsInteractiveContent(node);
+			if (isSameDocumentNode(document, node) && isAppendableNode(node) && node.parentNode === null && !node.contains(host) && !containsInteractiveContent(node)) validatedNode = node;
 		} catch (cause) {
 			throw createConfigurationError(`${direction} icon factory result could not be inspected.`, cause);
 		}
-		if (!isValid) throw createConfigurationError(`${direction} icon factory must return detached, noninteractive content owned by the host document.`);
-		nodes[direction] = node;
-	}
+		if (validatedNode === null) throw createConfigurationError(`${direction} icon factory must return detached, noninteractive content owned by the host document.`);
+		return validatedNode;
+	};
+	const nodes = {
+		previous: resolve("previous"),
+		next: resolve("next")
+	};
 	if (nodes.previous === nodes.next) throw createConfigurationError("Navigation icon factories must return distinct nodes.");
 	return Object.freeze(nodes);
 }
@@ -1245,6 +1254,24 @@ function clearIssue(elements) {
 	elements.panelMessage.textContent = "";
 }
 //#endregion
+//#region src/internal/dom/heading.ts
+var CHILD_HEADING_LEVELS = {
+	1: 2,
+	2: 3,
+	3: 4,
+	4: 5,
+	5: 6,
+	6: 6
+};
+/** Creates a native heading while preserving its validated tag name. */
+function createHeading(document, level) {
+	return document.createElement(`h${level}`);
+}
+/** Resolves a subordinate heading without exceeding the native h6 level. */
+function getChildHeadingLevel(level) {
+	return CHILD_HEADING_LEVELS[level];
+}
+//#endregion
 //#region src/internal/dom/month-picker.ts
 /** Owns native Popover or dialog state, validation, synchronization, and focus restoration. */
 var CalendarMonthPickerController = class {
@@ -1255,7 +1282,7 @@ var CalendarMonthPickerController = class {
 		this.options = options;
 	}
 	handleBeforeToggle = (event) => {
-		if (event.newState !== "open" || event.defaultPrevented) return;
+		if (("newState" in event ? event.newState : void 0) !== "open" || event.defaultPrevented) return;
 		const elements = this.options.getElements();
 		if (!this.options.canContinue() || elements === null) {
 			event.preventDefault();
@@ -1419,7 +1446,7 @@ var CalendarMonthPickerController = class {
 };
 /** Creates the semantic month heading, native trigger, and light-dismiss picker form. */
 function createCalendarMonthPicker(options) {
-	const title = createHeading$1(options.document, options.headingLevel);
+	const title = createHeading(options.document, options.headingLevel);
 	title.className = "lfc-calendar-title";
 	title.id = `${options.instanceName}-title`;
 	const titleButton = options.document.createElement("button");
@@ -1459,7 +1486,7 @@ function createCalendarMonthPicker(options) {
 		installDialogLightDismiss(monthPicker, options.onCancel);
 	}
 	monthPicker.setAttribute("role", "dialog");
-	const monthPickerTitle = createHeading$1(options.document, Math.min(6, options.headingLevel + 1));
+	const monthPickerTitle = createHeading(options.document, getChildHeadingLevel(options.headingLevel));
 	monthPickerTitle.className = "lfc-calendar-month-picker-title";
 	monthPickerTitle.id = `${options.instanceName}-month-picker-title`;
 	monthPickerTitle.textContent = options.messages.jumpToMonthYear;
@@ -1539,9 +1566,6 @@ function createCalendarMonthPicker(options) {
 		titleLabelFull
 	});
 }
-function createHeading$1(document, level) {
-	return document.createElement(`h${level.toString()}`);
-}
 function isDialogPicker(picker) {
 	return picker.localName === "dialog";
 }
@@ -1599,7 +1623,9 @@ function createCalendarStructure(layoutOptions, options) {
 	todayButton.className = "lfc-calendar-nav-button lfc-calendar-today-button";
 	todayButton.type = "button";
 	todayButton.textContent = options.messages.today;
-	todayButton.addEventListener("click", options.onToday);
+	todayButton.addEventListener("click", () => {
+		options.onToday(todayButton);
+	});
 	navigation.append(monthStepper, picker.title, todayButton);
 	toolbar.append(navigation, picker.monthPicker);
 	appendToolbarEnd(options, toolbar);
@@ -1611,7 +1637,7 @@ function createCalendarStructure(layoutOptions, options) {
 	const panelIcon = options.document.createElement("span");
 	panelIcon.className = "lfc-calendar-status-icon";
 	panelIcon.setAttribute("aria-hidden", "true");
-	const panelTitle = createHeading(options.document, Math.min(6, options.headingLevel + 1));
+	const panelTitle = createHeading(options.document, getChildHeadingLevel(options.headingLevel));
 	panelTitle.className = "lfc-calendar-status-title";
 	const panelMessage = options.document.createElement("p");
 	panelMessage.className = "lfc-calendar-status-message";
@@ -1657,7 +1683,7 @@ function createCalendarStructure(layoutOptions, options) {
 	swipeViewport.append(previousLane, grid, nextLane);
 	const agenda = options.document.createElement("section");
 	agenda.className = "lfc-calendar-agenda";
-	const agendaTitle = createHeading(options.document, Math.min(6, options.headingLevel + 1));
+	const agendaTitle = createHeading(options.document, getChildHeadingLevel(options.headingLevel));
 	agendaTitle.className = "lfc-calendar-agenda-title";
 	agendaTitle.id = `${options.instanceName}-agenda-title`;
 	agendaTitle.tabIndex = -1;
@@ -1751,9 +1777,6 @@ function appendToolbarEnd(options, toolbar) {
 	toolbarEnd.append(options.toolbarEnd);
 	if (options.toolbarEnd.parentNode === toolbarEnd) options.integrationParents.set(options.toolbarEnd, toolbarEnd);
 	toolbar.append(toolbarEnd);
-}
-function createHeading(document, level) {
-	return document.createElement(`h${level.toString()}`);
 }
 function createLiveRegion(document, politeness, role) {
 	const region = document.createElement("p");
@@ -1998,7 +2021,7 @@ function installEventActionListeners(options) {
 	const { action, isCurrent, onActivate, onContext, onGridKeydown } = options;
 	const shortcuts = [...options.surface === "grid-summary" ? ["F2"] : [], ...options.hasContextAction ? ["Shift+F10"] : []];
 	if (shortcuts.length > 0) action.setAttribute("aria-keyshortcuts", shortcuts.join(" "));
-	action.addEventListener("click", (nativeEvent) => {
+	listen(action, "click", (nativeEvent) => {
 		if (!isCurrent()) {
 			nativeEvent.preventDefault();
 			nativeEvent.stopImmediatePropagation();
@@ -2008,13 +2031,9 @@ function installEventActionListeners(options) {
 			onActivate(nativeEvent);
 			return;
 		}
-		if (action.tagName === "BUTTON" && onContext !== null) {
-			const mouseEvent = nativeEvent;
-			onContext(mouseEvent, mouseEvent.clientX, mouseEvent.clientY);
-		}
+		if (action.tagName === "BUTTON" && onContext !== null) onContext(nativeEvent, nativeEvent.clientX, nativeEvent.clientY);
 	});
-	if (onGridKeydown !== null || onContext !== null) action.addEventListener("keydown", (event) => {
-		const nativeEvent = event;
+	if (onGridKeydown !== null || onContext !== null) listen(action, "keydown", (nativeEvent) => {
 		onGridKeydown?.(nativeEvent);
 		if (onContext === null || !isContextMenuKey(nativeEvent)) return;
 		nativeEvent.preventDefault();
@@ -2024,8 +2043,7 @@ function installEventActionListeners(options) {
 		}
 	});
 	if (onContext === null) return;
-	action.addEventListener("contextmenu", (event) => {
-		const nativeEvent = event;
+	listen(action, "contextmenu", (nativeEvent) => {
 		if (!isCurrent()) {
 			nativeEvent.preventDefault();
 			return;
@@ -2036,6 +2054,10 @@ function installEventActionListeners(options) {
 		}
 	});
 }
+/** Preserves the native event map shared by anchor and button controls. */
+function listen(element, type, listener) {
+	element.addEventListener(type, listener);
+}
 function isContextMenuKey(event) {
 	return event.key === "ContextMenu" || event.shiftKey && event.key === "F10";
 }
@@ -2044,18 +2066,23 @@ function isContextMenuKey(event) {
 /** Creates a complete native event representation without invoking application code. */
 function createEventRepresentation(input) {
 	const event = input.event.event;
-	const isLink = event.url !== null;
-	const isActionable = isLink || input.hasApplicationAction;
-	const root = input.document.createElement(isLink ? "a" : isActionable ? "button" : input.surface === "agenda" ? "div" : "span");
+	let action = null;
+	if (event.url !== null) {
+		const link = input.document.createElement("a");
+		link.href = event.url;
+		action = link;
+	} else if (input.hasApplicationAction) {
+		const button = input.document.createElement("button");
+		button.type = "button";
+		action = button;
+	}
+	const root = action ?? input.document.createElement(input.surface === "agenda" ? "div" : "span");
 	root.className = input.surface === "agenda" ? "lfc-calendar-agenda-event" : "lfc-calendar-event-summary";
 	root.setAttribute("data-lfc-date", input.dateString);
 	root.setAttribute("data-lfc-event-id", event.id);
 	root.setAttribute("data-lfc-surface", input.surface);
-	const action = isActionable ? root : null;
 	if (action !== null) {
 		action.classList.add("lfc-calendar-event-button");
-		if (action.tagName === "BUTTON") action.type = "button";
-		else if (event.url !== null) action.href = event.url;
 		if (input.surface === "grid-summary") {
 			action.tabIndex = -1;
 			action.setAttribute("aria-label", input.accessibleLabel);
@@ -3044,7 +3071,8 @@ var SwipeGestureController = class {
 	handleClickCapture = (event) => {
 		if (!this.suppressNextClick) return;
 		const pointerId = "pointerId" in event ? event.pointerId : void 0;
-		const firesTouchEvents = "sourceCapabilities" in event && event.sourceCapabilities?.firesTouchEvents === true;
+		const capabilities = "sourceCapabilities" in event ? event.sourceCapabilities : null;
+		const firesTouchEvents = capabilities !== null && typeof capabilities === "object" && "firesTouchEvents" in capabilities && capabilities.firesTouchEvents === true;
 		if (typeof pointerId === "number" && pointerId >= 0 && this.suppressedPointerId !== null && pointerId !== this.suppressedPointerId) return;
 		if ((typeof pointerId !== "number" || pointerId < 0) && !firesTouchEvents && "detail" in event && event.detail === 0) return;
 		this.clearClickSuppression();
@@ -4574,7 +4602,7 @@ var MonthCalendar = class {
 		this.agendaPageSize = normalizeIntegerOption(resolvedOptions.agendaPageSize, AGENDA_PAGE_SIZE_DEFAULT, AGENDA_PAGE_SIZE_MINIMUM, AGENDA_PAGE_SIZE_MAXIMUM, "agendaPageSize");
 		this.agendaDomLimit = normalizeIntegerOption(resolvedOptions.agendaDomLimit, AGENDA_DOM_LIMIT_DEFAULT, AGENDA_DOM_LIMIT_MINIMUM, AGENDA_DOM_LIMIT_MAXIMUM, "agendaDomLimit");
 		this.agendaVisibleCount = Math.min(this.agendaPageSize, this.agendaDomLimit);
-		this.headingLevel = normalizeIntegerOption(resolvedOptions.headingLevel, 2, 1, 6, "headingLevel");
+		this.headingLevel = normalizeHeadingLevel(resolvedOptions.headingLevel);
 		if (resolvedOptions.swipe !== void 0 && typeof resolvedOptions.swipe !== "boolean") throw createConfigurationError("swipe must be a boolean.");
 		this.swipeEnabled = resolvedOptions.swipe ?? true;
 		this.swipeGesture = new SwipeGestureController({
@@ -4933,9 +4961,8 @@ var MonthCalendar = class {
 				if (this.canContinueInteraction()) this.shiftMonth(direction === "next" ? 1 : -1);
 			},
 			onRetry: this.handleRetry,
-			onToday: (event) => {
-				const target = event.currentTarget;
-				if (this.canContinueInteraction() && target?.getAttribute("aria-disabled") !== "true") this.navigateToToday(false);
+			onToday: (button) => {
+				if (this.canContinueInteraction() && button.getAttribute("aria-disabled") !== "true") this.navigateToToday(false);
 			},
 			toolbarEnd: this.toolbarEnd
 		});

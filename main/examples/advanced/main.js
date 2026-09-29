@@ -656,7 +656,8 @@ const calendarMethods = {
     today: () => { calendar.today(); }
 };
 function runCommand(command) {
-    if (!Object.hasOwn(calendarMethods, command)) {
+    const entry = Object.entries(calendarMethods).find(([name]) => name === command);
+    if (entry === undefined) {
         throw new Error(`Unknown advanced example command: ${command}`);
     }
     const isTargetDateCommand = command === "focusDate" || command === "gotoDate";
@@ -674,7 +675,7 @@ function runCommand(command) {
         return true;
     }
     try {
-        calendarMethods[command]();
+        entry[1]();
     }
     catch (error) {
         if (!(error instanceof LitefoldCalendarError)) {

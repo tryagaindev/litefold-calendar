@@ -598,8 +598,12 @@ function getInputKeys(input, allowed) {
 	} catch {
 		return null;
 	}
-	if (keys.some((key) => typeof key !== "string" || !allowed.has(key))) return null;
-	return new Set(keys);
+	const validatedKeys = /* @__PURE__ */ new Set();
+	for (const key of keys) {
+		if (typeof key !== "string" || !allowed.has(key)) return null;
+		validatedKeys.add(key);
+	}
+	return validatedKeys;
 }
 function createCursorInstanceId(document) {
 	try {
