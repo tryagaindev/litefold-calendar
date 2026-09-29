@@ -6,6 +6,7 @@ import type {
 	CalendarEventTimeDisplay,
 	CalendarGridEventPlacement,
 	CalendarGridEventDisplay,
+	CalendarHeadingLevel,
 	CalendarOptions,
 	CalendarWeekRowSizing
 } from "../../types.js";
@@ -170,6 +171,17 @@ export function snapshotCalendarOptions<TMetadata>(
 	snapshot["gridEventDisplay"] = normalizeGridEventDisplay(snapshot["gridEventDisplay"]);
 	snapshot["weekRowSizing"] = normalizeWeekRowSizing(snapshot["weekRowSizing"]);
 	return Object.freeze(snapshot) as CalendarOptionsSnapshot<TMetadata>;
+}
+
+/** Validates a heading level without widening the native heading tag union. */
+export function normalizeHeadingLevel(value: unknown): CalendarHeadingLevel {
+	if (value === undefined) {
+		return 2;
+	}
+	if (value !== 1 && value !== 2 && value !== 3 && value !== 4 && value !== 5 && value !== 6) {
+		throw createConfigurationError("headingLevel must be an integer from 1 through 6.");
+	}
+	return value;
 }
 
 export function normalizeIntegerOption(
@@ -349,8 +361,7 @@ export function resolveIconNodes(
 	host: HTMLElement,
 	icons: Readonly<CalendarIcons>
 ): Readonly<Record<"next" | "previous", Node>> {
-	const nodes = {} as Record<"next" | "previous", Node>;
-	for (const direction of ["previous", "next"] as const) {
+	const resolve = (direction: "next" | "previous"): Node => {
 		if (typeof icons[direction] !== "function") {
 			throw createConfigurationError(`${direction} icon must be a factory function.`);
 		}
@@ -360,18 +371,21 @@ export function resolveIconNodes(
 		} catch (cause: unknown) {
 			throw createConfigurationError(`${direction} icon factory failed.`, cause);
 		}
-		let isValid = false;
+		let validatedNode: Node | null = null;
 		try {
-			isValid = isSameDocumentNode(document, node) && isAppendableNode(node) &&
-				node.parentNode === null && !node.contains(host) && !containsInteractiveContent(node);
+			if (isSameDocumentNode(document, node) && isAppendableNode(node) &&
+				node.parentNode === null && !node.contains(host) && !containsInteractiveContent(node)) {
+				validatedNode = node;
+			}
 		} catch (cause: unknown) {
 			throw createConfigurationError(`${direction} icon factory result could not be inspected.`, cause);
 		}
-		if (!isValid) {
+		if (validatedNode === null) {
 			throw createConfigurationError(`${direction} icon factory must return detached, noninteractive content owned by the host document.`);
 		}
-		nodes[direction] = node as Node;
-	}
+		return validatedNode;
+	};
+	const nodes = { previous: resolve("previous"), next: resolve("next") };
 	if (nodes.previous === nodes.next) {
 		throw createConfigurationError("Navigation icon factories must return distinct nodes.");
 	}

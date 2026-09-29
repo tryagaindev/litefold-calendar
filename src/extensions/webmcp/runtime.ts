@@ -872,10 +872,14 @@ function getInputKeys(input: object, allowed: ReadonlySet<string>): ReadonlySet<
 	} catch {
 		return null;
 	}
-	if (keys.some((key) => typeof key !== "string" || !allowed.has(key))) {
-		return null;
+	const validatedKeys = new Set<string>();
+	for (const key of keys) {
+		if (typeof key !== "string" || !allowed.has(key)) {
+			return null;
+		}
+		validatedKeys.add(key);
 	}
-	return new Set(keys as readonly string[]);
+	return validatedKeys;
 }
 
 function createCursorInstanceId(document: Document): string {

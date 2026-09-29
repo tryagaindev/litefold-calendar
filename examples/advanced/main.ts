@@ -797,7 +797,8 @@ const calendarMethods = {
 } satisfies Record<keyof Calendar<EventData>, () => unknown>;
 
 function runCommand(command: string): boolean {
-	if (!Object.hasOwn(calendarMethods, command)) {
+	const entry = Object.entries(calendarMethods).find(([name]) => name === command);
+	if (entry === undefined) {
 		throw new Error(`Unknown advanced example command: ${command}`);
 	}
 	const isTargetDateCommand = command === "focusDate" || command === "gotoDate";
@@ -817,7 +818,7 @@ function runCommand(command: string): boolean {
 	}
 
 	try {
-		calendarMethods[command as Exclude<keyof Calendar<EventData>, "getState">]();
+		entry[1]();
 	} catch (error: unknown) {
 		if (!(error instanceof LitefoldCalendarError)) {
 			throw error;

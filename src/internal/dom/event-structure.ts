@@ -27,24 +27,22 @@ export function installEventActionListeners(options: Readonly<EventActionListene
 	if (shortcuts.length > 0) {
 		action.setAttribute("aria-keyshortcuts", shortcuts.join(" "));
 	}
-	action.addEventListener("click", (nativeEvent) => {
+	listen(action, "click", (nativeEvent) => {
 		if (!isCurrent()) {
 			nativeEvent.preventDefault();
 			nativeEvent.stopImmediatePropagation();
 			return;
 		}
 		if (onActivate !== null) {
-			onActivate(nativeEvent as MouseEvent);
+			onActivate(nativeEvent);
 			return;
 		}
 		if (action.tagName === "BUTTON" && onContext !== null) {
-			const mouseEvent = nativeEvent as MouseEvent;
-			onContext(mouseEvent, mouseEvent.clientX, mouseEvent.clientY);
+			onContext(nativeEvent, nativeEvent.clientX, nativeEvent.clientY);
 		}
 	});
 	if (onGridKeydown !== null || onContext !== null) {
-		action.addEventListener("keydown", (event) => {
-			const nativeEvent = event as KeyboardEvent;
+		listen(action, "keydown", (nativeEvent) => {
 			onGridKeydown?.(nativeEvent);
 			if (onContext === null || !isContextMenuKey(nativeEvent)) {
 				return;
@@ -59,8 +57,7 @@ export function installEventActionListeners(options: Readonly<EventActionListene
 	if (onContext === null) {
 		return;
 	}
-	action.addEventListener("contextmenu", (event) => {
-		const nativeEvent = event as MouseEvent;
+	listen(action, "contextmenu", (nativeEvent) => {
 		if (!isCurrent()) {
 			nativeEvent.preventDefault();
 			return;
@@ -70,6 +67,15 @@ export function installEventActionListeners(options: Readonly<EventActionListene
 			onContext(nativeEvent, nativeEvent.clientX, nativeEvent.clientY);
 		}
 	});
+}
+
+/** Preserves the native event map shared by anchor and button controls. */
+function listen<TType extends keyof HTMLElementEventMap>(
+	element: HTMLElement,
+	type: TType,
+	listener: (event: HTMLElementEventMap[TType]) => void
+): void {
+	element.addEventListener(type, listener);
 }
 
 function isContextMenuKey(event: KeyboardEvent): boolean {

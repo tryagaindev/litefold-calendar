@@ -24,8 +24,9 @@ function replaceCursorField(cursor: string, index: number, value: unknown): stri
 	const serialized = Buffer.from(cursor.slice("lfc.".length), "hex").toString("ascii");
 	const parsed: unknown = JSON.parse(serialized);
 	assert.ok(Array.isArray(parsed));
+	const fields: readonly unknown[] = parsed;
 	const payload: unknown[] = [];
-	for (const value of parsed as readonly unknown[]) {
+	for (const value of fields) {
 		payload.push(value);
 	}
 	payload[index] = value;
@@ -87,7 +88,8 @@ void test("get-events pages unique allowed-range events and exposes only present
 	assert.equal(first["totalEvents"], 15);
 	assert.equal(first["offset"], 0);
 	assert.equal(firstEvents.length, 10);
-	assert.equal(typeof first["nextCursor"], "string");
+	const firstCursor = first["nextCursor"];
+	assert.ok(typeof firstCursor === "string");
 	assert.equal(Object.hasOwn(first, "nextOffset"), false);
 	for (const event of firstEvents) {
 		assert.deepEqual(Object.keys(event).sort(), ["end", "isAllDay", "start", "title"]);
@@ -132,7 +134,8 @@ void test("get-events pages unique allowed-range events and exposes only present
 	}]);
 	assert.equal(projected["nextCursor"], null);
 	const dateFirst = requireRecord(await executeTool(getEvents, { date: "2026-07-14" }));
-	assert.equal(typeof dateFirst["nextCursor"], "string");
+	const dateCursor = dateFirst["nextCursor"];
+	assert.ok(typeof dateCursor === "string");
 	const dateSecond = requireRecord(await executeTool(getEvents, {
 		cursor: dateFirst["nextCursor"]
 	}));
@@ -150,21 +153,21 @@ void test("get-events pages unique allowed-range events and exposes only present
 	assert.deepEqual(repeated, second);
 	const repeatedFirst = requireRecord(await executeTool(getEvents, {}));
 	assert.equal(repeatedFirst["nextCursor"], first["nextCursor"]);
-	const unsupportedCursor = replaceCursorField(first["nextCursor"] as string, 0, 2);
+	const unsupportedCursor = replaceCursorField(firstCursor, 0, 2);
 	assertErrorEnvelope(await executeTool(getEvents, { cursor: unsupportedCursor }), "invalid-input");
-	const malformedScopeCursor = replaceCursorField(first["nextCursor"] as string, 5, "date");
+	const malformedScopeCursor = replaceCursorField(firstCursor, 5, "date");
 	assertErrorEnvelope(
 		await executeTool(getEvents, { cursor: malformedScopeCursor }),
 		"invalid-input"
 	);
 	const malformedDateCursor = replaceCursorField(
-		dateFirst["nextCursor"] as string,
+		dateCursor,
 		6,
 		"2026-7-14"
 	);
 	assertErrorEnvelope(await executeTool(getEvents, { cursor: malformedDateCursor }), "invalid-input");
 	const impossibleDateCursor = replaceCursorField(
-		dateFirst["nextCursor"] as string,
+		dateCursor,
 		6,
 		"2026-07-15"
 	);
@@ -172,7 +175,7 @@ void test("get-events pages unique allowed-range events and exposes only present
 		await executeTool(getEvents, { cursor: impossibleDateCursor }),
 		"pagination-stale"
 	);
-	const impossibleCursor = replaceCursorField(first["nextCursor"] as string, 7, 20);
+	const impossibleCursor = replaceCursorField(firstCursor, 7, 20);
 	assertErrorEnvelope(await executeTool(getEvents, { cursor: impossibleCursor }), "pagination-stale");
 });
 

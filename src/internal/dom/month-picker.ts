@@ -1,7 +1,8 @@
-import type { CalendarDate } from "../../types.js";
+import type { CalendarDate, CalendarHeadingLevel } from "../../types.js";
 import { toUtcDate } from "../domain/civil-date.js";
 import type { CalendarMessages } from "../../messages.js";
 import type { CalendarMonthTitleElements } from "./month-title.js";
+import { createHeading, getChildHeadingLevel } from "./heading.js";
 
 /** Stable package-owned elements used to control and render the month-and-year picker. */
 export interface CalendarMonthPickerElements extends CalendarMonthTitleElements {
@@ -16,7 +17,7 @@ export interface CalendarMonthPickerElements extends CalendarMonthTitleElements 
 
 interface CalendarMonthPickerOptions {
 	readonly document: Document;
-	readonly headingLevel: number;
+	readonly headingLevel: CalendarHeadingLevel;
 	readonly instanceName: string;
 	readonly maxYear: number;
 	readonly messages: Readonly<CalendarMessages>;
@@ -53,7 +54,7 @@ export class CalendarMonthPickerController {
 	public constructor(private readonly options: Readonly<CalendarMonthPickerControllerOptions>) {}
 
 	public readonly handleBeforeToggle = (event: Event): void => {
-		const newState = (event as Event & { readonly newState?: unknown }).newState;
+		const newState = "newState" in event ? event.newState : undefined;
 		if (newState !== "open" || event.defaultPrevented) {
 			return;
 		}
@@ -314,7 +315,7 @@ export function createCalendarMonthPicker(
 		installDialogLightDismiss(monthPicker, options.onCancel);
 	}
 	monthPicker.setAttribute("role", "dialog");
-	const monthPickerTitle = createHeading(options.document, Math.min(6, options.headingLevel + 1));
+	const monthPickerTitle = createHeading(options.document, getChildHeadingLevel(options.headingLevel));
 	monthPickerTitle.className = "lfc-calendar-month-picker-title";
 	monthPickerTitle.id = `${options.instanceName}-month-picker-title`;
 	monthPickerTitle.textContent = options.messages.jumpToMonthYear;
@@ -397,10 +398,6 @@ export function createCalendarMonthPicker(
 		titleLabelCompact,
 		titleLabelFull
 	});
-}
-
-function createHeading(document: Document, level: number): HTMLHeadingElement {
-	return document.createElement(`h${level.toString()}`) as HTMLHeadingElement;
 }
 
 function isDialogPicker(picker: HTMLDivElement | HTMLDialogElement): picker is HTMLDialogElement {

@@ -121,7 +121,8 @@ function allowsSelectionMotion(document: Document): boolean {
 	if (ownerWindow === null) {
 		return true;
 	}
-	const matchMedia = (ownerWindow as Partial<Window>).matchMedia;
+	const capabilities: Partial<Pick<Window, "matchMedia">> = ownerWindow;
+	const matchMedia = capabilities.matchMedia;
 	return matchMedia === undefined || (
 		matchMedia.call(ownerWindow, SELECTION_MOTION_QUERY).matches &&
 		!matchMedia.call(ownerWindow, FORCED_COLORS_QUERY).matches
