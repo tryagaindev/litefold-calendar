@@ -84,6 +84,10 @@
     cursor: pointer;
     text-decoration: none;
     touch-action: manipulation;
+  }
+
+  :where(.litefold-calendar) .lfc-calendar-event-button,
+  :where(.litefold-calendar) .lfc-calendar-grid-more {
     transition-duration: var(--lfc-internal-motion-duration);
     transition-property: background-color, border-color, box-shadow, color;
     transition-timing-function: var(--lfc-internal-motion-easing);
