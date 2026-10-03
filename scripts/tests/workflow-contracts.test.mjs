@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
@@ -530,26 +530,27 @@ void test("hosted gates run Chromium and WebKit while local Playwright retains F
 			process.stdout.write(JSON.stringify(configuration.projects.map(({ grepInvert, name, use, workers }) => ({
 				browserType: use.defaultBrowserType,
 				grepInvert: grepInvert?.source ?? null,
+				launchOptions: use.launchOptions ?? null,
 				name,
 				workers
 			}))));
 		`], {
 			cwd: REPOSITORY_ROOT,
-			env: { ...process.env, CI: ci ? "true" : "" }
+			env: { ...process.env, CI: ci ? "true" : "", LFC_FIREFOX_OUTER_SANDBOX: "" }
 		});
 		return JSON.parse(stdout);
 	}));
 	assert.deepEqual(
 		localProjects,
 		[
-			{ browserType: "chromium", grepInvert: null, name: "chromium" },
-			{ browserType: "firefox", grepInvert: "@chromium-input", name: "firefox", workers: 1 },
-			{ browserType: "webkit", grepInvert: "@chromium-input", name: "webkit" }
+			{ browserType: "chromium", grepInvert: null, launchOptions: null, name: "chromium" },
+			{ browserType: "firefox", grepInvert: "@chromium-input", launchOptions: null, name: "firefox", workers: 1 },
+			{ browserType: "webkit", grepInvert: "@chromium-input", launchOptions: null, name: "webkit" }
 		]
 	);
 	assert.deepEqual(ciProjects, [
-		{ browserType: "chromium", grepInvert: null, name: "chromium" },
-		{ browserType: "webkit", grepInvert: "@chromium-input", name: "webkit" }
+		{ browserType: "chromium", grepInvert: null, launchOptions: null, name: "chromium" },
+		{ browserType: "webkit", grepInvert: "@chromium-input", launchOptions: null, name: "webkit" }
 	]);
 	assert.equal(
 		packageManifest.scripts["test:browser:install"],
@@ -561,6 +562,35 @@ void test("hosted gates run Chromium and WebKit while local Playwright retains F
 			packageManifest.scripts[`test:browser:${project}`],
 			`npm run build && playwright test --project=${project}`
 		);
+	}
+});
+
+void test("Windows outer-sandbox mode changes only Firefox launch options", {
+	skip: process.platform !== "win32"
+}, async () => {
+	const { stdout } = await execFileAsync(process.execPath, ["--input-type=module", "--eval", `
+		import configuration from "./playwright.config.mjs";
+		process.stdout.write(JSON.stringify(configuration.projects.map(({ name, use }) => ({
+			name,
+			launchOptions: use.launchOptions === undefined ? null : {
+				env: Object.fromEntries(["MOZ_APP_DATA", "MOZ_LOCAL_APP_DATA", "MOZ_DISABLE_CONTENT_SANDBOX"]
+					.map((name) => [name, use.launchOptions.env[name]]))
+			}
+		}))));
+	`], {
+		cwd: REPOSITORY_ROOT,
+		env: { ...process.env, CI: "", LFC_FIREFOX_OUTER_SANDBOX: "1" }
+	});
+	const projects = JSON.parse(stdout);
+	assert.equal(projects.find(({ name }) => name === "chromium").launchOptions, null);
+	assert.equal(projects.find(({ name }) => name === "webkit").launchOptions, null);
+	const firefox = projects.find(({ name }) => name === "firefox");
+	assert.equal(firefox.launchOptions.env.MOZ_DISABLE_CONTENT_SANDBOX, "1");
+	for (const [variable, directory] of [["MOZ_APP_DATA", "app"], ["MOZ_LOCAL_APP_DATA", "local"]]) {
+		const appDataPath = firefox.launchOptions.env[variable];
+		assert.equal(basename(appDataPath), directory);
+		assert.equal(dirname(dirname(appDataPath)), join(REPOSITORY_ROOT, ".cache", "firefox-app-data"));
+		assert.ok((await stat(appDataPath)).isDirectory());
 	}
 });
 
