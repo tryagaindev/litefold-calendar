@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Added an explicit Windows-only Firefox launch mode for trusted local fixtures already inside an OS sandbox, with isolated application data and unchanged default launch settings.
 - Count and remaining-count actions now share event actions' inset hover cue, including borderless themes and custom overflow content, while preserving passive cues and keyboard focus treatment.
 - Bounded event identifiers before whitespace validation, disabled workers in newly generated Pages documents and upgraded root shells while preserving exact legacy policies on immutable historical pages, and validated decoded meta-refresh destinations in staged and retained HTML.
 - Preserved direct-provider and promise-like loading semantics when request-abort callbacks, event providers, or custom-element busy reactions synchronously reenter focus navigation, including retained refreshes, detached hosts, and source failures. Replacement callbacks cannot publish a new selection paired with the previous request's range or a duplicate or premature phase. Clarified that explicit reentrant navigation adds its own renders and mount hooks.

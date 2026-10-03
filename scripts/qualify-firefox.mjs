@@ -20,6 +20,7 @@ for (const qualification of runs) {
 	await mkdir(output, { recursive: true });
 	await writeFile(join(output, "environment.json"), `${JSON.stringify({
 		arch: process.arch,
+		firefoxOuterSandbox: process.env["LFC_FIREFOX_OUTER_SANDBOX"] === "1",
 		node: process.version,
 		platform: process.platform,
 		retries: 0,

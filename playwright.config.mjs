@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 
+import { createFirefoxLaunchOptions } from "./scripts/lib/firefox-launch-options.mjs";
 import { assertSupportedNodeVersion } from "./scripts/lib/node-version.mjs";
 
 const DEFAULT_PORT = 4173;
@@ -16,6 +20,15 @@ if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
 }
 
 const origin = `http://127.0.0.1:${String(port)}`;
+const firefoxLaunchOptions = createFirefoxLaunchOptions({
+	appDataRoot: resolve(import.meta.dirname, ".cache", "firefox-app-data", randomUUID())
+});
+if (firefoxLaunchOptions !== undefined) {
+	for (const directory of ["MOZ_APP_DATA", "MOZ_LOCAL_APP_DATA"]) {
+		mkdirSync(firefoxLaunchOptions.env[directory], { recursive: true });
+	}
+	console.warn("Firefox outer-sandbox mode: Firefox's content sandbox is disabled; an existing OS sandbox is required.");
+}
 
 export default defineConfig({
 	expect: {
@@ -38,7 +51,8 @@ export default defineConfig({
 			grepInvert: /@chromium-input/u,
 			workers: 1,
 			use: {
-				...devices["Desktop Firefox"]
+				...devices["Desktop Firefox"],
+				launchOptions: firefoxLaunchOptions
 			}
 		},
 		{

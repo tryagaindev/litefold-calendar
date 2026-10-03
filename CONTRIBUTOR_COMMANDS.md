@@ -116,6 +116,34 @@ npm run test:browser:firefox
 npm run test:browser:webkit
 ```
 
+### Run Firefox inside a Windows OS sandbox
+
+For local Windows runs already contained by an OS sandbox, opt in with
+`LFC_FIREFOX_OUTER_SANDBOX=1` when Firefox cannot create its nested content
+sandbox. Use this mode only with trusted repository fixtures. It disables
+Firefox's inner content sandbox and isolates its application data under the
+ignored `.cache/firefox-app-data/<run-id>` directory. Ordinary desktop runs and
+CI retain the default Firefox content sandbox.
+
+This mode does not change Codex permissions, network restrictions, filesystem
+ACLs, or configuration. It does not authorize browsing arbitrary websites.
+Keep `CI` unset and restore the previous setting after the command:
+
+```powershell
+$previousFirefoxOuterSandbox = $env:LFC_FIREFOX_OUTER_SANDBOX
+try {
+    $env:LFC_FIREFOX_OUTER_SANDBOX = "1"
+    npm run test:browser:firefox
+} finally {
+    $env:LFC_FIREFOX_OUTER_SANDBOX = $previousFirefoxOuterSandbox
+}
+```
+
+Replace `npm run test:browser:firefox` with `npm run check` to use the same
+setting for the complete local gate, including its clean-worktree requirement.
+Leave the setting unset for runs outside an OS sandbox. This opt-in mode is
+supported only on Windows and is unavailable in CI.
+
 ### Run browser checks concurrently
 
 One Playwright invocation starts one repository server on port `4173` by default and shares that origin across every configured browser project and worker. Keep that shared origin for the local browser matrix so Chromium, Firefox, and WebKit exercise the same server contract.
