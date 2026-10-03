@@ -4,6 +4,106 @@ import { expectLibraryFixtureReady, expectOnlyOneGridTabStop } from "./helpers.j
 
 const TARGET_DATE = "2026-07-14";
 
+for (const scenario of [
+	{ name: "default compact multiple-event count", settings: { width: 320 } },
+	{ name: "explicit compact total count", settings: { display: { compact: "count", wide: "events" }, width: 320 } },
+	{ name: "explicit wide total count", settings: { display: { compact: "events", wide: "count" }, width: 900 } },
+	{ name: "compact singleton count", settings: { count: 1, display: { compact: "count", wide: "count" }, width: 320 } },
+	{ name: "wide singleton count", settings: { count: 1, display: { compact: "count", wide: "count" }, width: 900 } },
+	{ name: "wide remaining-event action", settings: { count: 4, width: 900 } }
+]) {
+	test(`${scenario.name} matches event hover without changing calendar state or layout`, async ({ page }) => {
+		await mountCalendar(page, scenario.settings);
+		const { count } = targets(page);
+		const event = page.locator(".lfc-calendar-agenda-event.lfc-calendar-event-button").first();
+		await expect(count).toBeVisible();
+		await expect(event).toBeVisible();
+		await expect(count).toHaveCSS("box-shadow", "none");
+		await expect(event).toHaveCSS("box-shadow", "none");
+		const before = await captureHoverState(count);
+		const identity = await captureRenderIdentity(page);
+
+		await event.hover();
+		await expect(event).toHaveCSS("box-shadow", /inset/u);
+		const eventShadow = await event.evaluate((element) => getComputedStyle(element).boxShadow);
+		expect(eventShadow).toMatch(/0px 0px 0px 1px/u);
+		await count.hover();
+		await expect(count).toHaveCSS("box-shadow", eventShadow);
+		await expect(event).toHaveCSS("box-shadow", "none");
+		expect(await captureHoverState(count)).toEqual(before);
+		await expectRenderIdentity(page, identity);
+
+		await page.mouse.move(0, 0);
+		await expect(count).toHaveCSS("box-shadow", "none");
+		expect(await captureHoverState(count)).toEqual(before);
+		await expectRenderIdentity(page, identity);
+	});
+}
+
+test("disabled and aria-disabled grid counts omit the hover cue", async ({ page }) => {
+	await mountCalendar(page);
+	const { count } = targets(page);
+	await count.hover();
+	await expect(count).toHaveCSS("box-shadow", /inset/u);
+	for (const attribute of ["disabled", "aria-disabled"]) {
+		await count.evaluate((element, attribute) => { element.setAttribute(attribute, attribute === "disabled" ? "" : "true"); }, attribute);
+		await expect(count).toHaveCSS("box-shadow", "none");
+		await count.evaluate((element, attribute) => { element.removeAttribute(attribute); }, attribute);
+		await expect(count).toHaveCSS("box-shadow", /inset/u);
+	}
+});
+
+test("passive compact additional-event cues remain decorative during hover", async ({ page }) => {
+	await mountCalendar(page, { display: { compact: "events", wide: "events" }, width: 390 });
+	const { action, count } = targets(page);
+	const cue = page.locator(".lfc-calendar-event-overflow-cluster > .lfc-calendar-event-overflow.lfc-is-compact");
+	await expect(cue).toHaveText("+1");
+	await expect(count).toHaveCount(0);
+	await action.hover();
+	await expect(action).toHaveCSS("box-shadow", /inset/u);
+	await expect(cue).toHaveCSS("box-shadow", "none");
+	await cue.hover({ force: true });
+	await expect(cue).toHaveCSS("box-shadow", "none");
+	expect(await cue.evaluate((element) => ({
+		pointerEvents: getComputedStyle(element).pointerEvents,
+		role: element.getAttribute("role"),
+		tabIndex: element.getAttribute("tabindex")
+	}))).toEqual({ pointerEvents: "none", role: null, tabIndex: null });
+});
+
+for (const reducedMotion of ["no-preference", "reduce"]) {
+	test(`count hover shares event transitions with reduced motion ${reducedMotion}`, async ({ page }) => {
+		await page.emulateMedia({ reducedMotion });
+		await mountCalendar(page);
+		const { count } = targets(page);
+		const event = page.locator(".lfc-calendar-agenda-event.lfc-calendar-event-button").first();
+		const transition = await captureTransition(event);
+		expect(transition.duration).toBe(reducedMotion === "reduce" ? "0s" : "0.12s");
+		expect(transition.properties).toContain("box-shadow");
+		expect(await captureTransition(count)).toEqual(transition);
+		await count.hover();
+		await expect(count).toHaveCSS("box-shadow", /0px 0px 0px 1px inset/u);
+		await page.mouse.move(0, 0);
+		await expect(count).toHaveCSS("box-shadow", "none");
+	});
+}
+
+//Use the repository's Chromium input subset for touch emulation; Firefox and WebKit exclude @chromium-input.
+test.describe("grid count hover with touch input", { tag: "@chromium-input" }, () => {
+	test.use({ hasTouch: true });
+
+	test("touch counts stay usable without a hover cue", async ({ page }) => {
+		await mountCalendar(page);
+		const { count } = targets(page);
+		expect(await page.evaluate(() => matchMedia("(hover: hover)").matches)).toBe(false);
+		await count.hover();
+		await expect(count).toHaveCSS("box-shadow", "none");
+		await count.tap();
+		await expect(page.locator(".lfc-calendar-agenda-title")).toBeFocused();
+		await expect(count).toHaveCSS("box-shadow", "none");
+	});
+});
+
 test("compact multiple-event counts are the only new keyboard entry", async ({ page }) => {
 	await mountCalendar(page, { width: 320 });
 	const { action, count, day, grid } = targets(page);
@@ -401,6 +501,28 @@ function expectRectInside(inner, outer, description) {
 	expect(inner.top, `${description}: top`).toBeGreaterThanOrEqual(outer.top - tolerance);
 	expect(inner.right, `${description}: right`).toBeLessThanOrEqual(outer.right + tolerance);
 	expect(inner.bottom, `${description}: bottom`).toBeLessThanOrEqual(outer.bottom + tolerance);
+}
+
+async function captureHoverState(action) {
+	return action.evaluate((element) => {
+		const rect = (node) => {
+			const { x, y, width, height } = node.getBoundingClientRect();
+			return { x, y, width, height };
+		};
+		return {
+			action: rect(element),
+			day: rect(element.closest(".lfc-calendar-day")),
+			label: element.getAttribute("aria-label"),
+			selectedDate: window.gridCountFixture.calendar.getState().selectedDate
+		};
+	});
+}
+
+async function captureTransition(action) {
+	return action.evaluate((element) => {
+		const style = getComputedStyle(element);
+		return { duration: style.transitionDuration, properties: style.transitionProperty, timing: style.transitionTimingFunction };
+	});
 }
 
 async function expectDayNumberContained(page, date, { wrapped = false } = {}) {

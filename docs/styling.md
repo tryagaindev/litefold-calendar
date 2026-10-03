@@ -110,6 +110,11 @@ by default; wide days show capped summaries plus overflow when needed.
 | Compact additional-event cue | `display: "overflow"`, `variant: "compact"`; usually a passive `+N` beside the primary event.  Without a primary marker it shows the total.  `elements.action` is `null` unless overflow itself is the primary control, such as with `maxGridEventsPerDay: 0`. |
 | Wide additional-event action | `display: "overflow"`, `variant: "wide"`; the native button presents the remaining count, such as “3 more”. |
 
+On hover-capable devices, count and remaining-count buttons use the same inset
+`--lfc-accent-color` cue as event actions. It transitions over `120ms` with
+ease-out timing, or appears immediately under reduced motion. Passive compact
+cues remain decorative and receive no hover treatment.
+
 Use `renderEventOverflow` for decorative content inside the visual slot, and
 `onEventOverflowActivate` to open an application-owned chooser.  These are
 different tasks: a visual hook does not take over activation or focus.
@@ -161,7 +166,8 @@ Minimum block size and compact preferred width allow intrinsic growth and
 retain the target floor. Compact count text can wrap beyond the square floor;
 passive cues can force a marker/cue cluster to stack without resizing the event
 theme. Hidden representations stay hidden until the existing focus rules expose
-them. Removing borders does not remove the keyboard outline.
+them. Removing borders retains the inset hover cue and keyboard outline.
+Custom overflow content also retains the native action's hover cue.
 
 Use `onEventOverflowDefault` for application scrolling after successful agenda
 focus; the [integration recipe](integration-guide.md#scroll-after-the-default-agenda-action)
