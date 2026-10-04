@@ -67,6 +67,12 @@ async function styles(locator) {
 async function theme(page, className = "themed") {
 	await page.locator("[data-my-calendar]").evaluate((host, className) => { host.classList.add(className); }, className);
 }
+async function dimensions(locator) {
+	return locator.evaluate((element) => {
+		const { width, height } = element.getBoundingClientRect();
+		return { width, height };
+	});
+}
 
 for (const width of [320, 800]) {
 	test(`eight tokens are isolated to overflow at ${String(width)}px`, async ({ page }) => {
@@ -90,6 +96,64 @@ for (const width of [320, 800]) {
 		expect(await styles(page.locator(ACTION))).toEqual(before.action);
 	});
 }
+
+for (const width of [320, 800]) {
+	test(`hover feedback is additive over independent overflow tokens at ${String(width)}px`, async ({ page }) => {
+		await mount(page, { width, theme: `${THEME} --lfc-accent-color: rgb(7, 80, 140);` });
+		await theme(page);
+		const button = page.locator(ACTION);
+		const event = page.locator(".lfc-calendar-agenda-event.lfc-calendar-event-button").first();
+		const before = { paint: await styles(button), dimensions: await dimensions(button),
+			state: await page.evaluate(() => window.themeFixture.calendar.getState()) };
+		const expectedShadow = "rgb(7, 80, 140) 0px 0px 0px 1px inset";
+		await event.hover();
+		await expect(event).toHaveCSS("box-shadow", expectedShadow);
+		await button.hover();
+		await expect(button).toHaveCSS("box-shadow", expectedShadow);
+		expect(await styles(button)).toEqual(before.paint);
+		expect(await dimensions(button)).toEqual(before.dimensions);
+		expect(await page.evaluate(() => window.themeFixture.calendar.getState())).toEqual(before.state);
+		await page.mouse.move(0, 0);
+		await expect(button).toHaveCSS("box-shadow", "none");
+		expect(await styles(button)).toEqual(before.paint);
+		expect(await dimensions(button)).toEqual(before.dimensions);
+	});
+}
+
+test("borderless custom overflow content keeps hover, focus and keyboard activation on its action", async ({ page }) => {
+	await mount(page, { custom: "explicit", theme: `${THEME} --lfc-grid-overflow-border-width: 0; --lfc-accent-color: rgb(7, 80, 140);` });
+	await theme(page);
+	const button = page.locator(ACTION);
+	const content = button.locator(".lfc-is-wide .explicit-content");
+	const before = { paint: await styles(button), content: await styles(content), dimensions: await dimensions(button),
+		label: await button.getAttribute("aria-label"), state: await page.evaluate(() => window.themeFixture.calendar.getState()) };
+	await page.locator('.lfc-calendar-day-button[data-lfc-date="2026-07-14"]').press("F2");
+	await expect(button).toBeFocused();
+	await expect(button).toHaveCSS("border-top-width", "0px");
+	const focus = await button.evaluate((element) => {
+		const css = getComputedStyle(element);
+		return { style: css.outlineStyle, width: css.outlineWidth, color: css.outlineColor };
+	});
+	expect(focus.style).not.toBe("none");
+	expect(Number.parseFloat(focus.width)).toBeGreaterThan(0);
+	await content.hover();
+	await expect(button).toHaveCSS("box-shadow", "rgb(7, 80, 140) 0px 0px 0px 1px inset");
+	await expect(button).toBeFocused();
+	await expect(button).toHaveCSS("outline-style", focus.style);
+	await expect(button).toHaveCSS("outline-width", focus.width);
+	await expect(button).toHaveCSS("outline-color", focus.color);
+	expect(await styles(button)).toEqual(before.paint);
+	expect(await styles(content)).toEqual(before.content);
+	expect(await dimensions(button)).toEqual(before.dimensions);
+	await expect(button).toHaveAttribute("aria-label", before.label);
+	expect(await page.evaluate(() => window.themeFixture.calendar.getState())).toEqual(before.state);
+	await page.mouse.move(0, 0);
+	await expect(button).toHaveCSS("box-shadow", "none");
+	await expect(button).toBeFocused();
+	await button.press("Enter");
+	await expect(page.locator(".lfc-calendar-agenda-title")).toBeFocused();
+	expect(await page.evaluate(() => window.themeViolations)).toEqual([]);
+});
 
 for (const display of [{ compact: "count", wide: "events" }, { compact: "events", wide: "count" }, { compact: "events", wide: "events" }]) {
 	test(`relative typography and contextual paint ${JSON.stringify(display)}`, async ({ page }) => {

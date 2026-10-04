@@ -28,7 +28,7 @@
     }
 
     :where(.litefold-calendar)
-      .lfc-calendar-event-button:not([disabled], [aria-disabled="true"]):hover {
+      :is(.lfc-calendar-event-button, .lfc-calendar-grid-more):not([disabled], [aria-disabled="true"]):hover {
       box-shadow: inset 0 0 0 0.0625rem var(--lfc-accent-color);
     }
 
