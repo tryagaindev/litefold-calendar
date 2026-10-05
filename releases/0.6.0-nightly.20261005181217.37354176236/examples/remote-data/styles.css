@@ -1,0 +1,45 @@
+@layer my.remote-data {
+	.my-remote-controls {
+		container-name: my-example my-remote-controls;
+	}
+
+	.my-event-dialog {
+		box-sizing: border-box;
+		inline-size: min(32rem, calc(100% - 2rem));
+		max-block-size: calc(100% - 2rem);
+		padding: 1.25rem;
+		border: 0.125rem solid var(--my-border-color);
+		border-radius: var(--my-radius);
+		background: var(--my-surface-background);
+		color: var(--my-color);
+		overflow: auto;
+	}
+
+	.my-event-dialog::backdrop {
+		background: rgb(0 0 0 / 0.5);
+	}
+
+	.my-event-dialog > h2 {
+		margin-block-start: 0;
+		overflow-wrap: anywhere;
+	}
+
+	.my-event-choices {
+		display: grid;
+		gap: 0.75rem;
+		padding: 0;
+		list-style: none;
+	}
+
+	.my-event-choices .my-button {
+		inline-size: 100%;
+		text-align: start;
+		overflow-wrap: anywhere;
+	}
+
+	@container my-remote-controls (inline-size < 28rem) {
+		.my-control-row > :not(label) {
+			inline-size: 100%;
+		}
+	}
+}
