@@ -100,6 +100,18 @@ typography:
     fontWeight: 700
     lineHeight: 1.5
     letterSpacing: 0.025em
+  day-number:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 1em
+    fontWeight: 500
+    lineHeight: 1
+    letterSpacing: 0em
+  today-number:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 1em
+    fontWeight: 700
+    lineHeight: 1
+    letterSpacing: 0em
   grid-event:
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: 0.75em
@@ -109,6 +121,18 @@ typography:
   compact-count:
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: 0.875rem
+    fontWeight: 700
+    lineHeight: 1
+    letterSpacing: 0em
+  pager-label:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 0.75rem
+    fontWeight: 700
+    lineHeight: 1.5
+    letterSpacing: 0em
+  pager-direction:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 1.5rem
     fontWeight: 700
     lineHeight: 1
     letterSpacing: 0em
@@ -192,13 +216,15 @@ components:
   day-selected-dark:
     backgroundColor: "{colors.dark-selected-background}"
     textColor: "{colors.dark-selected-color}"
-  today-badge:
+  today-indicator:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
+    typography: "{typography.today-number}"
     rounded: "{rounded.full}"
-  today-badge-dark:
+  today-indicator-dark:
     backgroundColor: "{colors.dark-primary}"
     textColor: "{colors.dark-on-primary}"
+    typography: "{typography.today-number}"
     rounded: "{rounded.full}"
   grid-event:
     backgroundColor: "{colors.event-background}"
@@ -209,6 +235,14 @@ components:
     backgroundColor: "{colors.dark-event-background}"
     textColor: "{colors.dark-event-color}"
     typography: "{typography.grid-event}"
+    rounded: "{rounded.md}"
+  grid-total-count:
+    backgroundColor: "{colors.event-background}"
+    textColor: "{colors.event-color}"
+    rounded: "{rounded.md}"
+  grid-total-count-dark:
+    backgroundColor: "{colors.dark-event-background}"
+    textColor: "{colors.dark-event-color}"
     rounded: "{rounded.md}"
   agenda-event:
     backgroundColor: "{colors.event-background}"
@@ -322,11 +356,13 @@ The calendar uses the operating system's sans-serif stack. It downloads no font 
 
 - **Month title:** Wide containers use `{typography.month-title-lg.fontSize}` at weight 700. At `42rem` and below the title switches to `{typography.month-title-compact.fontSize}` at weight 500. Below `24rem`, its visible text uses the locale's abbreviated month with `year: "numeric"`; the full month and numeric year remain visible at exactly `24rem` and above. When interactive, a `0.0625em` underline with a `0.2em` offset identifies the month/year chooser without making it resemble a primary button.
 - **Picker title:** `{typography.picker-title.fontSize}`, weight 700, and balanced wrapping establish the picker heading in both the native non-modal popover and modal dialog fallback.
-- **Control emphasis:** Weight 600 is reserved for the Today action and month/year field labels—stronger than body text, quieter than primary actions and headings.
+- **Control emphasis:** The Today action and month/year field labels use weight 600—stronger than body text, quieter than primary actions and headings.
 - **Agenda title:** `{typography.agenda-title.fontSize}`, weight 700, line height 1.3, and balanced wrapping introduce the selected date's schedule.
-- **Weekdays:** Uppercase, weight 700, and `0.025em` tracking create ledger-column labels. Their visual sizes are `{typography.weekday-lg.fontSize}` above `42rem`, `{typography.weekday-md.fontSize}` by default, and `{typography.weekday-compact.fontSize}` for the compact treatment.
-- **Events and metadata:** Grid events use `{typography.grid-event.fontSize}` relative to the inherited base. Titles and actionable hints use weight 700; times and day numbers use tabular numerals. Long text wraps in agenda rows and status panels but ellipsizes inside constrained grid cells and the one-line month title.
+- **Weekdays:** Uppercase, weight 700, and `0.025em` tracking create ledger-column labels. Sizes are `{typography.weekday-lg.fontSize}` above `42rem` and `{typography.weekday-compact.fontSize}` at or below it. `weekday-md` is the base fallback, not a third responsive tier.
+- **Day numbers:** `{typography.day-number.fontSize}` inherits the calendar's base size, with weight 500 and line height 1. Today uses `today-number` at weight 700; both use tabular numerals.
+- **Events and metadata:** Grid events use `{typography.grid-event.fontSize}` relative to the inherited base. Titles and actionable hints use weight 700; times use tabular numerals. Long text wraps in agenda rows and status panels but ellipsizes inside constrained grid cells and the one-line month title.
 - **Compact total counts:** `{typography.compact-count.fontSize}`, weight 700, line height 1, and tabular numerals make the total legible within its count button. This root-relative type scales with text enlargement; it does not shrink to fit the container. Counts may wrap and their buttons grow taller when the complete localized text needs more space. The passive additional-count cue in `"events"` mode keeps its smaller semibold treatment.
+- **Pager:** Decorative month labels use `pager-label` (`0.75rem`, weight 700, inherited base line height); direction glyphs use `pager-direction` (`1.5rem`, weight 700, line height 1).
 
 Use `rem` for base and component typography and `em` only when a detail must scale with its containing text. Do not introduce a brand font, display face, italic styling, or large promotional type into package-owned UI.
 
@@ -361,7 +397,7 @@ The date number and badge remain at the cell's block start. `gridEventPlacement`
 - **At or below `42rem`:** Navigation appears above application `toolbarEnd` content, and day badges disappear. Previous/Next, the month title, and Today share a row when their intrinsic widths fit; longer labels or enlarged text can move the title or Today onto following rows while preserving their order and separate targets. The default `gridEventDisplay.compact: "count-when-multiple"` presents multiple occurrences as one bordered, recognizable total-count button, independent of the summary cap. `"count"` also uses this button for single-event days. A one-event day otherwise retains its existing event representation. Counts use localized compact number formatting and a complete, exact accessible total. An empty day has no count action.
 
 `gridEventDisplay: { compact: "events" }` restores the prior marker-plus-overflow presentation. Its first actionable event uses a marker-only 24–44 CSS-pixel target; later actions remain available on focus. A passive cue reports the signed additional count with a marker or the unsigned total without one. The package arranges marker and cue in equal auto-fit blocks, stacked when the full compact targets cannot fit beside each other. A zero summary cap suppresses individual summaries in every mode, while total-count actions remain available. All loaded normalized occurrences contribute to counts, including multi-day occurrences and visually suppressed markers.
-- **Below `24rem`:** The toolbar title and decorative pager lanes switch their visible month/year text from the full month to the locale's `month: "short", year: "numeric"` form. The full title, trigger name, grid name, and live text remain complete, while the compact title and entire pager lanes are excluded from accessibility. Agenda title and supporting event content span the row beneath marker and time so long text keeps useful measure.
+- **Below `24rem`:** The toolbar title and decorative pager lanes switch their visible month/year text from the full month to the locale's `month: "short", year: "numeric"` form. The full title, trigger name, grid name, and live text remain complete, while the compact title and entire pager lanes are excluded from accessibility. Agenda event titles and supporting content span the row beneath marker and time so long text keeps useful measure.
 - **At or below `20rem`:** Previous/Next and the month title share a row when their intrinsic widths fit; otherwise the title follows on its own row. Today occupies the next row, followed by application content. Navigation targets must remain separate as text grows. Picker fields stack, the status panel becomes one column, and narrow weekday labels replace short labels without changing their full accessible names. These are additional structural changes; month/year abbreviation already follows the below-`24rem` rule.
 
 Responsive changes are CSS container-query-only and must not depend on viewport-category JavaScript, consumer measurement, or visual reordering. Crossing `42rem` applies the toolbar, weekday, and day-cell composition above and selects the already-rendered event summaries, count action, and compact/wide `renderEventOverflow` visuals for that container size. An already focused action remains visible until focus leaves it. The label transition at `24rem` likewise selects already-rendered full and abbreviated toolbar/pager variants; the same query also performs the agenda reflow described above. Neither transition reruns render hooks, measures content in JavaScript, replaces interactive nodes, or changes accessible naming. The canonical DOM, interaction, and focus-order invariants are defined by [responsive and direct-input behavior](ACCESSIBILITY.md#responsive-and-direct-input-behavior). Visually, the agenda remains below the grid, and the interface must reflow without persistent two-dimensional content scrolling in a 320 CSS-pixel calendar host border box and remain usable at 200% text size and 400% page zoom.
@@ -395,13 +431,13 @@ Previous/Next are transparent glyph controls with the standard component radius.
 
 ### Month/year picker
 
-Use the native non-modal `popover="auto"` surface with a native modal `<dialog>` fallback, native Month `<select>`, native Year `<input>`, a filled primary Show month action, and a quiet Cancel action. The picker is at most `24rem` wide, scrolls within the dynamic viewport when necessary, and stacks its fields only at the smallest container. Opening, validation, dismissal, and focus behavior are canonical in the [built-in month-and-year jump](docs/api.md#built-in-month-and-year-jump) and [interaction model](ACCESSIBILITY.md#interaction-model).
+Use the native non-modal `popover="auto"` surface with a native modal `<dialog>` fallback, native Month `<select>`, native Year `<input>`, a filled primary Jump action, and a quiet Cancel action; labels are localizable. The picker is at most `24rem` wide, scrolls within the dynamic viewport when necessary, and stacks its fields only at the smallest container. On hover-capable devices, Jump gains a `0.125rem` inset rule in its text color, with a `120ms` ease-out transition or immediate feedback under reduced motion. Opening, validation, dismissal, and focus behavior are canonical in the [built-in month-and-year jump](docs/api.md#built-in-month-and-year-jump) and [interaction model](ACCESSIBILITY.md#interaction-model).
 
 ### Month grid and day states
 
 The grid is always seven equal logical columns and six week rows. Equal week-row sizing is the default; content sizing preserves six rows but lets their intrinsic heights differ. Outside-month days use the surface tone and muted ink. Out-of-range days remain visible at `0.55` opacity but disabled and expose no event action. Day numbers align to the logical end on wide layouts and center in compact layouts while remaining at the block start in either presentation. Compact date-number decoration stays within the cell width, including with enlarged text; the full-cell day button retains its independent interaction target.
 
-Today is a primary-filled date number with its own border and the contained rounded geometry defined above. Selection colors the whole cell and adds an inset primary outline. Keyboard focus uses the violet ring and takes visual precedence over the selected outline. Hover and press preview the selected palette only on eligible, unselected, non-Today date-number decoration; selection and agenda behavior follow the [interaction model](ACCESSIBILITY.md#interaction-model).
+The Today indicator is a primary-filled date number with its own border and the contained rounded geometry defined above; it is separate from the application-supplied day badge. Selection colors the whole cell and adds an inset primary outline. Keyboard focus uses the violet ring and takes visual precedence over the selected outline. Hover and press preview the selected palette only on eligible, unselected, non-Today date-number decoration; selection and agenda behavior follow the [interaction model](ACCESSIBILITY.md#interaction-model).
 
 ### Events and agenda
 
@@ -409,11 +445,30 @@ Grid summaries use the event palette, logical-leading accent rule, marker slot, 
 
 On hover-capable devices, total-count and remaining-count actions share event actions' inset `--lfc-accent-color` hover cue. The cue belongs to the native action, including with borderless themes or custom overflow content, and does not change layout or replace the keyboard focus ring. Passive compact overflow cues remain decorative and receive no hover treatment.
 
-The legacy passive compact overflow cue remains a bare semibold number. The package owns placement according to `gridEventPlacement`; render hooks replace only noninteractive visual content within the assigned block. `renderEventOverflow` exposes `display: "count" | "overflow"` in addition to the compact/wide variant. Count contexts set `visibleEventCount: 0` and `overflowCount: eventCount`. Mandatory actions keep their fallback for `null` or invalid output. The [interaction model](ACCESSIBILITY.md#interaction-model) defines application override and focus ownership.
+The legacy passive compact overflow cue remains a bare semibold number. The package owns placement according to `gridEventPlacement`; render hooks replace only noninteractive visuals within the assigned block. The [overflow customization guide](docs/styling.md#event-overflow) defines variants and fallback content; the [interaction model](ACCESSIBILITY.md#interaction-model) defines activation and focus ownership.
 
 The agenda is a rounded surface panel immediately below the grid. Its ordered event rows reuse the event palette and visually align leading content, localized time, title, supporting details, and application trailing content. The canonical action and render-hook semantics are defined by the [interaction model](ACCESSIBILITY.md#interaction-model) and [render-hook API](docs/api.md#customize-rendering-calendarrenderhooks).
 
+#### Optional event content
+
+`eventTimeDisplay` controls visible times and all-day labels. Agenda rows collapse absent time or leading columns, becoming one column when both are absent; suppressing only the marker retains any other leading content. Timed multi-day continuations have empty time slots. Below `24rem`, event titles and supporting content span beneath the available leading/time row; the agenda heading stays above the list. Supported wrapping fallbacks preserve content order. See [event display options](docs/api.md#data-date-and-layout-options) and [accessible time exposure](ACCESSIBILITY.md#interaction-model) for the behavioral contract.
+
+#### Agenda states and pagination
+
+The agenda footer is a leading-aligned stack. Empty and progress text use muted body text and wrap within `80ch`; Show more uses the bordered quiet-control treatment. These roles follow the shared theme and focus rules, independently of grid overflow tokens. Labels below are localizable English defaults.
+
+| Loaded agenda state | Footer |
+|---|---|
+| No events on the selected date | “No events”; event list hidden |
+| More rows can be revealed | “Show {count} more” followed by “Showing {visible} of {total} events” |
+| DOM limit reached with events remaining | Progress text only |
+| All events displayed | No footer content |
+
+Reveal limits and focus behavior belong to the [agenda options](docs/api.md#data-date-and-layout-options) and [interaction model](ACCESSIBILITY.md#interaction-model).
+
 ### Status and recovery
+
+During asynchronous initial or new-range loading, the agenda heading remains while its list and footer are empty. Same-range refreshes retain the previous snapshot, including a loaded-empty presentation. The busy host uses a progress cursor; controls retain their own cursor rules. See [source timing](docs/api.md#source-timing-and-renders) and [loading and failure presentation](docs/errors.md#package-owned-presentation).
 
 Persistent warnings and errors appear between the toolbar and grid, using a semantic surface/text/border trio, a strong logical-leading rule, an icon, clear copy, and optional Retry in a stable position. Warning means usable data may be stale or partial; error means the action or initial view cannot continue normally. Error ownership, announcement, focus, and recovery behavior are canonical in [Error handling](docs/errors.md).
 
@@ -429,7 +484,7 @@ These values keep the built-in pieces proportionate but are not public token pro
 
 - Navigation prefers a `32rem` basis.
 - The picker year track has a `7rem` minimum and `0.65fr` share.
-- Agenda titles use a `10rem` flex basis.
+- Agenda event titles use a `10rem` flex basis in the wrapping fallback.
 - Each pager lane is `min(6rem, 25cqi)`.
 - Navigation glyphs occupy `1.25em`, status icons `1.5rem`, event markers `0.75em`, and compact markers `0.375rem`.
 

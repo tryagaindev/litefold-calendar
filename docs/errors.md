@@ -40,7 +40,7 @@ The package creates empty live regions before they are needed and uses one annou
 
 An immediate provider throw or invalid direct array completes the operational-error pipeline before the initiating `render()`, navigation, `setEvents()`, or `refetchEvents()` call returns. Promise-like rejection follows the same presentation rules after settlement. For promise-like work, settlement handlers are attached before loading callbacks run, so synchronous callback reentrancy may safely supersede or destroy the pending generation without allowing a stale result to change state or DOM.
 
-"No events" appears only after a successful empty source result. Loading, failed, invalid, and over-limit results never use the empty state.
+"No events" means a usable snapshot has no occurrences on the selected date. Initial or new-range loading and failures never substitute this message for unavailable data; same-range refreshes can retain a previously loaded empty presentation. See the [visual loading and recovery rules](../DESIGN.md#status-and-recovery).
 
 ## Handle programmer errors
 
