@@ -11,7 +11,7 @@ in older versions.  Install current security and patch updates.
 
 <!-- browser-targets:start -->
 <!-- Generated from the shared browser target resolver; do not edit by hand. -->
-Preset: `baseline-widely-available`.  Resolver: Vite `8.3.1`; esbuild `0.28.2`.
+Preset: `baseline-widely-available`.  Resolver: Vite `8.3.2`; esbuild `0.28.2`.
 
 | Browser | JavaScript minimum | CSS minimum |
 | --- | --- | --- |

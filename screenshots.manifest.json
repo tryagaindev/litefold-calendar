@@ -7,7 +7,7 @@
     "npm": "12.0.2",
     "playwright": "1.63.0"
   },
-  "sourceFingerprint": "9d962bd746474d5dbe097a55bab30281e33b550edbb04395747429a68973ca1c",
+  "sourceFingerprint": "66bba785bca528b176e9371bcd800d6d4f4da76bccf972a36d3ddd9677026d3b",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -216,10 +216,10 @@
   ],
   "browserTargets": {
     "query": "baseline-widely-available",
-    "effectiveQuery": "Vite 8.3.1: baseline-widely-available",
-    "resolvedAt": "2026-10-04",
+    "effectiveQuery": "Vite 8.3.2: baseline-widely-available",
+    "resolvedAt": "2026-10-10",
     "dataVersions": {
-      "vite": "8.3.1",
+      "vite": "8.3.2",
       "esbuild": "0.28.2"
     },
     "browsers": [
