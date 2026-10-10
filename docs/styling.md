@@ -66,6 +66,9 @@ Use the typed element references supplied to hooks rather than searching the DOM
 | Selected day | The cell whose date drives the agenda.  Read `isSelected` in day contexts; use selection callbacks or navigation methods for behavior. |
 | Selected-day agenda | The ordered list below the grid.  Event hooks receive `surface: "agenda"`; the package owns ordering, disclosure, loading/empty states, and focus transfer. |
 
+See [agenda states and pagination](../DESIGN.md#agenda-states-and-pagination)
+and [loading presentation](../DESIGN.md#status-and-recovery) when reviewing a theme.
+
 ### Day cell
 
 | Part | Public element or hook |
@@ -96,6 +99,9 @@ inside the leading group, before any content added by `renderEventLeading`.
 | Title | `elements.title` contains the exact source title, including whitespace.  There is no title-replacement hook. |
 | Details | `elements.details`; add content with `renderEventDetails`. |
 | Trailing content | `elements.trailing`; add content with `renderEventTrailing`. |
+
+The [optional-content layout](../DESIGN.md#optional-event-content) defines how
+agenda rows reflow when time or leading content is absent.
 
 ### Event overflow
 

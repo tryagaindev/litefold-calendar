@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Expanded the visual specification for existing typography, count roles, agenda states, loading, and optional event layouts; corrected labels and documentation links.
 - **Migration:** Event titles are no longer trimmed. Any nonempty string of at most 1,024 UTF-16 code units is preserved exactly, including whitespace-only titles; applications are responsible for supplying meaningful visible and accessible text.
 - Reduced the default day padding to `clamp(0.25rem, 0.75cqi, 0.5rem)` for a more compact grid while retaining control target floors and intrinsic content growth.
 - Consolidated anatomy and CSS integration into one styling guide; moved generic extension contracts into the API reference, extension implementation guidance into architecture, and delivery steps into contributor/release procedures. Removed obsolete move-notice pages and their references.
