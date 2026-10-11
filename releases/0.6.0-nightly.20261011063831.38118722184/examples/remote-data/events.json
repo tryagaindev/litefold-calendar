@@ -1,0 +1,7 @@
+[
+  { "id": "open-studio", "title": "Open studio", "start": "2026-08-06", "category": "community" },
+  { "id": "print-workshop", "title": "Print workshop", "start": "2026-08-06", "category": "workshop" },
+  { "id": "garden-meetup", "title": "Garden meetup", "start": "2026-08-06", "category": "community" },
+  { "id": "exhibition", "title": "Summer exhibition", "start": "2026-08-08", "end": "2026-08-11", "category": "community" },
+  { "id": "bookbinding", "title": "Bookbinding workshop", "start": "2026-08-15", "category": "workshop" }
+]

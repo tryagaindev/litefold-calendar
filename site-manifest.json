@@ -9,6 +9,12 @@
 	"releases": [
 		{
 			"channel": "release",
+			"commit": "e7313544a9ea9eeb0c228b8eb9b75a2be8dc3868",
+			"version": "0.6.0-nightly.20261011063831.38118722184",
+			"path": "releases/0.6.0-nightly.20261011063831.38118722184/examples/"
+		},
+		{
+			"channel": "release",
 			"commit": "ba46f980208b6aaa405413f6f9abe54986d5bf98",
 			"version": "0.6.0-nightly.20261005181217.37354176236",
 			"path": "releases/0.6.0-nightly.20261005181217.37354176236/examples/"
