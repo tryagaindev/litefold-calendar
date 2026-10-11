@@ -42,11 +42,18 @@ export interface CalendarDom extends CalendarMonthPickerElements {
 	readonly weeks: HTMLDivElement;
 }
 
+/** Validated decorative content mounted in the native navigation buttons. */
+export interface CalendarIconNodes {
+	readonly next: Node;
+	readonly previous: Node;
+	readonly today: Node | null;
+}
+
 interface CalendarStructureOptions {
 	readonly document: Document;
 	readonly headingLevel: CalendarHeadingLevel;
 	readonly host: HTMLElement;
-	readonly iconNodes: Readonly<Record<"next" | "previous", Node>>;
+	readonly iconNodes: Readonly<CalendarIconNodes>;
 	readonly instanceName: string;
 	readonly integrationParents: Map<Node, Node>;
 	readonly maxYear: number;
@@ -105,7 +112,19 @@ export function createCalendarStructure(
 	const todayButton = options.document.createElement("button");
 	todayButton.className = "lfc-calendar-nav-button lfc-calendar-today-button";
 	todayButton.type = "button";
-	todayButton.textContent = options.messages.today;
+	if (options.iconNodes.today === null) {
+		todayButton.textContent = options.messages.today;
+	} else {
+		todayButton.setAttribute("aria-label", options.messages.today);
+		const label = options.document.createElement("span");
+		label.className = "lfc-calendar-today-label";
+		label.textContent = options.messages.today;
+		const icon = options.document.createElement("span");
+		icon.className = "lfc-calendar-today-icon";
+		icon.setAttribute("aria-hidden", "true");
+		appendIntegrationIcon(options, icon, options.iconNodes.today);
+		todayButton.append(label, icon);
+	}
 	todayButton.addEventListener("click", () => { options.onToday(todayButton); });
 	navigation.append(monthStepper, picker.title, todayButton);
 	toolbar.append(navigation, picker.monthPicker);
@@ -267,13 +286,20 @@ function createNavigationButton(
 	button.className = `lfc-calendar-nav-button lfc-calendar-nav-button-${direction}`;
 	button.type = "button";
 	button.setAttribute("aria-label", options.messages[direction]);
-	const icon = options.iconNodes[direction];
-	button.append(icon);
-	if (icon.parentNode === button) {
-		options.integrationParents.set(icon, button);
-	}
+	appendIntegrationIcon(options, button, options.iconNodes[direction]);
 	button.addEventListener("click", () => { options.onNavigate(direction); });
 	return button;
+}
+
+function appendIntegrationIcon(
+	options: Readonly<CalendarStructureOptions>,
+	parent: HTMLElement,
+	icon: Node
+): void {
+	parent.append(icon);
+	if (icon.parentNode === parent) {
+		options.integrationParents.set(icon, parent);
+	}
 }
 
 function appendToolbarEnd(options: Readonly<CalendarStructureOptions>, toolbar: HTMLDivElement): void {

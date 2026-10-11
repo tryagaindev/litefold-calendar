@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added optional `icons.today` content for narrow calendars, with the localized Today text retained at wider widths and an unchanged accessible name and native button behavior.
 - Added `onEventOverflowDefault` and `CalendarEventOverflowDefaultContext` for synchronous observation of successful count/overflow selection and agenda focus. The callback receives the actual heading and original occurrence snapshot; applications can scroll directly without a timing or focus-discovery bridge.
 - Added eight independent `--lfc-grid-overflow-*` tokens for count and overflow paint, typography, and sizing. Contextual defaults preserve existing themes; the advanced example demonstrates adaptive borderless counts and application-owned instant agenda scrolling.
 - Added independent compact and wide `gridEventDisplay` settings for individual summaries, total counts, or counts only on days with multiple events. `onEventOverflowActivate` supports application-owned day choosers with synchronous cancellation of the default agenda action, and `renderEventOverflow` now identifies count presentation.

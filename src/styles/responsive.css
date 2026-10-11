@@ -414,6 +414,14 @@
   }
 
   @container lfc-calendar (inline-size < 24rem) {
+    :where(.litefold-calendar) .lfc-calendar-today-label {
+      display: none;
+    }
+
+    :where(.litefold-calendar) .lfc-calendar-today-icon {
+      display: inline-flex;
+    }
+
     :where(.litefold-calendar) .lfc-calendar-title-label-full {
       block-size: var(--lfc-internal-visually-hidden-size);
       border: 0;

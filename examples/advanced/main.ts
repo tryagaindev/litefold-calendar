@@ -436,6 +436,21 @@ function createNavigationIcon(ownerDocument: Document, text: string): Node {
 	return icon;
 }
 
+/** Creates the optional compact Today icon without directional mirroring. */
+function createTodayIcon(ownerDocument: Document): SVGSVGElement {
+	const icon = ownerDocument.createElementNS("http://www.w3.org/2000/svg", "svg");
+	icon.classList.add("my-today-icon");
+	icon.setAttribute("viewBox", "0 0 24 24");
+	icon.setAttribute("aria-hidden", "true");
+	icon.setAttribute("fill", "none");
+	icon.setAttribute("stroke", "currentColor");
+	icon.setAttribute("stroke-width", "1.5");
+	const path = ownerDocument.createElementNS("http://www.w3.org/2000/svg", "path");
+	path.setAttribute("d", "M4 5h16v15H4zM4 9h16M8 3v4m8-4v4m-5 6h2v2h-2z");
+	icon.append(path);
+	return icon;
+}
+
 function updatePendingControl(): void {
 	completePendingButton.disabled = pendingSourceRequest === null;
 }
@@ -684,7 +699,8 @@ const calendarOptions = {
 	headingLevel: 3,
 	icons: {
 		next: (ownerDocument) => createNavigationIcon(ownerDocument, "\u2192"),
-		previous: (ownerDocument) => createNavigationIcon(ownerDocument, "\u2190")
+		previous: (ownerDocument) => createNavigationIcon(ownerDocument, "\u2190"),
+		today: createTodayIcon
 	},
 	initialDate: { day: 6, month: 8, year: 2026 },
 	isEventContextMenuAvailable: ({ event }) => event.metadata?.itemType === "appointment",

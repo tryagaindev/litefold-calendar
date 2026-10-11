@@ -7,6 +7,8 @@ export interface CalendarIcons {
 	readonly next: CalendarIconFactory;
 	/** Creates decorative content for the previous-month button. */
 	readonly previous: CalendarIconFactory;
+	/** Creates decorative Today content shown below the compact title breakpoint; omitted content keeps the text label. */
+	readonly today?: CalendarIconFactory;
 }
 
 function createTextIcon(document: Document, text: string): HTMLSpanElement {

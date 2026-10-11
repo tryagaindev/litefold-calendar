@@ -32,7 +32,7 @@ import {
 } from "./state.js";
 import { CalendarAnnouncementPresenter } from "../dom/announcement.js";
 import { presentCalendarIssue } from "../dom/issue-region.js";
-import { createCalendarStructure, type CalendarDom } from "../dom/structure.js";
+import { createCalendarStructure, type CalendarDom, type CalendarIconNodes } from "../dom/structure.js";
 import { CalendarMonthPickerController } from "../dom/month-picker.js";
 import { CalendarPalette } from "../dom/palette.js";
 import { CalendarMonthTitleRenderer } from "../dom/month-title.js";
@@ -149,7 +149,7 @@ export class MonthCalendar<TMetadata = unknown> implements Calendar<TMetadata> {
 	private readonly gridEventLimit: number;
 	private readonly headingLevel: CalendarHeadingLevel;
 	private readonly host: HTMLElement;
-	private readonly iconNodes: Readonly<Record<"next" | "previous", Node>>;
+	private readonly iconNodes: Readonly<CalendarIconNodes>;
 	private readonly integrationNodes: IntegrationNodeController;
 	private readonly instanceName: string;
 	private readonly messages: Readonly<CalendarMessages>;

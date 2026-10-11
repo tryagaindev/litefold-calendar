@@ -208,6 +208,10 @@
     justify-self: end;
   }
 
+  :where(.litefold-calendar) .lfc-calendar-today-icon {
+    display: none;
+  }
+
   :where(.litefold-calendar)
     .lfc-calendar-month-stepper
     .lfc-calendar-nav-button {
