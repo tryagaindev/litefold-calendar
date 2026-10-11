@@ -858,10 +858,11 @@ function getFallbackOption(fallbackElement) {
 }
 function resolveIconNodes(document, host, icons) {
 	const resolve = (direction) => {
-		if (typeof icons[direction] !== "function") throw createConfigurationError(`${direction} icon must be a factory function.`);
+		const factory = icons[direction];
+		if (typeof factory !== "function") throw createConfigurationError(`${direction} icon must be a factory function.`);
 		let node;
 		try {
-			node = invokeForUnknownResult(icons[direction], [document]);
+			node = invokeForUnknownResult(factory, [document]);
 		} catch (cause) {
 			throw createConfigurationError(`${direction} icon factory failed.`, cause);
 		}
@@ -876,9 +877,10 @@ function resolveIconNodes(document, host, icons) {
 	};
 	const nodes = {
 		previous: resolve("previous"),
-		next: resolve("next")
+		next: resolve("next"),
+		today: icons.today === void 0 ? null : resolve("today")
 	};
-	if (nodes.previous === nodes.next) throw createConfigurationError("Navigation icon factories must return distinct nodes.");
+	if (nodes.previous === nodes.next || nodes.today === nodes.previous || nodes.today === nodes.next) throw createConfigurationError("Navigation icon factories must return distinct nodes.");
 	return Object.freeze(nodes);
 }
 //#endregion
@@ -1622,7 +1624,18 @@ function createCalendarStructure(layoutOptions, options) {
 	const todayButton = options.document.createElement("button");
 	todayButton.className = "lfc-calendar-nav-button lfc-calendar-today-button";
 	todayButton.type = "button";
-	todayButton.textContent = options.messages.today;
+	if (options.iconNodes.today === null) todayButton.textContent = options.messages.today;
+	else {
+		todayButton.setAttribute("aria-label", options.messages.today);
+		const label = options.document.createElement("span");
+		label.className = "lfc-calendar-today-label";
+		label.textContent = options.messages.today;
+		const icon = options.document.createElement("span");
+		icon.className = "lfc-calendar-today-icon";
+		icon.setAttribute("aria-hidden", "true");
+		appendIntegrationIcon(options, icon, options.iconNodes.today);
+		todayButton.append(label, icon);
+	}
 	todayButton.addEventListener("click", () => {
 		options.onToday(todayButton);
 	});
@@ -1762,13 +1775,15 @@ function createNavigationButton(options, direction) {
 	button.className = `lfc-calendar-nav-button lfc-calendar-nav-button-${direction}`;
 	button.type = "button";
 	button.setAttribute("aria-label", options.messages[direction]);
-	const icon = options.iconNodes[direction];
-	button.append(icon);
-	if (icon.parentNode === button) options.integrationParents.set(icon, button);
+	appendIntegrationIcon(options, button, options.iconNodes[direction]);
 	button.addEventListener("click", () => {
 		options.onNavigate(direction);
 	});
 	return button;
+}
+function appendIntegrationIcon(options, parent, icon) {
+	parent.append(icon);
+	if (icon.parentNode === parent) options.integrationParents.set(icon, parent);
 }
 function appendToolbarEnd(options, toolbar) {
 	if (options.toolbarEnd === null) return;
@@ -2563,7 +2578,8 @@ var DEFAULT_CALENDAR_ICONS = Object.freeze({
 //#region src/internal/runtime/icon-configuration.ts
 var CALENDAR_ICON_SCHEMA = Object.freeze({
 	next: true,
-	previous: true
+	previous: true,
+	today: true
 });
 var CALENDAR_ICON_KEY_SET = new Set(Object.keys(CALENDAR_ICON_SCHEMA));
 /** Resolves a partial icon set over the dependency-free defaults. */
@@ -2571,11 +2587,12 @@ function resolveCalendarIcons(icons) {
 	if (icons === void 0) return DEFAULT_CALENDAR_ICONS;
 	if (!isConfigurationRecord(icons)) throw createConfigurationError("icons must be an object when supplied.");
 	assertKnownConfigurationKeys(icons, CALENDAR_ICON_KEY_SET, "icons");
-	const resolved = {
-		next: DEFAULT_CALENDAR_ICONS.next,
-		previous: DEFAULT_CALENDAR_ICONS.previous
-	};
-	for (const direction of ["next", "previous"]) {
+	const resolved = { ...DEFAULT_CALENDAR_ICONS };
+	for (const direction of [
+		"next",
+		"previous",
+		"today"
+	]) {
 		const value = readConfigurationValue(icons, direction, `icons.${direction}`);
 		if (value === void 0) continue;
 		if (typeof value !== "function") throw createConfigurationError(`icons.${direction} must be a factory function.`);
@@ -2637,6 +2654,7 @@ var IntegrationNodeController = class {
 		const nodes = [
 			this.options.iconNodes.previous,
 			this.options.iconNodes.next,
+			this.options.iconNodes.today,
 			this.options.toolbarEnd,
 			this.options.fallbackElement
 		].filter((node) => node !== null);
