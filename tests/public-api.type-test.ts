@@ -6,6 +6,7 @@ import type {
 	CalendarEventOverflowDefaultContext,
 	CalendarGridEventDisplay,
 	CalendarGridEventPlacement,
+	CalendarIcons,
 	CalendarOptions,
 	CalendarRenderCleanup,
 	CalendarRenderHooks,
@@ -25,6 +26,26 @@ interface DetailedMetadata extends BaseMetadata {
 
 function consumeTypeAssertions(...values: readonly unknown[]): readonly unknown[] {
 	return values;
+}
+
+/** Today is optional for existing complete icon sets and can be configured independently. */
+export function verifyTodayIconTypeContracts(): void {
+	const arrows: CalendarIcons = {
+		next: (document) => document.createTextNode("Next"),
+		previous: (document) => document.createTextNode("Previous")
+	};
+	const options: CalendarOptions = {
+		events: [],
+		icons: { today: (document) => document.createElement("span") }
+	};
+	const invalid: CalendarOptions = {
+		events: [],
+		icons: {
+			//@ts-expect-error Icon factories must return a Node synchronously.
+			today: (document) => Promise.resolve(document.createElement("span"))
+		}
+	};
+	consumeTypeAssertions(arrows, options, invalid);
 }
 
 /** Count options preserve metadata inference and immutable activation snapshots. */

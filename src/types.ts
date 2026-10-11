@@ -486,7 +486,7 @@ export interface CalendarOptions<TMetadata = unknown> {
 	readonly firstDay?: CalendarFirstDay;
 	/** Month-title heading level; agenda and status headings use the next level, capped at `6`. Defaults to `2`. */
 	readonly headingLevel?: CalendarHeadingLevel;
-	/** Partial navigation-icon factories resolved over built-in text icons. */
+	/** Partial navigation-icon factories; optional Today content replaces its label only at compact widths. */
 	readonly icons?: Readonly<Partial<CalendarIcons>>;
 	/** Initially displayed and selected date; defaults to the date produced by `now`. */
 	readonly initialDate?: CalendarDateInput;

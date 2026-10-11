@@ -2,6 +2,7 @@ import { MAX_SOURCE_EVENT_LIMIT } from "../domain/event-normalization.js";
 import { resolveCalendarFirstDay } from "../domain/grid.js";
 import { LitefoldCalendarError } from "../../errors.js";
 import type { CalendarIcons } from "../../icons.js";
+import type { CalendarIconNodes } from "../dom/structure.js";
 import type {
 	CalendarEventTimeDisplay,
 	CalendarGridEventPlacement,
@@ -360,14 +361,15 @@ export function resolveIconNodes(
 	document: Document,
 	host: HTMLElement,
 	icons: Readonly<CalendarIcons>
-): Readonly<Record<"next" | "previous", Node>> {
-	const resolve = (direction: "next" | "previous"): Node => {
-		if (typeof icons[direction] !== "function") {
+): Readonly<CalendarIconNodes> {
+	const resolve = (direction: keyof CalendarIcons): Node => {
+		const factory = icons[direction];
+		if (typeof factory !== "function") {
 			throw createConfigurationError(`${direction} icon must be a factory function.`);
 		}
 		let node: unknown;
 		try {
-			node = invokeForUnknownResult(icons[direction], [document]);
+			node = invokeForUnknownResult(factory, [document]);
 		} catch (cause: unknown) {
 			throw createConfigurationError(`${direction} icon factory failed.`, cause);
 		}
@@ -385,8 +387,12 @@ export function resolveIconNodes(
 		}
 		return validatedNode;
 	};
-	const nodes = { previous: resolve("previous"), next: resolve("next") };
-	if (nodes.previous === nodes.next) {
+	const nodes = {
+		previous: resolve("previous"),
+		next: resolve("next"),
+		today: icons.today === undefined ? null : resolve("today")
+	};
+	if (nodes.previous === nodes.next || nodes.today === nodes.previous || nodes.today === nodes.next) {
 		throw createConfigurationError("Navigation icon factories must return distinct nodes.");
 	}
 	return Object.freeze(nodes);

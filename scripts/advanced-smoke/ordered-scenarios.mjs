@@ -142,6 +142,16 @@ export async function runAdvancedSmokeScenarios(environment) {
 		"Expected the conventional Today label in the advanced fixture."
 	);
 	assert.equal(
+		host.querySelector(".lfc-calendar-today-button")?.getAttribute("aria-label"),
+		"Today",
+		"Expected a complete accessible name for the optional compact Today icon."
+	);
+	assert.equal(
+		host.querySelector(".lfc-calendar-today-button .my-today-icon")?.namespaceURI,
+		"http://www.w3.org/2000/svg",
+		"Expected the Today icon factory to mount its document-owned SVG."
+	);
+	assert.equal(
 		host.querySelector('[role="columnheader"]')?.getAttribute("aria-label"),
 		"Monday",
 		"Expected the explicit Monday week start."
