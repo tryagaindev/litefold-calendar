@@ -5,9 +5,7 @@ import { chromium } from "@playwright/test";
 
 import { resolveBrowserTargets } from "./lib/browser-targets.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
-import {
-	replaceScreenshotBatch, validateScreenshotBatch, writeScreenshotReview
-} from "./lib/screenshot-preparation.mjs";
+import { finalizeScreenshotCapture } from "./lib/screenshot-preparation.mjs";
 import {
 	assertSupportedNode, assertPinnedNpm, assertPinnedPlaywright, computeSourceFingerprint,
 	readPngDimensions, readScreenshotManifest, REQUIRED_NPM_VERSION,
@@ -20,7 +18,12 @@ import { startRepositoryServer } from "./serve-repository.mjs";
 assertSupportedNode();
 assertPinnedNpm();
 await assertPinnedPlaywright();
-if (process.env["CI"]) {
+const arguments_ = process.argv.slice(2);
+if (arguments_.length > 1 || arguments_.some((argument) => argument !== "--candidate")) {
+	throw new Error("Usage: node scripts/update-screenshots.mjs [--candidate]");
+}
+const candidate = arguments_.includes("--candidate");
+if (process.env["CI"] && !candidate) {
 	throw new Error("CI must verify screenshot evidence; canonical captures can only be prepared locally.");
 }
 
@@ -49,6 +52,9 @@ let repositoryServer;
 let browser;
 
 try {
+	if (candidate) {
+		await rm(join(cacheDirectory, "candidate"), { recursive: true, force: true });
+	}
 	const stagingDirectory = await mkdtemp(join(cacheDirectory, "staging-"));
 	const sourceFingerprint = await computeSourceFingerprint();
 	repositoryServer = await startRepositoryServer({ port: 0 });
@@ -95,19 +101,13 @@ try {
 	};
 	const finalErrors = validateScreenshotManifest(updatedManifest, { final: true });
 	if (finalErrors.length > 0) { throw new Error(finalErrors.join("\n")); }
-	await validateScreenshotBatch({ directory: stagingDirectory, manifest: updatedManifest,
-		readDimensions: readPngDimensions, hashFile: sha256File });
-	if (await computeSourceFingerprint() !== sourceFingerprint) {
-		throw new Error("Screenshot sources changed during capture; canonical evidence was preserved. Retry after edits settle.");
-	}
-	const review = await writeScreenshotReview({ directory: join(cacheDirectory, "review"),
-		beforeDirectory: SCREENSHOT_DIRECTORY, afterDirectory: stagingDirectory,
-		previousManifest, manifest: updatedManifest });
-	await replaceScreenshotBatch({ stagingDirectory, screenshotDirectory: SCREENSHOT_DIRECTORY,
-		manifestPath: SCREENSHOT_MANIFEST_PATH, manifest: updatedManifest });
+	const { directory, review } = await finalizeScreenshotCapture({ cacheDirectory, stagingDirectory,
+		screenshotDirectory: SCREENSHOT_DIRECTORY, manifestPath: SCREENSHOT_MANIFEST_PATH,
+		previousManifest, manifest: updatedManifest, readDimensions: readPngDimensions,
+		hashFile: sha256File, computeSourceFingerprint, candidate });
 	await rm(stagingDirectory, { recursive: true, force: true });
-	console.log(`Finalized ${updatedScenes.length} screenshots; ${review.changed.length} changed. ` +
-		`Review ${relative(REPOSITORY_ROOT, join(cacheDirectory, "review", "index.html"))}.`);
+	console.log(`${candidate ? "Prepared candidate for" : "Finalized"} ${updatedScenes.length} screenshots; ` +
+		`${review.changed.length} changed. Review ${relative(REPOSITORY_ROOT, join(directory, "index.html"))}.`);
 } finally {
 	try { await browser?.close(); }
 	finally {

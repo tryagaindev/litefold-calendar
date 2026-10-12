@@ -173,6 +173,10 @@ Prepare screenshot evidence after source and build inputs settle. The preparatio
 command skips current evidence, otherwise builds and validates a staged capture
 batch and produces a before/after gallery. Review every changed scene using the
 [screenshot contract](docs/screenshots/README.md). CI verification remains read-only.
+Dependency-only Dependabot updates can refresh provenance automatically when every
+captured PNG is byte-identical; changed images still require human review. See
+[automatic dependency evidence](docs/screenshots/README.md#automatic-dependency-evidence)
+for the eligibility checks and candidate gallery command.
 
 ```shell
 npm run screenshots:prepare

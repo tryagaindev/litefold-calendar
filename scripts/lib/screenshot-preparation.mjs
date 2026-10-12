@@ -1,19 +1,45 @@
 import { copyFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-/** Builds once only when evidence is stale. CI can verify evidence but never accept it. */
+/** Builds stale evidence once; CI may capture candidates but can never accept canonical evidence. */
 export async function prepareScreenshots({ checkCurrent, build, capture, verify, force = false,
-	ci = Boolean(process.env["CI"]) }) {
+	candidate = false, ci = Boolean(process.env["CI"]) }) {
 	if (!force && await checkCurrent()) {
 		return "current";
 	}
-	if (ci) {
+	if (ci && !candidate) {
 		throw new Error("Screenshot evidence is stale. Prepare and review captures locally; CI cannot accept them.");
 	}
 	await build();
-	await capture();
+	await capture({ candidate });
+	if (candidate) {
+		return "candidate";
+	}
 	await verify();
 	return "updated";
+}
+
+/** Publishes a validated gallery, keeping candidate captures separate from canonical evidence. */
+export async function finalizeScreenshotCapture({ cacheDirectory, stagingDirectory,
+	screenshotDirectory, manifestPath, previousManifest, manifest, readDimensions, hashFile,
+	computeSourceFingerprint, candidate = false, ci = Boolean(process.env["CI"]),
+	replaceBatch = replaceScreenshotBatch }) {
+	if (ci && !candidate) {
+		throw new Error("CI must verify screenshot evidence; canonical captures can only be prepared locally.");
+	}
+	await validateScreenshotBatch({ directory: stagingDirectory, manifest, readDimensions, hashFile });
+	if (await computeSourceFingerprint() !== manifest.sourceFingerprint) {
+		throw new Error("Screenshot sources changed during capture; canonical evidence was preserved. Retry after edits settle.");
+	}
+	const directory = join(cacheDirectory, candidate ? "candidate" : "review");
+	const review = await writeScreenshotReview({ directory, beforeDirectory: screenshotDirectory,
+		afterDirectory: stagingDirectory, previousManifest, manifest });
+	if (candidate) {
+		await writeFile(join(directory, "screenshots.manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+	} else {
+		await replaceBatch({ stagingDirectory, screenshotDirectory, manifestPath, manifest });
+	}
+	return { directory, review };
 }
 
 function escapeHtml(value) {
