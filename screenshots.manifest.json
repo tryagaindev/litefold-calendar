@@ -7,7 +7,7 @@
     "npm": "12.0.2",
     "playwright": "1.63.0"
   },
-  "sourceFingerprint": "66bba785bca528b176e9371bcd800d6d4f4da76bccf972a36d3ddd9677026d3b",
+  "sourceFingerprint": "240a6c676cdcb272d0d176b469259418c2fd3c90cc28fd5fbf3bf579e8ed7d6f",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -68,7 +68,7 @@
         "README.md",
         "docs/screenshots/README.md"
       ],
-      "sha256": "4ad8d6b102f9c93cd930839f77863603d417bcffc70b995a0957b352da79ab1e"
+      "sha256": "10d5e4a74d3ec9dfc6ee839fa1eaf391e1651a95f175d256e89781763c70668b"
     },
     {
       "id": "mobile-month-swipe-pull",
@@ -88,7 +88,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "a22a82d5fb49ed9fe5f4f3158171683189357407f5ce5e8ca44d5bba4d334483"
+      "sha256": "e2114489fab7e87d54ff04ad875e580feac2ea74fc5111c130710f5ce6226211"
     },
     {
       "id": "event-details-dark",
@@ -129,7 +129,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "51e8c1b091dfde5717cc5546aaed3315eb044e127c103b2ba0613af578d04429"
+      "sha256": "45147d8a29d99246955a9b2962f208886e18967c6cd6e7647b7558dac81622f4"
     },
     {
       "id": "compact-default-counts",
@@ -217,7 +217,7 @@
   "browserTargets": {
     "query": "baseline-widely-available",
     "effectiveQuery": "Vite 8.3.2: baseline-widely-available",
-    "resolvedAt": "2026-10-10",
+    "resolvedAt": "2026-10-11",
     "dataVersions": {
       "vite": "8.3.2",
       "esbuild": "0.28.2"

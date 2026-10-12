@@ -1,4 +1,5 @@
 import type { LitefoldCalendarError } from "../../errors.js";
+import type { CalendarIconNodes } from "../dom/structure.js";
 import { isAppendableNode, isSameDocumentNode } from "./safety.js";
 import {
 	hasNodeLease,
@@ -13,7 +14,7 @@ interface IntegrationNodeControllerOptions {
 	readonly document: Document;
 	readonly fallbackElement: HTMLElement | null;
 	readonly host: HTMLElement;
-	readonly iconNodes: Readonly<Record<"next" | "previous", Node>>;
+	readonly iconNodes: Readonly<CalendarIconNodes>;
 	readonly reportDetachError: (error: LitefoldCalendarError) => void;
 	readonly toolbarEnd: HTMLElement | null;
 }
@@ -34,6 +35,7 @@ export class IntegrationNodeController {
 		const nodes = [
 			this.options.iconNodes.previous,
 			this.options.iconNodes.next,
+			this.options.iconNodes.today,
 			this.options.toolbarEnd,
 			this.options.fallbackElement
 		].filter((node): node is Node => node !== null);

@@ -29,6 +29,7 @@ In the browser, try these paths:
 4. Compare **Immediate array** with **Controlled PromiseLike**, then complete the pending request to observe their different loading-state behavior.
 5. Choose **Replace event source** to exercise `setEvents()`. Changing **Source timing** restores the original provider with the selected timing.
 6. Change theme or text direction and compare visible output with **Observe state and actions**.
+7. Narrow the calendar to see the optional Today icon, then widen it to restore the text label. Its accessible name and native button behavior stay the same.
 
 ## Patterns worth reusing
 
@@ -38,6 +39,7 @@ In the browser, try these paths:
 - The unified `renderEventOverflow` hook branches on its compact/wide discriminant without measuring the container. It uses package-formatted text or returns application-owned DOM while package CSS chooses the applicable responsive presentation.
 - `weekRowSizing: "content"` and `gridEventPlacement: "bottom"` demonstrate non-default layout choices.  Consult the [layout options](../../docs/api.md#data-date-and-layout-options) rather than copying these choices as defaults.
 - `eventDidMount` returns cleanup that remains safe when its signal aborts.
+- Navigation icon factories accept document-owned content. This example configures `icons.today` with an SVG for narrow calendars while keeping the text label at wider widths; copy the [Today icon recipe](../../docs/integration-guide.md#show-a-today-icon-in-narrow-calendars) to use it independently.
 - `fallbackElement` keeps useful schedule content available until a usable event snapshot commits.
 - The dialog and external live regions remain application-owned; callbacks provide the data and native event context.
 - WebMCP is opt-in through `extensions: [webMcp({ toolNamePrefix: "my-schedule" })]`. Review the [extension API](../../docs/api.md#configure-first-party-extensions) and [WebMCP guide](../../docs/webmcp.md) before exposing private schedule data.

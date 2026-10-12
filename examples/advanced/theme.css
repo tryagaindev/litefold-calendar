@@ -150,6 +150,12 @@
 		transform: scaleX(-1);
 	}
 
+	.my-today-icon {
+		block-size: 1.25rem;
+		display: block;
+		inline-size: 1.25rem;
+	}
+
 	.my-item-type {
 		font-size: 0.75em;
 		font-weight: 700;

@@ -12,7 +12,8 @@ import {
 
 const CALENDAR_ICON_SCHEMA = Object.freeze({
 	next: true,
-	previous: true
+	previous: true,
+	today: true
 } as const satisfies Record<keyof CalendarIcons, true>);
 
 const CALENDAR_ICON_KEY_SET: ReadonlySet<string> = new Set(Object.keys(CALENDAR_ICON_SCHEMA));
@@ -28,11 +29,8 @@ export function resolveCalendarIcons(
 		throw createConfigurationError("icons must be an object when supplied.");
 	}
 	assertKnownConfigurationKeys(icons, CALENDAR_ICON_KEY_SET, "icons");
-	const resolved: Record<"next" | "previous", CalendarIconFactory> = {
-		next: DEFAULT_CALENDAR_ICONS.next,
-		previous: DEFAULT_CALENDAR_ICONS.previous
-	};
-	for (const direction of ["next", "previous"] as const) {
+	const resolved = { ...DEFAULT_CALENDAR_ICONS };
+	for (const direction of ["next", "previous", "today"] as const) {
 		const value = readConfigurationValue(icons, direction, `icons.${direction}`);
 		if (value === undefined) {
 			continue;

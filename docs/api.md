@@ -413,7 +413,7 @@ The [advanced TypeScript example](../examples/advanced/) demonstrates every opti
 | Option | Default | Purpose and lifecycle | Invalid or failed behavior |
 |---|---|---|---|
 | `messages` | Immutable English messages | Partially replaces package-owned labels, errors, and announcements. | A non-object, unknown own string key, supported key with a non-string or whitespace-only value, or unsupported complete `{token}` placeholder is `invalid-configuration`. |
-| `icons` | Text previous/next icons | Partially replaces decorative navigation content through document-aware factories. | An unknown own string key, invalid factory, factory throw, or reused, interactive, parented, cross-document, or otherwise invalid factory result is `invalid-configuration` during construction. If an accepted icon node becomes leased, reparented, or otherwise unavailable before `render()` claims it, `render()` throws recoverable `invalid-state`. |
+| `icons` | Text previous/next icons; Today text | Partially replaces decorative navigation content through document-aware factories. Optional `today` content replaces the Today label below the compact title breakpoint; wider calendars retain the label. | An unknown own string key, invalid factory, factory throw, or reused, interactive, parented, cross-document, or otherwise invalid factory result is `invalid-configuration` during construction. If an accepted icon node becomes leased, reparented, or otherwise unavailable before `render()` claims it, `render()` throws recoverable `invalid-state`. |
 | `toolbarEnd` | No custom toolbar element | Moves one detached or host-descendant, same-document `HTMLElement` after the built-in controls in DOM and focus order. The application retains its state and listeners. | A structurally invalid, cross-document, or externally parented element is `invalid-configuration` during construction. If an accepted element becomes leased, reparented, or otherwise unavailable before `render()` claims it, `render()` throws recoverable `invalid-state`. `destroy()` detaches an unchanged eligible element; the application owns reinsertion. |
 | `fallbackElement` | No fallback element | Exclusively leases a same-document element that is DOM-disjoint from the host—neither element may contain the other. A pending initial promise-like result preserves its original `hidden` state; a direct-array result coordinates it before `render()` returns. Later commits follow the rules below without overwriting an application mutation. A sibling is the normal arrangement. | A structurally invalid, cross-document, host-descendant, or host-ancestor element is `invalid-configuration` during construction. An element that is already leased or otherwise unavailable when `render()` claims integration nodes produces `invalid-state`. Both failures leave it untouched. |
 | `extensions` | Empty array | Configures optional package components.  See [extension configuration and lifecycle](#configure-first-party-extensions). | Invalid values or duplicate IDs throw `invalid-configuration`; runtime failures are isolated diagnostic-only `extension-failed`. |
@@ -713,12 +713,15 @@ Use `getState()` for pull-based inspection and `onStateChange` for synchronous o
 interface CalendarIcons {
 	readonly next: CalendarIconFactory;
 	readonly previous: CalendarIconFactory;
+	readonly today?: CalendarIconFactory;
 }
 
 type CalendarIconFactory = (this: void, document: Document) => Node;
 ```
 
 Each icon factory receives the host's `Document` and must return distinct, detached, appendable, same-document, wholly noninteractive content. Icons are decorative; the native buttons retain localized accessible names.
+
+Supply `icons.today` to show custom decorative content in the Today button below a `24rem` calendar content width. At exactly `24rem` and above, the visible button keeps `messages.today`; omitting the factory keeps that text at every width. The button's accessible name always comes from `messages.today`. The package renders both variants once and CSS selects the visible content without replacing the button, changing focus, rerunning the factory, or measuring the viewport. The Today icon is hidden from accessibility and is not directionally mirrored by the package. Style its output through an application-owned class. See the [Today icon recipe](integration-guide.md#show-a-today-icon-in-narrow-calendars).
 
 `CalendarMessages` contains the following required keys. Supply a partial object through `CalendarOptions.messages`; omitted keys retain their English defaults.
 

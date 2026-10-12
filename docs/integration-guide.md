@@ -423,6 +423,26 @@ const calendar = createCalendar(host, {
 
 The package temporarily mounts the same node while its state, names, labels, and listeners remain application-owned. Keep custom content flexible and keyboard operable. The [API integration-node contract](api.md#application-integration-options) owns mounting and release, [DESIGN.md](../DESIGN.md#responsive-model) owns composition, and the [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior) owns focus order. Do not interleave content through private selectors.
 
+### Show a Today icon in narrow calendars
+
+Provide `icons.today` when a compact calendar should use an icon while wider calendars keep the localized Today label:
+
+```ts
+const calendar = createCalendar(host, {
+	events,
+	icons: {
+		today: (document) => {
+			const icon = document.createElement("span");
+			icon.className = "my-today-icon";
+			icon.textContent = "\u25ce";
+			return icon;
+		}
+	}
+});
+```
+
+The factory may return an SVG instead. Style the returned node through its own class and keep its content noninteractive. The [icon API](api.md#customize-messages-and-icons) owns the width threshold, accessible naming, node validation, and teardown. The package chooses between text and icon using the calendar's container width, so no application resize listener or viewport check is needed.
+
 ## Add metadata-driven visuals without private selectors
 
 Render hooks must synchronously create a new, detached, same-document node for each invocation. Output is wholly noninteractive. Event representations are anchors when `url` is present, buttons when a callback action is available without a URL, and static otherwise. Map metadata through a finite application-owned palette instead of turning arbitrary values into classes or attributes:
