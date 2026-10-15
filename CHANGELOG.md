@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Narrowed screenshot freshness to build and capture dependency closures. Dependency-only Dependabot updates can refresh verified provenance automatically when every PNG is byte-identical; changed screenshots retain human review.
 - Expanded the visual specification for existing typography, count roles, agenda states, loading, and optional event layouts; corrected labels and documentation links.
 - **Migration:** Event titles are no longer trimmed. Any nonempty string of at most 1,024 UTF-16 code units is preserved exactly, including whitespace-only titles; applications are responsible for supplying meaningful visible and accessible text.
 - Reduced the default day padding to `clamp(0.25rem, 0.75cqi, 0.5rem)` for a more compact grid while retaining control target floors and intrinsic content growth.

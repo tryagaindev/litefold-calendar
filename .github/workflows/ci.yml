@@ -6,6 +6,15 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      pr-number:
+        description: Dependabot pull request to verify after a provenance refresh
+        required: false
+        type: string
+      expected-head:
+        description: Exact refreshed pull request head commit
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -19,22 +28,90 @@ env:
   LFC_NPM_VERSION: "12.0.2"
 
 jobs:
+  source:
+    name: Resolve the verified source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      contents: read
+      pull-requests: read
+
+    outputs:
+      checkout-ref: ${{ steps.dispatch.outputs.checkout-ref || steps.default.outputs.checkout-ref }}
+      head: ${{ steps.dispatch.outputs.head || steps.default.outputs.head }}
+      base: ${{ steps.dispatch.outputs.base || steps.default.outputs.base }}
+      pr-number: ${{ steps.dispatch.outputs.pr-number || steps.default.outputs.pr-number }}
+
+    steps:
+      - name: Set up exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.LFC_NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Preserve the ordinary event source
+        id: default
+        if: ${{ github.event_name != 'workflow_dispatch' || (inputs.pr-number == '' && inputs.expected-head == '') }}
+        env:
+          LFC_CHECKOUT_REF: ${{ github.sha }}
+          LFC_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          LFC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          LFC_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          node --input-type=module --eval '
+            import { appendFileSync } from "node:fs";
+            const values = {
+              "checkout-ref": process.env.LFC_CHECKOUT_REF,
+              head: process.env.LFC_HEAD_SHA,
+              base: process.env.LFC_BASE_SHA ?? "",
+              "pr-number": process.env.LFC_PR_NUMBER ?? ""
+            };
+            appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(values).map(([key, value]) => `${key}=${value}\n`).join(""));
+          '
+
+      - name: Check out trusted dispatch validation without persisted credentials
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.pr-number != '' || inputs.expected-head != '') }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Validate the requested Dependabot head before installing dependencies
+        id: dispatch
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.pr-number != '' || inputs.expected-head != '') }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LFC_PR_NUMBER: ${{ inputs.pr-number }}
+          LFC_HEAD_SHA: ${{ inputs.expected-head }}
+        run: node scripts/screenshot-automation.mjs verify-dispatch
+
   verify:
     name: Build, test, and verify package
+    needs: source
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     steps:
+      - name: Reject an invalid source selection
+        env:
+          LFC_SOURCE_RESULT: ${{ needs.source.result }}
+        run: test "${LFC_SOURCE_RESULT}" = success
+
       - name: Check out source without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.sha }}
 
       - name: Reject high-severity dependency regressions
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' || needs.source.outputs.pr-number != '' }}
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
+          base-ref: ${{ needs.source.outputs.base }}
+          head-ref: ${{ needs.source.outputs.head }}
 
       - name: Set up exact Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -53,7 +130,19 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
 
       - name: Run the CI quality gate
+        id: quality-gate
         run: npm run check
+
+      - name: Verify dependency package after a failed quality gate
+        id: dependency-package
+        if: >-
+          ${{
+            failure() && steps.quality-gate.outcome == 'failure' &&
+            github.event_name == 'pull_request' &&
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            github.event.pull_request.head.repo.full_name == github.repository
+          }}
+        run: npm run check:tarball
 
       - name: Upload browser results and failure diagnostics
         if: always()
@@ -64,4 +153,76 @@ jobs:
           path: |
             playwright-report/
             test-results/
+          retention-days: 7
+
+  screenshot-candidate:
+    name: Capture Dependabot screenshot candidates
+    if: >-
+      ${{
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.user.login == 'dependabot[bot]' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      }}
+    runs-on: windows-2025
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      pull-requests: read
+
+    env:
+      LFC_PR_NUMBER: ${{ github.event.pull_request.number }}
+      LFC_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      LFC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+    steps:
+      - name: Check out the exact Dependabot head without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up exact Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.LFC_NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Check whether the dependency diff needs screenshot evidence
+        id: eligibility
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/screenshot-automation.mjs candidate-eligibility
+
+      - name: Set up exact npm
+        if: ${{ steps.eligibility.outputs.eligible == 'true' }}
+        working-directory: ${{ runner.temp }}
+        run: npm install --global "npm@$env:LFC_NPM_VERSION" --ignore-scripts
+
+      - name: Install locked development tooling
+        if: ${{ steps.eligibility.outputs.eligible == 'true' }}
+        run: npm ci --ignore-scripts
+
+      - name: Install pinned capture browser
+        if: ${{ steps.eligibility.outputs.eligible == 'true' }}
+        run: npx playwright install chromium
+
+      - name: Capture candidates for pixel comparison and human review
+        if: ${{ steps.eligibility.outputs.eligible == 'true' }}
+        env:
+          LFC_BROWSER_TARGET_DATE: ${{ steps.eligibility.outputs.capture-date }}
+        run: npm run screenshots:candidate
+
+      - name: Seal candidate provenance
+        if: ${{ steps.eligibility.outputs.eligible == 'true' }}
+        run: node scripts/screenshot-automation.mjs seal-candidate
+
+      - name: Upload screenshot candidates and comparison gallery
+        if: ${{ always() && steps.eligibility.outputs.eligible == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: screenshot-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .cache/screenshots/candidate/
+          include-hidden-files: true
+          if-no-files-found: ignore
           retention-days: 7

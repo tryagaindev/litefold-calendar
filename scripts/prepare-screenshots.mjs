@@ -8,13 +8,15 @@ assertSupportedNode();
 assertPinnedNpm();
 await assertPinnedPlaywright();
 const arguments_ = process.argv.slice(2);
-if (arguments_.some((argument) => argument !== "--force")) {
-	throw new Error("Usage: npm run screenshots:prepare [-- --force]");
+if (arguments_.some((argument) => argument !== "--force" && argument !== "--candidate") ||
+	new Set(arguments_).size !== arguments_.length) {
+	throw new Error("Usage: npm run screenshots:prepare [-- --force] [--candidate]");
 }
 
 const verify = () => run(process.execPath, ["scripts/check-screenshots.mjs"]);
 const result = await prepareScreenshots({
 	force: arguments_.includes("--force"),
+	candidate: arguments_.includes("--candidate"),
 	checkCurrent: async () => {
 		try {
 			await run(process.execPath, ["scripts/check-screenshots.mjs"], { capture: true });
@@ -29,9 +31,12 @@ const result = await prepareScreenshots({
 			throw new Error("Screenshot sources changed during build. Retry after edits settle.");
 		}
 	},
-	capture: () => run(process.execPath, ["scripts/update-screenshots.mjs"]),
+	capture: ({ candidate }) => run(process.execPath,
+		["scripts/update-screenshots.mjs", ...(candidate ? ["--candidate"] : [])]),
 	verify
 });
 console.log(result === "current"
 	? "Screenshot evidence is current; no build or capture was needed."
-	: "Screenshot evidence prepared. Review .cache/screenshots/review/index.html before committing.");
+	: result === "candidate"
+		? "Screenshot candidate prepared. Review .cache/screenshots/candidate/index.html; canonical evidence was preserved."
+		: "Screenshot evidence prepared. Review .cache/screenshots/review/index.html before committing.");

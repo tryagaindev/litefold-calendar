@@ -90,7 +90,23 @@ On a fresh Linux machine, add `--with-deps` to the Playwright install command wh
 
 All captures go into an ignored staging directory first. The updater validates the complete batch, checks that sources did not change during capture, and creates `.cache/screenshots/review/index.html` with before/after images plus `changes.json`. It replaces canonical images only after successful capture and validation, commits the manifest last, and restores originals if replacement fails. Failed capture batches remain under `.cache/screenshots/staging-*` for diagnosis; canonical evidence stays untouched. The replacement is rollback-capable, not a cross-file filesystem transaction, so interruption during replacement requires inspecting the retained backup before retrying.
 
-Open the local review gallery and review changed scenes at native dimensions before staging files. CI runs read-only `check:screenshots`; preparation and capture reject attempts to accept stale evidence in CI. A capture lock prevents simultaneous updaters. After a forcibly terminated updater, verify no capture is still running before removing `.cache/screenshots/capture.lock`.
+Open the local review gallery and review changed scenes at native dimensions before staging files. CI runs read-only `check:screenshots`; preparation and capture reject canonical acceptance in CI. CI can explicitly capture candidates under the automatic dependency workflow below. A capture lock prevents simultaneous updaters. After a forcibly terminated updater, verify no capture is still running before removing `.cache/screenshots/capture.lock`.
+
+### Automatic dependency evidence
+
+For same-repository Dependabot pull requests against `main`, CI checks whether the diff is limited to locked dependencies and existing exact-pinned development dependency versions. Changes to scripts, source, workflows, scenes, or screenshot images are ineligible for automatic acceptance.
+
+The capture job uses the pinned Playwright Chromium binary on `windows-2025`, with the workflow-selected Node and npm versions. It prepares candidates in the ignored `.cache/screenshots/candidate/` directory and uploads a seven-day artifact containing the before/after gallery, PNGs, candidate manifest, and exact run/base/head identities. It never replaces tracked evidence. Contributors can produce the same candidate layout locally:
+
+```shell
+npm run screenshots:candidate
+```
+
+A separate workflow executes only trusted default-branch tooling, checks the originating CI attempt and current pull request, and recomputes the fingerprint without installing or executing changed dependencies. All required checks must pass; a failure solely due to the stale screenshot fingerprint is allowed only after independent tarball verification succeeds. Every candidate PNG must be byte-identical to its canonical image, and effective browser targets and scene definitions must remain unchanged. Only then does the workflow atomically commit refreshed provenance and dispatch CI for that exact new head.
+
+Changed screenshots, browser targets, missing evidence, unexpected files, or platform/font drift require human review. Download the candidate artifact from the CI run and open its `index.html` at native dimensions. Prepare and review canonical captures locally before committing any changed images. Automation does not approve or merge a pull request, and release verification remains read-only.
+
+The workflow becomes available after its trusted implementation is merged into `main`. The dependency branch must include the current base before capture. If main advances, update the branch with main and start fresh CI; rerunning an old attempt retains its old event base. Stale head or base results are discarded. A changed capture environment can require a reviewed baseline refresh rather than automatic provenance acceptance.
 
 Nine scenes capture settled states. The held-pull scene intentionally captures direct manipulation before release so the decorative adjacent-month/year lane can be reviewed; selection timing and post-release browser physics remain browser-test and supported-device concerns. Review every canonical scene after an intentional source-layout change. The four count scenes mount a fixture through the public built-package API, with empty, single-event, and multiple-event days. They retain the example's general palette but remove its independent overflow-theme class, preserving evidence for the contextual count defaults. The advanced scenes exercise the borderless overflow theme.
 
@@ -112,7 +128,7 @@ The screenshot manifest is machine-owned and records, for every scene:
 - Example URL and deterministic setup steps.
 - Viewport and output dimensions.
 - SHA-256 hash.
-- Source fingerprint covering package source, Vite configuration, the advanced route and shared stylesheet, build/server/capture helpers, locked compiler/browser dependencies, and effective JavaScript/CSS browser targets. The preparation scripts and their automatic `pre`/`post` hooks are included. Browser target evidence records its resolution date, but a date change alone does not require recapture. Other example routes, deployment metadata, Playwright's test configuration, root version metadata, and npm scripts outside that capture lifecycle are excluded.
+- Source fingerprint covering package source, Vite configuration, the advanced route and shared stylesheet, build/server/capture helpers, and effective JavaScript/CSS browser targets. Locked development inputs include TypeScript, Vite, esbuild, and Playwright plus their resolved transitive, optional, and present peer dependencies. Unrelated lint/test dependency entries are excluded; a dependency shared with the build/capture graph remains included. The preparation and candidate scripts and their automatic `pre`/`post` hooks are included. Browser target evidence records its resolution date, but a date change alone does not require recapture. Other example routes, deployment metadata, Playwright's test configuration, root version metadata, and npm scripts outside that capture lifecycle are excluded.
 - Exact Node patch used for capture; validation accepts that provenance when it belongs to major version 24, while npm, Playwright, and Chromium remain exact-pinned. The Playwright value is derived from the exact `package.json` development dependency, and preparation rejects a stale local install before capture.
 - Documentation references and exact alt text.
 
