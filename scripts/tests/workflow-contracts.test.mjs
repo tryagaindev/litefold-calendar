@@ -521,7 +521,8 @@ void test("CI dispatch validation resolves an exact Dependabot head before insta
 	assert.doesNotMatch(selection, /npm ci|npm install|npm run|contents: write|id-token: write/u);
 	assert.match(verify, /name: Build, test, and verify package[\s\S]*?needs: source[\s\S]*?if: \$\{\{ always\(\) && !cancelled\(\) \}\}/u);
 	assert.match(verify, /Reject an invalid source selection[\s\S]*?needs\.source\.result[\s\S]*?test "\$\{LFC_SOURCE_RESULT\}" = success[\s\S]*?actions\/checkout@/u);
-	assert.match(verify, /ref: \$\{\{ needs\.source\.outputs\.checkout-ref \}\}[\s\S]*?npm ci --ignore-scripts/u);
+	assert.match(verify, /ref: \$\{\{ github\.sha \}\}[\s\S]*?npm ci --ignore-scripts/u);
+	assert.doesNotMatch(verify, /ref: \$\{\{ needs\.source\.outputs\.checkout-ref \}\}/u);
 	assert.match(verify, /name: Run the CI quality gate\s*\n\s*id: quality-gate\s*\n\s*run: npm run check/u);
 });
 
