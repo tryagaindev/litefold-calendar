@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import {
 	assertSupportedNodeVersion,
@@ -8,8 +8,16 @@ import {
 	SUPPORTED_NODE_RANGE
 } from "./lib/node-version.mjs";
 import { REPOSITORY_ROOT } from "./lib/process.mjs";
-import { browserTargetsFingerprint } from "./lib/browser-targets.mjs";
+import { resolveBrowserTargets } from "./lib/browser-targets.mjs";
 import { parseSemVer } from "./lib/semver.mjs";
+import {
+	fingerprintScreenshotFiles, isScreenshotSourceInput, SCREENSHOT_SOURCE_INPUTS
+} from "./lib/screenshot-fingerprint.mjs";
+
+export {
+	canonicalizeScreenshotSource, captureDependencyVersions, fingerprintScreenshotFiles,
+	isScreenshotSourceFile, isScreenshotSourceInput, SCREENSHOT_SOURCE_INPUTS
+} from "./lib/screenshot-fingerprint.mjs";
 
 export const REQUIRED_NPM_VERSION = "12.0.2";
 const PACKAGE_MANIFEST = JSON.parse(await readFile(resolve(REPOSITORY_ROOT, "package.json"), "utf8"));
@@ -29,53 +37,6 @@ export const EXPECTED_SCENES = Object.freeze([
 	"count-keyboard-focus"
 ]);
 
-const SOURCE_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".mjs", ".ts"]);
-const GENERATED_SOURCE_FILES = new Set([
-	"examples/advanced/main.js",
-	"examples/metadata.json"
-]);
-const SCREENSHOT_SOURCE_DIRECTORIES = new Set(["src"]);
-const SCREENSHOT_PACKAGE_SCRIPTS = Object.freeze([
-	"prebuild:package",
-	"build:package",
-	"postbuild:package",
-	"prebuild:examples:advanced",
-	"build:examples:advanced",
-	"postbuild:examples:advanced",
-	"prescreenshots:update",
-	"screenshots:update",
-	"postscreenshots:update",
-	"prescreenshots:prepare",
-	"screenshots:prepare",
-	"postscreenshots:prepare"
-]);
-export const SCREENSHOT_SOURCE_INPUTS = Object.freeze([
-	"package.json",
-	"package-lock.json",
-	"tsconfig.base.json",
-	"tsconfig.build.json",
-	"vite.config.mjs",
-	"src",
-	"examples/example.css",
-	"examples/advanced/index.html",
-	"examples/advanced/main.ts",
-	"examples/advanced/theme.css",
-	"examples/advanced/tsconfig.json",
-	"scripts/build-advanced-example.mjs",
-	"scripts/build-package.mjs",
-	"scripts/lib/advanced-example-build.mjs",
-	"scripts/lib/browser-targets.mjs",
-	"scripts/lib/node-version.mjs",
-	"scripts/lib/package-entries.mjs",
-	"scripts/lib/process.mjs",
-	"scripts/lib/styles.mjs",
-	"scripts/lib/screenshot-preparation.mjs",
-	"scripts/prepare-screenshots.mjs",
-	"scripts/screenshot-contract.mjs",
-	"scripts/screenshot-scenes.mjs",
-	"scripts/serve-repository.mjs",
-	"scripts/update-screenshots.mjs"
-]);
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 export function assertSupportedNode() {
@@ -128,52 +89,6 @@ function isRepositoryPath(path) {
 	return child !== "" && child !== ".." && !child.startsWith(`..${sep}`) && !isAbsolute(child);
 }
 
-export function isScreenshotSourceFile(repositoryRelativePath) {
-	const normalizedPath = repositoryRelativePath.replaceAll("\\", "/");
-	return !GENERATED_SOURCE_FILES.has(normalizedPath) &&
-		SOURCE_EXTENSIONS.has(extname(normalizedPath).toLowerCase());
-}
-
-export function isScreenshotSourceInput(repositoryRelativePath) {
-	const normalizedPath = repositoryRelativePath.replaceAll("\\", "/");
-	return isScreenshotSourceFile(normalizedPath) && (
-		SCREENSHOT_SOURCE_INPUTS.includes(normalizedPath) ||
-		[...SCREENSHOT_SOURCE_DIRECTORIES].some((directory) =>
-			normalizedPath.startsWith(`${directory}/`)
-		)
-	);
-}
-
-export function canonicalizeScreenshotSource(repositoryRelativePath, contents) {
-	const normalizedPath = repositoryRelativePath.replaceAll("\\", "/");
-	if (normalizedPath !== "package.json" && normalizedPath !== "package-lock.json") {
-		return Buffer.isBuffer(contents) ? contents : Buffer.from(contents);
-	}
-
-	const manifest = JSON.parse(Buffer.isBuffer(contents) ? contents.toString("utf8") : contents);
-	if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) {
-		throw new Error(`${normalizedPath} must contain a JSON object.`);
-	}
-	if (Object.hasOwn(manifest, "version")) {
-		manifest.version = "<root-version>";
-	}
-	if (normalizedPath === "package.json" &&
-		manifest.scripts !== null && typeof manifest.scripts === "object" &&
-		!Array.isArray(manifest.scripts)) {
-		manifest.scripts = Object.fromEntries(SCREENSHOT_PACKAGE_SCRIPTS
-			.filter((name) => Object.hasOwn(manifest.scripts, name))
-			.map((name) => [name, manifest.scripts[name]]));
-	}
-	if (normalizedPath === "package-lock.json" &&
-		manifest.packages?.[""] !== null &&
-		typeof manifest.packages?.[""] === "object" &&
-		!Array.isArray(manifest.packages[""]) &&
-		Object.hasOwn(manifest.packages[""], "version")) {
-		manifest.packages[""].version = "<root-version>";
-	}
-	return Buffer.from(JSON.stringify(manifest));
-}
-
 async function collectFiles(path) {
 	const metadata = await stat(path);
 	if (metadata.isFile()) {
@@ -192,24 +107,15 @@ async function collectFiles(path) {
 }
 
 export async function computeSourceFingerprint() {
-	const files = (await Promise.all(SCREENSHOT_SOURCE_INPUTS.map((input) =>
-		collectFiles(resolve(REPOSITORY_ROOT, input))))).flat().sort();
-	const hash = createHash("sha256");
-	hash.update(browserTargetsFingerprint());
-	hash.update("\0");
-	for (const file of files) {
+	const paths = (await Promise.all(SCREENSHOT_SOURCE_INPUTS.map((input) =>
+		collectFiles(resolve(REPOSITORY_ROOT, input))))).flat();
+	const files = await Promise.all(paths.map(async (file) => {
 		if (!isRepositoryPath(file)) {
 			throw new Error(`Screenshot source escaped the repository: ${file}`);
 		}
-		hash.update(relative(REPOSITORY_ROOT, file).replaceAll("\\", "/"));
-		hash.update("\0");
-		hash.update(canonicalizeScreenshotSource(
-			relative(REPOSITORY_ROOT, file).replaceAll("\\", "/"),
-			await readFile(file)
-		));
-		hash.update("\0");
-	}
-	return hash.digest("hex");
+		return { path: relative(REPOSITORY_ROOT, file).replaceAll("\\", "/"), contents: await readFile(file) };
+	}));
+	return fingerprintScreenshotFiles(files, resolveBrowserTargets());
 }
 
 export async function readScreenshotManifest() {

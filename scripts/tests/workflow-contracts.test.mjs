@@ -483,6 +483,7 @@ void test("all third-party workflow actions are pinned to full commits", async (
 		"ci.yml",
 		"deploy-examples.yml",
 				"publish-nightly.yml",
+		"refresh-screenshot-evidence.yml",
 		"rollback-examples.yml"
 	]) {
 		const source = await workflow(name);
@@ -499,9 +500,63 @@ void test("CI rejects high-severity dependency regressions on pull requests", as
 	assert.match(source, /^permissions:\s*\n\s*contents: read/mu);
 	assert.match(
 		verify,
-		/name: Reject high-severity dependency regressions[\s\S]*?if: \$\{\{ github\.event_name == 'pull_request' \}\}[\s\S]*?uses: actions\/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5\.0\.0[\s\S]*?fail-on-severity: high/u
+		/name: Reject high-severity dependency regressions[\s\S]*?if: \$\{\{ github\.event_name == 'pull_request' \|\| needs\.source\.outputs\.pr-number != '' \}\}[\s\S]*?uses: actions\/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5\.0\.0[\s\S]*?fail-on-severity: high/u
 	);
+	assert.match(verify, /base-ref: \$\{\{ needs\.source\.outputs\.base \}\}/u);
+	assert.match(verify, /head-ref: \$\{\{ needs\.source\.outputs\.head \}\}/u);
 	assert.doesNotMatch(source, /pull-requests: write|issues: write/u);
+});
+
+void test("CI dispatch validation resolves an exact Dependabot head before installing dependencies", async () => {
+	const source = await workflow("ci.yml");
+	const selection = job(source, "source");
+	const verify = job(source, "verify");
+	assert.match(trigger(source), /workflow_dispatch:[\s\S]*?pr-number:[\s\S]*?expected-head:/u);
+	assert.match(selection, /LFC_CHECKOUT_REF: \$\{\{ github\.sha \}\}/u);
+	assert.match(selection, /LFC_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/u);
+	assert.match(selection, /LFC_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/u);
+	assert.match(selection, /Check out trusted dispatch validation[\s\S]*?persist-credentials: false[\s\S]*?ref: \$\{\{ github\.event\.repository\.default_branch \}\}/u);
+	assert.match(selection, /github\.event_name == 'workflow_dispatch' && \(inputs\.pr-number != '' \|\| inputs\.expected-head != ''\)/u);
+	assert.match(selection, /LFC_PR_NUMBER: \$\{\{ inputs\.pr-number \}\}[\s\S]*?LFC_HEAD_SHA: \$\{\{ inputs\.expected-head \}\}[\s\S]*?node scripts\/screenshot-automation\.mjs verify-dispatch/u);
+	assert.doesNotMatch(selection, /npm ci|npm install|npm run|contents: write|id-token: write/u);
+	assert.match(verify, /name: Build, test, and verify package[\s\S]*?needs: source[\s\S]*?if: \$\{\{ always\(\) && !cancelled\(\) \}\}/u);
+	assert.match(verify, /Reject an invalid source selection[\s\S]*?needs\.source\.result[\s\S]*?test "\$\{LFC_SOURCE_RESULT\}" = success[\s\S]*?actions\/checkout@/u);
+	assert.match(verify, /ref: \$\{\{ github\.sha \}\}[\s\S]*?npm ci --ignore-scripts/u);
+	assert.doesNotMatch(verify, /ref: \$\{\{ needs\.source\.outputs\.checkout-ref \}\}/u);
+	assert.match(verify, /name: Run the CI quality gate\s*\n\s*id: quality-gate\s*\n\s*run: npm run check/u);
+});
+
+void test("Dependabot screenshot capture is read-only and retains changed candidates for human review", async () => {
+	const source = await workflow("ci.yml");
+	const candidate = job(source, "screenshot-candidate");
+	const verify = job(source, "verify");
+	assert.match(candidate, /github\.event_name == 'pull_request'[\s\S]*?github\.event\.pull_request\.user\.login == 'dependabot\[bot\]'[\s\S]*?github\.event\.pull_request\.head\.repo\.full_name == github\.repository/u);
+	assert.match(candidate, /runs-on: windows-2025/u);
+	assert.match(candidate, /permissions:\s*\n\s*contents: read\s*\n\s*pull-requests: read/u);
+	assert.doesNotMatch(candidate, /(?:contents|actions|pull-requests|issues|id-token): write|git (?:push|commit)|screenshots:prepare|pull_request_target/u);
+	assert.match(candidate, /persist-credentials: false[\s\S]*?ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/u);
+	assert.match(candidate, /candidate-eligibility[\s\S]*?npm ci --ignore-scripts[\s\S]*?npx playwright install chromium[\s\S]*?npm run screenshots:candidate[\s\S]*?screenshot-automation\.mjs seal-candidate/u);
+	assert.match(candidate, /Capture candidates for pixel comparison and human review[\s\S]*?LFC_BROWSER_TARGET_DATE: \$\{\{ steps\.eligibility\.outputs\.capture-date \}\}[\s\S]*?npm run screenshots:candidate/u);
+	assert.match(candidate, /Upload screenshot candidates and comparison gallery[\s\S]*?always\(\)[\s\S]*?screenshot-candidate-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}[\s\S]*?path: \.cache\/screenshots\/candidate\/[\s\S]*?include-hidden-files: true/u);
+	assert.match(verify, /id: dependency-package[\s\S]*?failure\(\) && steps\.quality-gate\.outcome == 'failure'[\s\S]*?dependabot\[bot\][\s\S]*?head\.repo\.full_name == github\.repository[\s\S]*?run: npm run check:tarball/u);
+});
+
+void test("screenshot promotion consumes a validated artifact without executing pull request code", async () => {
+	const source = await workflow("refresh-screenshot-evidence.yml");
+	const promote = job(source, "promote");
+	assert.match(trigger(source), /workflow_run:[\s\S]*?workflows:\s*\n\s*- CI[\s\S]*?types:\s*\n\s*- completed/u);
+	assert.doesNotMatch(trigger(source), /pull_request(?:_target)?:|workflow_dispatch:|push:/u);
+	assert.match(promote, /workflow_run\.event == 'pull_request'[\s\S]*?workflow_run\.head_repository\.full_name == github\.repository/u);
+	assert.match(promote, /permissions:\s*\n\s*contents: write\s*\n\s*pull-requests: read\s*\n\s*actions: write/u);
+	assert.doesNotMatch(source, /id-token: write|pull-requests: write|issues: write|secrets\.|npm (?:ci|install|run|publish)|npx |git push/u);
+	assert.equal(occurrences(promote, /actions\/checkout@/gu), 1);
+	assert.match(promote, /Check out trusted promotion code[\s\S]*?persist-credentials: false[\s\S]*?ref: \$\{\{ github\.sha \}\}/u);
+	assert.doesNotMatch(promote, /ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/u);
+	assert.match(promote, /LFC_UPSTREAM_RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/u);
+	assert.match(promote, /LFC_UPSTREAM_RUN_ATTEMPT: \$\{\{ github\.event\.workflow_run\.run_attempt \}\}/u);
+	assert.match(promote, /LFC_UPSTREAM_HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/u);
+	assert.match(promote, /screenshot-automation\.mjs promotion-context[\s\S]*?steps\.context\.outputs\.eligible == 'true'[\s\S]*?actions\/download-artifact@[0-9a-f]{40}[\s\S]*?run-id: \$\{\{ github\.event\.workflow_run\.id \}\}[\s\S]*?artifact-ids: \$\{\{ steps\.context\.outputs\.artifact-id \}\}[\s\S]*?screenshot-automation\.mjs promote/u);
+	assert.match(promote, /LFC_CANDIDATE_DIRECTORY: \$\{\{ runner\.temp \}\}\/screenshot-candidate/u);
 });
 
 void test("hosted gates run Chromium and WebKit while local Playwright retains Firefox", async () => {
@@ -596,9 +651,10 @@ void test("Windows outer-sandbox mode changes only Firefox launch options", {
 
 void test("workflow artifacts use bounded purpose-specific retention", async () => {
 	const expectations = new Map([
-		["ci.yml", [7]],
+		["ci.yml", [7, 7]],
 		["deploy-examples.yml", [1, 1]],
 		["publish-nightly.yml", [7, 30, 30]],
+		["refresh-screenshot-evidence.yml", []],
 		["rollback-examples.yml", [1]]
 	]);
 	for (const [name, expected] of expectations) {
@@ -612,6 +668,7 @@ void test("artifact downloads use the official Node 24 action", async () => {
 	const workflows = [
 		"deploy-examples.yml",
 				"publish-nightly.yml",
+		"refresh-screenshot-evidence.yml",
 		"rollback-examples.yml"
 	];
 	const expected =
@@ -624,7 +681,7 @@ void test("artifact downloads use the official Node 24 action", async () => {
 			assert.equal(match[1], expected, name);
 		}
 	}
-	assert.equal(downloads, 5);
+	assert.equal(downloads, 6);
 });
 
 void test("workflow dependency caches stay disabled", async () => {
@@ -632,6 +689,7 @@ void test("workflow dependency caches stay disabled", async () => {
 		"ci.yml",
 		"deploy-examples.yml",
 				"publish-nightly.yml",
+		"refresh-screenshot-evidence.yml",
 		"rollback-examples.yml"
 	]) {
 		const source = await workflow(name);

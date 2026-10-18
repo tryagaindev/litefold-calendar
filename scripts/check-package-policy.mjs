@@ -1590,6 +1590,10 @@ await inspectWorkflowTree({
         LFC_NPM_VERSION:
             String(referenceNpmVersion)
     },
+    ".github/workflows/refresh-screenshot-evidence.yml": {
+        LFC_NODE_VERSION:
+        WORKFLOW_NODE_VERSION
+    },
     ".github/workflows/rollback-examples.yml": {
         LFC_NODE_VERSION:
         WORKFLOW_NODE_VERSION,
