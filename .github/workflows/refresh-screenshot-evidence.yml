@@ -40,7 +40,6 @@ jobs:
       LFC_UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
       LFC_UPSTREAM_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
       LFC_UPSTREAM_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-      LFC_CANDIDATE_DIRECTORY: ${{ runner.temp }}/screenshot-candidate
 
     steps:
       - name: Check out trusted promotion code without persisted credentials
@@ -72,4 +71,6 @@ jobs:
 
       - name: Refresh identical evidence and verify the new exact head
         if: ${{ steps.context.outputs.eligible == 'true' }}
+        env:
+          LFC_CANDIDATE_DIRECTORY: ${{ runner.temp }}/screenshot-candidate
         run: node scripts/screenshot-automation.mjs promote
