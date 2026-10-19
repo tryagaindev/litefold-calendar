@@ -556,7 +556,11 @@ void test("screenshot promotion consumes a validated artifact without executing 
 	assert.match(promote, /LFC_UPSTREAM_RUN_ATTEMPT: \$\{\{ github\.event\.workflow_run\.run_attempt \}\}/u);
 	assert.match(promote, /LFC_UPSTREAM_HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/u);
 	assert.match(promote, /screenshot-automation\.mjs promotion-context[\s\S]*?steps\.context\.outputs\.eligible == 'true'[\s\S]*?actions\/download-artifact@[0-9a-f]{40}[\s\S]*?run-id: \$\{\{ github\.event\.workflow_run\.id \}\}[\s\S]*?artifact-ids: \$\{\{ steps\.context\.outputs\.artifact-id \}\}[\s\S]*?screenshot-automation\.mjs promote/u);
-	assert.match(promote, /LFC_CANDIDATE_DIRECTORY: \$\{\{ runner\.temp \}\}\/screenshot-candidate/u);
+	const stepBoundary = promote.indexOf("\n    steps:");
+	assert.ok(stepBoundary > 0, "Promotion must declare its steps.");
+	assert.doesNotMatch(promote.slice(0, stepBoundary), /\$\{\{\s*runner\./u,
+		"The runner context is unavailable in job-level environment variables.");
+	assert.match(promote, /Refresh identical evidence and verify the new exact head[\s\S]*?\n {8}env:\s*\n {10}LFC_CANDIDATE_DIRECTORY: \$\{\{ runner\.temp \}\}\/screenshot-candidate\s*\n {8}run: node scripts\/screenshot-automation\.mjs promote/u);
 });
 
 void test("hosted gates run Chromium and WebKit while local Playwright retains Firefox", async () => {
