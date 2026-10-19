@@ -5,10 +5,12 @@ import {
 	createEventRepresentation,
 	type EventRepresentationInput
 } from "../src/internal/dom/event-representation.js";
+import { CalendarEventText } from "../src/internal/dom/event-text.js";
 import {
 	normalizeCalendarEvents,
 	type NormalizedCalendarEvent
 } from "../src/internal/domain/event-normalization.js";
+import { DEFAULT_CALENDAR_MESSAGES } from "../src/messages.js";
 import type { CalendarEventInput, CalendarEventSurface, CalendarEventTimeDisplay } from "../src/types.js";
 import { createDom } from "./helpers/dom.js";
 
@@ -88,6 +90,65 @@ void test("event representations select link, button, and static roots consisten
 		);
 		assert.equal(staticRepresentation.elements.action, null);
 		assert.equal(staticRepresentation.elements.root.querySelector("a, button"), null);
+	}
+
+	dom.window.close();
+});
+
+void test("grid action names follow time and title order while retaining occurrence date context", () => {
+	const dom = createDom();
+	const event = normalizeEvent({ id: "planning", start: "2026-07-14T09:00", title: "Planning" });
+	const text = new CalendarEventText(
+		"en-US",
+		new Intl.DateTimeFormat("en-US", { dateStyle: "full", timeZone: "UTC" }),
+		DEFAULT_CALENDAR_MESSAGES,
+		new Intl.NumberFormat("en-US")
+	);
+	const fullDateText = "Tuesday, July 14, 2026";
+	const cases = [
+		{ expectedLabel: "9:00 AM, Planning, Tuesday, July 14, 2026", timeText: "9:00 AM" },
+		{ expectedLabel: "All day, Planning, Tuesday, July 14, 2026", timeText: "All day" },
+		{ expectedLabel: "Planning, Tuesday, July 14, 2026", timeText: "" }
+	];
+
+	for (const { expectedLabel, timeText } of cases) {
+		for (const timeDisplay of ["all", "none"] as const) {
+			const { elements } = createEventRepresentation({
+				accessibleLabel: text.getEventAccessibleLabel(event, timeText, fullDateText),
+				dateString: "2026-07-14",
+				document: dom.window.document,
+				event,
+				hasApplicationAction: true,
+				surface: "grid-summary",
+				timeDisplay,
+				timeText
+			});
+
+			assert.equal(elements.action?.getAttribute("aria-label"), expectedLabel);
+			assert.equal(elements.time.textContent, timeText);
+			assert.equal(elements.time.getAttribute("aria-hidden"), null);
+			assert.equal(elements.time.classList.contains("lfc-visually-hidden"), timeDisplay === "none");
+		}
+	}
+
+	dom.window.close();
+});
+
+void test("event slots retain word boundaries when visual layout gaps are unavailable", () => {
+	const dom = createDom();
+	const event = normalizeEvent({ id: "planning", start: "2026-07-14T09:00", title: "Planning" });
+
+	for (const surface of ["grid-summary", "agenda"] as const) {
+		const { elements, slots } = represent(dom.window.document, event, surface, true, "all");
+		elements.marker.textContent = "M";
+		slots.leadingContent.textContent = "Milestone";
+		elements.details.textContent = "Confirmed";
+		elements.trailing.textContent = "View details";
+
+		assert.equal(
+			elements.root.textContent?.replace(/\s+/gu, " ").trim(),
+			"M Milestone 9:00 AM Planning Confirmed View details"
+		);
 	}
 
 	dom.window.close();

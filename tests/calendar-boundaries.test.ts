@@ -494,7 +494,7 @@ void test("the month title opens a localized native popover and jumps with day c
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-full")?.textContent, "July 2026");
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Jul 2026");
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.getAttribute("aria-hidden"), "true");
-	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently July 2026");
+	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently July 2026, Jul 2026");
 	assert.equal(picker.popover.getAttribute("popover"), "auto");
 	assert.equal(picker.popover.getAttribute("role"), "dialog");
 	assert.equal(getAccessibleName(picker.popover), "Jump to reporting month and year");
@@ -584,7 +584,7 @@ void test("the month title opens a localized native popover and jumps with day c
 	assert.equal(dom.window.document.activeElement, picker.trigger);
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-full")?.textContent, "February 2027");
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Feb 2027");
-	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently February 2027");
+	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently February 2027, Feb 2027");
 });
 
 void test("Escape restores the month-title trigger while light-dismiss preserves outside focus", async (context) => {

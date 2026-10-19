@@ -81,8 +81,8 @@ test.describe("screen-reader-facing browser semantics", () => {
 			- group "Schedule navigation":
 			  - button "Earlier month"
 			  - button "Later month"
-			  - heading "Choose schedule month and year, currently August 2026" [level=3]:
-			    - button "Choose schedule month and year, currently August 2026": August 2026
+			  - heading "Choose schedule month and year, currently August 2026, Aug 2026" [level=3]:
+			    - button "Choose schedule month and year, currently August 2026, Aug 2026": August 2026
 			  - button "Today"
 		`);
 
@@ -93,7 +93,7 @@ test.describe("screen-reader-facing browser semantics", () => {
 		await expect(selectedDay).toMatchAriaSnapshot(`
 			- gridcell [selected]:
 			  - button "Thursday, August 6, 2026, 53 items"
-			  - button "View 53 items for Thursday, August 6, 2026, 51 additional"
+			  - button "View 53 items for Thursday, August 6, 2026, 51 additional in agenda"
 		`);
 		await expect(selectedDay.locator(":scope > .lfc-calendar-day-button"))
 			.toHaveAttribute("aria-current", "date");
@@ -107,7 +107,7 @@ test.describe("screen-reader-facing browser semantics", () => {
 			  - heading "Schedule for Thursday, August 6, 2026" [level=4]
 			  - list:
 			    - listitem:
-			      - 'button "Any time, milestone: Release window, In progress. View details."'
+			      - button "milestone, Any time, Release window, In progress, View details."
 			  - button "Load 10 more"
 			  - paragraph: Showing 10 of 53 items
 		`);
@@ -121,6 +121,65 @@ test.describe("screen-reader-facing browser semantics", () => {
 		await expect(assertiveLive).toHaveAttribute("aria-atomic", "true");
 		await expect(assertiveLive).toHaveAttribute("aria-live", "assertive");
 		await expect(assertiveLive).toMatchAriaSnapshot("- alert");
+	});
+
+	test("keeps custom event labels in visible order before supplemental time and date context", async ({ page }) => {
+		await page.setViewportSize({ height: 900, width: 1440 });
+		await expectExampleReady(page, "/examples/advanced/");
+		const grid = page.getByRole("grid", { name: "August 2026" });
+
+		for (const event of [
+			{
+				date: "2026-08-05",
+				id: "milestone:3",
+				name: "milestone, Release window, In progress, Any time, Wednesday, August 5, 2026.",
+				status: "In progress",
+				title: "Release window",
+				time: "Any time"
+			},
+			{
+				date: "2026-08-07",
+				id: "appointment:45",
+				name: "appointment, Follow-up call, Confirmed, 10:30 AM, Friday, August 7, 2026.",
+				status: "Confirmed",
+				title: "Follow-up call",
+				time: "10:30 AM"
+			}
+		]) {
+			const action = grid.locator(`[data-lfc-event-id="${event.id}"][data-lfc-date="${event.date}"]`);
+			await expect(action).toBeVisible();
+			await expect(action.locator(".my-item-type")).toBeVisible();
+			await expect(action.locator(".lfc-calendar-event-title")).toHaveText(event.title);
+			await expect(action.locator(".my-status")).toHaveText(event.status);
+			await expect(action.locator("time")).toHaveText(event.time);
+			await expect(action.locator("time")).toHaveClass(/lfc-visually-hidden/u);
+			await expect(action.locator(".my-event-marker")).toHaveAttribute("aria-hidden", "true");
+			await expect(action).toHaveAccessibleName(event.name);
+		}
+
+		const agenda = page.getByRole("region", {
+			exact: true,
+			name: "Schedule for Thursday, August 6, 2026"
+		});
+		for (const event of [
+			{
+				id: "milestone:3",
+				name: "milestone, Any time, Release window, In progress, View details."
+			},
+			{
+				id: "appointment:41",
+				name: "appointment, 11:38 AM, Design review, Confirmed, View details."
+			}
+		]) {
+			const action = agenda.locator(`[data-lfc-event-id="${event.id}"]`);
+			await expect(action.locator(".my-item-type")).toBeVisible();
+			await expect(action.locator("time")).toBeVisible();
+			await expect(action.locator(".lfc-calendar-event-title")).toBeVisible();
+			await expect(action.locator(".my-status")).toBeVisible();
+			await expect(action.locator(".my-action-hint")).toBeVisible();
+			await expect(action.locator(".my-event-marker")).toHaveAttribute("aria-hidden", "true");
+			await expect(action).toHaveAccessibleName(event.name);
+		}
 	});
 
 	test("keyboard navigation keeps current date, focus, and selection as distinct accessible states", async ({ page }) => {
@@ -155,9 +214,9 @@ test.describe("screen-reader-facing browser semantics", () => {
 			  - heading "Schedule for Friday, August 7, 2026" [level=4]
 			  - list:
 			    - listitem:
-			      - 'button "Any time, milestone: Release window, In progress. View details."'
+			      - button "milestone, Any time, Release window, In progress, View details."
 			    - listitem:
-			      - 'button "10:30 AM, appointment: Follow-up call, Confirmed. View details."'
+			      - button "appointment, 10:30 AM, Follow-up call, Confirmed, View details."
 		`);
 		await expectOnlyOneGridTabStop(grid);
 	});
