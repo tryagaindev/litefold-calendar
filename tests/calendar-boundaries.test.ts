@@ -815,7 +815,7 @@ void test("package-owned navigation controls ignore reentrant and stale lifecycl
 	assert.deepEqual(uncaughtErrors, []);
 });
 
-void test("a fatal render cancels pending native pager navigation and disables retained controls", async (context) => {
+void test("a fatal render cancels pending native pager navigation and focuses its visible fallback", async (context) => {
 	const { dom, host } = setupDom(context);
 	const uncaughtErrors: unknown[] = [];
 	const fatalErrors: LitefoldCalendarError[] = [];
@@ -835,7 +835,6 @@ void test("a fatal render cancels pending native pager navigation and disables r
 		},
 		onError: (error) => {
 			fatalErrors.push(error);
-			return "handled";
 		}
 	});
 	calendar.render();
@@ -855,7 +854,12 @@ void test("a fatal render cancels pending native pager navigation and disables r
 	assert.equal(pager.viewport.scrollLeft, pager.centerOffset);
 	assert.equal(isPopoverOpen(picker.popover), false);
 	assert.equal(picker.trigger.getAttribute("aria-disabled"), "true");
-	assert.equal(dom.window.document.activeElement, picker.trigger);
+	const panel = host.querySelector<HTMLDivElement>(".lfc-calendar-status-panel");
+	const panelTitle = host.querySelector<HTMLHeadingElement>(".lfc-calendar-status-title");
+	assert.ok(panel);
+	assert.ok(panelTitle);
+	assert.equal(panel.hidden, false);
+	assert.equal(dom.window.document.activeElement, panelTitle);
 	dispatchPagerEvent(dom, pager, "scrollend");
 	for (const control of retainedNavigation) {
 		dispatchClick(dom, control);
