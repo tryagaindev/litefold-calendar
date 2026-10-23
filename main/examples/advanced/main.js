@@ -10,10 +10,12 @@ const ITEM_TYPE_LABELS = Object.freeze({
     milestone: "Milestone",
     task: "Task"
 });
-const ITEM_TYPE_MARKERS = Object.freeze({
-    appointment: "A",
-    milestone: "M"
+const FULL_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+    calendar: "gregory",
+    dateStyle: "full",
+    timeZone: "UTC"
 });
+const OVERFLOW_DESTINATION = "in agenda";
 const ADVANCED_MESSAGES = Object.freeze({
     actionErrorMessage: "The requested schedule action could not be completed.",
     actionErrorTitle: "Schedule action failed",
@@ -32,8 +34,8 @@ const ADVANCED_MESSAGES = Object.freeze({
     gridEventInstructions: "Use arrow keys to move between dates and Enter or Space to select. Press F2 on a date to move to its visible event actions; use Up and Down Arrow between actions, and Escape or F2 to return.",
     gridEventCount: "{count} {eventLabel}",
     gridEventCountLabel: "View {count} {eventLabel} for {date}",
-    gridMore: "{count} additional",
-    gridMoreLabel: "View {count} more {eventLabel} for {date}",
+    gridMore: `{count} additional ${OVERFLOW_DESTINATION}`,
+    gridMoreLabel: `View {count} additional ${OVERFLOW_DESTINATION} for {date}`,
     internalErrorMessage: "The schedule encountered an unexpected error.",
     internalErrorTitle: "Schedule unavailable",
     jump: "Show month",
@@ -57,7 +59,6 @@ const REPLACEMENT_EVENTS = Object.freeze([
         accentColor: "#805FC0",
         id: "dynamic-replacement",
         metadata: Object.freeze({
-            accessibleLabel: "Dynamically replaced schedule item",
             actionLabel: "Open dynamically replaced schedule item",
             itemType: "milestone",
             statusLabel: "Updated"
@@ -234,7 +235,6 @@ function toAccentColor(value) {
 function adaptScheduleRecord(item) {
     const accentColor = toAccentColor(item.accentCandidate);
     const metadata = Object.freeze({
-        accessibleLabel: `${item.itemType}: ${item.title}${item.statusLabel === null ? "" : `, ${item.statusLabel}`}`,
         actionLabel: item.title,
         itemType: item.itemType,
         ...(item.statusLabel === null ? {} : { statusLabel: item.statusLabel })
@@ -449,7 +449,7 @@ const advancedRenderHooks = Object.freeze({
             elements.cell.classList.remove("my-today-hook");
         };
     },
-    eventDidMount: ({ elements, event, signal, surface, timeText }) => {
+    eventDidMount: ({ dateString, elements, event, signal, surface, timeText }) => {
         const metadata = event.metadata;
         if (metadata === undefined) {
             return;
@@ -460,9 +460,21 @@ const advancedRenderHooks = Object.freeze({
         elements.root.setAttribute("data-test-event-id", event.id);
         elements.root.setAttribute("data-test-event-surface", surface);
         elements.root.setAttribute("data-test-time-text", timeText);
-        if (surface === "agenda" && elements.action !== null) {
-            const accessibleTime = timeText === "" ? "" : `${timeText}, `;
-            elements.action.setAttribute("aria-label", `${accessibleTime}${metadata.accessibleLabel}. View details.`);
+        if (elements.action !== null) {
+            //Visible words stay together in slot order; hidden time and date add context afterward.
+            const visibleTime = !elements.time.classList.contains("lfc-visually-hidden");
+            const label = [
+                metadata.itemType,
+                visibleTime ? timeText : "",
+                event.title,
+                metadata.statusLabel,
+                surface === "agenda" ? "View details" : "",
+                visibleTime ? "" : timeText,
+                surface === "grid-summary"
+                    ? FULL_DATE_FORMATTER.format(new Date(`${dateString}T00:00:00Z`))
+                    : ""
+            ].filter((part) => part !== undefined && part !== "").join(", ");
+            elements.action.setAttribute("aria-label", `${label}.`);
         }
         //Cleanup may run from the returned callback or the hook-scoped abort signal.
         let cleaned = false;
@@ -515,7 +527,6 @@ const advancedRenderHooks = Object.freeze({
         const marker = ownerDocument.createElement("span");
         marker.className = `my-event-marker my-event-marker-${itemType}`;
         marker.setAttribute("aria-hidden", "true");
-        marker.textContent = ITEM_TYPE_MARKERS[itemType];
         return marker;
     },
     renderEventTrailing: ({ document: ownerDocument, surface }) => {
@@ -546,11 +557,15 @@ const advancedRenderHooks = Object.freeze({
         //The wide branch demonstrates structured DOM while retaining the localized package text.
         const defaultText = ownerDocument.createElement("strong");
         defaultText.className = "my-event-overflow-wide-count";
-        defaultText.textContent = text;
+        //The suffix is part of our gridMore message, so the native action name includes it too.
+        const countText = display === "overflow"
+            ? text.slice(0, -(` ${OVERFLOW_DESTINATION}`).length)
+            : text;
+        defaultText.textContent = countText;
         const destination = ownerDocument.createElement("span");
         destination.className = "my-event-overflow-wide-destination";
-        destination.textContent = "in agenda";
-        content.append(defaultText, destination);
+        destination.textContent = display === "overflow" ? OVERFLOW_DESTINATION : "";
+        content.append(defaultText, " ", destination);
         return content;
     }
 });

@@ -1968,9 +1968,10 @@ var CalendarMonthTitleRenderer = class {
 		const date = toUtcDate(month);
 		const fullTitle = this.fullFormatter.format(date);
 		const compactTitle = this.compactFormatter.format(date);
+		const triggerLabel = formatCalendarMessage(this.triggerLabelTemplate, { date: fullTitle });
 		setTextContent(elements.titleLabelFull, fullTitle);
 		setTextContent(elements.titleLabelCompact, compactTitle);
-		setAccessibleLabel(elements.titleButton, formatCalendarMessage(this.triggerLabelTemplate, { date: fullTitle }));
+		setAccessibleLabel(elements.titleButton, fullTitle === compactTitle ? triggerLabel : `${triggerLabel}, ${compactTitle}`);
 	}
 };
 function setAccessibleLabel(element, value) {
@@ -2109,7 +2110,7 @@ function createEventRepresentation(input) {
 	marker.className = "lfc-calendar-event-marker";
 	const leadingContent = input.document.createElement("span");
 	leadingContent.className = "lfc-calendar-event-leading-content";
-	leading.append(marker, leadingContent);
+	leading.append(marker, " ", leadingContent);
 	const time = input.document.createElement("time");
 	Object.assign(time, {
 		className: "lfc-calendar-time",
@@ -2128,7 +2129,7 @@ function createEventRepresentation(input) {
 	details.className = "lfc-calendar-event-details";
 	const trailing = input.document.createElement("span");
 	trailing.className = "lfc-calendar-event-trailing";
-	root.append(leading, time, title, details, trailing);
+	root.append(leading, " ", time, " ", title, " ", details, " ", trailing);
 	return Object.freeze({
 		elements: Object.freeze({
 			action,
@@ -2177,8 +2178,8 @@ var CalendarEventText = class {
 	}
 	getEventAccessibleLabel(event, timeText, fullDateText) {
 		return [
-			event.event.title,
 			timeText,
+			event.event.title,
 			fullDateText
 		].filter((part) => part.length > 0).join(", ");
 	}

@@ -200,8 +200,18 @@
 		color: var(--my-appointment-color);
 	}
 
+	.my-event-marker-appointment::before {
+		content: "A";
+		content: "A" / "";
+	}
+
 	.my-event-marker-milestone {
 		color: var(--my-milestone-color);
+	}
+
+	.my-event-marker-milestone::before {
+		content: "M";
+		content: "M" / "";
 	}
 
 	.my-event-overflow-compact {
