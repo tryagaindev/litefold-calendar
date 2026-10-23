@@ -54,11 +54,12 @@ export class CalendarMonthTitleRenderer {
 		const date = toUtcDate(month);
 		const fullTitle = this.fullFormatter.format(date);
 		const compactTitle = this.compactFormatter.format(date);
+		const triggerLabel = formatCalendarMessage(this.triggerLabelTemplate, { date: fullTitle });
 		setTextContent(elements.titleLabelFull, fullTitle);
 		setTextContent(elements.titleLabelCompact, compactTitle);
 		setAccessibleLabel(
 			elements.titleButton,
-			formatCalendarMessage(this.triggerLabelTemplate, { date: fullTitle })
+			fullTitle === compactTitle ? triggerLabel : `${triggerLabel}, ${compactTitle}`
 		);
 	}
 }

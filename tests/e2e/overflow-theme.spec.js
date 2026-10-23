@@ -21,9 +21,31 @@ async function mount(page, settings = {}) {
 		.reset { ${TOKENS.map((name) => `--lfc-grid-overflow-${name}: initial;`).join(" ")} }
 		.explicit-content { font-size: 17px; color: rgb(100, 20, 40); }
 	` }));
-	await page.evaluate(async (settings) => {
+	const nativeSelectViolations = await page.evaluate(async (settings) => {
 		window.themeViolations = [];
-		document.addEventListener("securitypolicyviolation", (event) => { window.themeViolations.push(event.violatedDirective); });
+		document.addEventListener("securitypolicyviolation", (event) => {
+			window.themeViolations.push({
+				blockedURI: event.blockedURI,
+				directive: event.violatedDirective,
+				element: event.target instanceof Element ? event.target.localName : null,
+				style: event.target instanceof Element ? event.target.getAttribute("style") : null
+			});
+		});
+		//WebKit 27.2 reports its own select styling: https://github.com/microsoft/playwright/issues/43497.
+		//Measure a plain native control before library code; all additional CSP events must still fail.
+		const nativeSelect = document.createElement("select");
+		nativeSelect.hidden = true;
+		document.body.append(nativeSelect);
+		await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+		window.themeNativeSelectViolations = window.themeViolations.splice(0);
+		nativeSelect.remove();
+		window.themeStyleMutations = [];
+		new MutationObserver((records) => {
+			window.themeStyleMutations.push(...records.map((record) => ({
+				element: record.target.localName,
+				previousValue: record.oldValue
+			})));
+		}).observe(document.body, { attributeFilter: ["style"], attributeOldValue: true, attributes: true, subtree: true });
 		await new Promise((resolve, reject) => {
 			const link = document.createElement("link");
 			link.rel = "stylesheet"; link.href = "/overflow-theme.css";
@@ -36,27 +58,61 @@ async function mount(page, settings = {}) {
 		fixture.calendar = createCalendar(host, {
 			initialDate: "2026-07-14", now: () => new Date("2026-07-14T12:00:00Z"),
 			gridEventDisplay: settings.display ?? { compact: "count", wide: "count" },
+			messages: settings.custom === "long" ? {
+				gridEventCount: "123456789012345678901234567890",
+				gridEventCountLabel: "123456789012345678901234567890, {count} events for {date}",
+				gridMore: "123456789012345678901234567890",
+				gridMoreLabel: "123456789012345678901234567890, {count} additional events for {date}"
+			} : {},
 			weekRowSizing: settings.rows ?? "equal", maxGridEventsPerDay: settings.limit ?? 1, agendaPageSize: 10,
 			events: () => {
 				fixture.requests += 1;
 				return Array.from({ length: 12 }, (_, i) => ({ id: String(i), start: "2026-07-14", title: `Event ${String(i)}` }));
 			},
 			onEventActivate: () => {}, onError: (error) => { fixture.errors.push(error.code); },
-			renderHooks: [{ id: "overflow-theme-fixture", renderEventOverflow: () => {
+			renderHooks: [{ id: "overflow-theme-fixture", renderEventOverflow: ({ text }) => {
 				fixture.hooks += 1;
 				if (settings.suppressOverflow) { return null; }
 				if (!settings.custom) { return undefined; }
 				const content = document.createElement("span");
 				content.className = settings.custom === "explicit" ? "explicit-content" : "inherited-content";
-				content.textContent = settings.custom === "long" ? "123456789012345678901234567890" : "Custom count";
+				content.textContent = text;
 				return content;
 			} }]
 		});
 		window.themeFixture = fixture;
 		fixture.calendar.render();
+		return window.themeNativeSelectViolations;
 	}, settings);
+	const nativeSelectReport = { blockedURI: "inline", directive: "style-src-attr", element: "select", style: null };
+	const browserName = page.context().browser().browserType().name();
+	if (browserName === "webkit") {
+		expect([[], [nativeSelectReport]]).toContainEqual(nativeSelectViolations);
+	} else {
+		expect(nativeSelectViolations).toEqual([]);
+	}
 	await expect.poll(() => page.evaluate(() => window.themeFixture.calendar.getState().phase)).toBe("ready");
 }
+
+async function expectNoAuthoredInlineStyles(page) {
+	expect(await page.evaluate(() => window.themeStyleMutations)).toEqual([]);
+	expect(await page.locator("[data-my-calendar] [style]").count()).toBe(0);
+	expect(await page.evaluate(() => window.themeViolations))
+		.toEqual(await page.evaluate(() => window.themeNativeSelectViolations));
+}
+
+test("CSP checks detect authored styles even when the attribute is removed", async ({ page }) => {
+	await mount(page);
+	await expectNoAuthoredInlineStyles(page);
+	await page.locator(ACTION).evaluate((action) => {
+		action.setAttribute("style", "color: red");
+		action.removeAttribute("style");
+	});
+	await expect.poll(() => page.evaluate(() => window.themeStyleMutations.length)).toBe(2);
+	await expect.poll(() => page.evaluate(() => window.themeViolations.length))
+		.toBe(await page.evaluate(() => window.themeNativeSelectViolations.length + 1));
+	await expect(page.locator(ACTION)).not.toHaveAttribute("style");
+});
 
 async function styles(locator) {
 	return locator.evaluate((element) => {
@@ -90,8 +146,7 @@ for (const width of [320, 800]) {
 		expect(await styles(pagination)).toEqual(before.more);
 		await expect(page.locator(`${ACTION} :is(button,a,[tabindex])`)).toHaveCount(0);
 		await expect(page.locator(ACTION)).toHaveCount(1);
-		expect(await page.locator("[data-my-calendar] [style]").count()).toBe(0);
-		expect(await page.evaluate(() => window.themeViolations)).toEqual([]);
+		await expectNoAuthoredInlineStyles(page);
 		await theme(page, "reset");
 		expect(await styles(page.locator(ACTION))).toEqual(before.action);
 	});
@@ -152,7 +207,7 @@ test("borderless custom overflow content keeps hover, focus and keyboard activat
 	await expect(button).toBeFocused();
 	await button.press("Enter");
 	await expect(page.locator(".lfc-calendar-agenda-title")).toBeFocused();
-	expect(await page.evaluate(() => window.themeViolations)).toEqual([]);
+	await expectNoAuthoredInlineStyles(page);
 });
 
 for (const display of [{ compact: "count", wide: "events" }, { compact: "events", wide: "count" }, { compact: "events", wide: "events" }]) {

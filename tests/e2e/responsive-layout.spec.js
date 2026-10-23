@@ -19,13 +19,13 @@ const WEEK_LAYOUT_FIXTURE = "#my-week-layout-fixture";
 const WEEK_LAYOUT_TARGET_DATE = "2026-08-06";
 const SEPTEMBER_TITLE = "September 2026";
 const SEPTEMBER_TITLE_BUTTON_LABEL =
-	"Choose schedule month and year, currently September 2026";
+	"Choose schedule month and year, currently September 2026, Sep 2026";
 const LONG_MONTH_TITLE =
 	"September in the exceptionally verbose regional calendar for the year 2026";
 const LONG_COMPACT_MONTH_TITLE =
 	"Sep in the exceptionally verbose regional calendar 2026";
 const LONG_MONTH_TITLE_BUTTON_LABEL =
-	`Choose schedule month and year, currently ${LONG_MONTH_TITLE}`;
+	`Choose schedule month and year, currently ${LONG_MONTH_TITLE}, ${LONG_COMPACT_MONTH_TITLE}`;
 const EXACT_HOST_WIDTH_CASES = Object.freeze([
 	{ abbreviatedMonthLabels: true, agendaReflows: true, compactEvents: true, narrowWeekdays: true, toolbarLayout: "three-row", width: 280 },
 	{ abbreviatedMonthLabels: true, agendaReflows: true, compactEvents: true, narrowWeekdays: true, toolbarLayout: "three-row", width: 320 },
@@ -398,7 +398,7 @@ async function setLongMonthTitle(page) {
 		}
 		titleButton.setAttribute(
 			"aria-label",
-			`Choose schedule month and year, currently ${titles.full}`
+			`Choose schedule month and year, currently ${titles.full}${titles.full === titles.compact ? "" : `, ${titles.compact}`}`
 		);
 	}, { compact: LONG_COMPACT_MONTH_TITLE, full: LONG_MONTH_TITLE });
 }

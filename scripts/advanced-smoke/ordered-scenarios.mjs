@@ -184,7 +184,7 @@ export async function runAdvancedSmokeScenarios(environment) {
 	assert.equal(titleButton.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Aug 2026");
 	assert.equal(
 		titleButton.getAttribute("aria-label"),
-		"Choose schedule month and year, currently August 2026"
+		"Choose schedule month and year, currently August 2026, Aug 2026"
 	);
 	assert.equal(titleButton.getAttribute("aria-haspopup"), "dialog");
 	assert.equal(titleButton.getAttribute("aria-expanded"), "false");
@@ -515,7 +515,9 @@ export async function runAdvancedSmokeScenarios(environment) {
 			dom.window.HTMLTimeElement,
 		"Expected native event-time markup."
 	);
-	assert.equal(initialAppointment.querySelector(".my-event-marker")?.textContent, "A");
+	const decorativeMarker = requireElement(initialAppointment, ".my-event-marker-appointment", dom.window.HTMLSpanElement);
+	assert.equal(decorativeMarker.textContent, "");
+	assert.equal(decorativeMarker.getAttribute("aria-hidden"), "true");
 	assert.equal(initialAppointment.querySelector(".my-item-type")?.textContent, "appointment");
 	assert.equal(initialAppointment.querySelector(".my-status")?.textContent, "Confirmed");
 	assert.equal(initialAppointment.querySelector(".my-action-hint")?.textContent, "View details");

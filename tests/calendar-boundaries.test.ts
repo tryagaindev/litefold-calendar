@@ -494,7 +494,7 @@ void test("the month title opens a localized native popover and jumps with day c
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-full")?.textContent, "July 2026");
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Jul 2026");
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.getAttribute("aria-hidden"), "true");
-	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently July 2026");
+	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently July 2026, Jul 2026");
 	assert.equal(picker.popover.getAttribute("popover"), "auto");
 	assert.equal(picker.popover.getAttribute("role"), "dialog");
 	assert.equal(getAccessibleName(picker.popover), "Jump to reporting month and year");
@@ -584,7 +584,7 @@ void test("the month title opens a localized native popover and jumps with day c
 	assert.equal(dom.window.document.activeElement, picker.trigger);
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-full")?.textContent, "February 2027");
 	assert.equal(picker.trigger.querySelector(".lfc-calendar-title-label-compact")?.textContent, "Feb 2027");
-	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently February 2027");
+	assert.equal(picker.trigger.getAttribute("aria-label"), "Choose reporting month, currently February 2027, Feb 2027");
 });
 
 void test("Escape restores the month-title trigger while light-dismiss preserves outside focus", async (context) => {
@@ -815,7 +815,7 @@ void test("package-owned navigation controls ignore reentrant and stale lifecycl
 	assert.deepEqual(uncaughtErrors, []);
 });
 
-void test("a fatal render cancels pending native pager navigation and disables retained controls", async (context) => {
+void test("a fatal render cancels pending native pager navigation and focuses its visible fallback", async (context) => {
 	const { dom, host } = setupDom(context);
 	const uncaughtErrors: unknown[] = [];
 	const fatalErrors: LitefoldCalendarError[] = [];
@@ -835,7 +835,6 @@ void test("a fatal render cancels pending native pager navigation and disables r
 		},
 		onError: (error) => {
 			fatalErrors.push(error);
-			return "handled";
 		}
 	});
 	calendar.render();
@@ -855,7 +854,12 @@ void test("a fatal render cancels pending native pager navigation and disables r
 	assert.equal(pager.viewport.scrollLeft, pager.centerOffset);
 	assert.equal(isPopoverOpen(picker.popover), false);
 	assert.equal(picker.trigger.getAttribute("aria-disabled"), "true");
-	assert.equal(dom.window.document.activeElement, picker.trigger);
+	const panel = host.querySelector<HTMLDivElement>(".lfc-calendar-status-panel");
+	const panelTitle = host.querySelector<HTMLHeadingElement>(".lfc-calendar-status-title");
+	assert.ok(panel);
+	assert.ok(panelTitle);
+	assert.equal(panel.hidden, false);
+	assert.equal(dom.window.document.activeElement, panelTitle);
 	dispatchPagerEvent(dom, pager, "scrollend");
 	for (const control of retainedNavigation) {
 		dispatchClick(dom, control);

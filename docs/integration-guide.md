@@ -452,6 +452,13 @@ Render hooks must synchronously create a new, detached, same-document node for e
 ```ts
 import type { CalendarRenderHooks } from "@tryagaindev/litefold-calendar";
 
+const CALENDAR_LOCALE = "en-US";
+const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat(CALENDAR_LOCALE, {
+	calendar: "gregory",
+	dateStyle: "full",
+	timeZone: "UTC"
+});
+
 const EVENT_CLASS_BY_KIND = {
 	appointment: "my-calendar-event--appointment",
 	milestone: "my-calendar-event--milestone",
@@ -504,7 +511,7 @@ const applicationRenderHooks: CalendarRenderHooks<EventData> = {
 		status.textContent = label;
 		return status;
 	},
-	eventDidMount({ dateString, elements, event, surface }) {
+	eventDidMount({ date, dateString, elements, event, surface, timeText }) {
 		const kind = event.metadata?.kind;
 		if (kind === undefined) {
 			return;
@@ -515,7 +522,17 @@ const applicationRenderHooks: CalendarRenderHooks<EventData> = {
 		elements.root.setAttribute("data-my-event-kind", kind);
 
 		const action = elements.action;
+		const previousLabel = action?.getAttribute("aria-label") ?? null;
 		if (action !== null) {
+			const occurrenceDate = new Date(0);
+			occurrenceDate.setUTCFullYear(date.year, date.month - 1, date.day);
+			const accessibleLabel = [
+				timeText,
+				event.title,
+				event.metadata?.statusLabel,
+				EVENT_DATE_FORMATTER.format(occurrenceDate)
+			].filter((part) => part !== undefined && part !== "").join(", ");
+			action.setAttribute("aria-label", accessibleLabel);
 			action.setAttribute("data-my-event-id", event.id);
 			action.setAttribute("data-my-event-date", dateString);
 			action.setAttribute("data-my-event-surface", surface);
@@ -527,6 +544,13 @@ const applicationRenderHooks: CalendarRenderHooks<EventData> = {
 			action?.removeAttribute("data-my-event-id");
 			action?.removeAttribute("data-my-event-date");
 			action?.removeAttribute("data-my-event-surface");
+			if (action !== null) {
+				if (previousLabel === null) {
+					action.removeAttribute("aria-label");
+				} else {
+					action.setAttribute("aria-label", previousLabel);
+				}
+			}
 		};
 	}
 };
@@ -537,6 +561,7 @@ Pass the consumer-owned hook set through the visual option, independently of com
 ```ts
 const calendar = createCalendar(host, {
 	events,
+	locale: CALENDAR_LOCALE,
 	renderHooks: [applicationRenderHooks]
 });
 ```
@@ -549,8 +574,20 @@ and `variant` (`"compact"` or `"wide"`) when the design needs different content.
 A total-count action always remains available, including when the hook returns
 `null`.
 
-The package owns the native action, accessible name, focus behavior, and
-responsive placement. Fit compact content inside its assigned slot. Increase
+Custom event names must contain the visible words in their slot order: leading
+content, time, title, details, then trailing content. This recipe names its time,
+title, and custom status together, then adds the occurrence date as context on
+both surfaces. If a hidden time would interrupt other visible words, place that
+time after the complete visible phrase. Use the supplied occurrence date and
+localized `timeText`; cleanup must restore the action's previous `aria-label`,
+including its absence. Decorative markers need no spoken text.
+
+The package owns overflow action names. Keep custom overflow words aligned with
+the localized messages and `context.text`; do not change `elements.action` in
+`renderEventOverflow`. See the [overflow naming contract](api.md#handle-user-actions-calendaraction).
+
+The package owns native actions, focus behavior, and responsive placement.
+Fit compact content inside its assigned slot. Increase
 `--lfc-control-min-size` and `--lfc-grid-event-min-block-size` together when the
 custom content needs more room. Container resizing changes visibility without
 rerunning hooks. The [render-hook API](api.md#customize-rendering-calendarrenderhooks)
