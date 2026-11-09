@@ -47,7 +47,7 @@ function verifyLocalRuntimeAssets(document) {
 	}
 }
 
-async function renderMetadata(dom, metadata) {
+async function renderMetadata(dom, response, scenario) {
 	const descriptors = new Map();
 	try {
 		installGlobal("document", dom.window.document, descriptors);
@@ -60,15 +60,26 @@ async function renderMetadata(dom, metadata) {
 				credentials: "same-origin",
 				headers: { Accept: "application/json" }
 			});
-			return {
-				json: async () => metadata,
-				ok: true,
-				status: 200
-			};
+			return response();
 		}, descriptors);
-		await import(`${pathToFileURL(LANDING_MODULE).href}?lfc-landing-smoke=1`);
+		await import(`${pathToFileURL(LANDING_MODULE).href}?lfc-landing-smoke=${encodeURIComponent(scenario)}`);
 	} finally {
 		restoreGlobals(descriptors);
+	}
+}
+
+function successfulResponse(metadata) {
+	return () => ({ json: async () => metadata, ok: true, status: 200 });
+}
+
+function verifyRepositoryLinks(document, commit) {
+	const links = document.querySelectorAll("a[data-my-repository-path]");
+	assert.ok(links.length > 0, "Expected source and documentation links on the examples landing page.");
+	for (const link of links) {
+		assert.equal(
+			link.getAttribute("href"),
+			`https://github.com/tryagaindev/litefold-calendar/${link.getAttribute("data-my-repository-kind")}/${commit}/${link.getAttribute("data-my-repository-path")}`
+		);
 	}
 }
 
@@ -97,7 +108,7 @@ export async function verifyExamplesLandingPage() {
 			access(join(EXAMPLES_DIRECTORY, path, "index.html"))
 		));
 
-		await renderMetadata(dom, metadata);
+		await renderMetadata(dom, successfulResponse(metadata), "built-metadata");
 		assert.equal(
 			dom.window.document.querySelector("[data-my-version]")?.textContent,
 			metadata.version
@@ -113,5 +124,57 @@ export async function verifyExamplesLandingPage() {
 		);
 	} finally {
 		dom.window.close();
+	}
+
+	const commit = "0123456789abcdef0123456789abcdef01234567";
+	for (const [channel, label] of [
+		["local", "Local working copy"],
+		["main", "Rolling main preview"],
+		["release", "Immutable release"]
+	]) {
+		const successDom = new JSDOM(markup, { url: "https://example.test/examples/" });
+		try {
+			const sourceCommit = channel === "local" ? null : commit;
+			await renderMetadata(successDom, successfulResponse({
+				channel, commit: sourceCommit, version: metadata.version
+			}), channel);
+			const document = successDom.window.document;
+			assert.equal(document.querySelector("[data-my-metadata-state]")?.getAttribute("data-my-metadata-state"), "ready");
+			assert.equal(document.querySelector("[data-my-version]")?.textContent, metadata.version);
+			assert.equal(document.querySelector("[data-my-channel]")?.textContent, label);
+			assert.equal(document.querySelector("[data-my-commit]")?.textContent, sourceCommit ?? "Not available");
+			assert.equal(document.querySelector("[data-my-commit-link]")?.getAttribute("href"), sourceCommit === null
+				? "https://github.com/tryagaindev/litefold-calendar/tree/main"
+				: `https://github.com/tryagaindev/litefold-calendar/commit/${sourceCommit}`);
+			verifyRepositoryLinks(document, sourceCommit ?? "main");
+		} finally {
+			successDom.window.close();
+		}
+	}
+
+	for (const [scenario, response] of [
+		["missing-file", () => ({ ok: false, status: 404 })],
+		["missing-fields", successfulResponse({})],
+		["malformed-metadata", successfulResponse({ channel: "release", commit: null, version: metadata.version })],
+		["invalid-json", () => ({
+			json: async () => { throw new SyntaxError("Invalid JSON"); }, ok: true, status: 200
+		})],
+		["network-failure", () => { throw new Error("Network request failed"); }]
+	]) {
+		const failureDom = new JSDOM(markup, { url: "https://example.test/examples/" });
+		try {
+			await renderMetadata(failureDom, response, scenario);
+			const document = failureDom.window.document;
+			assert.equal(document.querySelector("[data-my-metadata-state]")?.getAttribute("data-my-metadata-state"), "error", scenario);
+			assert.equal(document.querySelector("[data-my-version]")?.textContent, "Not available", scenario);
+			assert.equal(document.querySelector("[data-my-channel]")?.textContent, "Metadata unavailable", scenario);
+			assert.equal(document.querySelector("[data-my-commit]")?.textContent, "main branch", scenario);
+			assert.equal(document.querySelector("[data-my-commit-link]")?.getAttribute("href"),
+				"https://github.com/tryagaindev/litefold-calendar/tree/main", scenario);
+			assert.match(document.querySelector("[data-my-metadata-status]")?.textContent ?? "", /main branch/u, scenario);
+			verifyRepositoryLinks(document, "main");
+		} finally {
+			failureDom.window.close();
+		}
 	}
 }

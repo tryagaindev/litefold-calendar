@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added writing guidance for clear documentation and interface explanations, with shared terminology, audience-specific technical detail, and protected legal text.
 - Added optional `icons.today` content for narrow calendars, with the localized Today text retained at wider widths and an unchanged accessible name and native button behavior.
 - Added `onEventOverflowDefault` and `CalendarEventOverflowDefaultContext` for synchronous observation of successful count/overflow selection and agenda focus. The callback receives the actual heading and original occurrence snapshot; applications can scroll directly without a timing or focus-discovery bridge.
 - Added eight independent `--lfc-grid-overflow-*` tokens for count and overflow paint, typography, and sizing. Contextual defaults preserve existing themes; the advanced example demonstrates adaptive borderless counts and application-owned instant agenda scrolling.
@@ -17,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Reorganized dense lifecycle, responsive-design, and release-recovery explanations across the documentation. Updated example and site help text while preserving public contracts and established control labels.
 - Narrowed screenshot freshness to build and capture dependency closures. Dependency-only Dependabot updates can refresh verified provenance automatically when every PNG is byte-identical; changed screenshots retain human review.
 - Expanded the visual specification for existing typography, count roles, agenda states, loading, and optional event layouts; corrected labels and documentation links.
 - **Migration:** Event titles are no longer trimmed. Any nonempty string of at most 1,024 UTF-16 code units is preserved exactly, including whitespace-only titles; applications are responsible for supplying meaningful visible and accessible text.
@@ -32,6 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The examples landing page now shows "Not available" when build metadata cannot be loaded, instead of claiming an alpha version. Source links still open the main branch.
+- Build details on the examples landing page stack in narrow containers so metadata labels remain readable with enlarged text.
 - Added an explicit Windows-only Firefox launch mode for trusted local fixtures already inside an OS sandbox, with isolated application data and unchanged default launch settings.
 - Count and remaining-count actions now share event actions' inset hover cue, including borderless themes and custom overflow content, while preserving passive cues and keyboard focus treatment.
 - Bounded event identifiers before whitespace validation, disabled workers in newly generated Pages documents and upgraded root shells while preserving exact legacy policies on immutable historical pages, and validated decoded meta-refresh destinations in staged and retained HTML.

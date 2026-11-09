@@ -1,30 +1,48 @@
 # Coding conventions
 
-This document defines required repository conventions for TypeScript and JavaScript source, HTML, CSS, documentation, tests, and runnable examples. ESLint, Stylelint, TypeScript, and repository policy scripts are the executable source for mechanical rules; this guide explains the design and ownership choices those tools cannot express on their own.
+Follow these conventions for TypeScript, JavaScript, HTML, CSS, tests, and runnable
+examples. ESLint, Stylelint, TypeScript, and repository policy scripts enforce
+mechanical rules. This guide explains the design and ownership choices behind
+them. For documentation and interface explanations, follow the
+[writing style](writing-style.md).
 
 ## Documentation version references
 
-Do not duplicate exact package or runtime patch versions in prose. Name the supported major or release line and point readers to the authoritative manifest, lockfile, generated metadata, or executable configuration. Supported ranges and major selectors belong in repository configuration; exact resolved versions belong in lockfiles, generated receipts, capture metadata, and commands where the value is a required input.
+Follow the [version-reference rules](writing-style.md#version-references) for
+supported release lines, exact versions, and authoritative version sources.
 
 ## Documentation scope and history
 
-Write evergreen guidance around current situations, invariants, decisions, and reusable recovery actions. Do not use a past event, tag, commit hash, or individual outcome as the reason for a standing rule. Record shipped product changes in `CHANGELOG.md`; keep event-specific chronology and sensitive operational evidence in the relevant issue, private release record, or postmortem.
-
-Each fact has one canonical owner. Shorter guides should summarize the decision a reader must make and link to that owner instead of copying its command sequence, signature inventory, responsive geometry, or recovery matrix.
+Follow the [scope and history rules](writing-style.md#scope-and-history). Keep
+[one complete specification](writing-style.md#keep-one-complete-specification)
+for each contract while reusing familiar terms and short explanations where needed.
 
 ## Documentation diagrams
 
-Use diagrams when they make a relationship materially easier to understand, while keeping the surrounding prose or table as the complete text equivalent and canonical contract.
-
-- Use fenced Mermaid flowcharts or sequence diagrams for dependency direction, event order, and lifecycle. Every Mermaid block requires a concise `accTitle` and `accDescr`.
-- Use an annotated SVG under `docs/assets/` when spatial placement or component anatomy matters. Give it useful Markdown alternative text and describe every callout in nearby prose or a table. Its SVG source must include a maintenance comment naming the canonical code and documentation it illustrates and the changes that require reviewing or updating the asset.
-- Let the renderer own Mermaid colors and styling. Communicate meaning with labels, arrows, shapes, and text rather than color alone, and verify that static assets remain legible with repository light and dark presentation.
-- Do not use Mermaid frontmatter, embedded HTML, initialization/configuration directives, or `click` directives. Put navigation in ordinary Markdown links so repository checks can validate it.
-- Diagram stable concepts, public vocabulary, and ownership boundaries. Do not duplicate exhaustive module inventories, private selectors, incidental DOM order, or other volatile implementation details that would create a second source of truth.
+Follow the [diagram and text-equivalent rules](writing-style.md#diagrams-and-text-equivalents)
+for Mermaid, annotated SVGs, accessibility, and asset maintenance.
 
 ## Browser compatibility
 
-Apply the [Baseline Widely available policy](browser-support.md) to library code, examples, and published-site code. Resolve the shared `baseline-widely-available` preset through Vite's public API; its support window is fixed per Vite major rather than updated daily. Do not hand-copy resolved browser versions into source or prose.  The marked minimum-browser table in [Browser support](browser-support.md#minimum-browser-versions) is generated evidence, including its toolchain versions; follow the [browser documentation workflow](../CONTRIBUTOR_COMMANDS.md#refresh-browser-documentation) after dependency changes.  The documentation gate verifies it against the installed resolver without rewriting it. Review Vite dependency updates, including majors, through CI. Check new platform features against the installed preset's effective targets; a current Baseline badge alone is insufficient. Features outside those targets require capability detection and an independently tested supported implementation. Keep compatibility work local to the missing capability and release its listeners during teardown; do not add broad layout-observer systems or global polyfills. WebMCP remains an optional progressive extension.
+Apply the [Baseline Widely available policy](browser-support.md) to the library,
+examples, and published site. Resolve the shared `baseline-widely-available`
+preset through Vite's public API. Its support window is fixed per Vite major;
+it does not change daily.
+
+Do not hand-copy resolved browser versions into source or prose. The marked
+[minimum-browser table](browser-support.md#minimum-browser-versions) is generated
+evidence, including its toolchain versions. Follow the
+[browser documentation workflow](../CONTRIBUTOR_COMMANDS.md#refresh-browser-documentation)
+after dependency changes. The documentation gate checks this table against the
+installed resolver without rewriting it.
+
+Review Vite updates, including majors, through CI. Check new platform features
+against the installed preset's effective targets; a current Baseline badge alone
+is not enough. Features outside those targets need capability detection and an
+independently tested supported implementation. Keep compatibility work local to
+the missing capability and release its listeners during teardown. Do not add
+broad layout-observer systems or global polyfills. WebMCP remains an optional
+progressive extension.
 
 ## TypeScript contracts
 

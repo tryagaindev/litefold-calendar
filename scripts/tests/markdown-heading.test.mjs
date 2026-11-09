@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -8,6 +9,26 @@ import {
 	markdownVisibleText,
 	maskMarkdownNonProse
 } from "../lib/markdown-heading.mjs";
+
+void test("moved writing guidance preserves its published coding-convention anchors", async () => {
+	const conventions = await readFile(new URL("../../docs/code-style.md", import.meta.url), "utf8");
+	const writing = await readFile(new URL("../../docs/writing-style.md", import.meta.url), "utf8");
+	const legacyAnchors = new Set([
+		...githubMarkdownHeadingSlugs(conventions),
+		...markdownExplicitAnchors(conventions)
+	]);
+	const writingAnchors = new Set(githubMarkdownHeadingSlugs(writing));
+	for (const [legacy, destination] of [
+		["documentation-version-references", "version-references"],
+		["documentation-scope-and-history", "scope-and-history"],
+		["documentation-diagrams", "diagrams-and-text-equivalents"]
+	]) {
+		assert.ok(legacyAnchors.has(legacy), `Existing #${legacy} links must keep working.`);
+		assert.ok(writingAnchors.has(destination), `Writing guide must resolve #${destination}.`);
+		assert.ok(conventions.includes(`](writing-style.md#${destination})`),
+			`The old guidance must link to its new #${destination} location.`);
+	}
+});
 
 void test("GitHub heading slugs preserve the visible labels of autolinks", () => {
 	assert.equal(githubHeadingSlug("Contact <https://example.com>"), "contact-httpsexamplecom");

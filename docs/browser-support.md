@@ -29,9 +29,11 @@ and assistive technologies still require the checks described below.
 
 ## Supported release window
 
-The shared build target is Vite's `baseline-widely-available` preset. Vite fixes the preset's Baseline date for each major release; targets do not advance merely because another day passes. The repository resolves the preset through Vite's public API and uses its effective browser targets for JavaScript and CSS, without maintaining a separate browser-version list. See [Vite's target policy](https://vite.dev/config/build-options#build-target).
+The shared build target is Vite's `baseline-widely-available` preset. Vite fixes its Baseline date for each major release; targets do not change daily.
 
-Baseline Widely available describes capabilities interoperable across the core browser set for at least 30 months. The support commitment uses the installed Vite preset's fixed window, so a current Baseline badge alone does not prove support in every resolved target. See [MDN's Baseline definition](https://developer.mozilla.org/en-US/docs/Glossary/Baseline/Compatibility).
+The build resolves the preset through Vite's public API and uses those targets for JavaScript and CSS. The repository does not maintain a separate browser-version list. See [Vite's target policy](https://vite.dev/config/build-options#build-target).
+
+Baseline Widely available describes features that have worked across the core browser set for at least 30 months. This package uses the installed Vite preset's fixed window. A current Baseline badge alone does not prove support in every resolved target. See [MDN's Baseline definition](https://developer.mozilla.org/en-US/docs/Glossary/Baseline/Compatibility).
 
 The generated table makes the resolved versions readable without cloning the repository.  Builds, screenshots, and release receipts retain the same target evidence.  Reviewed Vite dependency updates can change the support window; a report's resolution date is not a rolling compatibility cutoff.  Contributors can [refresh and check the generated table](../CONTRIBUTOR_COMMANDS.md#refresh-browser-documentation).
 
@@ -47,11 +49,22 @@ This policy defines where the project accepts compatibility defects. Chromium an
 
 ## Automated engine matrix
 
-The hosted Playwright gate runs the end-to-end suite in Chromium (`Desktop Chrome`) and WebKit (`Desktop Safari`). The Firefox (`Desktop Firefox`) project is retained for local checks because its hosted automation has been unstable. Browser-neutral interaction, layout, accessibility-rule, and Playwright-computed ARIA scenarios remain expected to pass in all three engines. The WebKit project does not replace testing branded Safari on macOS, iOS, or iPadOS, and none of the projects substitutes for testing with an actual screen reader or inspecting a native platform accessibility tree.
+The hosted Playwright gate runs the end-to-end suite in Chromium (`Desktop Chrome`) and WebKit (`Desktop Safari`). Firefox (`Desktop Firefox`) runs locally because its hosted automation has been unstable.
+
+Browser-neutral interaction, layout, accessibility-rule, and Playwright-computed ARIA scenarios must still pass in all three engines. WebKit automation does not replace testing branded Safari on macOS, iOS, or iPadOS. Automation also does not replace testing with an actual screen reader or inspecting a native platform accessibility tree.
 
 A small capability-specific subset remains Chromium-only because it requires Playwright's Chrome DevTools Protocol session: trusted synthetic touch/pen injection and programmatic 400% browser zoom. Portable wheel, keyboard, disabled-pager, responsive, and accessibility outcomes continue to run in every engine. This protocol boundary is a test-tool limitation, not an exclusion from the support policy.
 
-Use `npm run test:browser` for the complete local matrix or `npm run test:browser:chromium`, `npm run test:browser:firefox`, and `npm run test:browser:webkit` while diagnosing one engine. When `CI` is set, the Playwright configuration excludes Firefox; run local Firefox checks with `CI` unset. For local Firefox runs inside a Windows OS sandbox, follow the [explicit opt-in launch guidance](../CONTRIBUTOR_COMMANDS.md#run-firefox-inside-a-windows-os-sandbox). Optional repeated local qualification is described in the [contributor command reference](../CONTRIBUTOR_COMMANDS.md#run-the-final-gate). When running separate engine processes concurrently, follow the [concurrent browser-check guidance](../CONTRIBUTOR_COMMANDS.md#run-browser-checks-concurrently) so each process has its own port and output directory. The supported-browser, device, and assistive-technology matrix remains a required manual release activity according to the [accessibility testing policy](../ACCESSIBILITY.md#testing).
+Choose the check for your task:
+
+- Run `npm run test:browser` for the complete local matrix.
+- Use `npm run test:browser:chromium`, `npm run test:browser:firefox`, or `npm run test:browser:webkit` to diagnose one engine.
+- Unset `CI` for local Firefox checks; the Playwright configuration excludes Firefox when `CI` is set.
+- For Firefox inside a Windows OS sandbox, follow the [explicit opt-in launch guidance](../CONTRIBUTOR_COMMANDS.md#run-firefox-inside-a-windows-os-sandbox).
+- See the [contributor command reference](../CONTRIBUTOR_COMMANDS.md#run-the-final-gate) for optional repeated local qualification.
+- Give concurrent engine processes separate ports and output directories, as described in [concurrent browser checks](../CONTRIBUTOR_COMMANDS.md#run-browser-checks-concurrently).
+
+The [accessibility testing policy](../ACCESSIBILITY.md#testing) also requires manual release checks across the supported browsers, devices, and assistive technologies.
 
 ## Required platform
 
@@ -65,11 +78,21 @@ The package relies directly on these Baseline platform capabilities:
 
 The optional [classic-script recipe](integration-guide.md#classic-script-entry-point) also requires dynamic `import()`.
 
-Capabilities outside the resolved preset require feature detection and a tested supported path. The displayed month/year button uses `popover="auto"` when available and a native modal `<dialog>` otherwise. Both provide labelled Month and Year controls, validation, Jump, Cancel, Escape, light dismissal, and focus restoration. The fallback uses native modality; other page controls remain inert until dismissal. It does not require `<input type="month">` or modify global APIs.
+Capabilities outside the resolved preset require feature detection and a tested supported path.
 
-The palette uses `light-dark()` when available. Otherwise a small local controller mirrors the effective host `color-scheme` into the same CSS palette, observing system preference and live host/ancestor theme attributes. It does not rerender, refetch, reset picker input, or move focus. The default host scheme remains `light dark`; applications can set `color-scheme: light`, `dark`, or `inherit` on their host. Use `inherit` when an ancestor controls application themes. Removing the override resumes the automatic default. Application token overrides and forced-color/increased-contrast rules remain in the normal cascade.
+The displayed month/year button uses `popover="auto"` when available and a native modal `<dialog>` otherwise. Both provide labelled Month and Year controls, validation, Jump, Cancel, Escape, light dismissal, and focus restoration. The dialog keeps other page controls inert until dismissal. It does not require `<input type="month">` or modify global APIs.
 
-Agenda columns share tracks with subgrid where supported; explicit per-row tracks provide the supported fallback. Browsers without `:has()` use wrapping agenda rows that retain optional markers, times, titles, and supporting content. Required count actions and compact toolbar layout do not depend on relational selectors. Where `:dir()` is unavailable, the same local controller reflects the effective host direction, including nested ancestor resets and live attribute changes, into package-owned styling state. None of these fallbacks measures layout or replaces controls. Balanced/pretty text wrapping, stable scrollbar gutters, and safe alignment are enhancements over ordinary wrapping, scrolling, and alignment.
+The palette uses `light-dark()` when available. Otherwise a small local controller applies the effective host `color-scheme` to the same CSS palette. It observes system preference and live theme attributes on the host and its ancestors. It does not rerender, refetch, reset picker input, or move focus.
+
+The default host scheme is `light dark`. Applications can set `color-scheme: light`, `dark`, or `inherit` on their host. Use `inherit` when an ancestor controls application themes; remove the override to resume the automatic default. Application token overrides and forced-color/increased-contrast rules remain in the normal cascade.
+
+Other layout and direction features have these fallbacks:
+
+- Agenda columns use subgrid where supported, or explicit tracks for each row otherwise.
+- Without `:has()`, agenda rows wrap while retaining optional markers, times, titles, and supporting content. Required count actions and compact toolbar layout do not depend on relational selectors.
+- Without `:dir()`, the same local controller applies the effective host direction to package-owned styling state. It handles nested ancestor resets and live attribute changes.
+
+None of these fallbacks measures layout or replaces controls. Balanced/pretty text wrapping, stable scrollbar gutters, and safe alignment enhance ordinary wrapping, scrolling, and alignment.
 
 Locale-derived week starts use either `Intl.Locale#getWeekInfo()` or `Intl.Locale#weekInfo` and fall back to Sunday only when neither returns a usable `firstDay`.
 

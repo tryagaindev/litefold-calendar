@@ -4,11 +4,15 @@
 	<img src="docs/assets/litefold-calendar-mark.svg" alt="" width="128" height="128">
 </p>
 
-Litefold Calendar is a mobile-first, responsive month calendar for applications that need fast date browsing and a focused selected-day agenda.  It is dependency-free, framework-agnostic, accessible, and designed for phone layouts, application sidebars, dashboards, portals, and wide desktop views.
+Litefold Calendar is a mobile-first, responsive month calendar with a focused selected-day agenda. It supports fast date browsing and accessible interaction without runtime dependencies or a required framework. Use it in phone layouts, application sidebars, dashboards, portals, and wide desktop views.
 
 Use Litefold Calendar when your product needs a polished month calendar without adopting a complete scheduling platform or maintaining separate mobile and desktop implementations.
 
-> **Prerelease:** The `nightly` channel contains validated snapshots of `main`. Nightly publication leaves `latest` on the frozen historical alpha; the first stable release will move `latest` to stable, and stable releases will own it afterward. Install `@nightly` explicitly or pin an exact version for reproducible deployments. Public API changes remain possible before `1.0.0` and are recorded in the changelog. Existing alpha releases remain available by exact version.
+> **Prerelease:** Install `@nightly` to try a validated snapshot of `main`, or pin an exact version for reproducible deployments. Public API changes remain possible before `1.0.0`; check the changelog before upgrading.
+>
+> - `nightly` follows validated development snapshots.
+> - `latest` still points to the frozen historical alpha. The first stable release will move it to stable; stable releases will own it afterward.
+> - Existing alpha releases remain available by exact version.
 
 ## Install
 

@@ -27,7 +27,9 @@ After a usable source snapshot commits, the calendar uses:
 
 This improves document semantics, link behavior, keyboard support, and machine readability after JavaScript runs. It is not equivalent to server-rendered, crawlable event detail content.
 
-`eventTimeDisplay` changes visual exposure, not this semantic output. A time suppressed from grid, agenda, or both remains a native `<time datetime>` value with visually hidden localized text, so it stays exposed to assistive technology; for actionable occurrences, it also remains part of the event action's accessible name. This improves consistency for assistive technology and client-side consumers, but it still does not make client-rendered content equivalent to canonical server markup.
+`eventTimeDisplay` changes which times are visible, not this semantic output. A time hidden from the grid, agenda, or both remains a native `<time datetime>` value with visually hidden localized text. Assistive technology can still read it. For actionable occurrences, the time also remains in the event action's accessible name.
+
+This keeps time information consistent for assistive technology and client-side consumers. It does not make client-rendered content equivalent to canonical server markup.
 
 ## Provide a no-JavaScript fallback
 
@@ -72,11 +74,12 @@ The fallback must belong to the host document and remain outside the calendar ho
 
 ## Fallback lifecycle
 
-The [API source-timing contract](api.md#source-timing-and-renders) owns
-direct-versus-PromiseLike classification and callback order. For fallback
-coordination, a direct initial result settles visibility before the initiating
-void method returns; a PromiseLike keeps the pending visibility through the
-loading render and settles it with the terminal render.
+Initial source timing determines when fallback visibility changes:
+
+- A direct result settles visibility before the initiating `void` method returns.
+- A PromiseLike keeps the pending visibility through the loading render, then settles it with the terminal render.
+
+See [source timing and renders](api.md#source-timing-and-renders) for result classification and callback order.
 
 The package changes only the fallback element's `hidden` property:
 

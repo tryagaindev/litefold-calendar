@@ -47,7 +47,14 @@ Treat event-source results and ordinary event fields as untrusted input. Options
 - Caching and routing.
 - Protecting event data before it reaches the library.
 
-WebMCP is an explicit, default-off same-document integration. Its arguments are untrusted, and enabling it intentionally exposes paged event titles plus raw normalized start/end civil values for the allowed portion of the currently loaded visible range to a compatible browser agent, even when `eventTimeDisplay` hides time visually. Grid density, overflow, and agenda rendering limits are not authorization filters and do not narrow otherwise eligible tool results. WebMCP grants no server permission and excludes identifiers, URLs, metadata, extensions, raw errors, and application actions. Review the [WebMCP privacy guidance](docs/webmcp.md#privacy-and-security) before enabling it for confidential schedules.
+WebMCP is an explicit, default-off same-document integration. Treat its arguments
+as untrusted input. Enabling it exposes these values to a compatible browser
+agent for the allowed portion of the currently loaded visible range:
+
+- Paged event titles.
+- Raw normalized start/end civil values, even when `eventTimeDisplay` hides time visually.
+
+Grid density, overflow, and agenda rendering limits are not authorization filters and do not narrow otherwise eligible tool results. WebMCP grants no server permission and excludes identifiers, URLs, metadata, extensions, raw errors, and application actions. Review the [WebMCP privacy guidance](docs/webmcp.md#privacy-and-security) before enabling it for confidential schedules.
 
 See the canonical [security model](docs/security-model.md) for trust boundaries, abuse cases, controls, and residual risk.
 
@@ -71,17 +78,28 @@ The following properties must hold:
 
 ### Build and release
 
-- Public nightlies snapshot the exact eligible current `main` commit through scheduled or manual publication. The publisher runs the hosted publication gate, including Chromium and WebKit, for that exact SHA before retaining the candidate bytes. Its generated version binds the original workflow creation time and run ID; isolated staging changes only the package manifest version. Retained evidence includes a canonical SPDX 2.3 SBOM bound to the generated package version, full source SHA, and source-commit time. Recovery reuses verified retained bytes for the same candidate.
-- Source execution and publication authority never coincide.  Verification has read-only repository access and no npm or Pages OIDC.  The npm-authorized job checks out no source, installs or imports no candidate package, executes no project code, and publishes only the checksum-verified retained tarball.  Registry verification, repository writes, and Pages deployment remain separately scoped.
+- Public nightlies snapshot the exact eligible current `main` commit through scheduled or manual publication. Before retaining candidate bytes, the publisher runs the hosted publication gate, including Chromium and WebKit, for that exact SHA.
+- The generated nightly version binds the original workflow creation time and run ID. Isolated staging changes only the package manifest version. Retained evidence includes a canonical SPDX 2.3 SBOM bound to the generated package version, full source SHA, and source-commit time. Recovery reuses verified retained bytes for the same candidate.
+- Source execution and publication authority never coincide. Verification has read-only repository access and no npm or Pages OIDC. Registry verification, repository writes, and Pages deployment remain separately scoped.
+- The npm-authorized job publishes only the checksum-verified retained tarball. It checks out no source, installs or imports no candidate package, and executes no project code.
 - Nightly npm publication uses OIDC only under `nightly`, without an npm token or secondary dist-tag write. Public reads verify that `latest` is unchanged from preflight: it remains on the frozen historical alpha before stable and belongs to stable after the first stable release.
 - Remote release state fails closed.  Unavailable, ambiguous, conflicting, or malformed npm, authenticated GraphQL, GitHub, or Pages state never authorizes a transition.  Registry completion independently verifies exact integrity, a clean installation and supported imports, signatures, and SLSA provenance bound to the artifact and exact source identity.
-- Automatic rolling Pages previews move monotonically by source ancestry; only explicit retained-state rollback may move backward. Existing release directories remain immutable. Automatic Pages deployment is `workflow_run`-only, while manual rollback is isolated in a separate `workflow_dispatch`-only workflow that cannot accept a release ref. Rollback reconstructs inside the contents writer from authenticated retained Git objects and the current retained shell; no producer-composed site artifact crosses into write authority. The shared assembler enforces the exact root CSP and rejects remote runtime assets. Both workflows use one non-canceling maximum queue from retained-state validation through deployment, so their writers and deployers cannot interleave. A successful same-repository publisher completion starts release Pages after the registry-verified GitHub prerelease is public, while separately scoped Pages authority performs the deployment.
+- Automatic rolling Pages previews move monotonically by source ancestry; only explicit retained-state rollback may move backward. Existing release directories remain immutable.
+- Automatic Pages deployment is `workflow_run`-only. Manual rollback uses a separate `workflow_dispatch`-only workflow that cannot accept a release ref.
+- Rollback reconstructs inside the contents writer from authenticated retained Git objects and the current retained shell. No producer-composed site artifact crosses into write authority. The shared assembler enforces the exact root CSP and rejects remote runtime assets.
+- Both workflows use one non-canceling maximum queue from retained-state validation through deployment, so their writers and deployers cannot interleave.
+- A successful same-repository publisher completion starts release Pages after the registry-verified GitHub prerelease is public. Separately scoped Pages authority performs the deployment.
 
 Operational recovery and hosted controls are defined in [release administration](docs/release-administration.md).  Artifact and registry evidence details remain canonical in [package verification](docs/package-verification.md), and Pages procedures remain canonical in [example deployment](docs/example-deployment.md).
 
 ## Reportable findings
 
-Report realistic paths to compromise an application integration, repository, release artifact, or maintainer privilege. Examples include DOM or script injection through event data, bypass of event-link or WebMCP output policy, unauthorized site-tool disclosure or navigation, stale or cross-instance tool registration, sensitive diagnostic disclosure, resource-bound bypass, stale-generation races, package substitution, workflow privilege escalation, or publication of bytes other than the reviewed tarball.
+Report realistic paths to compromise an application integration, repository, release artifact, or maintainer privilege. Examples include:
+
+- DOM or script injection through event data, or bypass of event-link or WebMCP output policy.
+- Unauthorized site-tool disclosure or navigation, or stale or cross-instance tool registration.
+- Sensitive diagnostic disclosure, resource-bound bypass, or stale-generation races.
+- Package substitution, workflow privilege escalation, or publication of bytes other than the reviewed tarball.
 
 A development-tool advisory is relevant when it can affect CI, repository integrity, or published output.  A version match without a reachable path is not sufficient by itself.
 

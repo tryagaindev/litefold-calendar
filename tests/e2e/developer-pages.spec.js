@@ -208,6 +208,32 @@ test.describe("large-text developer-page reflow", () => {
 		await expectNoDocumentHorizontalOverflow(page);
 	});
 
+	test("examples landing explains missing metadata without claiming a version at 200% text", async ({ page }) => {
+		await page.setViewportSize({ height: 844, width: 390 });
+		await page.route("**/examples/metadata.json", async (route) => route.fulfill({
+			body: "{}",
+			contentType: "application/json",
+			status: 404
+		}));
+		const response = await page.goto("/examples/", { waitUntil: "domcontentloaded" });
+		expect(response?.ok()).toBe(true);
+		await expect(page.locator("[data-my-metadata-state]")).toHaveAttribute("data-my-metadata-state", "error");
+		await expect(page.locator("[data-my-version]")).toHaveText("Not available");
+		await expect(page.locator("[data-my-channel]")).toHaveText("Metadata unavailable");
+		await expect(page.locator("[data-my-metadata-status]")).toContainText("main branch");
+		await expect(page.getByRole("link", { exact: true, name: "API reference" }))
+			.toHaveAttribute("href", "https://github.com/tryagaindev/litefold-calendar/blob/main/docs/api.md");
+		await expect(page.getByRole("link", { exact: true, name: "Render static events" }))
+			.toHaveAttribute("href", "./basic/");
+		await page.addStyleTag({ content: "html { font-size: 200%; }" });
+		const status = page.locator("[data-my-metadata-status]");
+		await expect(status).toBeVisible();
+		await expect.poll(() => status.evaluate((element) =>
+			element.scrollWidth - element.clientWidth
+		)).toBeLessThanOrEqual(1);
+		await expectNoDocumentHorizontalOverflow(page);
+	});
+
 	test("async-errors heading reflows inside the example shell at 200% text", async ({ page }) => {
 		await page.setViewportSize({ height: 844, width: 320 });
 		const response = await page.goto("/examples/async-errors/", { waitUntil: "domcontentloaded" });

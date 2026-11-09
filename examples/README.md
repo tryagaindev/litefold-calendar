@@ -69,13 +69,21 @@ npm run demo
 
 Open the printed `/examples/` URL. `npm run demo` builds the package and generated example assets, then starts a loopback HTTP server. After a successful `npm run build`, use `npm run serve:repository` to restart the server without rebuilding.
 
-The build generates `examples/advanced/main.js` and `examples/metadata.json`. Both are ignored build output: do not edit or commit them. `metadata.json` records the package version, exact source commit when one can be proven, and deployment channel so a rendered example can identify its provenance.
+The build generates `examples/advanced/main.js` and `examples/metadata.json`. Both are ignored build output: do not edit or commit them.
+
+`metadata.json` identifies the running build. It records the package version, deployment channel, and exact source commit when one can be proven.
 
 ## Contributors
 
 Use the contributor command reference to [choose focused validation](../CONTRIBUTOR_COMMANDS.md#choose-focused-validation) while iterating. It routes example changes through public-declaration, `checkJs`, JSDOM, and real-browser coverage as applicable. Before submission, follow the [final gate](../CONTRIBUTOR_COMMANDS.md#run-the-final-gate), including its committed, clean-worktree prerequisite and packed-consumer checks.
 
-The advanced recipe is deliberately exhaustive where it serves repository coverage: complete option, hook, and method inventories expose missing public-surface coverage during typechecking; boundary fixtures exercise range, overflow, and DOM limits; and `data-test-*` attributes provide repository synchronization probes. Consumer code should copy the documented integration patterns, not those coverage mechanics. Exact responsive geometry belongs in [DESIGN.md](../DESIGN.md).
+The advanced recipe includes extra machinery for repository tests:
+
+- Complete option, hook, and method inventories let typechecking find gaps in public-API coverage.
+- Boundary fixtures exercise range, overflow, and DOM limits.
+- `data-test-*` attributes let repository tests synchronize with the example.
+
+Copy the documented integration patterns into applications, not this test machinery. See [DESIGN.md](../DESIGN.md) for exact responsive geometry.
 
 When adding or changing an example:
 
@@ -89,7 +97,6 @@ When adding or changing an example:
 
 `examples/metadata.json` is generated provenance, not configuration or a release record. Deployment tooling regenerates it from the package version, exact source commit, and channel; never edit or commit it.
 
-GitHub Pages hosts a rolling `main` preview and immutable release snapshots. The
-[static example deployment guide](../docs/example-deployment.md) owns deployment
-prerequisites, verification, recovery, and rollback, including the specific
-GitHub permissions required for each operation.
+GitHub Pages hosts a rolling `main` preview and immutable release snapshots. See
+[static example deployment](../docs/example-deployment.md) for prerequisites,
+verification, recovery, rollback, and the GitHub permissions each operation requires.

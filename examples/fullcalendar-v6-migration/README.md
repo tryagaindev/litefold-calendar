@@ -1,12 +1,12 @@
 # FullCalendar v6 `dayGridMonth` migration example
 
-This runnable example is the smallest useful companion to the [migration guide](../../docs/fullcalendar-v6-migration.md). It rewrites the source shape of a basic FullCalendar v6 month view; the version label defines that compatibility boundary and does not make this a compatibility layer.
+This runnable companion to the [migration guide](../../docs/fullcalendar-v6-migration.md) adapts the source data for a basic FullCalendar v6 month view. The version label identifies the source API being migrated; the example is not a FullCalendar compatibility layer.
 
 ## Run it
 
 Follow the shared [local run instructions](../README.md#run-locally), then choose **Rewrite a dayGridMonth view**.
 
-[`main.js`](main.js) is committed source, not generated output. The full example build checks it with TypeScript `checkJs`; `typecheck:examples` checks the advanced TypeScript recipe only. [`index.html`](index.html) provides the page structure, and [`../example.css`](../example.css) supplies shared example styles.
+[`main.js`](main.js) is committed source, not generated output. The full example build checks it with TypeScript `checkJs`. The separate `typecheck:examples` command checks the advanced TypeScript and remote-data recipes. [`index.html`](index.html) provides the page structure, and [`../example.css`](../example.css) supplies shared example styles.
 
 ## Choose a package version
 
@@ -23,7 +23,9 @@ Read [`main.js`](main.js) from top to bottom:
 5. `onDaySelect` and `onEventActivate` replace the common `dateClick` and `eventClick` callbacks.
 6. **Trigger overlapping refetches** calls `refetchEvents()` twice. The second request aborts the first, and only the latest result can render.
 
-`loadMigratedEvents()` is `async`, so every invocation first renders loading with `aria-busy` and later renders its terminal result. A provider that directly returned an adapted array would instead complete one terminal render before the initiating method returned; even `Promise.resolve(array)` deliberately keeps the two-render async lifecycle.
+`loadMigratedEvents()` is `async`. Each call first renders loading with `aria-busy`, then renders its terminal result.
+
+A provider that directly returned an adapted array would complete one terminal render before the initiating method returned. Even `Promise.resolve(array)` keeps the two-render async lifecycle.
 
 The linked event is still a native anchor, including its path, query, and fragment. The example callback prevents navigation only to keep the demo page open, then reports the preserved target.
 

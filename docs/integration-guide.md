@@ -35,7 +35,9 @@ first render.  Verify the behavior you add, including failure recovery and
 
 ## Typed source adapter
 
-Event metadata is optional. A basic calendar needs no metadata interface and no generic argument. Use an application-defined type only when application data must remain available to actions or render hooks; typed `events` let `createCalendar()` infer that type and return `Calendar<TMetadata>`. The returned type keeps later `setEvents()` replacements on the same metadata contract as actions and render hooks.
+Event metadata is optional. A basic calendar needs no metadata interface and no generic argument.
+
+Define a metadata type when actions or render hooks need your application data. Typed `events` let `createCalendar()` infer that type and return `Calendar<TMetadata>`. Later `setEvents()` replacements use the same metadata contract as actions and render hooks.
 
 Namespace IDs when records from multiple application categories can share a numeric or short identifier:
 
@@ -199,7 +201,7 @@ const calendar = createCalendar(host, {
 });
 ```
 
-Keep application-owned date controls aligned by applying the same bounds to external inputs that call `gotoDate()` or `focusDate()`. The [API configuration contract](api.md#data-date-and-layout-options) owns exact bound admission, navigation, and initial-date behavior.
+Apply the same bounds to application inputs that call `gotoDate()` or `focusDate()`. See the [API configuration contract](api.md#data-date-and-layout-options) for valid bounds, navigation, and initial-date behavior.
 
 ## WebMCP site tools
 
@@ -231,7 +233,22 @@ See the [WebMCP site-tool guide](webmcp.md) for exact tool schemas, lifecycle, c
 
 ## Native pull/snap paging
 
-Leave `swipe` enabled unless the host context must disable direct-input paging. Below a `24rem` calendar content width, package container CSS shows the locale's abbreviated month with a numeric year in both the toolbar and decorative pager lanes; exactly `24rem` and above uses the full month. Complete accessible month naming is unchanged, and the lanes remain entirely decorative. Do not measure the viewport or host to select this state, intercept package touch, pointer, wheel, or scroll events, or query or mutate private toolbar and pager descendants. The [API option](api.md#data-date-and-layout-options) owns public behavior, the [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior) owns input and verification requirements, and [DESIGN.md](../DESIGN.md#pager-direction-and-motion) owns exact presentation.
+Leave `swipe` enabled unless the host context must disable direct-input paging.
+
+The package's container CSS chooses the visible month label for both the toolbar and decorative pager lanes:
+
+- Below a `24rem` calendar content width, it shows the locale's abbreviated month and a numeric year.
+- At exactly `24rem` and above, it shows the full month.
+
+The complete accessible month name stays the same. Pager lanes remain decorative.
+
+Keep the package in control of paging:
+
+- Do not measure the viewport or host to choose the label.
+- Do not intercept package touch, pointer, wheel, or scroll events.
+- Do not query or change private toolbar and pager descendants.
+
+See the [API option](api.md#data-date-and-layout-options) for public behavior, the [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior) for input checks, and [DESIGN.md](../DESIGN.md#pager-direction-and-motion) for exact presentation.
 
 ## Choose visual time surfaces
 
@@ -244,7 +261,7 @@ const calendar = createCalendar(host, {
 });
 ```
 
-Choose among `"all"`, `"grid"`, `"agenda"`, and `"none"` through the public option rather than hiding internal time slots. The [API option](api.md#data-date-and-layout-options) and [accessibility semantics](../ACCESSIBILITY.md#interaction-model) own the observable contract; use public tokens for density.
+Choose `"all"`, `"grid"`, `"agenda"`, or `"none"` through the public option. Do not hide internal time slots. See the [API option](api.md#data-date-and-layout-options) and [accessibility semantics](../ACCESSIBILITY.md#interaction-model) for the full contract; use public tokens to adjust density.
 
 ## Choose month-grid layout
 
@@ -406,7 +423,13 @@ calendar.render();
 calendar.setEvents(remoteEvents);
 ```
 
-Replacement is complete rather than additive. A static array or directly returned provider array commits before `setEvents()` returns; a PromiseLike replacement returns after its loading render and settles later. An immediate replacement supersedes pending async work and clears its busy state. Use `setEvents()` only for event-input replacement and recreate the instance for other configuration changes. The [canonical `setEvents()` contract](api.md#control-the-calendar-calendar) owns lifecycle admission, preserved state and focus, cancellation, retained data, Retry, and reentrancy.
+`setEvents()` replaces the complete input; it does not add or merge events.
+
+- A static array or directly returned provider array commits before the call returns.
+- A PromiseLike replacement returns after its loading render and settles later.
+- An immediate replacement supersedes pending async work and clears its busy state.
+
+Use `setEvents()` only to replace event input. Recreate the instance for other configuration changes. See the [`setEvents()` contract](api.md#control-the-calendar-calendar) for valid lifecycle states, preserved state and focus, cancellation, retained data, Retry, and reentrancy.
 
 ## Toolbar content
 
@@ -421,7 +444,9 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The package temporarily mounts the same node while its state, names, labels, and listeners remain application-owned. Keep custom content flexible and keyboard operable. The [API integration-node contract](api.md#application-integration-options) owns mounting and release, [DESIGN.md](../DESIGN.md#responsive-model) owns composition, and the [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior) owns focus order. Do not interleave content through private selectors.
+The package temporarily mounts the same node. Your application still owns its state, names, labels, and listeners. Keep custom content flexible and keyboard operable; do not insert it through private selectors.
+
+See the [API integration-node contract](api.md#application-integration-options) for mounting and release, [DESIGN.md](../DESIGN.md#responsive-model) for layout, and the [accessibility guide](../ACCESSIBILITY.md#responsive-and-direct-input-behavior) for focus order.
 
 ### Show a Today icon in narrow calendars
 
@@ -441,7 +466,7 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The factory may return an SVG instead. Style the returned node through its own class and keep its content noninteractive. The [icon API](api.md#customize-messages-and-icons) owns the width threshold, accessible naming, node validation, and teardown. The package chooses between text and icon using the calendar's container width, so no application resize listener or viewport check is needed.
+The factory may return an SVG instead. Style the returned node through its own class and keep its content noninteractive. The package chooses between text and icon using the calendar's container width; the application needs no resize listener or viewport check. See the [icon API](api.md#customize-messages-and-icons) for the width threshold, accessible naming, valid nodes, and teardown.
 
 ## Add metadata-driven visuals without private selectors
 
@@ -619,7 +644,7 @@ If a hook set throws, returns an invalid or asynchronous result, or fails cleanu
 
 ## Progressive fallback
 
-Keep server-authored or otherwise application-owned fallback content DOM-disjoint from the host—normally as a sibling, with neither element containing the other—and pass its element to the calendar:
+Keep server-authored or other application-owned fallback content outside the host. Neither element may contain the other; sibling elements are the usual choice. Pass the fallback element to the calendar:
 
 ```ts
 const fallbackElement = document.querySelector<HTMLElement>("[data-my-calendar-fallback]");
@@ -630,7 +655,11 @@ const calendar = createCalendar(host, {
 });
 ```
 
-The application owns the fallback's content, authorization, freshness, canonical links, metadata, structured data, and privacy policy. With a direct array, the terminal fallback visibility decision completes before the initiating void method returns. A PromiseLike source leaves the fallback at its loading visibility while settlement is pending. The [API reference owns lease and visibility lifecycle](api.md#application-integration-options); [SEO and progressive enhancement](seo-and-progressive-enhancement.md) owns the server-content recipe and verification guidance.
+The application owns the fallback's content, authorization, freshness, canonical links, metadata, structured data, and privacy policy.
+
+With a direct array, the terminal fallback visibility decision completes before the initiating `void` method returns. A PromiseLike source leaves the fallback at its loading visibility while settlement is pending.
+
+See the [API reference](api.md#application-integration-options) for the lease and visibility lifecycle. Follow [SEO and progressive enhancement](seo-and-progressive-enhancement.md) for the server-content recipe and verification steps.
 
 ## Actions and errors
 
@@ -677,11 +706,11 @@ const calendar = createCalendar(host, {
 
 Use the occurrence `dateString` rather than assuming `event.start`, and call `nativeEvent.preventDefault()` synchronously only when a linked event has a complete alternative action. Position keyboard-invoked context UI from the supplied element when coordinates are not meaningful.
 
-The [action contract](api.md#handle-user-actions-calendaraction) owns callback shapes, representation, admission, concurrency, and failure behavior. The [error guide](errors.md) owns current versus diagnostic failures, `"default"` versus `"handled"` presentation, programmer errors, and recovery.
+See the [action contract](api.md#handle-user-actions-calendaraction) for callback shapes, representation, admission, concurrency, and failure behavior. See the [error guide](errors.md) for current versus diagnostic failures, `"default"` versus `"handled"` presentation, programmer errors, and recovery.
 
 ## Token bridge
 
-Keep application token mapping outside the package and set overrides on the same host passed to `createCalendar()`. [DESIGN.md](../DESIGN.md) owns the canonical roles and defaults; the [Styling and customization](styling.md#apply-token-overrides) provides the single supported bridge example, cascade rules, and CSP implications.
+Map application tokens outside the package and set overrides on the same host passed to `createCalendar()`. See [DESIGN.md](../DESIGN.md) for canonical roles and defaults. Use [Styling and customization](styling.md#apply-token-overrides) for the supported bridge example, cascade rules, and CSP implications.
 
 Place the calendar in a host whose border box meets the [minimum supported design width](../DESIGN.md#responsive-model). Hosts below that floor receive best-effort graceful degradation only. Above it, allow the host to reflect its actual available width and leave exact responsive behavior to the design contract. Do not override private responsive or pager internals.
 
@@ -721,16 +750,12 @@ deployment paths, not package specifiers. See the runnable
 
 An integration is ready when:
 
-- Data adapters, authorization, range caching, filtering, and diagnostic handling remain application-owned and fail atomically.
-- Event replacement, actions, toolbar content, render hooks, extensions, and fallback coordination use documented public surfaces without private selectors.
-- Compact and wide `renderEventOverflow` customizations preserve canonical
-  native-action behavior, use the package-supplied localized text and counts,
-  stay within package-assigned blocks, and satisfy the
-  [responsive design checks](../DESIGN.md#responsive-model) without rerunning
-  the hook on resize.
+- Keep data adapters, authorization, range caching, filtering, and diagnostics in the application. Failed operations must not leave partial results.
+- Use documented public APIs for event replacement, actions, toolbar content, render hooks, extensions, and fallback coordination. Do not use private selectors.
+- Check compact and wide `renderEventOverflow` content against the [responsive design](../DESIGN.md#responsive-model). It must preserve native actions, use the supplied localized text and counts, and stay inside its assigned block. Resizing must not rerun the hook.
 - Lifecycle, validation, replacement, fallback, render-hook, and extension scenarios satisfy the [API reference](api.md) and failures satisfy the [error guide](errors.md).
 - Keyboard, direct-input, RTL, zoom, forced-color, reduced-motion, localization, and screen-reader flows satisfy the [accessibility verification matrix](../ACCESSIBILITY.md#testing).
-- Visual overrides satisfy [DESIGN.md](../DESIGN.md) and the [Styling and customization](styling.md), including affected screenshot evidence.
+- Check visual overrides against [DESIGN.md](../DESIGN.md) and [Styling and customization](styling.md), including affected screenshot evidence.
 - No-JavaScript content and indexing policy satisfy the [progressive-enhancement verification](seo-and-progressive-enhancement.md#verify-progressive-behavior).
-- Any WebMCP extension uses a stable unique prefix when calendars can share a document, preserves the normal UI when unsupported, exposes only authorized event summaries, and unregisters during teardown.
+- Give WebMCP a stable unique prefix when calendars can share a document. Confirm that the normal UI works without WebMCP, tools expose only authorized event summaries, and registrations are removed during teardown.
 - A production install adds no transitive runtime dependency or remote asset.

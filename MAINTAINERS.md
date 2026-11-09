@@ -41,7 +41,8 @@ Authorization for one project or platform role does not imply another.
 
 Maintainers are expected to:
 
-- Triage issues and pull requests, enforce the documented public, accessibility, security, and package contracts, and explain material tradeoffs.
+- Triage issues and pull requests. Enforce the documented public, accessibility,
+  security, and package contracts, and explain material tradeoffs.
 - Require repository checks and relevant manual evidence before merge; maintainer-authored changes follow the same gate as community changes.
 - Follow the [nightly release operations runbook](docs/release-operations.md), [release policy](docs/releasing.md), and [release administration guide](docs/release-administration.md) for publication work.
 - Handle suspected vulnerabilities through [SECURITY.md](SECURITY.md) and keep sensitive reports out of public issues.
@@ -55,12 +56,13 @@ should preserve documented public guarantees and explain important tradeoffs in
 issues or pull requests. Code of Conduct reports follow the separate assignment
 and recusal rules below.
 
-When a maintainer authors a change or operates a release and no other eligible
-maintainer is available, independent maintainer approval is impossible and the
-hosted policy must avoid deadlock while preserving all other checks. Changes
-authored by contributors can still require approval from the sole eligible
-maintainer. When multiple eligible maintainers are available, protected branches
-and release environments require at least one non-author approval.
+When a maintainer authors a change or operates a release, independent approval
+requires another eligible maintainer. If none is available, the hosted policy
+must avoid deadlock while preserving all other checks. Changes authored by
+contributors can still require approval from the sole eligible maintainer.
+
+When multiple eligible maintainers are available, protected branches and release
+environments require at least one non-author approval.
 
 ## Code of Conduct response
 
@@ -110,12 +112,15 @@ person, and the appeal path must be documented.
 ## Adding or removing maintainers
 
 As the contributor community grows, additional maintainers may be appointed
-through the TryAgainDev GitHub organization based on
-sustained, constructive contributions, sound judgment, security awareness, and
-willingness to support the project. Changes to this file and CODEOWNERS require
-approval from an organization owner. This is a human governance decision recorded
-in the pull request; CODEOWNERS alone does not enforce or prove it. Access should
-be removed promptly when responsibilities end.
+through the TryAgainDev GitHub organization. Base appointments on sustained,
+constructive contributions, sound judgment, security awareness, and willingness
+to support the project.
+
+Obtain approval from an organization owner for changes to this file and
+CODEOWNERS. Record this human governance decision in the pull request;
+CODEOWNERS alone does not enforce or prove it.
+
+When responsibilities end, access should be removed promptly.
 
 When another active maintainer is appointed, update the current maintainer list,
 team membership, CODEOWNERS, required pull-request approvals, required reviewers

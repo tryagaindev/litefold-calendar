@@ -1,5 +1,5 @@
 name: Usage question
-description: Ask for help integrating or using litefold-calendar.
+description: Ask for help integrating or using Litefold Calendar.
 title: "[Question]: "
 body:
   - type: markdown
@@ -34,7 +34,15 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Include browser and operating-system versions, input device, framework, and relevant assistive technology. For WebMCP, also provide sanitized host version, embedding and permission-policy context, feature-detection result, configured tool prefix, expected tool name, and the failed operation; exclude account, workspace, conversation, tenant, and organization identifiers.
+      description: |
+        For all reports, include browser and operating-system versions, input device, framework, and relevant assistive technology.
+
+        For WebMCP reports, also include these sanitized details:
+        - Host version, embedding context, and permission-policy context.
+        - Feature-detection result, configured tool prefix, and expected tool name.
+        - The failed operation.
+
+        Exclude account, workspace, conversation, tenant, and organization identifiers.
       placeholder: Current Chrome on Windows; plain TypeScript
     validations:
       required: true
