@@ -14,9 +14,11 @@ interface Calendar<in out TMetadata = unknown> {
 }
 ```
 
-`createCalendar<TMetadata>()` returns `Calendar<TMetadata>`. `setEvents()` replaces the complete static snapshot or provider, then resolves the current visible range on the existing instance. A direct array finishes before the method returns; a PromiseLike keeps the loading-then-terminal lifecycle. The method does not update locale, time zone, date bounds, callbacks, render hooks, complete extensions, messages, icons, limits, or integration nodes. Those values remain construction-time configuration and require recreation.
+`createCalendar<TMetadata>()` returns `Calendar<TMetadata>`. Call `setEvents()` to replace the complete static snapshot or provider and resolve the current visible range on the existing instance. A direct array finishes before the method returns. A PromiseLike keeps the loading-then-terminal lifecycle.
 
-Do not add a general `setOptions()` method. Event data is the repeated dynamic case, while the other options own formatters, bounds, DOM leases, callbacks, or rendering policy whose safe partial replacement would turn a focused calendar into a general state-reconciliation system.
+Locale, time zone, date bounds, callbacks, render hooks, complete extensions, messages, icons, limits, and integration nodes remain construction-time configuration. Destroy and recreate the calendar to change them.
+
+Do not add a general `setOptions()` method. Applications repeatedly replace event data. Other options own formatters, bounds, DOM leases, callbacks, or rendering policy. Safely replacing only some of those options would turn a focused calendar into a general state-reconciliation system.
 
 Choose the update path by what changed:
 
@@ -50,7 +52,9 @@ The fixtures also establish these behavior differences:
 
 ### Recreate the instance
 
-Recreation remains the correct operation when construction-time configuration changes. It provides a clean ownership boundary and already aborts source, render-hook, and extension work. It is a poor default for event replacement because it clears the usable snapshot, resets agenda paging, replaces focused nodes, and reruns every render-hook mount and extension lifecycle. A PromiseLike source also temporarily returns progressive enhancement to pending fallback state; a direct result settles fallback before `render()` returns.
+Recreation remains the correct operation when construction-time configuration changes. It provides a clean ownership boundary and already aborts source, render-hook, and extension work.
+
+For event replacement, recreation has avoidable costs: it clears the usable snapshot, resets agenda paging, replaces focused nodes, and reruns every render-hook mount and extension lifecycle. A PromiseLike source also temporarily returns progressive enhancement to pending fallback state. A direct result settles fallback before `render()` returns.
 
 ### Provider state plus `refetchEvents()`
 
@@ -88,9 +92,19 @@ The implementation uses all of the following rules:
 
 ## Implementation and verification
 
-The coordinator stores a mutable current `CalendarEvents<TMetadata>` separate from the immutable options snapshot, preserving a static array or provider without wrapping one as the other. A focused source module returns a private synchronous/asynchronous discriminant for every request, while shared terminal helpers preserve generation, error, focus, agenda, and fallback behavior. Argument resolution reuses the hardened array inspection used at construction while mapping method misuse to `invalid-argument`.
+The coordinator stores the current `CalendarEvents<TMetadata>` separately from the immutable options snapshot. It can replace that current value while preserving an array or provider without wrapping one as the other.
 
-Public declarations, the exhaustive `Calendar` method map, API and integration documentation, the changelog, built examples, and packed-package consumer verification change together. Focused tests cover static arrays, provider replacement, invalid top-level input, invalid payloads, stale success and failure, abort signals, recoverable source failure, before-render and after-destroy calls, callback reentrancy, exact focus restoration, removed-event fallback, preserved agenda paging, filters, and `refetchEvents()` after multiple replacements.
+For each request, the source module returns a private discriminant that identifies synchronous or asynchronous work. Shared terminal helpers preserve generation, error, focus, agenda, and fallback behavior. Argument resolution reuses the hardened array inspection from construction and maps method misuse to `invalid-argument`.
+
+Public declarations, the exhaustive `Calendar` method map, API and integration documentation, the changelog, built examples, and packed-package consumer verification change together.
+
+Focused tests cover:
+
+- Static arrays, provider replacement, filters, and `refetchEvents()` after multiple replacements.
+- Invalid top-level input, invalid payloads, and recoverable source failure.
+- Stale success and failure, abort signals, and callback reentrancy.
+- Calls before render and after destroy.
+- Exact focus restoration, removed-event fallback, and preserved agenda paging.
 
 The decision record, integration fixtures, and measurement harness remain repository-only artifacts; the package manifest publishes `dist/` alone.
 
@@ -104,7 +118,14 @@ The opt-in harness compares `setEvents()`, application-owned provider state foll
 npm run measure:dynamic-events
 ```
 
-The default protocol alternates two deterministic snapshots of 10,000 valid events across the fixed `2026-07-26` through `2026-09-06` visible range. Each strategy receives five warmup operations and at least twenty measured operations. Strategy order rotates between cycles, the snapshot alternates each cycle, and the report uses the median and nearest-rank 95th percentile. Pass `--runs N` for more samples, `--size-only` for distribution size only, or `--json` for machine-readable output and raw samples.
+The default protocol uses the fixed `2026-07-26` through `2026-09-06` visible range:
+
+- Alternate two deterministic snapshots of 10,000 valid events.
+- Give each strategy five warmup operations and at least twenty measured operations.
+- Rotate strategy order and alternate the snapshot each cycle.
+- Report the median and nearest-rank 95th percentile.
+
+Pass `--runs N` for more samples, `--size-only` for distribution size only, or `--json` for machine-readable output and raw samples.
 
 The harness runs the built package in JSDOM. Use results to compare the three paths on one machine and toolchain, not as browser latency or Interaction to Next Paint data. No timing or size threshold is part of the repository gate. Lifecycle, ready-state, event-count, and visible-range mismatches still fail because they invalidate the comparison.
 
@@ -114,7 +135,11 @@ Use the broader workflow harness to measure the root package import, initializat
 npm run measure:workflows
 ```
 
-It reports fresh-process import samples, only the modules reachable from the root entry (excluding optional WebMCP), public stylesheet raw/gzip bytes, render mutations, and median/p95 JSDOM timings. It deterministically asserts source calls, state phases, grid commits, and dense DOM limits; these operation counts catch redundant renders without relying on machine speed. Pass `--runs N`, `--warmups N`, `--import-runs N`, `--import-warmups N`, or `--json` after `--` to adjust diagnostic sampling. The fast tooling tests validate the import-graph, stylesheet-size, and operation-count contracts; the timed workflow remains opt-in.
+The workflow report includes fresh-process import samples, modules reachable from the root entry (excluding optional WebMCP), public stylesheet raw/gzip bytes, render mutations, and median/p95 JSDOM timings.
+
+The harness checks source calls, state phases, grid commits, and dense DOM limits deterministically. These operation counts catch redundant renders without relying on machine speed. The fast tooling tests validate the import-graph, stylesheet-size, and operation-count contracts; the timed workflow remains opt-in.
+
+Pass `--runs N`, `--warmups N`, `--import-runs N`, `--import-warmups N`, or `--json` after `--` to adjust diagnostic sampling.
 
 The npm commands build first, so their build messages precede a JSON report. For clean machine-readable workflow output, build once and invoke the measurement script directly:
 

@@ -69,21 +69,27 @@ These focused DOM presenters illustrate the boundary; the table is not an exhaus
 
 The coordinator's `MonthCalendar` class is the sole transaction owner, but it remains an orchestrator rather than a policy container. Focused runtime modules own source-shape classification, PromiseLike observation, source-error construction, and other separable concerns; the coordinator retains generation checks and atomic state/DOM commits.
 
-Accepted navigation and explicit data replacement also claim an interaction epoch,
-independent of optional extensions. A committed-render receipt records that epoch,
-DOM identity, render generation, and selected date after mount hooks and focus
-restoration. Reentrant work invalidates older focus/default completion, including
-accepted same-date navigation. Structural render validity uses DOM identity and
-render generation separately: a same-date navigation that needs no replacement
-must still allow the current grid and its selection state to commit.
-Selection publication compares the winning render's target with the current
-immutable state snapshot, rather than a date staged by an interrupted selection.
-This lets reentrant same-target focus navigation publish once without reviving
-the superseded default completion. Detached hosts also commit render/state changes.
-Overflow completion additionally requires
-connectivity and actual heading focus. Render-hook recovery remains within
-its owning interaction. The action pipeline observes returned promises using per-hook
-generations; action completion does not own or replay navigation.
+Accepted navigation and explicit data replacement claim an interaction epoch,
+independent of optional extensions. After mount hooks and focus restoration,
+a committed-render receipt records the epoch, DOM identity, render generation,
+and selected date.
+
+Keep these checks separate:
+
+- **Focus and default completion:** Reentrant work invalidates older completion,
+  including accepted same-date navigation.
+- **Structural render validity:** Check DOM identity and render generation.
+  A same-date navigation that needs no replacement must still allow the current
+  grid and its selection state to commit.
+- **Selection publication:** Compare the winning render's target with the current
+  immutable state snapshot, not a date staged by an interrupted selection.
+  Reentrant same-target focus navigation can then publish once without reviving
+  the superseded default completion.
+
+Detached hosts also commit render and state changes. Overflow completion requires
+both connectivity and actual heading focus. Render-hook recovery stays within
+its owning interaction. The action pipeline observes returned promises using
+per-hook generations; action completion does not own or replay navigation.
 
 ### Instance lifetime
 
@@ -123,7 +129,37 @@ sequenceDiagram
   Note over Coordinator,DOM: Current-generation checks guard provider work, normalization, callbacks, render hooks, and commits.
 ```
 
-A direct array performs one terminal render without a loading or busy phase. A PromiseLike attaches both settlement handlers before publishing loading, then performs one loading render and one terminal render. Explicit reentrant navigation can add its own renders and mount hooks, as described in [source timing](api.md#source-timing-and-renders). From request preparation, including previous-request abort callbacks, through provider classification and busy-attribute reactions, the source transaction reserves state publication for its generation. The guard also covers asynchronous success and failure commits. Non-owning state writes, including recoverable hook-error snapshots during reentrant renders, wait for the owning source phase; error delivery and issue admission retain their usual generation checks. This prevents callbacks from pairing a newly selected date with the previous request's range or publishing a duplicate or premature phase. Publication releases after the state snapshot is assigned and before consumer or extension state callbacks run. Nested generations restore their enclosing scope without suppressing a newer request's publication or later navigation. Source rejection or invalid payload follows the same ownership and generation gates: a current failure enters the documented error-admission path, while stale work may be reported but cannot update state or DOM. See the [error guide](errors.md) for failure presentation and recovery.
+The returned value determines the uninterrupted render sequence:
+
+- A direct array performs one terminal render, with no loading or busy phase.
+- A PromiseLike attaches both settlement handlers before publishing loading.
+   It then performs one loading render and one terminal render.
+
+Explicit reentrant navigation can add its own renders and mount hooks. See
+[source timing](api.md#source-timing-and-renders) for those cases.
+
+#### Source publication ownership
+
+The source transaction reserves state publication for its generation. This guard
+starts during request preparation, including previous-request abort callbacks.
+It covers provider classification, busy-attribute reactions, and asynchronous
+success and failure commits.
+
+State writes from other work wait for the owning source phase. This includes
+recoverable hook-error snapshots during reentrant renders. Error delivery and
+issue admission still use their usual generation checks. These rules prevent a
+callback from pairing a newly selected date with the previous request's range,
+or publishing a duplicate or premature phase.
+
+The transaction releases publication ownership after assigning the state snapshot,
+before consumer or extension state callbacks run. Nested generations restore
+their enclosing scope. They must not suppress a newer request's publication or
+later navigation.
+
+Source rejection and invalid payloads use the same ownership and generation
+checks. A current failure enters the documented error-admission path. Stale work
+may be reported, but cannot update state or DOM. See the [error guide](errors.md)
+for failure presentation and recovery.
 
 Configured extensions receive state through their separate queued lifecycle after the consumer callback; see the [extension lifecycle sequence](#extension-lifecycle-implementation).
 
@@ -131,7 +167,20 @@ The immutable options snapshot keeps the construction-time `events` value, while
 
 Keep generation checks and commit decisions in the coordinator or a focused runtime policy module. Do not let DOM renderers start requests, mutate public state, or decide whether stale work may commit.
 
-Performance fast paths must preserve those ownership boundaries. Event indexing may parse once, sort once, and distribute occurrences because it is a pure domain operation. A calendar with no render hooks may skip hook-integrity snapshots and mount-context construction because those render regions contain no consumer render-hook nodes to protect; any configured hook set always uses the complete integrity and quarantine path. Shared and optional formatters belong to focused presentation helpers, and disabled features must avoid installing inactive listeners or observers. Full grid and agenda replacement remains the transaction boundary for selection and source commits until a partial-render design can preserve focus restoration, hook cleanup, quarantine recovery, and callback reentrancy together.
+Performance fast paths must preserve these ownership boundaries:
+
+- Event indexing may parse once, sort once, and distribute occurrences because it
+  is a pure domain operation.
+- A calendar with no render hooks may skip hook-integrity snapshots and
+  mount-context construction. Those regions contain no consumer render-hook nodes
+  to protect. Any configured hook set must use the complete integrity and
+  quarantine path.
+- Shared and optional formatters belong to focused presentation helpers.
+  Disabled features must not install inactive listeners or observers.
+
+Full grid and agenda replacement remains the transaction boundary for selection
+and source commits. A partial-render design must first preserve focus restoration,
+hook cleanup, quarantine recovery, and callback reentrancy together.
 
 ## Stable DOM and ownership invariants
 
@@ -182,7 +231,14 @@ The root runtime resolves only package-issued opaque `CalendarExtension` values 
 | `src/extensions/webmcp/execution-signal.ts` | Cross-realm execution cancellation validation and lifecycle fallback |
 | `src/extensions/webmcp/runtime.ts` | WebMCP schemas, capability use, registration, tool execution, and disposal |
 
-Each first-party extension factory validates and snapshots configuration synchronously, returns an immutable reusable value, and defers document access until activation. Extension IDs are stable and unique per calendar; duplicate IDs fail before host mutation. Distinct IDs always coexist, activation and state delivery follow caller order, and teardown reverses it. There is no dependency, priority, precedence, conflict, discovery, or global-registration mechanism.
+Each first-party extension factory validates and snapshots configuration
+synchronously. It returns an immutable reusable value and defers document access
+until activation.
+
+Extension IDs are stable and unique per calendar. Duplicate IDs fail before host
+mutation; distinct IDs always coexist. Activation and state delivery follow
+caller order, and teardown reverses it. There is no dependency, priority,
+precedence, conflict, discovery, or global-registration mechanism.
 
 An extension failure emits diagnostic-only `extension-failed` with its trusted `extensionId` and lifecycle `hook`. The manager aborts and disposes that extension exactly once, then continues independent work while the calendar remains live. Consumer visual hooks use the separate `render-hook-failed` / `renderHookId` channel and are not an extension-authoring surface.
 

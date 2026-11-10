@@ -2,7 +2,9 @@
 
 Thanks for helping improve Litefold Calendar. The project is maintained by TryAgainDev and released under the MIT License. Participation is governed by the [Contributor Covenant 3.0 Code of Conduct](CODE_OF_CONDUCT.md).
 
-This guide owns contribution policy and the obligations that accompany each kind of change. Use the [contributor command reference](CONTRIBUTOR_COMMANDS.md) for repository setup, focused checks, the final gate, and change delivery.
+Follow this guide for contribution policy and the work required for each kind of
+change. Use the [contributor command reference](CONTRIBUTOR_COMMANDS.md) for setup,
+focused checks, the final gate, and change delivery.
 
 ## Before you start
 
@@ -26,7 +28,11 @@ Use focused checks while developing, then run the [complete repository gate](CON
 
 ## Change obligations
 
-Put each contract in its canonical document and link to it from shorter guides. Do not create a second inventory or restate implementation details in contributor-facing policy.
+Keep each complete contract in its canonical document and link to it from
+shorter guides. Reuse familiar terms and short explanations when a guide needs
+them to stand alone. Do not duplicate full inventories or implementation details
+in contributor policy. Follow the [writing style](docs/writing-style.md) for copy
+and terminology changes.
 
 | Change area | Canonical contract | Required companion work |
 |---|---|---|
@@ -36,21 +42,21 @@ Put each contract in its canonical document and link to it from shorter guides. 
 | CSS tokens, responsive composition, motion, or visual state | [Design system](DESIGN.md) | Run design and browser checks; update and review the [canonical screenshots](docs/screenshots/README.md) only when a captured visual state intentionally changes. |
 | First-party extension composition or WebMCP | [Extension API](docs/api.md#configure-first-party-extensions) and [WebMCP guide](docs/webmcp.md) | Preserve the documented opt-in package boundary, update schemas and lifecycle coverage, and exercise supported and unavailable-host behavior. |
 | Package exports, build output, dependency policy, or tarball contents | [Package verification](docs/package-verification.md) | Update package-policy tests, installed-consumer verification, and release evidence contracts as applicable. |
-| Documentation or examples | [Documentation hub](docs/README.md), [example guide](examples/README.md), and [coding conventions](docs/code-style.md) | Keep audience routing and canonical ownership intact, validate links and exports, and update executable examples when observable behavior changes. |
+| Documentation or examples | [Documentation hub](docs/README.md), [example guide](examples/README.md), and [writing style](docs/writing-style.md) | Preserve audience routing, shared terms, legal text, and canonical ownership. Validate links and exports; update executable examples when observable behavior changes. |
 | Publication or hosted release workflow | [Release policy](docs/releasing.md), [release administration](docs/release-administration.md), and [release operations](docs/release-operations.md) | Obtain maintainer review, identify any required GitHub `Admin` or npm permission changes, and update workflow-contract tests and private evidence requirements together. Ordinary publication is outside the contributor workflow. |
 
 ## Documentation audiences
 
 Before changing prose or an example, identify its primary audience in the
-[documentation hub](docs/README.md) and write for that reader's immediate
-decision:
+[documentation hub](docs/README.md). Write for the decision that reader needs
+to make:
 
 | Audience | Reader mindset | What the document should optimize for |
 | --- | --- | --- |
 | Package user — getting started | “Can I use this, and can I get a correct first result quickly?” | State assumptions, show the shortest safe path, and route optional complexity elsewhere. |
-| Package user — integration and API | “What is the exact contract, tradeoff, and failure behavior in my application?” | Define supported composition, ownership, edge cases, and stable public boundaries without exposing repository mechanics. |
-| Contributor | “Where does this fact belong, what else must change, and how do I prove it?” | Name the canonical owner, companion work, observable checks, and review evidence. |
-| Maintainer | “Who has authority, what changes public state, and how is it verified or recovered?” | Make project roles, platform permissions, approval boundaries, exact identities, irreversible effects, stop conditions, and private evidence explicit. |
+| Package user — integration and API | “What is the exact contract, tradeoff, and failure behavior in my application?” | Explain supported combinations, ownership, edge cases, and public boundaries. Keep repository mechanics out of the integration path. |
+| Contributor | “Where does this fact belong, what else must change, and how do I prove it?” | Name the canonical document, required companion work, checks, and review evidence. |
+| Maintainer | “Who has authority, what changes public state, and how is it verified or recovered?” | Name the role, platform permission, and approval required for each action. State exact identities, irreversible effects, stop conditions, and required private evidence. |
 
 Give each document one primary job. If a paragraph does not help that audience
 make its decision, move it to the canonical owner or replace it with a link.
@@ -61,15 +67,22 @@ it aligned with the basic example and verify it when the public API changes.
 Put costly integration surprises, especially date grammar, exclusive ends, and
 teardown, beside the code they affect.
 
-Avoid duplicating command inventories, API lists, responsive geometry, recovery
-matrices, and compatibility claims.  Label exhaustive API showcases and test
+Follow the [writing style](docs/writing-style.md) to make each explanation clear
+and keep terms consistent across pages. Label exhaustive API showcases and test
 fixtures before their setup instructions so readers can choose a smaller recipe.
 
 ## Tests
 
 Add focused regression tests for changed behavior and public contracts. Include relevant failure paths, stale asynchronous results, teardown, hostile input, and accessibility semantics. If a behavior or public contract does not need a regression test, explain why in the pull request.
 
-Browser-neutral end-to-end scenarios must remain runnable in the Chromium, Firefox, and WebKit projects. Chromium and WebKit gate hosted CI and publication; run Firefox locally for affected browser behavior. Scope a scenario to one engine only when the required Playwright capability is engine-specific, state that reason in the skip annotation, and keep the portable public-behavior path covered across all three engines. This automation policy does not reduce the [supported browser window](docs/browser-support.md).
+Browser-neutral end-to-end scenarios must run in the Chromium, Firefox, and
+WebKit projects. Chromium and WebKit gate hosted CI and publication; run Firefox
+locally for affected browser behavior.
+
+Limit a scenario to one engine only when it needs an engine-specific Playwright
+capability. State the reason in the skip annotation and keep the portable
+public-behavior path covered across all three engines. This automation policy
+does not reduce the [supported browser window](docs/browser-support.md).
 
 Automated accessibility coverage includes Playwright-computed ARIA snapshots and live-region/focus contracts in each browser engine. It supplements rather than replaces keyboard review and testing with actual assistive technologies.
 

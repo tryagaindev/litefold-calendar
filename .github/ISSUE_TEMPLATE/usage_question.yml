@@ -1,5 +1,5 @@
 name: Usage question
-description: Ask for help integrating or using litefold-calendar.
+description: Ask for help integrating or using Litefold Calendar.
 title: "[Question]: "
 body:
   - type: markdown
@@ -12,7 +12,7 @@ body:
     id: version
     attributes:
       label: Package version or commit
-      description: Provide the exact npm version or source commit and the SHA-256 when testing a tarball or generated artifact.
+      description: Give the exact npm version or source commit. If you tested a tarball or generated artifact, include its SHA-256 hash.
       placeholder: Exact npm version; full source commit; artifact SHA-256 when relevant
     validations:
       required: true
@@ -20,21 +20,34 @@ body:
     id: goal
     attributes:
       label: Integration goal
-      description: Describe the application behavior you are trying to implement.
+      description: Describe what you want your application to do.
     validations:
       required: true
   - type: textarea
     id: attempted
     attributes:
       label: What have you tried?
-      description: Include a minimal dependency-free example, relevant configuration, and sanitized output when practical.
+      description: |
+        When practical, include a small, dependency-free example, the relevant calendar settings, and sanitized output.
+        Sanitized output has private details removed. For example, replace a private event title with a made-up title such as "Sample event".
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: Include browser and operating-system versions, input device, framework, and relevant assistive technology. For WebMCP, also provide sanitized host version, embedding and permission-policy context, feature-detection result, configured tool prefix, expected tool name, and the failed operation; exclude account, workspace, conversation, tenant, and organization identifiers.
+      description: |
+        For all reports, include browser and operating-system versions. Name your input device, framework, and relevant assistive technology. Examples include a trackpad and a screen reader.
+
+        For WebMCP reports, also include these sanitized details:
+        - The host-agent version, when applicable.
+        - The embedding context: where the page runs, such as its own tab or an iframe.
+        - The permission policy: the browser-feature rules set by the page or its iframe. Report the relevant setting, or say "none set" if there is none.
+        - The feature-detection result: the value of `typeof document.modelContext?.registerTool`.
+        - The configured tool prefix and expected tool name.
+        - Which stage failed: registration, `get-events`, navigation, or teardown.
+
+        Exclude account, workspace, conversation, tenant, and organization identifiers.
       placeholder: Current Chrome on Windows; plain TypeScript
     validations:
       required: true

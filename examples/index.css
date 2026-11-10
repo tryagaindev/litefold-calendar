@@ -97,6 +97,7 @@
 
 	.my-metadata {
 		align-self: end;
+		container: my-metadata / inline-size;
 		display: grid;
 		flex: 1 1 16rem;
 		gap: 0.75rem;
@@ -156,6 +157,17 @@
 		border-color: var(--my-warning-border-color);
 		background: var(--my-warning-background);
 		color: var(--my-warning-color);
+	}
+
+	@container my-metadata (width < 16rem) {
+		.my-metadata dl > div {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.my-metadata dd {
+			justify-self: start;
+			text-align: start;
+		}
 	}
 
 	.my-landing-main {

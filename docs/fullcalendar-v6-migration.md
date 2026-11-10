@@ -215,7 +215,11 @@ Use `setEvents()` when the application receives a new complete static snapshot o
 calendar.setEvents(adaptFullCalendarEvents(nextEvents));
 ```
 
-`setEvents()` replaces rather than adds or merges. A direct array replacement commits before this void call returns; a PromiseLike replacement publishes loading and settles later. It preserves the displayed month and selected date, aborts superseded provider work, and makes the replacement current for later Retry and `refetchEvents()` calls. Call it only after `render()` and before `destroy()`.
+Call `setEvents()` only after `render()` and before `destroy()`. It replaces the complete input; it does not add or merge events.
+
+- A direct array replacement commits before this `void` call returns.
+- A PromiseLike replacement publishes loading and settles later.
+- Both preserve the displayed month and selected date, abort superseded provider work, and make the replacement current for later Retry and `refetchEvents()` calls.
 
 Recreate the calendar to change locale, time zone, bounds, callbacks, render hooks, extensions, limits, or any other construction-time option. The [API reference](api.md) documents focus preservation and failure behavior.
 

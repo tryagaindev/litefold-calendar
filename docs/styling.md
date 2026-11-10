@@ -29,11 +29,13 @@ once and declare the application layer afterward:
 ```
 
 `render()` adds `.litefold-calendar`, so the selector starts matching without
-another application class change.  Set overrides on this host: package defaults
-are declared there, so values set only on an ancestor do not replace them through
-inheritance.  If your application declares a global layer order, place `lfc`
-before your override layer.  The package stylesheet is scoped, uses `@layer lfc`,
-and includes no reset or remote assets.
+another application class change. Set overrides on this host. The package
+declares its defaults there, so inherited values from an ancestor do not replace
+them.
+
+If your application declares a global layer order, place `lfc` before your
+override layer. The package stylesheet is scoped, uses `@layer lfc`, and includes
+no reset or remote assets.
 
 Alternatively, import CSS from JavaScript and load your theme afterward.  In
 that setup, omit the CSS `@import` above to avoid importing the package twice:
@@ -128,12 +130,14 @@ The [chooser recipe](integration-guide.md#own-the-event-chooser) shows synchrono
 cancellation and focus restoration.
 
 Contexts expose `elements.root`, `elements.content`, `elements.action`,
-`variant`, `display`, the counts, and package-formatted `text`.  Count contexts
-use `visibleEventCount: 0` and `overflowCount: eventCount`.  Returning `null`
-retains built-in content for an actionable variant; only a passive cue can be
-suppressed.  The [overflow API](api.md#customize-rendering-calendarrenderhooks)
-defines all fields and return rules.  Container CSS chooses among the variants
-already rendered; resizing does not rerun the hook.
+`variant`, `display`, the counts, and package-formatted `text`. Count contexts
+use `visibleEventCount: 0` and `overflowCount: eventCount`.
+
+Returning `null` keeps built-in content for an actionable variant; only a
+passive cue can be suppressed. Container CSS chooses among the variants already
+rendered, so resizing does not rerun the hook. See the
+[overflow API](api.md#customize-rendering-calendarrenderhooks) for all fields and
+return rules.
 
 ### Theme counts independently
 
@@ -165,15 +169,21 @@ this borderless theme uses the application's adaptive semantic colors:
 ```
 
 Keep `--my-calendar-*` mapped to your application's light/dark palette. Leave
-tokens unset, or reset them to `initial`, to retain the package's contextual
-appearance. Relative fonts such as `.8em` apply once to each visual variant;
-custom content with its own font declarations still owns those declarations.
-Minimum block size and compact preferred width allow intrinsic growth and
-retain the target floor. Compact count text can wrap beyond the square floor;
-passive cues can force a marker/cue cluster to stack without resizing the event
-theme. Hidden representations stay hidden until the existing focus rules expose
-them. Removing borders retains the inset hover cue and keyboard outline.
-Custom overflow content also retains the native action's hover cue.
+tokens unset, or reset them to `initial`, to keep the package's appearance for
+each context.
+
+The overrides preserve these layout and interaction rules:
+
+- Relative fonts such as `.8em` apply once to each visual variant. Custom content
+  retains any font declarations of its own.
+- Minimum block size and compact preferred width let content grow while keeping
+  the target-size floor. Compact count text can wrap and make a button taller
+  than its square minimum.
+- Passive cues can make a marker/cue cluster stack without resizing the event
+  theme.
+- Hidden representations stay hidden until the existing focus rules expose them.
+- Removing borders keeps the inset hover cue and keyboard outline. Custom
+  overflow content also keeps the native action's hover cue.
 
 Use `onEventOverflowDefault` for application scrolling after successful agenda
 focus; the [integration recipe](integration-guide.md#scroll-after-the-default-agenda-action)
@@ -232,13 +242,15 @@ reproduce responsive states.  Resizing does not refetch, replace controls, or
 move focus.  Use `swipe: false` to disable paging instead of styling private snap
 positions, lanes, or scrolling behavior.
 
-Token combinations are not validated at runtime.  Preserve contrast, visible
+Token combinations are not validated at runtime. Preserve contrast, visible
 focus, target sizes, reflow, text direction, reduced motion, and system
-preferences.  Do not lower `--lfc-control-min-size` or
-`--lfc-grid-event-min-block-size` below the documented target floor.  Increase
-those tokens when custom compact content needs more space: normal package-owned
-roots then grow together.  Oversized content remains visible but is outside the
-equal-sizing guarantee; focus-only later summaries remain intrinsic.
+preferences.
+
+Do not lower `--lfc-control-min-size` or `--lfc-grid-event-min-block-size` below
+the documented target floor. Increase those tokens when custom compact content
+needs more space, so normal package-owned roots grow together. Oversized content
+stays visible but is outside the equal-sizing guarantee. Later summaries shown
+only on focus keep their intrinsic size.
 
 Test long translations, large text, custom fonts, toolbar content, and hooks.
 Use the [design guardrails](../DESIGN.md#dos-and-donts) and
