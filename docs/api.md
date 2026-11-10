@@ -516,7 +516,11 @@ Toolbar layout follows the container width. Sequential focus order always stays:
 Previous, Next, month title, Today, then `toolbarEnd`. See the
 [responsive design](../DESIGN.md#responsive-model) for row composition.
 
-The title keeps one canonical full localized DOM string and accessible name.
+The title keeps one canonical full localized DOM string. Its accessible name
+includes the full month/year form and, when different, the abbreviated form.
+This lets voice input match either visual label. The accessible name stays the
+same at every width.
+
 Compact visual labels are `aria-hidden` and use a complete locale-formatted
 abbreviated month and year.
 

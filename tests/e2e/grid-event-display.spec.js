@@ -450,7 +450,7 @@ for (const width of [320, 358]) {
 				}
 				const navigation = page.getByRole("group", { name: "Calendar navigation", exact: true });
 				const title = navigation.locator(".lfc-calendar-title-button");
-				await expect(title).toHaveAccessibleName("Choose month and year, currently July 2026");
+				await expect(title).toHaveAccessibleName("Choose month and year, currently July 2026, Jul 2026");
 				await expect(title.locator(".lfc-calendar-title-label-compact")).toBeVisible();
 				await expect(navigation.getByRole("button")).toHaveCount(4);
 				const geometry = await navigation.evaluate((container) => {

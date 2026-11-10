@@ -210,6 +210,11 @@ export async function waitFor(predicate: () => boolean, message = "condition"): 
 
 function installPopoverStubs(dom: JSDOM): void {
 	const prototype = dom.window.HTMLElement.prototype;
+	const displayStyles = new WeakMap<HTMLElement, {
+		readonly hadStyleAttribute: boolean;
+		readonly priority: string;
+		readonly value: string;
+	}>();
 	const dispatchToggle = (
 		element: HTMLElement,
 		oldState: "closed" | "open",
@@ -237,8 +242,27 @@ function installPopoverStubs(dom: JSDOM): void {
 			return;
 		}
 		if (open) {
+			displayStyles.set(element, {
+				hadStyleAttribute: element.hasAttribute("style"),
+				priority: element.style.getPropertyPriority("display"),
+				value: element.style.getPropertyValue("display")
+			});
+			//The shim has no native top-layer rendering state; render open fixtures for focusability.
+			element.style.setProperty("display", "block");
 			OPEN_POPOVERS.add(element);
 		} else {
+			const displayStyle = displayStyles.get(element);
+			if (displayStyle !== undefined) {
+				if (displayStyle.value === "") {
+					element.style.removeProperty("display");
+				} else {
+					element.style.setProperty("display", displayStyle.value, displayStyle.priority);
+				}
+				if (!displayStyle.hadStyleAttribute && element.style.length === 0) {
+					element.removeAttribute("style");
+				}
+				displayStyles.delete(element);
+			}
 			OPEN_POPOVERS.delete(element);
 		}
 		dispatchToggle(element, oldState, newState, "toggle");

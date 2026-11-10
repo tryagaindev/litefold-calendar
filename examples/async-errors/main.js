@@ -54,8 +54,39 @@ const EVENTS = [
 	}
 ];
 
+const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+	calendar: "gregory",
+	dateStyle: "full",
+	timeZone: "UTC"
+});
+
 const EVENT_DETAILS_RENDER_HOOKS = {
 	id: "my-async-errors-event-details",
+	eventDidMount: ({ date, elements, event, timeText }) => {
+		const action = elements.action;
+		if (action === null) {
+			return;
+		}
+
+		const previousLabel = action.getAttribute("aria-label");
+		const occurrenceDate = new Date(0);
+		occurrenceDate.setUTCFullYear(date.year, date.month - 1, date.day);
+		//The default time presentation precedes the title and custom details on both surfaces.
+		action.setAttribute("aria-label", [
+			timeText,
+			event.title,
+			elements.details.textContent ?? "",
+			EVENT_DATE_FORMATTER.format(occurrenceDate)
+		].filter((part) => part !== "").join(", "));
+
+		return () => {
+			if (previousLabel === null) {
+				action.removeAttribute("aria-label");
+			} else {
+				action.setAttribute("aria-label", previousLabel);
+			}
+		};
+	},
 	renderEventDetails: ({ document: ownerDocument }) => {
 		if (failRenderHooks.checked) {
 			throw new Error("Demonstration render-hook failure with developer-only detail.");

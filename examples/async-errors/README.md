@@ -23,6 +23,7 @@ Follow the shared [local run instructions](../README.md#run-locally), then choos
 - Source errors return `"handled"` only when application ownership is enabled. Other failures return `"default"` so package presentation remains active.
 - `onAnnounce` forwards messages to one polite and one assertive live region created before the calendar starts.
 - A failed render-hook set stays quarantined for the lifetime of its calendar instance, so changing that toggle destroys and recreates the instance.
+- Custom event names include the visible time, title, and **Render hooks active** detail in order, followed by the occurrence date; hook cleanup restores each action's previous name.
 - Application-owned cleanup destroys whichever instance is current on a non-cached `pagehide`; entering the browser's back/forward cache preserves it for restoration.
 
 The `data-my-*` attributes are application-owned selectors; Litefold Calendar output uses the package namespaces.

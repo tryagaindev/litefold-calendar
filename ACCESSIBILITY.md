@@ -117,6 +117,8 @@ In count presentation, individual summaries are hidden from new keyboard focus e
 
 Static and interactive agenda rows keep marker or leading content, localized time, title, details, and trailing content in that DOM order. Their [visual alignment and narrow reflow](DESIGN.md#events-and-agenda) preserve usable reading space in both text directions.
 
+Grid event action names include the localized time, title, and full occurrence date. Custom action names must retain visible words in their reading order, with real text boundaries between slots; append additional date or visually hidden time context after the visible label when needed. Decorative marker symbols do not replace visible category text.
+
 The [compact visual treatment](DESIGN.md#responsive-model) may switch from short to narrow weekday labels. Each `columnheader` retains the full localized weekday as its accessible name, so compact labels do not reduce the information exposed to assistive technology.
 
 Toolbar controls keep the same DOM and sequential-focus order at every width: Previous, Next, the interactive month title, Today, then application `toolbarEnd` content. The [responsive composition](DESIGN.md#responsive-model) changes rows without visual reordering.
@@ -125,8 +127,11 @@ CSS selects between already-rendered title variants:
 
 - Below a `24rem` calendar content width, show the locale-aware `month: "short", year: "numeric"` visual.
 - At exactly `24rem` and above, show the full-month visual.
-- Keep the full title text, trigger `aria-label`, grid accessible name, and live announcement complete. The compact title span is `aria-hidden` and cannot duplicate them.
 - If a localized title still cannot fit, ellipsize only its visual presentation.
+
+The trigger's accessible name includes both full and abbreviated month/year forms when they differ. Voice input can therefore match either visible label, and the name stays unchanged during resizing.
+
+The canonical full title text, grid accessible name, and live announcement remain complete. The compact title span is `aria-hidden` to avoid an additional accessibility-tree node.
 
 Container resizing changes CSS layout only. It does not rerender, replace focused nodes, refetch events, rerun render hooks, re-enter extension lifecycle, or require focus restoration.
 

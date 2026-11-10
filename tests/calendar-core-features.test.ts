@@ -197,7 +197,7 @@ void test("eventTimeDisplay changes only visual time presentation across both ev
 		);
 		assert.match(
 			gridTimedRoot.getAttribute("aria-label") ?? "",
-			/Timed event, 9:00 AM, Tuesday, July 14, 2026/u,
+			/9:00 AM, Timed event, Tuesday, July 14, 2026/u,
 			`${testCase.name}: hidden grid time must remain in the action's accessible name.`
 		);
 		const selectedDateMounts = mounted.filter(({ dateString }) => dateString === "2026-07-14");

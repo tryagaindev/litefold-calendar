@@ -41,7 +41,7 @@ export class CalendarEventText {
 		timeText: string,
 		fullDateText: string
 	): string {
-		return [event.event.title, timeText, fullDateText]
+		return [timeText, event.event.title, fullDateText]
 			.filter((part) => part.length > 0)
 			.join(", ");
 	}

@@ -34,6 +34,7 @@ const EXPOSED_GLOBALS = [
 function installPopoverStubs(dom, openPopovers) {
 	const prototype = dom.window.HTMLElement.prototype;
 	const matches = prototype.matches;
+	const displayStyles = new WeakMap();
 	const dispatchToggle = (element, oldState, newState, type) => {
 		const event = new dom.window.Event(type, {
 			bubbles: false,
@@ -56,8 +57,27 @@ function installPopoverStubs(dom, openPopovers) {
 			return;
 		}
 		if (open) {
+			displayStyles.set(element, {
+				hadStyleAttribute: element.hasAttribute("style"),
+				priority: element.style.getPropertyPriority("display"),
+				value: element.style.getPropertyValue("display")
+			});
+			//The shim has no native top-layer rendering state; render open fixtures for focusability.
+			element.style.setProperty("display", "block");
 			openPopovers.add(element);
 		} else {
+			const displayStyle = displayStyles.get(element);
+			if (displayStyle !== undefined) {
+				if (displayStyle.value === "") {
+					element.style.removeProperty("display");
+				} else {
+					element.style.setProperty("display", displayStyle.value, displayStyle.priority);
+				}
+				if (!displayStyle.hadStyleAttribute && element.style.length === 0) {
+					element.removeAttribute("style");
+				}
+				displayStyles.delete(element);
+			}
 			openPopovers.delete(element);
 		}
 		dispatchToggle(element, oldState, newState, "toggle");

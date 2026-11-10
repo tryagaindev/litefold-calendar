@@ -830,7 +830,8 @@ void test("renderEventLeading contains text nodes in a compact-hideable wrapper"
 		assert.ok(content);
 		assert.equal(content.textContent, "Priority");
 		assert.equal(content.firstChild?.nodeType, dom.window.Node.TEXT_NODE);
-		assert.equal([...leading.childNodes].some((node) => node.nodeType === dom.window.Node.TEXT_NODE), false);
+		assert.equal([...leading.childNodes].some((node) =>
+			node.nodeType === dom.window.Node.TEXT_NODE && (node.textContent ?? "").trim() !== ""), false);
 	}
 });
 

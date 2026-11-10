@@ -77,7 +77,7 @@ export function createEventRepresentation<TMetadata>(
 	marker.className = "lfc-calendar-event-marker";
 	const leadingContent = input.document.createElement("span");
 	leadingContent.className = "lfc-calendar-event-leading-content";
-	leading.append(marker, leadingContent);
+	leading.append(marker, " ", leadingContent);
 
 	const time = input.document.createElement("time");
 	Object.assign(time, {
@@ -100,7 +100,8 @@ export function createEventRepresentation<TMetadata>(
 	details.className = "lfc-calendar-event-details";
 	const trailing = input.document.createElement("span");
 	trailing.className = "lfc-calendar-event-trailing";
-	root.append(leading, time, title, details, trailing);
+	//Preserve word boundaries when slots are read without their CSS layout gaps.
+	root.append(leading, " ", time, " ", title, " ", details, " ", trailing);
 
 	return Object.freeze({
 		elements: Object.freeze({ action, details, leading, marker, root, time, title, trailing }),

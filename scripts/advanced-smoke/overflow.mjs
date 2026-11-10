@@ -94,7 +94,7 @@ export function verifyAdvancedOverflowPresentation({ document, dom, selectedCell
 	);
 	assert.equal(wideOverflow.getAttribute("aria-hidden"), "true");
 	assert.equal(customOverflowContent.ownerDocument, document);
-	assert.equal(customOverflowContent.textContent, "51 additionalin agenda");
+	assert.equal(customOverflowContent.textContent, "51 additional in agenda");
 	assert.equal(
 		customOverflowContent.querySelector(
 			":scope > .my-event-overflow-wide-count"
@@ -142,7 +142,7 @@ export function verifyAdvancedOverflowPresentation({ document, dom, selectedCell
 	);
 	assert.equal(
 		selectedOverflowAction.getAttribute("aria-label") ?? "",
-		"View 53 items for Thursday, August 6, 2026, 51 additional",
+		"View 53 items for Thursday, August 6, 2026, 51 additional in agenda",
 		"The shared action must retain the full count and date plus the wide visible label."
 	);
 }

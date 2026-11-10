@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The examples landing page now shows "Not available" when build metadata cannot be loaded, instead of claiming an alpha version. Source links still open the main branch.
 - Build details on the examples landing page stack in narrow containers so metadata labels remain readable with enlarged text.
+- Preserved word boundaries between event slots and matched action names to visible event and month-title wording, including abbreviated months. Examples also include custom type, status, and overflow wording in their accessible names.
 - Added an explicit Windows-only Firefox launch mode for trusted local fixtures already inside an OS sandbox, with isolated application data and unchanged default launch settings.
 - Count and remaining-count actions now share event actions' inset hover cue, including borderless themes and custom overflow content, while preserving passive cues and keyboard focus treatment.
 - Bounded event identifiers before whitespace validation, disabled workers in newly generated Pages documents and upgraded root shells while preserving exact legacy policies on immutable historical pages, and validated decoded meta-refresh destinations in staged and retained HTML.
