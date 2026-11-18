@@ -18,6 +18,7 @@
 
 - [ ] The change is focused, and I added regression coverage for changed behavior or explained why none is needed.
 - [ ] I followed the [coding conventions](https://github.com/tryagaindev/litefold-calendar/blob/main/docs/code-style.md) and ran `npm run check` with the repository-selected Node.js and npm toolchain.
+- [ ] When copy changed, I followed the [writing style](https://github.com/tryagaindev/litefold-calendar/blob/main/docs/writing-style.md), kept shared terms consistent, and preserved legal documents and clauses verbatim.
 - [ ] When public behavior changed, I updated affected types, [documentation](https://github.com/tryagaindev/litefold-calendar/blob/main/docs/README.md), examples, migration guidance, and the [`Unreleased` changelog](https://github.com/tryagaindev/litefold-calendar/blob/main/CHANGELOG.md).
 - [ ] When visual or interaction behavior changed, I reconciled it with the [design system](https://github.com/tryagaindev/litefold-calendar/blob/main/DESIGN.md), repeated affected [accessibility checks](https://github.com/tryagaindev/litefold-calendar/blob/main/ACCESSIBILITY.md), and updated [canonical screenshots](https://github.com/tryagaindev/litefold-calendar/blob/main/docs/screenshots/README.md) only when required.
 - [ ] When WebMCP, untrusted input, or another security boundary changed, I followed the [WebMCP contract](https://github.com/tryagaindev/litefold-calendar/blob/main/docs/webmcp.md) and [security policy](https://github.com/tryagaindev/litefold-calendar/blob/main/SECURITY.md) as applicable.

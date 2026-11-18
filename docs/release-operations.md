@@ -1,6 +1,12 @@
 # Nightly release operations runbook
 
-Use this runbook to publish and verify a nightly from reviewed `main`. Daily publication runs at **09:00 UTC**; use manual dispatch when a completed change needs publication immediately. The publisher derives the version, publishes under `nightly` through OIDC only, verifies that `latest` is unchanged, and hands off release Pages automatically.
+Use this runbook to publish and verify a nightly from reviewed `main`. Daily
+publication runs at **09:00 UTC**. Use manual dispatch when a completed change
+needs publication immediately.
+
+The publisher derives the version and publishes under `nightly` through OIDC
+only. It verifies that `latest` is unchanged, then hands off release Pages
+automatically.
 
 There is no release-preparation pull request or manual npm approval for a normal nightly. This guide also explains how to recognize a successful unchanged-source skip. Stable publication is a future procedure described in [release administration](release-administration.md#future-stable-release); these commands do not publish stable.
 
@@ -17,7 +23,17 @@ Read the [release policy](releasing.md) and confirm [hosted prerequisites](relea
 
 ## Stop rules
 
-Stop on a failed required check, unknown registry state, mismatched identity, or missing retained evidence. Do not run `npm publish` locally, move or delete a release tag, replace public assets, remove `latest`, or rerun from another source to rescue an existing version. Keep credential material and authentication codes out of chat, logs, and the release record.
+Stop on a failed required check, unknown registry state, mismatched identity, or
+missing retained evidence.
+
+Do not:
+
+- Run `npm publish` locally.
+- Move or delete a release tag, replace public assets, or remove `latest`.
+- Rerun from another source to rescue an existing version.
+
+Keep credential material and authentication codes out of chat, logs, and the
+release record.
 
 ## Roles
 
@@ -112,7 +128,15 @@ npm view "@tryagaindev/litefold-calendar@EXACT_VERSION" name version dist.integr
 npm view @tryagaindev/litefold-calendar versions dist-tags --json --registry https://registry.npmjs.org/
 ```
 
-Check that the exact package is readable and its `dist.integrity` equals the receipt's `npmIntegrity`. `nightly` must select `EXACT_VERSION`. `latest` must still select its recorded preflight version; the nightly workflow never updates it. Before stable exists, `latest` selects the frozen historical `alpha`; once any stable version exists, it selects stable. Historical `alpha` stays unchanged.
+Check each result:
+
+- The exact package is readable, and its `dist.integrity` equals the receipt's
+  `npmIntegrity`.
+- `nightly` selects `EXACT_VERSION`.
+- `latest` still selects its recorded preflight version; the nightly workflow
+  never updates it. Before stable exists, this is the frozen historical `alpha`.
+  Once any stable version exists, it is stable.
+- Historical `alpha` stays unchanged.
 
 Channel verification is read-only. If `latest` changed or registry identity is uncertain, stop and use the [recovery matrix](release-administration.md#recovery-matrix). Do not add a token or move a dist-tag to repair a nightly. A successful npm upload is not permission to create a replacement candidate while completion remains uncertain.
 

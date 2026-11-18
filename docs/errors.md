@@ -2,7 +2,7 @@
 
 Litefold Calendar separates failures into two paths:
 
-- **Programmer errors** are invalid configuration, arguments, or lifecycle calls. They throw synchronously and must be caught at the application boundary that supplied the uncertain input.
+- **Programmer errors** are invalid configuration, arguments, or lifecycle calls. They throw synchronously. Catch them at the application boundary that supplied the uncertain input.
 - **Operational failures** happen after a rendered calendar starts work. The package presents current failures by default and sends them to `onError` when configured. Late or stale failures are diagnostic only and never change the current UI or state.
 
 ## Choose an integration path
@@ -36,9 +36,16 @@ Persistent status/error UI appears after the toolbar and before the grid. It doe
 
 While a Retry is pending, its button remains mounted and focused, updates in place, exposes `aria-disabled="true"`, and guards repeated activation. After a successful Retry hides that control, focus moves to the selected day button or, if that button is unavailable, the calendar heading.
 
-The package creates empty live regions before they are needed and uses one announcement route for each message. Only a promise-like source result publishes `loading` and renders `aria-busy`; routine loading transitions are not repeatedly announced. A static array or provider-returned array proceeds directly to its terminal state with one full render and no busy interval. `Promise.resolve(events)`, an `async` provider, an already-fulfilled promise, and a custom thenable all retain the two-render asynchronous lifecycle.
+The package creates empty live regions before they are needed and uses one announcement route for each message. Routine loading transitions are not repeatedly announced.
 
-An immediate provider throw or invalid direct array completes the operational-error pipeline before the initiating `render()`, navigation, `setEvents()`, or `refetchEvents()` call returns. Promise-like rejection follows the same presentation rules after settlement. For promise-like work, settlement handlers are attached before loading callbacks run, so synchronous callback reentrancy may safely supersede or destroy the pending generation without allowing a stale result to change state or DOM.
+The returned source value determines the render sequence:
+
+- A static array or provider-returned array goes directly to its terminal state. It produces one full render with no busy interval.
+- A promise-like result publishes `loading` and renders `aria-busy`, then renders the terminal state. This two-render sequence also applies to `Promise.resolve(events)`, an `async` provider, an already-fulfilled promise, and a custom thenable.
+
+An immediate provider throw or invalid direct array completes the operational-error pipeline before the initiating `render()`, navigation, `setEvents()`, or `refetchEvents()` call returns. A promise-like rejection follows the same presentation rules after settlement.
+
+For promise-like work, the package attaches settlement handlers before running loading callbacks. A synchronous callback may safely supersede or destroy that pending generation. A stale result cannot change state or DOM.
 
 "No events" means a usable snapshot has no occurrences on the selected date. Initial or new-range loading and failures never substitute this message for unavailable data; same-range refreshes can retain a previously loaded empty presentation. See the [visual loading and recovery rules](../DESIGN.md#status-and-recovery).
 
@@ -52,9 +59,16 @@ An immediate provider throw or invalid direct array completes the operational-er
 
 These `LitefoldCalendarError` instances do not invoke `onError`, update `CalendarState.issues`, or render package error UI. Construction failure and a failed render-time host or integration-node claim leave `fallbackElement` unchanged.
 
-An omitted `initialDate` is intentionally different from an invalid explicit value: the date returned by `now` is moved to the nearest in-range date in a renderable month. `getState()` is safe throughout the lifecycle, repeated live `render()` and repeated `destroy()` calls are idempotent, and `destroy()` before render is allowed and terminal.
+Catch construction at application startup. Catch method calls when arguments or lifecycle ordering come from uncertain application state.
 
-Catch construction at application startup. Catch method calls when arguments or lifecycle ordering come from uncertain application state. `prev()`, `next()`, `today()`, `focusToday()`, and equivalent package-owned interactions stop or clamp at configured boundaries; only invalid or out-of-range `gotoDate()` / `focusDate()` targets throw. Boundary navigation controls remain focusable with `aria-disabled="true"`, while out-of-range day buttons are natively disabled. Selection bounds do not shrink the event provider's or `CalendarState.range`'s complete 42-day inclusive-start/exclusive-end range. See [date bounds and public method contracts](api.md#control-the-calendar-calendar) for the full behavior.
+Keep these defaults and lifecycle rules in mind when choosing what to catch:
+
+- If `initialDate` is omitted, the date returned by `now` moves to the nearest in-range date in a renderable month. An invalid explicit `initialDate` still throws.
+- `getState()` is safe throughout the lifecycle.
+- Repeated live `render()` calls and repeated `destroy()` calls are idempotent. Calling `destroy()` before render is allowed and terminal.
+- `prev()`, `next()`, `today()`, `focusToday()`, and equivalent package-owned interactions stop or clamp at configured boundaries. Only invalid or out-of-range `gotoDate()` / `focusDate()` targets throw.
+
+Boundary navigation controls remain focusable with `aria-disabled="true"`. Out-of-range day buttons are natively disabled. Selection bounds do not shrink the event provider's or `CalendarState.range`'s complete 42-day range: its start remains inclusive and its end exclusive. See [date bounds and public method contracts](api.md#control-the-calendar-calendar) for the full behavior.
 
 ```ts
 import {
@@ -98,7 +112,9 @@ Once `onError` is configured, it is the diagnostic sink for callbacks that retur
 
 A consumer render-hook failure uses code `render-hook-failed`, phase `render`, and includes its `renderHookId`, hook, and applicable surface. It can enter the partial-render warning flow described above.
 
-A registered extension failure follows the diagnostic-only route even when it occurs during render. The error uses code `extension-failed`, phase `integration`, and includes its `extensionId` and lifecycle `hook`; it does not enter `CalendarState.issues` or disable or degrade the ordinary calendar. For WebMCP registration, `extensionId` is `webmcp` and `hook` is `register`. Correct a name collision or host capability issue, then recreate the calendar if that extension is still required.
+A registered extension failure is diagnostic only, even during render. Its error uses code `extension-failed` and phase `integration`, and includes the `extensionId` and lifecycle `hook`. It does not enter `CalendarState.issues`, disable the calendar, or put it in a degraded state.
+
+For WebMCP registration, `extensionId` is `webmcp` and `hook` is `register`. Correct the name collision or host capability issue, then recreate the calendar if that extension is still required.
 
 ```ts
 import { createCalendar } from "@tryagaindev/litefold-calendar";
@@ -187,7 +203,14 @@ const calendar = createCalendar(host, {
 calendar.render();
 ```
 
-The page must create the empty `#my-application-status` (`role="status"`, `aria-live="polite"`) and `#my-application-assertive` (`role="alert"`, `aria-live="assertive"`) regions before the calendar runs, with `aria-atomic="true"` on both. The helper clears both routes synchronously, then schedules the selected region's text update before returning `"handled"`. The visible `#my-application-alert` panel itself should not duplicate that announcement route. A handled warning uses the polite region; a blocking or action failure uses the assertive region. See the [runnable async-errors example](../examples/async-errors/) for source-error ownership with Retry and recovery.
+Create both empty live regions before the calendar runs:
+
+| Region | Required attributes | Used for |
+| --- | --- | --- |
+| `#my-application-status` | `role="status"`, `aria-live="polite"`, `aria-atomic="true"` | Handled warnings |
+| `#my-application-assertive` | `role="alert"`, `aria-live="assertive"`, `aria-atomic="true"` | Blocking or action failures |
+
+The helper clears both routes synchronously. Before returning `"handled"`, it schedules the selected region's text update. The visible `#my-application-alert` panel should not repeat that announcement. See the [runnable async-errors example](../examples/async-errors/) for source-error ownership with Retry and recovery.
 
 When the application returns `"handled"` for a current error, the package still updates state and diagnostics, but it suppresses its visible panel and live announcement for that error. The application also owns retry/recovery presentation for the handed-off error.
 

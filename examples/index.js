@@ -80,10 +80,10 @@ try {
 	}
 	metadataRoot.dataset["myMetadataState"] = "ready";
 } catch {
-	versionElement.textContent = "@alpha";
+	versionElement.textContent = "Not available";
 	commitElement.textContent = "main branch";
 	commitLink.setAttribute("href", `${REPOSITORY_URL}/tree/main`);
 	channelElement.textContent = "Metadata unavailable";
-	statusElement.textContent = "Run npm run build for exact provenance. Source links still target the main branch.";
+	statusElement.textContent = "Build details could not be loaded. Source links open the main branch.";
 	metadataRoot.dataset["myMetadataState"] = "error";
 }

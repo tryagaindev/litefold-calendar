@@ -6,7 +6,15 @@ Package users can start with [Integration responsibilities](#integration-respons
 
 ## Interaction model
 
-The month is one ARIA grid inside a programmatically focusable horizontal paging viewport. Each `gridcell` contains a full-cell native day button followed by a sibling summaries container; event and overflow actions are children of that container, so interactive elements are never nested. One in-range day is selected, exactly one day proxy in the entire grid has `tabindex="0"`, and every grid event/overflow action remains `tabindex="-1"`. The visual pull lanes on either side are `aria-hidden`, contain no days or actions, and are not additional month grids. Dates outside the calendar instance's inclusive `minDate` / `maxDate` bounds remain visible when they fill the six-week grid, but their day buttons are disabled and their event actions are suppressed.
+The month is one ARIA grid inside a programmatically focusable horizontal paging viewport. Each `gridcell` contains a full-cell native day button followed by a sibling summaries container. Event and overflow actions sit inside that container, so interactive elements are never nested.
+
+The grid keeps these selection and focus rules:
+
+- One in-range day is selected.
+- Exactly one day proxy in the entire grid has `tabindex="0"`.
+- Every grid event/overflow action has `tabindex="-1"`.
+- Visual pull lanes on either side are `aria-hidden`, contain no days or actions, and are not additional month grids.
+- Dates outside the instance's inclusive `minDate` / `maxDate` bounds remain visible as six-week-grid filler. Their day buttons are disabled and their event actions are suppressed.
 
 | Key | Day-grid behavior |
 |---|---|
@@ -23,7 +31,9 @@ The month is one ARIA grid inside a programmatically focusable horizontal paging
 | Tab while in actions | Exit the grid forward toward the agenda |
 | Shift+Tab while in actions | Return to the represented day proxy |
 
-Arrow and Home/End navigation moves focus but does not select; movement stops at the rendered six-week boundary or the configured date bounds. This prevents ordinary focus movement from rebuilding and announcing the agenda. Page Up/Down is the deliberate exception: when an in-range destination exists, it changes the displayed month or year and synchronizes focus, selection, and agenda so the new grid retains one visible selected cell, but it does not invoke `onDaySelect`. Enter, Space, or click is the day-selection action path and invokes `onDaySelect` only for an enabled, in-range day.
+Arrow and Home/End navigation moves focus without selecting a day. Movement stops at the rendered six-week boundary or the configured date bounds. This keeps ordinary focus movement from rebuilding and announcing the agenda.
+
+Page Up/Down is the exception. When an in-range destination exists, it changes the displayed month or year and synchronizes focus, selection, and agenda. The new grid therefore retains one visible selected cell, but this path does not invoke `onDaySelect`. Enter, Space, or click selects the day and invokes `onDaySelect` only for an enabled, in-range day.
 
 F2 enters the focused cell's visible actions without adding another Tab stop. Up and Down Arrow move through those actions without wrapping. Escape or F2 returns to the day; Shift+Tab also returns to the day, while Tab exits forward toward the agenda. Context Menu or Shift+F10 invokes the optional day context action from a focused day, or the optional event context action from an eligible focused grid or agenda event action. The default localized grid instructions are: “Use arrow keys to move between dates and Enter or Space to select. Press F2 on a date to move to its visible event actions; use Up and Down Arrow between actions, and Escape or F2 to return.”
 
@@ -39,7 +49,11 @@ Direct event activation on either surface never selects the day or invokes `onDa
 
 Day counts and grid overflow share a native action. Whenever either container-size variant presents a total count, its stable accessible label uses the full count and date: “View {count} {eventLabel} for {date}”. If the wide variant presents remaining events, its localized visible wording is also included in that name, such as “View 4 events for Tuesday, July 14, 2026, 1 more”. Otherwise the label describes the hidden count with “View {count} more {eventLabel} for {date}”. `renderEventOverflow` customizes only `aria-hidden`, noninteractive visual content; count actions cannot be suppressed by returning `null`.
 
-Activation invokes `onEventOverflowActivate` with an immutable occurrence snapshot before selection or DOM replacement. Synchronous `nativeEvent.preventDefault()` transfers interaction and focus ownership to the application, which may open its own event chooser and restore focus when it closes. Without cancellation, activation selects the day, resets agenda expansion, focuses the agenda heading, and does not invoke `onDaySelect`. Application navigation, rerendering, or destruction during the callback invalidates the original action and prevents stale default work; asynchronous failures use the action-error channel.
+Activation invokes `onEventOverflowActivate` with an immutable occurrence snapshot before selection or DOM replacement:
+
+- Synchronous `nativeEvent.preventDefault()` transfers interaction and focus ownership to the application. It may open its own event chooser and restore focus when the chooser closes.
+- Without cancellation, activation selects the day, resets agenda expansion, and focuses the agenda heading. It does not invoke `onDaySelect`.
+- Application navigation, rerendering, or destruction during the callback invalidates the original action and prevents stale default work. Asynchronous failures use the action-error channel.
 
 After successful default focus, `onEventOverflowDefault` synchronously exposes the
 current agenda heading. Cancellation, supersession, unusable DOM, or redirected
@@ -55,7 +69,17 @@ Replacing or refetching event input keeps package-owned focus on the same day or
 
 `eventTimeDisplay` controls visual time exposure without removing information from assistive technology. For `"grid"`, `"agenda"`, and `"none"`, a suppressed surface still contains its native `<time datetime>` element with visually hidden localized text; the event action's accessible name and render-hook `timeText` keep the same time. Applications must not use this option to conceal a time from users who rely on assistive technology.
 
-The presented month and year is a native button inside the configured `h1` through `h6`; a dedicated visible date span alone labels the grid. The button opens the default `popover="auto"` surface exposed as a dialog, synchronizes its labelled month and year controls, and focuses Month. A successful Jump accepts only an in-range month, while Cancel makes no date change; both paths close the popover and return focus to the month/year trigger. Invalid form input remains open for correction. Escape also dismisses the popover and restores trigger focus. Pointer/outside light-dismiss closes it without stealing focus from the user's new target. The package-owned labels are localized through `chooseMonthYear`, `jumpToMonthYear`, `month`, `year`, `jump`, and `cancel`.
+The presented month and year is a native button inside the configured `h1` through `h6`. A dedicated visible date span alone labels the grid. The button opens the default `popover="auto"` surface, exposed as a dialog. Opening synchronizes its labelled month and year controls and focuses Month.
+
+| Picker action | Result |
+|---|---|
+| Successful Jump | Accept an in-range month, close the popover, and return focus to the month/year trigger. |
+| Cancel | Make no date change, close the popover, and return focus to the trigger. |
+| Invalid form input | Keep the picker open for correction. |
+| Escape | Close the popover and restore trigger focus. |
+| Pointer/outside light-dismiss | Close without taking focus from the user's new target. |
+
+The package-owned labels are localized through `chooseMonthYear`, `jumpToMonthYear`, `month`, `year`, `jump`, and `cancel`.
 
 Where Popover is unavailable, the same picker uses a native modal `<dialog>` to meet the [Baseline Widely available policy](docs/browser-support.md). Native modality keeps focus within the picker and makes the rest of the document inert. Jump, Cancel, Escape, and backdrop dismissal restore the trigger; invalid input remains open. Theme changes preserve the open surface, field values, selection, and focus in both implementations. Test the fallback independently by disabling the optional capability; current-engine success alone does not verify it.
 
@@ -83,7 +107,11 @@ Returning `"handled"` from `onError` explicitly transfers both visible and acces
 
 When `icons.today` is configured, CSS swaps the Today button's visible text for decorative icon content at the [documented narrow width](docs/api.md#customize-messages-and-icons). The same native button remains focused and exposes `messages.today` as its accessible name at every width. Its icon content is excluded from the accessibility tree, and its bounds and keyboard behavior remain unchanged.
 
-Responsive breakpoints, visual composition, week-row sizing, event-stack placement, and the supported design floor are canonical in the [responsive design](DESIGN.md#responsive-model). Layout uses CSS container queries and intrinsic grid sizing rather than viewport width or JavaScript measurement. `weekRowSizing` and `gridEventPlacement` change geometry only: the date stays at the cell's block start, and moving the event/overflow stack never changes DOM order, managed action order, or focus behavior. At the supported floor, reflow must not introduce persistent two-dimensional content scrolling; narrower containers are robustness targets rather than design claims. The pager's transient native horizontal movement is direct input, not a second content axis or adjacent interactive view. Verify the complete page at 400% zoom with the calendar host at the supported design floor.
+See the [responsive design](DESIGN.md#responsive-model) for breakpoints, visual layout, week-row sizing, event-stack placement, and the supported design floor. Layout uses CSS container queries and intrinsic grid sizing rather than viewport width or JavaScript measurement.
+
+`weekRowSizing` and `gridEventPlacement` change geometry only. The date stays at the cell's block start. Moving the event/overflow stack never changes DOM order, managed action order, or focus behavior.
+
+At the supported floor, reflow must not add persistent two-dimensional content scrolling. Narrower containers are robustness targets rather than design claims. The pager's brief native horizontal movement is direct input, not a second content axis or adjacent interactive view. Verify the complete page at 400% zoom with the calendar host at the supported design floor.
 
 In count presentation, individual summaries are hidden from new keyboard focus entry and from the accessibility tree. F2 and Up/Down Arrow attempt actions in canonical order and verify that the browser accepted focus, skipping CSS-hidden controls without measuring layout. An already focused summary stays visible across a container-size transition until focus leaves it; the shared count/overflow action also keeps its identity and accessible name across resizing. The count action provides access to all occurrences, including static events and events beyond summary or agenda-page limits. In legacy `"events"` presentation, visually hidden later actions remain available through managed navigation. Every visible action keeps its complete accessible name and at least the supported target size. Agenda rows retain titles, times, details, and visible/total progress in every mode.
 
@@ -93,7 +121,19 @@ Grid event action names include the localized time, title, and full occurrence d
 
 The [compact visual treatment](DESIGN.md#responsive-model) may switch from short to narrow weekday labels. Each `columnheader` retains the full localized weekday as its accessible name, so compact labels do not reduce the information exposed to assistive technology.
 
-Toolbar controls remain in the same DOM and sequential-focus order at every width: Previous, Next, the interactive month title, Today, then application `toolbarEnd` content. The [responsive composition](DESIGN.md#responsive-model) changes rows without visual reordering. Below a `24rem` calendar content width, CSS exposes the already-rendered locale-aware `month: "short", year: "numeric"` visual; at exactly `24rem` and above, it exposes the full-month visual. The trigger's name includes both full and abbreviated month/year forms when they differ, so voice input can match either visible label without changing the name during resizing. The canonical full title text, grid accessible name, and live announcement remain complete. The compact title span is `aria-hidden` to avoid an additional accessibility-tree node. If a localized title still cannot fit, only its visual presentation ellipsizes. Container resizing changes only CSS layout and does not rerender, replace focused nodes, refetch events, rerun render hooks, re-enter extension lifecycle, or require focus restoration.
+Toolbar controls keep the same DOM and sequential-focus order at every width: Previous, Next, the interactive month title, Today, then application `toolbarEnd` content. The [responsive composition](DESIGN.md#responsive-model) changes rows without visual reordering.
+
+CSS selects between already-rendered title variants:
+
+- Below a `24rem` calendar content width, show the locale-aware `month: "short", year: "numeric"` visual.
+- At exactly `24rem` and above, show the full-month visual.
+- If a localized title still cannot fit, ellipsize only its visual presentation.
+
+The trigger's accessible name includes both full and abbreviated month/year forms when they differ. Voice input can therefore match either visible label, and the name stays unchanged during resizing.
+
+The canonical full title text, grid accessible name, and live announcement remain complete. The compact title span is `aria-hidden` to avoid an additional accessibility-tree node.
+
+Container resizing changes CSS layout only. It does not rerender, replace focused nodes, refetch events, rerun render hooks, re-enter extension lifecycle, or require focus restoration.
 
 Applications must preserve the target-size obligations defined by the [responsive design](DESIGN.md#responsive-model) when overriding public size tokens.
 
@@ -150,7 +190,7 @@ Automated unit/DOM and Playwright checks cover semantics, native links/buttons, 
 - Polite atomic `status` and assertive atomic `alert` live regions expose progress and failure text with the intended urgency.
 - Agenda disclosure moves focus to newly revealed content, while an unrelated source failure announces through the assertive region without stealing that focus.
 
-Playwright ARIA snapshots and live-region assertions run in each browser engine, but they do not inspect the native platform accessibility tree. They do not launch NVDA, Narrator, VoiceOver, or TalkBack; validate speech output, browse/virtual-cursor behavior, or interaction modes; or replace the dated assistive-technology matrix below.
+Playwright ARIA snapshots and live-region assertions run in each browser engine. They do not inspect the native platform accessibility tree or launch NVDA, Narrator, VoiceOver, or TalkBack. They also do not verify speech output, browse/virtual-cursor behavior, or interaction modes. Use the dated assistive-technology matrix below for those checks.
 
 Manual browser and assistive-technology evidence is risk-based. Repeat the affected procedure and matrix rows when a change can alter interaction, semantics, accessible names, focus, announcements, responsive behavior, visual preferences, browser support, or the surrounding developer demo. An unrelated alpha can reuse still-applicable dated evidence. Complete the full supported matrix before stable promotion and after a support-policy change that invalidates the prior baseline. Automated results are necessary but not sufficient for claims about real browser/assistive-technology combinations.
 
@@ -183,8 +223,13 @@ Manual test procedure (run the affected groups for a focused change and all grou
    - Run 280 CSS pixels separately as a best-effort robustness stress check.
    - Immediately below, at, and above a `24rem` calendar content width, confirm only the below-boundary toolbar and exposed pager text use the locale's abbreviated month with a numeric year. Confirm the full visual is used at the boundary and above, and that the full trigger, grid, and live names remain unchanged while pager lanes stay absent from the accessibility tree.
    - At representative supported phone widths and default text sizing, confirm the abbreviated month/year title stays on one line without horizontal overflow. For longer translations or enlarged text, confirm any visual ellipsis retains the complete accessible text. Test a long localized Today label: it may wrap or move to a following row, while the complete navigation targets remain separate, within the host, and in their documented focus order.
-   - At 320 CSS pixels and 200% text size, check multi-digit totals such as 12 and 123 in equal and content-sized weeks, in LTR and RTL. Confirm count text grows with the text setting, remains fully visible through wrapping and taller buttons when needed, and retains its exact accessible total. Confirm Today and other date-number decoration stay within their cells; wrapped two-digit dates remain readable within the reserved date slot without overlapping count controls. Day and count actions retain their target sizes.
-   - Follow the [responsive visual checks](DESIGN.md#dos-and-donts) for custom marker and count geometry. Confirm count buttons remain actionable while their visual hook content and passive `"events"` cues remain decorative. Focus a compact count button and confirm its inset ring remains visible inside the button and its owning day cell without reducing the target size. Across the compact/wide boundary, retain an already focused action until blur, then confirm F2 and arrow navigation skip CSS-hidden summaries. Complete accessible names and managed action order must remain unchanged, pointer activation must reach the documented target, and reflow must introduce no persistent two-dimensional scrolling.
+   - **Enlarged counts:** At 320 CSS pixels and 200% text size, test totals such as 12 and 123 in equal and content-sized weeks, in LTR and RTL. Count text must grow with the text setting. It must remain fully visible by wrapping or making buttons taller, while retaining its exact accessible total.
+   - **Date decoration:** Under the same conditions, confirm Today and other date-number decoration stay within their cells. Wrapped two-digit dates must stay readable in the reserved date slot without overlapping count controls. Day and count actions must retain their target sizes.
+   - **Custom content:** Follow the [responsive visual checks](DESIGN.md#dos-and-donts) for custom marker and count geometry. Count buttons must remain actionable; their visual hook content and passive `"events"` cues must remain decorative.
+   - **Count focus ring:** Focus a compact count button. Its inset ring must remain visible inside the button and its owning day cell without reducing the target size.
+   - **Focus across widths:** Cross the compact/wide boundary with an action focused. It must stay visible until blur. After blur, F2 and arrow navigation must skip CSS-hidden summaries.
+   - **Names and order:** Confirm that complete accessible names and managed action order remain unchanged across the compact/wide boundary.
+   - **Pointer targets and reflow:** Confirm pointer activation reaches the documented target and reflow adds no persistent two-dimensional scrolling.
 7. **Application integration**
    - Repeat affected tasks with application toolbar, progressive fallback, and render-hook content enabled.
 8. **WebMCP, when enabled**

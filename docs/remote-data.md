@@ -63,7 +63,13 @@ async function loadEvents({ start, end, signal }, category) {
 | `end` | Excluded civil date, such as `2026-09-06` |
 | `category` | Application-owned filter value; validate it on the server |
 
-Return events that overlap the requested interval, including events that start earlier and continue into it. An event ending exactly at `start` or starting exactly at `end` is outside the range. Apply the documented default duration for missing ends: one day for all-day events, or a point at the start for timed events. An all-day event ending `2026-08-11` occupies dates through August 10. Do not derive requests from the viewport or assume every request begins on the month's first day.
+Return events that overlap the requested interval, including events that start earlier and continue into it. Keep these boundaries in mind:
+
+- An event ending exactly at `start` or starting exactly at `end` is outside the range.
+- Without an explicit end, an all-day event lasts one day and a timed event is a point at its start.
+- An all-day event ending `2026-08-11` occupies dates through August 10.
+
+Do not derive requests from the viewport or assume every request begins on the month's first day.
 
 Keep authentication, authorization, time-zone conversion, and response validation in the application. Filtering authorized results is not a substitute for authorization. The [event-source contract](api.md#supply-events-calendarevents-and-calendareventsource) owns exact range, date, and source behavior.
 
@@ -89,7 +95,11 @@ async function saveAndRefresh(changes) {
 }
 ```
 
-`applicationApi.saveEvent` represents your application's authenticated write operation. Handle its failure in the editing form and leave it open for correction. The lifetime check skips a refresh if permanent teardown occurred while saving; abort that lifetime before destroying the calendar, as shown below. `refetchEvents()` returns `void`; it starts loading and does not await the next snapshot. Use [state callbacks](api.md#observe-state-calendarstate) if other application UI needs to observe loading or completion.
+`applicationApi.saveEvent` represents your application's authenticated write operation. Handle its failure in the editing form and leave the form open for correction.
+
+The lifetime check skips a refresh if permanent teardown occurred while saving. Abort that lifetime before destroying the calendar, as shown below.
+
+`refetchEvents()` returns `void`: it starts loading without waiting for the next snapshot. Use [state callbacks](api.md#observe-state-calendarstate) when other application UI needs to observe loading or completion.
 
 | Task | Method |
 | --- | --- |

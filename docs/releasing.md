@@ -4,9 +4,16 @@ This policy applies to public nightly snapshots of `@tryagaindev/litefold-calend
 
 ## Supported release state
 
-The source development version is `0.6.0-nightly.0`. A publication receives a version shaped like `0.6.0-nightly.YYYYMMDDHHmmss.RUN_ID`, using the original workflow run's UTC creation time and numeric run ID. Rerunning that run preserves its version. A new source change requires a new run and version.
+The source development version is `0.6.0-nightly.0`. Published versions have the
+shape `0.6.0-nightly.YYYYMMDDHHmmss.RUN_ID`. Use the original workflow run's UTC
+creation time for the timestamp and its numeric run ID for `RUN_ID`. Rerunning
+that run preserves its version. A new source change requires a new run and version.
 
-Nightlies snapshot reviewed `main` directly. They do not create daily version commits, release branches, or metadata pull requests. The source version and `[Unreleased]` changelog remain in the checkout; isolated package staging changes only the published manifest's version and stamps the SBOM with the same published identity.
+Nightlies snapshot reviewed `main` directly. They do not create daily version
+commits, release branches, or metadata pull requests. The source version and
+`[Unreleased]` changelog remain in the checkout. Isolated package staging changes
+only the published manifest's version and stamps the SBOM with that published
+identity.
 
 A completed nightly must satisfy these invariants:
 
@@ -40,7 +47,11 @@ One non-canceling publication queue serializes all jobs through registry verific
 
 Implementation, documentation, examples, screenshots, accessibility evidence, and meaningful `[Unreleased]` notes must be merged before a nightly is requested. Phase commits receive their focused checks; the exact final source passes the full gate again before publication.
 
-An unchanged source is skipped only after the previous nightly's registry state, immutable release, and release Pages are verified complete. A failed or partially published attempt is a recovery case, not evidence that nothing changed. The first nightly verifies the existing historical alpha predecessor without moving `alpha`.
+Skip an unchanged source only after verifying that the previous nightly's
+registry state, immutable release, and release Pages are complete. A failed or
+partially published attempt requires recovery; it does not prove that nothing
+changed. The first nightly verifies the existing historical alpha predecessor
+without moving `alpha`.
 
 A successful publisher run hands off Pages asynchronously. The operator records completion only after package integrity, provenance, protected tag, GitHub assets, and the publisher-linked Pages metadata agree. A green workflow alone is insufficient.
 

@@ -1,6 +1,9 @@
 # Release administration and recovery
 
-This guide is for maintainers who configure GitHub and npm release controls. The [nightly operations runbook](release-operations.md) owns the normal ordered procedure. This document owns environment setup, trusted publishing, immutable-state recovery, and requirements for a future stable publisher.
+Use this guide to configure GitHub and npm release controls or recover an
+incomplete release. It covers environment setup, trusted publishing, immutable
+release state, and prerequisites for a future stable publisher. For normal
+publication, follow the [nightly operations runbook](release-operations.md).
 
 ## One-time hosted prerequisites
 
@@ -23,7 +26,16 @@ Require two-factor authentication and grant repository and organization administ
 
 npm supports multiple independent trusted-publisher configurations per package. They are additive: matching any configuration authorizes its permitted operation. Every configuration allows staging by default; direct publication requires a separate opt-in on that configuration. [npm's September 2026 publisher update](https://github.blog/changelog/2026-09-03-multiple-trusted-publishing-configurations-for-npm/)
 
-Bind [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) to the exact owner `tryagaindev`, repository `litefold-calendar`, workflow filename `publish-nightly.yml`, and environment `npm-nightly`. Enable **Allow npm publish** for direct publication so the workflow's `npm publish` completes without staged-release approval. Save and reload the binding to verify that setting; an unsaved form or the staging-only default does not satisfy unattended delivery. The publisher uses a GitHub-hosted runner and receives `id-token: write`.
+Configure [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/):
+
+1. Bind the exact owner `tryagaindev`, repository `litefold-calendar`, workflow
+   filename `publish-nightly.yml`, and environment `npm-nightly`.
+2. Enable **Allow npm publish** for direct publication. This lets the workflow's
+   `npm publish` complete without staged-release approval.
+3. Save and reload the binding to verify the setting. An unsaved form or the
+   staging-only default does not satisfy unattended delivery.
+
+The publisher uses a GitHub-hosted runner and receives `id-token: write`.
 
 Adding the nightly binding does not revoke the alpha binding. Confirm no historical alpha publication is in flight, then remove the old alpha binding before enabling the nightly schedule. Preserve historical package versions, tags, releases, and evidence.
 
@@ -53,7 +65,18 @@ The non-canceling `npm-nightly-<repository>` concurrency group covers publicatio
 
 ## Nightly channel policy
 
-Completed nightly delivery requires `nightly` to select the exact candidate and `latest` to retain its verified preflight value. Before stable exists, `latest` must select the frozen historical `alpha` version. Nightly never writes `latest`. The first stable release will move `latest` to stable; once any stable version exists, nightly verification also requires it to select a published stable version. A missing or malformed registry response is never interpreted as an empty package or as proof that stable does not exist.
+Completed nightly delivery requires `nightly` to select the exact candidate.
+Nightly never writes `latest`; it verifies that `latest` retains its preflight
+value and satisfies the current channel policy:
+
+| Release state | Required `latest` value |
+| --- | --- |
+| No stable version exists | The frozen historical `alpha` version |
+| A stable version exists | A published stable version |
+
+The first stable release will move `latest` to stable. A missing or malformed
+registry response never means the package is empty or proves that stable does
+not exist.
 
 The historical `alpha` dist-tag, versions, protected tags, immutable releases, and release Pages stay frozen. The first nightly can use the completed alpha as its predecessor. It does not rewrite alpha metadata or republish an alpha.
 
@@ -71,22 +94,37 @@ A rerun can consume repaired hosted trusted-publisher or environment configurati
 
 ## Recovery matrix
 
-| Observed state | Required action |
-| --- | --- |
-| Source is unchanged and previous nightly completed through Pages | Verify the reported skip. No new version is expected. |
-| Candidate was never published and has no partial public state | Repair transient infrastructure and rerun the original attempt only while its source remains current main, or leave it abandoned and start a new eligible current-main run. Each new run has a different version. |
-| Candidate has a matching staged tag/draft/assets but no npm version, and its source remains current main | Preserve the stage and resume its exact attempt; do not collide with or overwrite the staged identity. |
-| Candidate has a matching staged tag/draft/assets but no npm version, and main has advanced | Confirm no upload was accepted or remains pending. Preserve the abandoned staged identity and retained evidence, then start a new eligible current-main run with a new version. The old attempt cannot publish from stale source; do not move or overwrite its tag, draft, or assets. |
-| npm accepted the upload but the exact version is not yet publicly readable | Treat it as pending, blocked, or ambiguous. Check registry status and private package-maintainer notifications. Do not reuse the version or publish another candidate to bypass uncertainty. |
-| Exact npm version and integrity exist; registry verification or finalization failed | Restore transient hosted configuration, then resume the original attempt with the retained bytes. Investigate unexpected tag changes before reclassifying registry state through a full rerun. |
-| `latest` differs from its recorded preflight value | Stop and investigate the external change. Nightly has no authority to repair it; do not add a token or move a dist-tag. Resume only after the observed state is explained and valid under the channel policy. |
-| Stable version exists but `latest` selects a prerelease | Stop. Stable owns `latest`; investigate and use the approved stable recovery procedure. Nightly must not repair this by pointing `latest` to itself. |
-| npm version, tag, draft, notes, assets, or receipt conflict | Stop and investigate. Do not overwrite, delete, or reuse the identity. A reviewed correction receives a new greater version. |
-| Published package or example bytes are defective | Preserve immutable objects. Publish a corrected greater nightly and consider authorized deprecation of the defective version. |
-| Publisher succeeded but its Pages run failed | Rerun the exact publisher-linked Pages run for a transient or hosted-state failure. A source or assembly-code correction needs a new reviewed version. |
-| Successful publisher has no downstream Pages run | Verify the current Pages workflow, rerun the original publisher to emit its native completion event, and verify the new downstream run against the original receipt/source. |
-| Rolling main preview needs to move backward | Use [rolling-preview rollback](example-deployment.md#roll-back-the-rolling-preview). It does not modify npm or any release snapshot. |
-| Historical alpha requires investigation | Read the run's pinned source and retained schema-1 evidence under the historical policy. Preserve frozen public state; migration does not authorize republishing alpha or moving its tags. |
+Find the observed state before retrying. A matching staged release does not
+prove that an npm upload was rejected or that no upload remains pending.
+
+### Before npm publication
+
+| Observed state | Required action | Constraints |
+| --- | --- | --- |
+| Source is unchanged and the previous nightly completed through Pages | Verify the reported skip. | No new version is expected. |
+| Candidate was never published and has no partial public state | Repair transient infrastructure and rerun the original attempt, or leave it abandoned and start a new eligible current-main run. | Rerun only while the source remains current main. Each new run has a different version. |
+| Matching staged tag/draft/assets; no npm version; source remains current main | Preserve the stage and resume its exact attempt. | Do not collide with or overwrite the staged identity. |
+| Matching staged tag/draft/assets; no npm version; main has advanced | First confirm no upload was accepted or remains pending. Preserve the abandoned staged identity and retained evidence, then start a new eligible current-main run with a new version. | The old attempt cannot publish from stale source. Do not move or overwrite its tag, draft, or assets. |
+
+### Pending or published npm state
+
+| Observed state | Required action | Constraints |
+| --- | --- | --- |
+| npm accepted the upload, but the exact version is not publicly readable | Treat it as pending, blocked, or ambiguous. Check registry status and private package-maintainer notifications. | Do not reuse the version or publish another candidate to bypass uncertainty. |
+| Exact npm version and integrity exist; registry verification or finalization failed | Restore transient hosted configuration and resume the original attempt with retained bytes. | Investigate unexpected tag changes before reclassifying registry state through a full rerun. |
+| `latest` differs from its recorded preflight value | Stop and investigate the external change. Resume only when the state is explained and valid under the channel policy. | Nightly has no authority to repair it. Do not add a token or move a dist-tag. |
+| Stable exists, but `latest` selects a prerelease | Stop, investigate, and use the approved stable recovery procedure. | Stable owns `latest`. Nightly must not point `latest` to itself as a repair. |
+| npm version, tag, draft, notes, assets, or receipt conflict | Stop and investigate. A reviewed correction receives a new greater version. | Do not overwrite, delete, or reuse the identity. |
+| Published package or example bytes are defective | Preserve immutable objects and publish a corrected greater nightly. Consider authorized deprecation of the defective version. | Existing published bytes remain immutable. |
+
+### Pages and historical state
+
+| Observed state | Required action | Constraints |
+| --- | --- | --- |
+| Publisher succeeded, but its Pages run failed | Rerun the exact publisher-linked Pages run for a transient or hosted-state failure. | A source or assembly-code correction needs a new reviewed version. |
+| Successful publisher has no downstream Pages run | Verify the current Pages workflow. Rerun the original publisher to emit its native completion event, then verify the new downstream run against the original receipt/source. | The new downstream run must still match the original published identity. |
+| Rolling main preview needs to move backward | Use [rolling-preview rollback](example-deployment.md#roll-back-the-rolling-preview). | This does not modify npm or any release snapshot. |
+| Historical alpha requires investigation | Read the run's pinned source and retained schema-1 evidence under the historical policy. | Preserve frozen public state. Migration does not authorize republishing alpha or moving its tags. |
 
 ## Future stable release
 

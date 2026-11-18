@@ -188,17 +188,34 @@ npm run check:screenshots
 
 ## Run the final gate
 
-Both commands include tarball verification and therefore require the intended changes to be committed and the worktree to be clean. `npm run check` is the complete repository gate invoked locally and by CI. Locally, its browser suite includes Chromium, Firefox, and WebKit; when `CI` is set, the Playwright configuration selects Chromium and WebKit. The same selection applies to `test:browser` and `test:browser:built`. Local checks do not reproduce hosted controls such as dependency review or the workflow's exact environment. `check:fast` omits real-browser scenarios and is only a local fallback when the required Playwright browser binaries are unavailable.
+Commit the intended changes and return to a clean worktree before running either
+gate below. Both include tarball verification, which requires that clean state.
+
+Before submission, run the complete repository gate. CI uses the same command:
+
+```shell
+npm run check
+```
+
+The browser selection depends on the environment:
+
+| Environment | Browser coverage |
+| --- | --- |
+| `CI` unset (normal local run) | Chromium, Firefox, and WebKit |
+| `CI` set (including hosted CI) | Chromium and WebKit |
+
+The same selection applies to `test:browser` and `test:browser:built`. Local
+checks do not reproduce hosted controls such as dependency review or the
+workflow's exact environment.
+
+If the required Playwright browser binaries are unavailable, this local fallback
+omits real-browser scenarios:
 
 ```shell
 npm run check:fast
 ```
 
-Before submission, run the complete gate:
-
-```shell
-npm run check
-```
+It does not replace the complete gate required before submission.
 
 For additional local Firefox diagnosis, repeat the affected tests 20 times with
 zero retries and run three complete passes. After building, run this optional

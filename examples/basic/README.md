@@ -19,10 +19,10 @@ Try the following:
 - An omitted `initialDate`, so the calendar opens on the date supplied by its default clock.
 - `onEventActivate` receiving the normalized event, native event, rendered element, and the activating `surface`.
 - Optional `url` and `accentColor` event fields.
-- Omitted month-grid layout options, demonstrating equal week rows, common full slots for normally visible compact primary/count/overflow roots, and top-aligned event/overflow stacks.
-- Package-owned container CSS automatically abbreviating visible toolbar and decorative pager month/year text below a `24rem` calendar content width, without integration-side measurement or private descendant styling.
+- The default layout: equal-height week rows with event and overflow content aligned at the top. See [month-grid layout](../../docs/integration-guide.md#choose-month-grid-layout) for the compact sizing rules.
+- Automatic short month labels below a `24rem` calendar content width, in both the toolbar and decorative pager. The package's container CSS handles this; the application does not measure the calendar or style private descendants.
 - A small documented `--lfc-*` CSS-token override in the shared example stylesheet.
-- Application-owned cleanup: this standalone example explicitly calls `destroy()` on a non-cached `pagehide` while preserving the instance in the browser's back/forward cache. Litefold Calendar does not register that handler automatically.
+- Application-owned cleanup: this example calls `destroy()` on a non-cached `pagehide`. It preserves the instance when the page enters the browser's back/forward cache. Litefold Calendar does not register that handler automatically.
 
 Because `events` is a static array, `render()` validates the snapshot and completes its single terminal DOM render before returning. This recipe never enters loading state or sets `aria-busy`.
 

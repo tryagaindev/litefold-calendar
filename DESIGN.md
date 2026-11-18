@@ -320,7 +320,9 @@ Litefold Calendar should feel like a well-kept appointment ledger translated int
 
 The audience is people working in portals, sidebars, dashboards, booking summaries, and personal or public schedules. Density is deliberate: the six-week month grid always remains visible, while the agenda carries the detail that narrow cells cannot. The interface should feel dependable under keyboard, touch, pen, pointer, zoom, long localization, right-to-left direction, dark mode, and operating-system contrast preferences.
 
-This document is the canonical visual source for the package-owned `.litefold-calendar` surface. Its YAML values are normative; the prose explains their use. The [Styling and customization](docs/styling.md) defines how applications consume these roles through `--lfc-*` custom properties. The [accessibility contract](ACCESSIBILITY.md) and [public API reference](docs/api.md) remain canonical for interaction, focus, ARIA, and lifecycle behavior. Application-owned example shells, dialogs, filters, and render-hook nodes may use their own design system, but a calendar embedded inside them must preserve the roles and interaction distinctions defined here. Canonical screenshots are release evidence governed by the [screenshot contract](docs/screenshots/README.md), not an independent source of design rules.
+This document defines the visual rules for the package-owned `.litefold-calendar` surface. Its YAML values are normative; the prose explains how to use them. Follow [Styling and customization](docs/styling.md) to apply these roles through `--lfc-*` custom properties. For interaction, focus, ARIA, and lifecycle behavior, use the [accessibility contract](ACCESSIBILITY.md) and [public API reference](docs/api.md).
+
+Application-owned example shells, dialogs, filters, and render-hook nodes may use their own design system. A calendar embedded inside them must still preserve the roles and interaction distinctions defined here. Canonical screenshots provide release evidence under the [screenshot contract](docs/screenshots/README.md); they do not define separate design rules.
 
 For implementation work, start with the relevant component section, then check the responsive model and the final guardrails. For application theming, use the public token map with the CSS token contract; do not copy private geometry from the package stylesheet. For interaction or semantic changes, follow the accessibility contract and API reference rather than inferring behavior from visual treatment.
 
@@ -389,20 +391,54 @@ Status copy, empty/overflow messaging, and other readable explanatory text stop 
 
 The minimum supported design width is a **320 CSS-pixel calendar host border box**. Layout behavior below 320 CSS pixels is best-effort graceful degradation and robustness hardening, not a supported design target.
 
-By default, the six week tracks have equal intrinsic height: every row matches the tallest week and the complete grid grows when content requires more space. In compact layout, this `"equal"` mode gives normally visible primary-event and compact-primary overflow roots a common full slot. Total-count buttons use the same width and a square minimum, with rounded borders, but may grow taller for wrapped or enlarged text. Later event summaries exposed only on focus remain intrinsically sized. `weekRowSizing: "content"` instead lets each week track size independently and keeps compact roots intrinsically sized without the count button's square minimum. Both modes preserve the target-size floor and allow count content to wrap and grow. Neither mode assigns a fixed calendar height or clips a busy week.
+#### Week rows and event placement
+
+`weekRowSizing` controls how the six week rows share space:
+
+| Mode | Week rows | Compact events and counts |
+|---|---|---|
+| `"equal"` (default) | Every row matches the tallest week. The grid grows when content needs more space. | Normally visible primary-event and compact-primary overflow roots share a common full slot. Total-count buttons share its width and have a rounded border and square minimum. Wrapped or enlarged count text can make them taller. |
+| `"content"` | Each week sizes itself to its own content. | Compact roots size themselves to their content. Count buttons have no square minimum. |
+
+In both modes, later event summaries exposed only on focus keep their intrinsic size. Both modes preserve the target-size floor and let count text wrap and grow. Neither sets a fixed calendar height or clips a busy week.
 
 The date number and badge remain at the cell's block start. `gridEventPlacement` aligns the complete event-summary and overflow stack within the remaining block space at every width: `"top"` is the default, with `"center"` and `"bottom"` as alternatives. Center and bottom use safe alignment and fall back toward the top when the stack cannot fit; a content-filled cell may have no visible placement difference.
 
-- **Above `42rem`:** Toolbar content shares the primary row when it fits and weekday labels use the wide size. By default, capped event summaries fill the day width and remaining occurrences use a native overflow action. `gridEventDisplay.wide` can instead show a localized total-count button for every nonempty day (`"count"`) or only days with multiple occurrences (`"count-when-multiple"`).
-- **At or below `42rem`:** Navigation appears above application `toolbarEnd` content, and day badges disappear. Previous/Next, the month title, and Today share a row when their intrinsic widths fit; longer labels or enlarged text can move the title or Today onto following rows while preserving their order and separate targets. The default `gridEventDisplay.compact: "count-when-multiple"` presents multiple occurrences as one bordered, recognizable total-count button, independent of the summary cap. `"count"` also uses this button for single-event days. A one-event day otherwise retains its existing event representation. Counts use localized compact number formatting and a complete, exact accessible total. An empty day has no count action.
+#### Width boundaries
+
+These rules use the calendar's container width. The below-`24rem` and at-or-below-`20rem` rules add to the compact layout. All widths keep the shared focus and target-size rules.
+
+| Container width | Toolbar and labels | Grid and agenda |
+|---|---|---|
+| Above `42rem` | Toolbar content shares the primary row when it fits. Weekday labels use the wide size. | Capped event summaries fill the day width by default. Remaining occurrences use a native overflow action. |
+| At or below `42rem` | Navigation appears above application `toolbarEnd` content. Previous/Next, the month title, and Today share a row when they fit. Long labels or enlarged text may move the title or Today to following rows, preserving their order and separate targets. | Day badges disappear. Compact event presentation applies. |
+| Below `24rem` | The toolbar title and decorative pager lanes use the locale's `month: "short", year: "numeric"` form. At exactly `24rem` and above, they use the full month. | Agenda event titles and supporting content span the row beneath marker and time, giving long text useful reading space. |
+| At or below `20rem` | Previous/Next and the title share a row when they fit; otherwise the title follows on its own row. Today occupies the next row, followed by application content. Targets stay separate as text grows. Picker fields stack. | The status panel becomes one column. Narrow weekday labels replace short labels without changing their full accessible names. |
+
+Month/year abbreviation follows the below-`24rem` rule, independently of the extra changes at `20rem`. The full title, trigger name, grid name, and live text remain complete. The compact title and entire decorative pager lanes stay excluded from accessibility.
+
+#### Count and event presentation
+
+`gridEventDisplay` chooses the presentation for each size:
+
+- **Wide:** The default shows capped event summaries and a native overflow action for remaining occurrences. `gridEventDisplay.wide: "count"` instead shows a localized total-count button on every nonempty day. `"count-when-multiple"` shows it only on days with multiple occurrences.
+- **Compact:** The default `gridEventDisplay.compact: "count-when-multiple"` shows multiple occurrences as one bordered total-count button, independent of the summary cap. `"count"` also uses this button for single-event days. A one-event day otherwise keeps its existing event representation. Counts use localized compact number formatting and an exact, complete accessible total. Empty days have no count action.
 
 `gridEventDisplay: { compact: "events" }` restores the prior marker-plus-overflow presentation. Its first actionable event uses a marker-only 24–44 CSS-pixel target; later actions remain available on focus. A passive cue reports the signed additional count with a marker or the unsigned total without one. The package arranges marker and cue in equal auto-fit blocks, stacked when the full compact targets cannot fit beside each other. A zero summary cap suppresses individual summaries in every mode, while total-count actions remain available. All loaded normalized occurrences contribute to counts, including multi-day occurrences and visually suppressed markers.
-- **Below `24rem`:** The toolbar title and decorative pager lanes switch their visible month/year text from the full month to the locale's `month: "short", year: "numeric"` form. The full title, trigger name, grid name, and live text remain complete, while the compact title and entire pager lanes are excluded from accessibility. Agenda event titles and supporting content span the row beneath marker and time so long text keeps useful measure.
-- **At or below `20rem`:** Previous/Next and the month title share a row when their intrinsic widths fit; otherwise the title follows on its own row. Today occupies the next row, followed by application content. Navigation targets must remain separate as text grows. Picker fields stack, the status panel becomes one column, and narrow weekday labels replace short labels without changing their full accessible names. These are additional structural changes; month/year abbreviation already follows the below-`24rem` rule.
 
-Responsive changes are CSS container-query-only and must not depend on viewport-category JavaScript, consumer measurement, or visual reordering. Crossing `42rem` applies the toolbar, weekday, and day-cell composition above and selects the already-rendered event summaries, count action, and compact/wide `renderEventOverflow` visuals for that container size. An already focused action remains visible until focus leaves it. The label transition at `24rem` likewise selects already-rendered full and abbreviated toolbar/pager variants; the same query also performs the agenda reflow described above. Neither transition reruns render hooks, measures content in JavaScript, replaces interactive nodes, or changes accessible naming. The canonical DOM, interaction, and focus-order invariants are defined by [responsive and direct-input behavior](ACCESSIBILITY.md#responsive-and-direct-input-behavior). Visually, the agenda remains below the grid, and the interface must reflow without persistent two-dimensional content scrolling in a 320 CSS-pixel calendar host border box and remain usable at 200% text size and 400% page zoom.
+#### Resizing and target sizes
 
-Interactive day and compact event targets never fall below 24 by 24 CSS pixels and grow toward 44 by 44 when cell geometry permits. `--lfc-control-min-size` governs the control target, while `--lfc-grid-event-min-block-size` supplies the compact event action's block-axis floor; neither may be overridden so its target falls below that obligation. Keep custom compact marker and overflow visuals within their assigned slot, or raise those existing tokens so the package-owned roots grow together. Oversized output remains unclipped but opts out of equal visual sizing. Long fonts, translations, render-hook content, and toolbar content may make tracks taller; never clip them to preserve a screenshot.
+Responsive changes use CSS container queries only. Do not add viewport-category JavaScript, consumer measurement, or visual reordering.
+
+- Crossing `42rem` applies the toolbar, weekday, and day-cell layout above. CSS selects the already-rendered event summaries, count action, and compact/wide `renderEventOverflow` visuals. An already focused action stays visible until focus leaves it.
+- Crossing `24rem` selects the already-rendered full or abbreviated toolbar/pager labels and applies the agenda reflow above.
+- Neither transition reruns render hooks, measures content in JavaScript, replaces interactive nodes, or changes accessible names.
+
+Follow [responsive and direct-input behavior](ACCESSIBILITY.md#responsive-and-direct-input-behavior) for the DOM, interaction, and focus-order rules. The agenda always stays below the grid. At a 320 CSS-pixel host border box, the interface must reflow without persistent two-dimensional content scrolling. It must remain usable at 200% text size and 400% page zoom.
+
+Interactive day and compact event targets must be at least 24 by 24 CSS pixels. They grow toward 44 by 44 when the cell has room. `--lfc-control-min-size` governs the control target; `--lfc-grid-event-min-block-size` sets the compact event action's block-axis floor. Do not override either token in a way that makes its target smaller than required.
+
+Keep custom compact marker and overflow visuals within their assigned slot, or increase those tokens so package-owned roots grow together. Oversized output remains unclipped but gives up equal visual sizing. Fonts, translations, render hooks, and toolbar content may make tracks taller. Never clip them to preserve a screenshot.
 
 ## Elevation & Depth
 
@@ -476,7 +512,16 @@ Persistent warnings and errors appear between the toolbar and grid, using a sema
 
 Horizontal paging is a native scroll-snap enhancement around the one live grid. Adjacent lanes are decorative, use a mix of 72% selected surface and the calendar background, and contain only direction plus the adjacent month/year. Their visible text uses the same full form as the toolbar at exactly `24rem` and above and the same locale-aware abbreviated-month/numeric-year form below `24rem`. They are not event surfaces and are absent from the accessibility tree. Previous/Next buttons remain the universal fallback.
 
-Directional layout uses logical properties and inherited `dir`; glyphs and pager mapping mirror for RTL without visual reordering. Hover rules run only when hover is available. Quiet-control, event, and count/overflow action hover feedback uses a `120ms` ease-out transition. Direct day-number press feedback is immediate, with its transition disabled, so pointer or touch contact hands off cleanly to selection feedback. Selection feedback is brief and mechanical: a `160ms` whole-cell color reveal and `140ms` date-number confirmation from `0.92` to `1`, also using ease-out. State, focus, ARIA, and callback ordering are canonical in the [public API reference](docs/api.md) and [accessibility contract](ACCESSIBILITY.md); presentation never delays them. Under reduced motion the settled state appears immediately and authored scroll snapping is disabled.
+Directional layout uses logical properties and inherited `dir`. Glyphs and pager mapping mirror for RTL without visual reordering. Hover rules run only when hover is available.
+
+| Feedback | Timing |
+|---|---|
+| Quiet-control, event, and count/overflow action hover | `120ms` ease-out transition |
+| Direct day-number press | Immediate, with its transition disabled, so pointer or touch contact passes directly to selection feedback |
+| Whole-cell selection color | `160ms` ease-out reveal |
+| Date-number selection confirmation | `140ms` ease-out scale from `0.92` to `1` |
+
+Presentation never delays state, focus, ARIA, or callbacks. Their order is defined in the [public API reference](docs/api.md) and [accessibility contract](ACCESSIBILITY.md). Under reduced motion, the settled state appears immediately and authored scroll snapping is disabled.
 
 ### Private intrinsic geometry
 

@@ -8,9 +8,13 @@ Litefold Calendar has three primary risk centers:
 2. Optional WebMCP arguments and structured calendar results crossing between a browser agent and a live calendar instance.
 3. Repository changes crossing into public npm, GitHub release, and example-site artifacts.
 
-Runtime controls emphasize atomic validation, non-executable rendering, restricted links, bounded work, asynchronous generation guards, lifecycle isolation, and visible failures. WebMCP remains an explicit optional extension, bounded, same-origin, and tied to render/destroy ownership. Supply-chain controls preserve exact-source verification, immutable artifacts, isolated publication authority, provenance, and post-publication identity checks.
+Runtime controls validate complete snapshots atomically, render untrusted content without executing it, restrict links, and bound package-owned work. Generation guards and lifecycle isolation prevent stale work from changing the current calendar. Failures remain visible.
 
-Package users should focus on the assumptions, runtime trust boundaries, and TM-001 through TM-008. Maintainers changing build, release, or Pages workflows should also review TM-009 through TM-012, the path ownership table, and the validation matrix. These abuse cases are review targets, not confirmed vulnerabilities.
+WebMCP is an explicit optional extension. Its work is bounded and same-origin, and its lifetime follows render/destroy ownership. Supply-chain controls verify the exact source, preserve immutable artifacts, separate publication authority, and check provenance and public identity after publication.
+
+Package users should focus on the assumptions, runtime trust boundaries, and TM-001 through TM-008. Maintainers changing build, release, or Pages workflows should also review TM-009 through TM-012, the path ownership table, and the validation matrix.
+
+These abuse cases are review targets, not confirmed vulnerabilities.
 
 ## Scope and assumptions
 
@@ -87,7 +91,9 @@ flowchart LR
 
 ## Attacker capabilities
 
-An attacker may control one or more event fields, provider timing or rejection, duplicate or oversized results, metadata objects, ordinary browser input, or arguments sent through an enabled site tool. Event titles returned by `get-events` remain untrusted model content. A malicious contributor may submit source or workflow changes intended to add a dependency, lifecycle hook, unsafe sink, stale registration, or privileged pull-request path. An external actor may attempt package-name confusion or account compromise.
+An attacker may control event fields, provider timing or rejection, duplicate or oversized results, metadata objects, ordinary browser input, or arguments sent through an enabled site tool. Event titles returned by `get-events` remain untrusted model content.
+
+A malicious contributor may submit source or workflow changes intended to add a dependency, lifecycle hook, unsafe sink, stale registration, or privileged pull-request path. An external actor may attempt package-name confusion or account compromise.
 
 The attacker is not assumed to already control host application code, trusted render hooks, package extension code, the application origin, people with GitHub `Admin` access, npm package maintainers, or the browser platform. Those compromises cross a different trust boundary.
 
@@ -119,7 +125,9 @@ The scenarios below describe what each control must prevent. A scenario becomes 
 
 Behavior already authorized for trusted application code, unsupported downstream modifications, and defects in external browser, GitHub, or npm platforms are outside this model unless a repository-owned control creates an additional privilege boundary.
 
-Release-authority paths remain the highest supply-chain priority. Executable rendering remains the highest ordinary runtime priority. Unexpected WebMCP disclosure is high when it crosses an authorization or tenant boundary and otherwise calibrates to the sensitivity and breadth of exposed event content.
+Release-authority paths remain the highest supply-chain priority. Executable rendering remains the highest ordinary runtime priority.
+
+Unexpected WebMCP disclosure is high when it crosses an authorization or tenant boundary. Otherwise, assess it by the sensitivity of the exposed event content and how much was exposed.
 
 ## Review focus
 

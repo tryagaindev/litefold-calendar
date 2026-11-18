@@ -25,16 +25,19 @@ before adopting it.
 
 ## Choose an example
 
-Follow [Getting started](getting-started.md) for your first integration, then
-[Remote data](remote-data.md) for an API.  The [examples guide](../examples/README.md)
-includes runnable versions and an explicitly exhaustive advanced API showcase.
+Start with [Getting started](getting-started.md) to render your first calendar.
+Use [Remote data](remote-data.md) to load events from an API.
+The [examples guide](../examples/README.md) lists runnable recipes for specific tasks.
+The advanced example is an exhaustive API showcase; choose it when you need to
+explore the full API.
 
 ## Calendar display
 
-The layout adapts to its container, not the viewport.  Choose equal-height or
-content-sized weeks and top, center, or bottom event placement without moving
-the dates.  Check the [supported host width and responsive layout](../DESIGN.md#responsive-model)
-before placing it in a narrow sidebar.
+The layout adapts to the calendar's container. The viewport size does not control
+it. Choose equal-height or content-sized weeks. Place events at the top, center,
+or bottom of each day without moving the dates. Check the
+[supported host width and responsive layout](../DESIGN.md#responsive-model)
+before placing the calendar in a narrow sidebar.
 
 ## Events and event fetching
 
@@ -52,9 +55,12 @@ and [keyboard behavior](../ACCESSIBILITY.md#interaction-model).
 
 ## Localization and time zones
 
-Locale changes presentation and week conventions, not the Gregorian date model.
-Event strings are civil dates or local date-times, not UTC/offset timestamps;
-`timeZone` projects supplied `Date` instants but never converts event strings.
+Locale controls how dates appear and which day starts the week. The calendar
+still uses the Gregorian date model.
+
+Event strings are civil dates or local date-times. Do not supply UTC/offset
+timestamps as event strings. The `timeZone` option projects supplied `Date`
+instants into a time zone. It never converts event strings.
 See [date examples](getting-started.md#understand-event-dates).
 
 ## Custom toolbar, rendering, and styling
@@ -81,21 +87,55 @@ application-authored fallback content.
 
 ## Deliberate boundaries
 
+Check these limits before choosing the package.
+
+### Views and layout
+
 The package does not provide:
 
 - Week, day, time-grid, separate list, timeline, resource, year, or multi-month views.
-- View switching, configurable grid duration, hidden weekends, week numbers, business hours, background events, or a now indicator.
+- View switching or configurable grid duration.
+- Hidden weekends, week numbers, business hours, background events, or a now indicator.
 - Pre-rendered adjacent-month pager panels, carousel virtualization, or gesture-driven event prefetching.
-- Drag-and-drop, event resizing, built-in event creation/editing, per-event mutation methods, or a general mutable-options API.
-- Date-range or time-range selection.
-- Recurrence or RRULE expansion. Expand occurrences before returning the source snapshot.
-- Multiple first-class event sources, built-in JSON/iCalendar/calendar-service feeds, or package-owned caching. Aggregate, fetch, authorize, and cache in the application source.
 - Resource scheduling, time-slot configuration, or event virtualization.
-- Arbitrary HTML strings, per-event class names, or arbitrary background/text/border style inputs. Use validated event URLs, trusted render-hook nodes, and the documented built-in event marker color.
-- An SSR renderer, automatic JSON-LD, canonical event pages, metadata, sitemap policy, or search/privacy decisions.
-- Automatic WebMCP registration, a remote MCP server, declarative form or iframe tools, event activation, editing tools, or exposure of event IDs, URLs, metadata, render-hook content, and raw diagnostics.
-- Public third-party extension authoring. The package supports official extension factories and stable consumer render hooks; any future third-party lifecycle/capability contract will be explicit and lower stability.
-- Framework-specific wrappers, CommonJS output, polyfills, or legacy-browser builds.
 - Non-Gregorian calendar systems.
 
-These boundaries keep the package focused on a responsive, accessible month-and-agenda component with a small integration and security surface.
+### Editing and event data
+
+The package does not provide:
+
+- Drag-and-drop, event resizing, or built-in event creation/editing.
+- Per-event mutation methods or a general mutable-options API.
+- Date-range or time-range selection.
+- Recurrence or RRULE expansion.
+- Multiple first-class event sources or built-in JSON/iCalendar/calendar-service feeds.
+- Package-owned caching.
+
+Expand recurring events into occurrences before returning the source snapshot.
+Use the application source to aggregate, fetch, authorize, and cache events.
+
+### Rendering and search
+
+The package does not accept arbitrary HTML strings, per-event class names, or
+arbitrary background/text/border style inputs. Use validated event URLs, trusted
+render-hook nodes, and the documented built-in event marker color.
+
+The package has no SSR renderer. It does not generate JSON-LD, canonical event
+pages, or page metadata.
+The application sets sitemap policy and makes search/privacy decisions.
+
+### Extensions and packaging
+
+WebMCP does not register automatically. The extension does not provide a remote
+MCP server, declarative form or iframe tools, event activation, or editing tools.
+It does not expose event IDs, URLs, metadata, render-hook content, or raw diagnostics.
+
+The package supports official extension factories and stable consumer render
+hooks. It does not support public third-party extension authoring. Any future
+third-party lifecycle/capability contract will be explicit and lower stability.
+
+There are no framework-specific wrappers, CommonJS output, polyfills, or
+legacy-browser builds.
+
+These boundaries keep the package focused on a responsive, accessible month grid
+and agenda. They also keep its integration and security surface small.

@@ -58,6 +58,7 @@ For repository changes, start with contribution policy and the command reference
 | Run focused checks and the complete repository gate | [Contributor commands](../CONTRIBUTOR_COMMANDS.md) |
 | Commit and push an already-scoped change | [Commit-and-push operation skill](../.agents/skills/commit-and-push/SKILL.md) |
 | Submit and verify a contributor change | [Delivery checklist](../CONTRIBUTOR_COMMANDS.md#deliver-a-contributor-change) |
+| Write clear copy and preserve shared terminology | [Writing style](writing-style.md) |
 | Follow source conventions and dependency direction | [Code style](code-style.md) and [internal architecture](architecture.md) |
 | Understand extension lifecycle implementation | [Extension architecture](architecture.md#extension-lifecycle-implementation) |
 | Review the `setEvents()` decision or reproduce measurements | [Dynamic event update decision record](dynamic-event-updates-adr.md) |
@@ -84,4 +85,10 @@ publisher have separate [approval requirements](release-administration.md#public
 | Operate rolling and immutable example deployments | [Static example deployment](example-deployment.md) |
 | Review project governance | [Maintainers](../MAINTAINERS.md) and [Code of Conduct](../CODE_OF_CONDUCT.md) |
 
-Operation skills route a task to these canonical documents; they do not replace the repository's policies or runbooks. Public behavior is defined by the package-user guides and generated TypeScript declarations. Private `lfc-*` DOM details are not integration APIs; use the documented options, callbacks, render hooks, extensions, and CSS tokens instead.
+Operation skills route tasks to these canonical documents. They do not replace
+the repository's policies or runbooks.
+
+The package-user guides and generated TypeScript declarations define public
+behavior. Use the documented options, callbacks, render hooks, extensions, and
+CSS tokens to integrate the calendar. Private `lfc-*` DOM details are not
+integration APIs.

@@ -33,7 +33,9 @@ The runnable repository fixture deliberately uses `../../dist/index.js` and `../
 
 The calendar itself receives a static event array. Once the module loads, `render()` completes its one terminal render synchronously without a loading phase or `aria-busy`.
 
-This is an entry-point interoperability pattern, not a legacy or non-ESM build. It requires the same browsers as Litefold Calendar and must be served over HTTP with correct JavaScript MIME types. A Content Security Policy must permit the same-origin entry and module scripts; `nomodule` is not applicable.
+This pattern loads ESM from an existing classic entry point. It does not provide a legacy or non-ESM build, and it requires the same browsers as Litefold Calendar.
+
+Serve the files over HTTP with correct JavaScript MIME types. A Content Security Policy must permit the same-origin entry and module scripts; `nomodule` is not applicable.
 
 The fixture event URL renders as a native link. Its callback prevents navigation only so this standalone demo can show which calendar surface activated the event. The `data-my-*` attributes are application-owned selectors; Litefold Calendar output uses the package namespaces.
 

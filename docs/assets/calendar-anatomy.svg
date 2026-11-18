@@ -9,7 +9,7 @@
     synchronized; do not turn private lfc-* selectors into consumer API.
   -->
   <title id="calendar-anatomy-title">Litefold Calendar and event anatomy</title>
-  <desc id="calendar-anatomy-desc">An annotated schematic shows wide event summaries beside the default compact total-count button. It identifies the month title, day button and date, selected day, grid event summary or action, compact total-count action, wide overflow action, selected-day agenda, event leading rule, marker slot, leading content, time, title, details, and trailing content. A color key distinguishes the primary interface color, event leading-rule color, and per-event marker color.</desc>
+  <desc id="calendar-anatomy-desc">Compare wide event summaries with the default compact total-count button. Calendar labels identify the month title, day button and date, selected day, grid event summary or action, and selected-day agenda. Count labels identify the compact total-count action and wide overflow action. Event labels identify the leading rule, marker slot, leading content, time, title, details, and trailing content. The color key distinguishes the primary interface color, event leading-rule color, and per-event marker color.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />

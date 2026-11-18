@@ -25,7 +25,11 @@ Only the manifest-listed PNGs belong in this directory. Do not add alternate cro
 
 The root README embeds only the desktop month grid and mobile dark-theme agenda. Together they show the responsive and theme range without turning the GitHub and npm package landing pages into the complete review gallery.
 
-npm always includes the root `README.md`, while the package `files` allowlist deliberately keeps `docs/screenshots/**` outside the tarball. The previews therefore add no installed package bytes. They use repository-relative Markdown images for same-branch GitHub rendering and npm's GitHub-backed README rendering. An offline renderer opened from an installed package cannot load the excluded PNGs; the hosted GitHub and npm READMEs are the intended preview surfaces. The manifest hashes remain the version-specific visual evidence; the README previews are a current product overview.
+npm always includes the root `README.md`. The package `files` allowlist keeps `docs/screenshots/**` outside the tarball, so previews add no installed package bytes.
+
+The previews use repository-relative Markdown images. They render on the same GitHub branch and in npm's GitHub-backed README. An offline renderer opened from an installed package cannot load the excluded PNGs. The hosted GitHub and npm READMEs are the intended preview surfaces.
+
+Manifest hashes provide version-specific visual evidence. README previews provide a current product overview.
 
 Because npm refreshes a package README only when a new version is published, release verification includes a package-page rendering check. Keep every embedded image repository-relative, use the manifest's exact descriptive alt text, and update manifest references whenever documentation adds or removes a capture.
 
@@ -88,7 +92,14 @@ On a fresh Linux machine, add `--with-deps` to the Playwright install command wh
 
 `screenshots:prepare` first verifies the evidence. When it is current, it exits without building or capturing. Otherwise it builds the package and advanced example once, starts the strict-CSP repository server, and captures with fixed locale, time zone, theme, motion, clock/data fixtures, viewport, and interaction state. `screenshots:update` forces the same preparation when investigating browser or font drift. Do not hand-edit or recompress the PNGs.
 
-All captures go into an ignored staging directory first. The updater validates the complete batch, checks that sources did not change during capture, and creates `.cache/screenshots/review/index.html` with before/after images plus `changes.json`. It replaces canonical images only after successful capture and validation, commits the manifest last, and restores originals if replacement fails. Failed capture batches remain under `.cache/screenshots/staging-*` for diagnosis; canonical evidence stays untouched. The replacement is rollback-capable, not a cross-file filesystem transaction, so interruption during replacement requires inspecting the retained backup before retrying.
+The updater processes captures in this order:
+
+1. Capture all images into an ignored staging directory.
+2. Validate the complete batch and check that sources did not change during capture.
+3. Create `.cache/screenshots/review/index.html` with before/after images and `changes.json`.
+4. After successful capture and validation, replace canonical images and write the manifest last. Restore the originals if replacement fails.
+
+Failed capture batches remain under `.cache/screenshots/staging-*` for diagnosis; canonical evidence stays untouched. Replacement supports rollback but is not a cross-file filesystem transaction. If replacement is interrupted, inspect the retained backup before retrying.
 
 Open the local review gallery and review changed scenes at native dimensions before staging files. CI runs read-only `check:screenshots`; preparation and capture reject canonical acceptance in CI. CI can explicitly capture candidates under the automatic dependency workflow below. A capture lock prevents simultaneous updaters. After a forcibly terminated updater, verify no capture is still running before removing `.cache/screenshots/capture.lock`.
 
@@ -102,7 +113,15 @@ The capture job uses the pinned Playwright Chromium binary on `windows-2025`, wi
 npm run screenshots:candidate
 ```
 
-A separate workflow executes only trusted default-branch tooling, checks the originating CI attempt and current pull request, and recomputes the fingerprint without installing or executing changed dependencies. All required checks must pass; a failure solely due to the stale screenshot fingerprint is allowed only after independent tarball verification succeeds. Every candidate PNG must be byte-identical to its canonical image, and effective browser targets and scene definitions must remain unchanged. Only then does the workflow atomically commit refreshed provenance and dispatch CI for that exact new head.
+A separate workflow uses only trusted default-branch tooling. It checks the originating CI attempt and current pull request, then recomputes the fingerprint without installing or executing changed dependencies.
+
+Automatic acceptance requires all of the following:
+
+- All required checks pass. The only allowed failure is a stale screenshot fingerprint, and only after independent tarball verification succeeds.
+- Every candidate PNG is byte-identical to its canonical image.
+- Effective browser targets and scene definitions are unchanged.
+
+Only after these checks does the workflow atomically commit refreshed provenance and dispatch CI for that exact new head.
 
 Changed screenshots, browser targets, missing evidence, unexpected files, or platform/font drift require human review. Download the candidate artifact from the CI run and open its `index.html` at native dimensions. Prepare and review canonical captures locally before committing any changed images. Automation does not approve or merge a pull request, and release verification remains read-only.
 
@@ -128,9 +147,15 @@ The screenshot manifest is machine-owned and records, for every scene:
 - Example URL and deterministic setup steps.
 - Viewport and output dimensions.
 - SHA-256 hash.
-- Source fingerprint covering package source, Vite configuration, the advanced route and shared stylesheet, build/server/capture helpers, and effective JavaScript/CSS browser targets. Locked development inputs include TypeScript, Vite, esbuild, and Playwright plus their resolved transitive, optional, and present peer dependencies. Unrelated lint/test dependency entries are excluded; a dependency shared with the build/capture graph remains included. The preparation and candidate scripts and their automatic `pre`/`post` hooks are included. Browser target evidence records its resolution date, but a date change alone does not require recapture. Other example routes, deployment metadata, Playwright's test configuration, root version metadata, and npm scripts outside that capture lifecycle are excluded.
+- Source fingerprint, covering the inputs listed below.
 - Exact Node patch used for capture; validation accepts that provenance when it belongs to major version 24, while npm, Playwright, and Chromium remain exact-pinned. The Playwright value is derived from the exact `package.json` development dependency, and preparation rejects a stale local install before capture.
 - Documentation references and exact alt text.
+
+The source fingerprint includes package source, Vite configuration, the advanced route and shared stylesheet, build/server/capture helpers, and effective JavaScript/CSS browser targets. It also includes the preparation and candidate scripts and their automatic `pre`/`post` hooks.
+
+Locked development inputs include TypeScript, Vite, esbuild, and Playwright, plus their resolved transitive, optional, and present peer dependencies. Unrelated lint/test dependency entries are excluded. A dependency shared with the build/capture graph remains included.
+
+The fingerprint excludes other example routes, deployment metadata, Playwright's test configuration, root version metadata, and npm scripts outside the capture lifecycle. Browser target evidence records its resolution date, but a date change alone does not require recapture.
 
 `check:screenshots` fails when a canonical scene is absent, dimensions or hash differ, the source fingerprint is stale, a documented reference or alt text is missing, or an orphaned screenshot asset exists. A deliberate visual change must update implementation, captures, manifest, references, and alt text together.
 

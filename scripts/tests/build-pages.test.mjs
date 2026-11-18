@@ -1310,6 +1310,9 @@ void test("developer shell trusts canonical release order and pins commands and 
 		dom.window.document.querySelector("#my-install-command")?.textContent,
 		"npm install @tryagaindev/litefold-calendar@1.0.0"
 	);
+	assert.equal(dom.window.document.querySelector("#my-selected-channel")?.textContent, "Immutable release");
+	assert.equal(dom.window.document.querySelector("#my-primary-run-link")?.textContent, "Run basic example");
+	assert.match(dom.window.document.querySelector("#my-deployment-summary")?.textContent ?? "", /immutable release 1\.0\.0/u);
 	for (const [selector, expected] of [
 		["#my-primary-source-link", `/tree/${FIRST_COMMIT}/examples/basic`],
 		["#my-api-link", `/blob/${FIRST_COMMIT}/docs/api.md`],
@@ -1341,6 +1344,9 @@ void test("developer shell falls back to main and keeps static links on metadata
 		dom.window.document.querySelector("#my-install-command")?.textContent,
 		"npm install @tryagaindev/litefold-calendar@nightly"
 	);
+	assert.equal(dom.window.document.querySelector("#my-selected-channel")?.textContent, "Rolling main preview");
+	assert.equal(dom.window.document.querySelector("#my-primary-browse-link")?.textContent, "Browse all examples");
+	assert.match(dom.window.document.querySelector("#my-deployment-summary")?.textContent ?? "", /nightly dist-tag/u);
 	assert.match(dom.window.document.querySelector("#my-main-preview")?.textContent ?? "", new RegExp(SECOND_COMMIT, "u"));
 
 	renderDeploymentManifest(dom.window.document, {
@@ -1395,6 +1401,11 @@ void test("developer shell keeps repository links usable for an empty manifest",
 	assert.equal(
 		browseLink?.getAttribute("href"),
 		"https://github.com/tryagaindev/litefold-calendar/tree/main/examples"
+	);
+	assert.match(dom.window.document.querySelector("#my-deployment-summary")?.textContent ?? "", /No deployed build/u);
+	assert.equal(
+		dom.window.document.querySelector("#my-install-command")?.textContent,
+		"npm install @tryagaindev/litefold-calendar@nightly"
 	);
 	dom.window.close();
 });

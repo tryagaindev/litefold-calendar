@@ -1,6 +1,12 @@
 # Package verification
 
-Use this guide to verify release state, run the same package gate as CI, or inspect a published package. The automated release builds one tarball for the exact green `main` snapshot and retains it through publication; the npm-authorized job does not rebuild it. npm creates signatures and provenance during publication, and the workflow verifies both before making the GitHub prerelease public.
+Use this guide to verify release state, run the same package gate as CI, or
+inspect a published package.
+
+The automated release builds one tarball for the exact green `main` snapshot
+and retains it through publication. The npm-authorized job does not rebuild it.
+npm creates signatures and provenance during publication. The workflow verifies
+both before making the GitHub prerelease public.
 
 ## Audience routes
 
@@ -48,7 +54,13 @@ Choose the narrowest command that answers your question:
 | Release operator: retain a nightly evidence bundle | `npm run package:nightly -- --plan PATH` | The stamped tarball and its write-once release bundle under `.artifacts/` |
 | Package user or contributor: preview local npm file selection | `npm pack --dry-run --ignore-scripts` | Local checkout contents only; it is not a substitute for `check:tarball` |
 
-npm always includes the root `README.md`, but canonical PNGs remain outside the package's `files` allowlist. A dry run should therefore list `README.md` and no `docs/screenshots/**` entries. This keeps installed package size independent of the screenshot gallery; `check:screenshots` verifies the repository assets separately. Tarball checks cannot prove hosted README rendering, so the [release operations checklist](release-operations.md#6-verify-npm-and-the-github-prerelease) owns the npm package-page check.
+npm always includes the root `README.md`. Canonical PNGs remain outside the
+package's `files` allowlist, so a dry run should list `README.md` and no
+`docs/screenshots/**` entries. The screenshot gallery does not affect installed
+package size; `check:screenshots` verifies the repository assets separately.
+
+Tarball checks cannot prove how npm renders the README. Follow the npm
+package-page check in the [release operations checklist](release-operations.md#6-verify-npm-and-the-github-prerelease).
 
 ## Verify release state
 
@@ -88,7 +100,14 @@ matrix also includes Firefox. Hosted CI adds platform-owned controls such as
 pull-request dependency review. A local `npm run check` result is not evidence
 that those hosted controls ran.
 
-Package policy also verifies the optional-extension boundary. The root module graph must not reach `dist/extensions/**` or WebMCP, while the documented WebMCP subpath must contain its JavaScript, declarations, and source maps. The clean consumer passes `webMcp` through `CalendarOptions.extensions` using only public imports. Optional entries must also evaluate under Node without reading DOM globals.
+Package policy also verifies the optional-extension boundary:
+
+- The root module graph must not reach `dist/extensions/**` or WebMCP.
+- The documented WebMCP subpath must contain its JavaScript, declarations, and
+  source maps.
+- The clean consumer passes `webMcp` through `CalendarOptions.extensions` using
+  only public imports.
+- Optional entries must evaluate under Node without reading DOM globals.
 
 For intentional visual changes, follow the [screenshot update procedure](screenshots/README.md#update-captures) and review the images at native size against [`DESIGN.md`](../DESIGN.md). A release-only version change does not require recapturing unchanged scenes.
 
@@ -107,18 +126,22 @@ From a clean worktree, the command creates a write-once directory named `.artifa
 - The packaged `LICENSE`.
 
 The command refuses to overwrite an existing version directory. The source
-checkout keeps its development version; staging changes only the package
-manifest version before packing. The nightly receipt uses schema 2 and retains
-`sourceVersion`, the validated `nightly` plan, `manifestTransform: "version-only"`,
-and SHA-256 digests of the source and published manifests. `browserTargets`
-retains Vite's `baseline-widely-available` preset, versioned `effectiveQuery`,
-`resolvedAt`, locked Vite/esbuild `dataVersions`, selected `browsers`, and the
-JavaScript/CSS targets returned by Vite's public configuration resolver.
-`browserTargetsSha256` hashes its JSON serialization. The receipt records the
-original run's UTC creation date, including on reruns; target versions come from
-the locked Vite preset. The SBOM and tarball
-use the derived published version. `npm run package` retains the ordinary source
-version bundle for an explicitly requested local evidence operation.
+checkout keeps its development version. Staging changes only the package
+manifest version before packing; the SBOM and tarball use the derived published
+version.
+
+The schema-2 nightly receipt records:
+
+| Evidence | Recorded values |
+| --- | --- |
+| Source and publication | `sourceVersion`, the validated `nightly` plan, `manifestTransform: "version-only"`, and SHA-256 digests of both manifests |
+| `browserTargets` | Vite's `baseline-widely-available` preset, versioned `effectiveQuery`, `resolvedAt`, locked Vite/esbuild `dataVersions`, selected `browsers`, and the JavaScript/CSS targets returned by Vite's public configuration resolver |
+| `browserTargetsSha256` | The hash of the `browserTargets` JSON serialization |
+| Run date | The original run's UTC creation date, including on reruns |
+
+Target versions come from the locked Vite preset. `npm run package` retains the
+ordinary source-version bundle for an explicitly requested local evidence
+operation.
 
 Do not delete an existing bundle to produce different bytes for the same
 version. Recover an interrupted workflow using the original run and retained
@@ -129,7 +152,11 @@ A source correction requires a new reviewed identity. During an automated
 release, these files are attached to the draft GitHub prerelease before it
 becomes immutable.
 
-The SPDX document is canonicalized after npm generates and validates it. Its namespace uses the package version and exact source commit, its timestamp uses the commit's committer time, and its keys have a fixed order. With the pinned toolchain, the same clean commit therefore produces byte-identical `sbom.spdx.json` content.
+After npm generates and validates the SPDX document, repository tooling
+canonicalizes it. Its namespace uses the package version and exact
+source commit, its timestamp uses the commit's committer time, and its keys have
+a fixed order. With the pinned toolchain, the same clean commit produces
+byte-identical `sbom.spdx.json` content.
 
 ## Inspect local package selection
 
@@ -151,7 +178,11 @@ import "@tryagaindev/litefold-calendar/styles.css";
 
 The root import is sufficient for a calendar without optional components. The WebMCP subpath is supported only when that component is selected; it is not re-exported from root. No internal source or `dist/` subpath is a supported public entry point.
 
-Tree shaking and package contents answer different questions. The extension files remain in the one npm tarball, but an application that omits the extension subpath import leaves WebMCP outside its module graph so a bundler can omit those bytes. A runtime condition around a static import does not establish that exclusion. See the [first-party extension bundle contract](api.md#extension-imports-and-bundles).
+Tree shaking and package contents answer different questions. The extension
+files remain in the one npm tarball. When an application omits the extension
+subpath import, WebMCP stays outside its module graph and a bundler can omit
+those bytes. A runtime condition around a static import does not establish
+that exclusion. See the [first-party extension bundle contract](api.md#extension-imports-and-bundles).
 
 ## Registry and release evidence
 

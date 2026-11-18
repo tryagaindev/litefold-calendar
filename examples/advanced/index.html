@@ -18,7 +18,7 @@
 
 		<section class="my-panel my-controls" aria-labelledby="my-controls-title">
 			<h2 id="my-controls-title">Exercise the public API</h2>
-			<p>Each control calls the method named on the button. Results appear in the observable-state panel.</p>
+			<p>Each control calls the method named on the button. Results appear in the state panel below.</p>
 			<div class="my-control-row my-button-row">
 				<button class="my-button" type="button" data-my-command="prev">Previous via API</button>
 				<button class="my-button" type="button" data-my-command="next">Next via API</button>
@@ -37,7 +37,7 @@
 				</select>
 				<button class="my-button" type="button" data-my-complete-pending disabled>Complete pending request</button>
 			</div>
-			<p id="my-source-timing-help">Immediate arrays commit in one render without a loading state. Controlled PromiseLike requests stay busy until completed.</p>
+			<p id="my-source-timing-help">An immediate array commits in one render, with no loading state. A controlled PromiseLike request stays busy until you complete it.</p>
 
 			<div class="my-field-row">
 				<label for="my-target-date">Target date</label>
@@ -46,7 +46,7 @@
 				<button class="my-button" type="button" data-my-command="focusDate">Select and focus it</button>
 				<p class="my-field-error" id="my-target-date-error" data-my-target-date-error hidden>Choose a date from July 15, 2026 through September 15, 2027.</p>
 			</div>
-			<p id="my-target-date-help">Show its month passes a time-zone-projected <code>Date</code>; Select and focus it passes the exact civil-date string.</p>
+			<p id="my-target-date-help">Show its month passes a time-zone-projected <code>Date</code>. Select and focus it passes the exact civil-date string.</p>
 
 			<div class="my-field-row">
 				<label for="my-theme">Theme</label>

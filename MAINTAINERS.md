@@ -2,33 +2,39 @@
 
 ## Maintainership
 
-The `@TryAgainDev/maintainers` GitHub team is accountable for project direction,
-review, and policy. Security response, npm publication, protected-environment
-approval, and repository administration additionally require the corresponding
-system permission. The project currently has one maintainer:
+The `@TryAgainDev/maintainers` GitHub team is responsible for guiding the project,
+reviewing changes, and setting policy. You also need the relevant system
+permission for each of these tasks:
+
+- Security response.
+- npm publication.
+- Protected-environment approval.
+- Repository administration.
+
+The project currently has one maintainer:
 [Basi Angulo (`@redbasi`)](https://github.com/redbasi).
 
 ## Project and platform roles
 
-- A **package user** evaluates or integrates the published package. This audience
+- A **package user** evaluates or integrates the published package. A package user
   has no repository permission by default.
 - A **contributor** proposes or supplies code, documentation, issues, reviews,
   testing, or support. Contribution does not imply repository access.
-- A **maintainer** is a trusted project steward responsible for direction,
-  review, merge decisions, and policy. This project role is distinct from
-  GitHub's `Maintain` repository role, and team membership alone grants no npm,
-  security, environment, or GitHub `Admin` authority.
-- An **eligible maintainer** is a non-conflicted maintainer who holds the
-  permission needed for the decision. For required independent review, that
+- A **maintainer** is trusted to guide the project, review changes, make merge
+  decisions, and set policy. This project role differs from GitHub's `Maintain`
+  repository role. Team membership alone grants no npm, security, environment,
+  or GitHub `Admin` authority.
+- An **eligible maintainer** has no conflict of interest and holds the permission
+  needed for the decision. To provide required independent review, that
   maintainer must also not be the change author.
 - A **release operator** coordinates the repository's documented release
   procedure. The role grants no permission by itself.
 - A person with **Admin access** holds GitHub's `Admin` repository role.
   **Organization owner** and **security manager** are separate GitHub
   organization roles.
-- A **required reviewer for an environment** is a person or team configured in
-  that GitHub environment's deployment protection rules.
-- An **npm package maintainer** is an account listed by `npm owner ls` with
+- A **required reviewer for an environment** is a person or team named in the
+  deployment protection rules for that GitHub environment.
+- An **npm package maintainer** is an account listed by `npm owner ls`. It has
   permission to publish versions and manage package metadata. This role is
   separate from project maintainership.
 - A **Community Moderator** is a non-conflicted person explicitly assigned to
@@ -41,8 +47,11 @@ Authorization for one project or platform role does not imply another.
 
 Maintainers are expected to:
 
-- Triage issues and pull requests, enforce the documented public, accessibility, security, and package contracts, and explain material tradeoffs.
-- Require repository checks and relevant manual evidence before merge; maintainer-authored changes follow the same gate as community changes.
+- Triage issues and pull requests.
+- Enforce the documented public, accessibility, security, and package contracts.
+  Explain material tradeoffs.
+- Require repository checks and relevant manual evidence before merge.
+  Maintainer-authored changes follow the same gate as community changes.
 - Follow the [nightly release operations runbook](docs/release-operations.md), [release policy](docs/releasing.md), and [release administration guide](docs/release-administration.md) for publication work.
 - Handle suspected vulnerabilities through [SECURITY.md](SECURITY.md) and keep sensitive reports out of public issues.
 - Keep [CODEOWNERS](.github/CODEOWNERS), team membership, and repository or registry access aligned with current responsibilities.
@@ -50,17 +59,20 @@ Maintainers are expected to:
 ## Decision making
 
 Community input and evidence are welcome. Eligible maintainers make final
-technical, security, governance, and release decisions. Material decisions
-should preserve documented public guarantees and explain important tradeoffs in
-issues or pull requests. Code of Conduct reports follow the separate assignment
-and recusal rules below.
+decisions about technical work, security, governance, and releases.
 
-When a maintainer authors a change or operates a release and no other eligible
-maintainer is available, independent maintainer approval is impossible and the
-hosted policy must avoid deadlock while preserving all other checks. Changes
-authored by contributors can still require approval from the sole eligible
-maintainer. When multiple eligible maintainers are available, protected branches
-and release environments require at least one non-author approval.
+When making material decisions, maintainers should preserve documented public
+guarantees. They should explain important tradeoffs in issues or pull requests.
+Code of Conduct reports follow the separate assignment and recusal rules below.
+
+When a maintainer authors a change or operates a release, independent approval
+requires another eligible maintainer. If none is available, the hosted policy
+must avoid blocking the work solely for that reason. It must preserve all other
+checks. Changes authored by contributors can still require approval from the
+sole eligible maintainer.
+
+When multiple eligible maintainers are available, protected branches and release
+environments require at least one non-author approval.
 
 ## Code of Conduct response
 
@@ -109,18 +121,37 @@ person, and the appeal path must be documented.
 
 ## Adding or removing maintainers
 
-As the contributor community grows, additional maintainers may be appointed
-through the TryAgainDev GitHub organization based on
-sustained, constructive contributions, sound judgment, security awareness, and
-willingness to support the project. Changes to this file and CODEOWNERS require
-approval from an organization owner. This is a human governance decision recorded
-in the pull request; CODEOWNERS alone does not enforce or prove it. Access should
-be removed promptly when responsibilities end.
+As the contributor community grows, more maintainers may be appointed through
+the TryAgainDev GitHub organization. Base appointments on:
 
-When another active maintainer is appointed, update the current maintainer list,
-team membership, CODEOWNERS, required pull-request approvals, required reviewers
-for release environments, and the conduct-response policy together. Require a
-non-author approval for protected branches and releases whenever another
-eligible maintainer is available.
+- Sustained, constructive contributions.
+- Sound judgment.
+- Security awareness.
+- Willingness to support the project.
 
-Release and repository permissions follow least privilege. npm publishing, security advisory, branch-protection, and GitHub Actions administration access are granted separately as needed; membership in the GitHub team does not itself grant registry access.
+Obtain approval from an organization owner for changes to this file and
+CODEOWNERS. Record this human governance decision in the pull request;
+CODEOWNERS alone does not enforce or prove it.
+
+When responsibilities end, access should be removed promptly.
+
+When another active maintainer is appointed, update these together:
+
+- The current maintainer list.
+- Team membership and CODEOWNERS.
+- Required pull-request approvals.
+- Required reviewers for release environments.
+- The conduct-response policy.
+
+Require a non-author approval for protected branches and releases whenever
+another eligible maintainer is available.
+
+Release and repository permissions follow least privilege. Grant each type of
+access separately, only as needed:
+
+- npm publishing.
+- Security advisory access.
+- Branch-protection access.
+- GitHub Actions administration.
+
+Membership in the GitHub team does not itself grant registry access.
