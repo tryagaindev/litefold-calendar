@@ -203,7 +203,7 @@ function renderPrimaryDeployment(documentReference, entry) {
 		`npm install ${PACKAGE_NAME}@${isRelease ? entry.version : "nightly"}`);
 	setText(documentReference, "my-deployment-summary", isRelease
 		? `Running immutable release ${entry.version}. Source links are pinned to its commit.`
-		: `Running main at ${entry.commit}. The install command follows npm's nightly dist-tag.`);
+		: `Running main at ${entry.commit}. The install command uses npm's nightly dist-tag.`);
 }
 
 function renderUnavailablePrimary(documentReference) {

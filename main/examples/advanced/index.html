@@ -20,7 +20,7 @@
 
 		<section class="my-panel my-controls" aria-labelledby="my-controls-title">
 			<h2 id="my-controls-title">Exercise the public API</h2>
-			<p>Each control calls the method named on the button. Results appear in the observable-state panel.</p>
+			<p>Each control calls the method named on the button. Results appear in the state panel below.</p>
 			<div class="my-control-row my-button-row">
 				<button class="my-button" type="button" data-my-command="prev">Previous via API</button>
 				<button class="my-button" type="button" data-my-command="next">Next via API</button>
@@ -39,7 +39,7 @@
 				</select>
 				<button class="my-button" type="button" data-my-complete-pending disabled>Complete pending request</button>
 			</div>
-			<p id="my-source-timing-help">Immediate arrays commit in one render without a loading state. Controlled PromiseLike requests stay busy until completed.</p>
+			<p id="my-source-timing-help">An immediate array commits in one render, with no loading state. A controlled PromiseLike request stays busy until you complete it.</p>
 
 			<div class="my-field-row">
 				<label for="my-target-date">Target date</label>
@@ -48,7 +48,7 @@
 				<button class="my-button" type="button" data-my-command="focusDate">Select and focus it</button>
 				<p class="my-field-error" id="my-target-date-error" data-my-target-date-error hidden>Choose a date from July 15, 2026 through September 15, 2027.</p>
 			</div>
-			<p id="my-target-date-help">Show its month passes a time-zone-projected <code>Date</code>; Select and focus it passes the exact civil-date string.</p>
+			<p id="my-target-date-help">Show its month passes a time-zone-projected <code>Date</code>. Select and focus it passes the exact civil-date string.</p>
 
 			<div class="my-field-row">
 				<label for="my-theme">Theme</label>
@@ -152,9 +152,9 @@
 		<nav aria-label="Developer resources">
 			<ul class="my-developer-footer-links">
 				<li><a href="../">All examples</a></li>
-				<li><a href="https://github.com/tryagaindev/litefold-calendar/tree/732341681ce21e91954fba8edf2b45c0dbb69545/examples/advanced/">Recipe source</a></li>
-				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/732341681ce21e91954fba8edf2b45c0dbb69545/docs/api.md">API reference</a></li>
-				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/732341681ce21e91954fba8edf2b45c0dbb69545/docs/integration-guide.md">Integration guide</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/tree/fb09324d20830e8fd363ee551c7bd53c4932d444/examples/advanced/">Recipe source</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/fb09324d20830e8fd363ee551c7bd53c4932d444/docs/api.md">API reference</a></li>
+				<li><a href="https://github.com/tryagaindev/litefold-calendar/blob/fb09324d20830e8fd363ee551c7bd53c4932d444/docs/integration-guide.md">Integration guide</a></li>
 			</ul>
 		</nav>
 		<dl>
@@ -163,7 +163,7 @@
 			<dt>Deployment channel</dt>
 			<dd>Rolling main preview</dd>
 			<dt>Source commit</dt>
-			<dd><a href="https://github.com/tryagaindev/litefold-calendar/commit/732341681ce21e91954fba8edf2b45c0dbb69545"><code>732341681ce21e91954fba8edf2b45c0dbb69545</code></a></dd>
+			<dd><a href="https://github.com/tryagaindev/litefold-calendar/commit/fb09324d20830e8fd363ee551c7bd53c4932d444"><code>fb09324d20830e8fd363ee551c7bd53c4932d444</code></a></dd>
 		</dl>
 	</footer>
 </body>
