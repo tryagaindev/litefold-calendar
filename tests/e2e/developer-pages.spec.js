@@ -130,14 +130,21 @@ for (const { name, route } of EXAMPLE_ROUTES) {
 			page.goto(route, { waitUntil: "domcontentloaded" }), feed
 		]);
 		expect(response?.ok(), `Expected ${route} to return a successful response.`).toBe(true);
-		const host = page.locator(".litefold-calendar").first();
-		await expect(host).toBeVisible();
 		if (feedResponse !== null) {
 			expect(feedResponse.ok(), "Expected the remote recipe's event feed to load successfully.").toBe(true);
 			await feedResponse.finished();
+			const host = page.locator(".litefold-calendar").first();
 			await expect(host.getByRole("grid").getByRole("button", { name: /^View 3 events for /u })).toBeVisible();
 		}
-		await expect(host).not.toHaveAttribute("aria-busy", "true");
+		//Keep readiness polling in the page's script context. Firefox 159 can crash when axe
+		//reads ARIA after a locator assertion captures an accessibility snapshot (Playwright #43967).
+		await expect.poll(() => page.evaluate(() => {
+			const host = document.querySelector(".litefold-calendar");
+			if (host === null) { return false; }
+			const { width, height } = host.getBoundingClientRect();
+			return width > 0 && height > 0 && getComputedStyle(host).visibility === "visible" &&
+				host.getAttribute("aria-busy") !== "true";
+		}), { message: `Expected the calendar at ${route} to be visible and finished loading.` }).toBe(true);
 		await expectNoAutomatedAccessibilityViolations(page, testInfo);
 	});
 }

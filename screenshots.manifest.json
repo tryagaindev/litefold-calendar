@@ -5,9 +5,9 @@
     "browser": "chromium",
     "node": "24.21.0",
     "npm": "12.0.2",
-    "playwright": "1.64.1"
+    "playwright": "1.65.1"
   },
-  "sourceFingerprint": "001a418b866c4b6b658df08af4adec33b9850af51d1dfde91ac6b79667c4b8be",
+  "sourceFingerprint": "4e44d941f7ee679e7bf2c905960576c93ec5d7625ff32f6ce03609dcc31328cf",
   "scenes": [
     {
       "id": "desktop-month-grid",
@@ -129,7 +129,7 @@
       "references": [
         "docs/screenshots/README.md"
       ],
-      "sha256": "51e8c1b091dfde5717cc5546aaed3315eb044e127c103b2ba0613af578d04429"
+      "sha256": "45147d8a29d99246955a9b2962f208886e18967c6cd6e7647b7558dac81622f4"
     },
     {
       "id": "compact-default-counts",
@@ -216,10 +216,10 @@
   ],
   "browserTargets": {
     "query": "baseline-widely-available",
-    "effectiveQuery": "Vite 8.3.4: baseline-widely-available",
-    "resolvedAt": "2026-11-10",
+    "effectiveQuery": "Vite 8.3.8: baseline-widely-available",
+    "resolvedAt": "2026-11-18",
     "dataVersions": {
-      "vite": "8.3.4",
+      "vite": "8.3.8",
       "esbuild": "0.28.2"
     },
     "browsers": [
