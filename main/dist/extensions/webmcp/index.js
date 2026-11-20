@@ -1,5 +1,5 @@
-import { f as formatCalendarDate, g as parseCalendarDate, r as LitefoldCalendarError, t as createRegisteredExtension } from "../../chunks/registered-extension-contract-D6GEApjX.js";
-//#region src/extensions/webmcp/configuration.ts
+import { f as formatCalendarDate, g as parseCalendarDate, r as LitefoldCalendarError, t as createRegisteredExtension } from "../../chunks/registered-extension-contract-DvqnF3H8.js";
+// src/extensions/webmcp/configuration.ts
 var DEFAULT_TOOL_NAME_PREFIX = "litefold-calendar";
 var MAX_TOOL_NAME_PREFIX_LENGTH = 117;
 var TOOL_NAME_PREFIX_PATTERN = /^[A-Za-z0-9_.-]+$/u;
@@ -45,8 +45,7 @@ function isArray(value) {
 		return true;
 	}
 }
-//#endregion
-//#region src/extensions/webmcp/execution-signal.ts
+// src/extensions/webmcp/execution-signal.ts
 function createExecutionSignalResolver(fallbackSignal) {
 	const platform = createAbortSignalPlatform(fallbackSignal);
 	const fallback = createExecutionSignal(fallbackSignal, platform);
@@ -114,8 +113,7 @@ function findPrototypeFunction(value, property, member) {
 function isRecord$1(value) {
 	return typeof value === "object" && value !== null;
 }
-//#endregion
-//#region src/extensions/webmcp/runtime.ts
+// src/extensions/webmcp/runtime.ts
 var DATE_INPUT_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 var GET_EVENTS_TOOL_SUFFIX = "-get-events";
 var NAVIGATE_TOOL_SUFFIX = "-navigate";
@@ -643,8 +641,7 @@ function isExecutionCanceled(signal) {
 function isRecord(value) {
 	return typeof value === "object" && value !== null;
 }
-//#endregion
-//#region src/extensions/webmcp/index.ts
+// src/extensions/webmcp/index.ts
 /** Creates the optional, tree-shakeable first-party WebMCP extension. */
 function webMcp(options) {
 	const snapshot = normalizeCalendarWebMcpOptions(options);
@@ -659,7 +656,6 @@ function webMcp(options) {
 		id: "webmcp"
 	});
 }
-//#endregion
 export { webMcp };
 
 //# sourceMappingURL=index.js.map

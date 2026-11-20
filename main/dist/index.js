@@ -1,5 +1,5 @@
-import { _ as parseCalendarDateTime, a as reportCalendarError, b as toUtcDate, c as addCalendarMonths, d as compareDateTimes, f as formatCalendarDate, g as parseCalendarDate, h as isMidnight, i as isAbortError, l as assertCalendarDate, m as getDaysInMonth, n as resolveRegisteredExtension, o as toCalendarIssue, p as getCalendarDateForTimeZone, r as LitefoldCalendarError, s as addCalendarDays, u as compareCalendarDates, v as positiveModulo, x as toUtcDateTime, y as toCalendarDate } from "./chunks/registered-extension-contract-D6GEApjX.js";
-//#region src/internal/domain/event-normalization.ts
+import { _ as parseCalendarDateTime, a as reportCalendarError, b as toUtcDate, c as addCalendarMonths, d as compareDateTimes, f as formatCalendarDate, g as parseCalendarDate, h as isMidnight, i as isAbortError, l as assertCalendarDate, m as getDaysInMonth, n as resolveRegisteredExtension, o as toCalendarIssue, p as getCalendarDateForTimeZone, r as LitefoldCalendarError, s as addCalendarDays, u as compareCalendarDates, v as positiveModulo, x as toUtcDateTime, y as toCalendarDate } from "./chunks/registered-extension-contract-DvqnF3H8.js";
+// src/internal/domain/event-normalization.ts
 var ACCENT_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 var CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F-\u009F]/u;
 var URL_SCHEME_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]*:/u;
@@ -256,8 +256,7 @@ function createEventDataError(message, eventIndex, cause) {
 		eventIndex
 	});
 }
-//#endregion
-//#region src/internal/domain/grid.ts
+// src/internal/domain/grid.ts
 var GRID_DAY_COUNT = 42;
 var DEFAULT_FIRST_DAY = 0;
 var DAYS_PER_WEEK$2 = 7;
@@ -326,8 +325,7 @@ function readWeekInfoFirstDay(weekInfo) {
 	}
 	return typeof firstDay === "number" && Number.isInteger(firstDay) && firstDay >= 1 && firstDay <= 7 ? positiveModulo(firstDay, DAYS_PER_WEEK$2) : null;
 }
-//#endregion
-//#region src/internal/domain/ranges.ts
+// src/internal/domain/ranges.ts
 /** Tests a supported civil date against independently optional inclusive bounds. */
 function isCalendarDateWithinBounds(date, minDate, maxDate) {
 	assertCalendarDate(date);
@@ -370,8 +368,7 @@ function assertCalendarDateBounds(minDate, maxDate) {
 	if (maxDate !== null && maxDate !== void 0) assertCalendarDate(maxDate);
 	if (minDate !== null && minDate !== void 0 && maxDate !== null && maxDate !== void 0 && compareCalendarDates(minDate, maxDate) > 0) throw new RangeError("Calendar minimum date must not follow the maximum date.");
 }
-//#endregion
-//#region src/internal/domain/bounds.ts
+// src/internal/domain/bounds.ts
 /** Centralized inclusive date and renderable-month policy for one calendar instance. */
 var CalendarBounds = class {
 	firstDay;
@@ -477,8 +474,7 @@ function compareMonth(left, right) {
 function dayDistance(left, right) {
 	return Math.abs(toUtcDate(left).getTime() - toUtcDate(right).getTime());
 }
-//#endregion
-//#region src/internal/runtime/safety.ts
+// src/internal/runtime/safety.ts
 var INTERACTIVE_ROLES = /* @__PURE__ */ new Set([
 	"button",
 	"checkbox",
@@ -655,8 +651,7 @@ function safelyReportThenableRejection(onRejected, cause) {
 		reportCalendarError(new AggregateError([cause, reportingFailure], "A calendar callback rejection could not be reported."));
 	}
 }
-//#endregion
-//#region src/internal/runtime/configuration.ts
+// src/internal/runtime/configuration.ts
 var CALENDAR_OPTION_SCHEMA = Object.freeze({
 	agendaDomLimit: "value",
 	agendaPageSize: "value",
@@ -883,8 +878,7 @@ function resolveIconNodes(document, host, icons) {
 	if (nodes.previous === nodes.next || nodes.today === nodes.previous || nodes.today === nodes.next) throw createConfigurationError("Navigation icon factories must return distinct nodes.");
 	return Object.freeze(nodes);
 }
-//#endregion
-//#region src/internal/runtime/actions.ts
+// src/internal/runtime/actions.ts
 /** Creates an immutable public day-selection context. */
 function createDaySelection(nativeEvent, date, element) {
 	return Object.freeze({
@@ -938,8 +932,7 @@ function createEventContextMenu(nativeEvent, date, element, event, surface, clie
 		surface
 	});
 }
-//#endregion
-//#region src/internal/runtime/render-hooks.ts
+// src/internal/runtime/render-hooks.ts
 var RENDER_HOOK_SCHEMA = Object.freeze({
 	dayDidMount: "hook",
 	eventDidMount: "hook",
@@ -1006,8 +999,7 @@ function createRenderHookRuntimes(renderHooks, AbortControllerConstructor) {
 	});
 	return Object.freeze(runtimes);
 }
-//#endregion
-//#region src/internal/runtime/source.ts
+// src/internal/runtime/source.ts
 /** Reserves state publication for a source phase through preparation and DOM reactions. */
 var CalendarEventSourcePublication = class {
 	generation = null;
@@ -1111,8 +1103,7 @@ function observeSourceThenable(value, then) {
 		}
 	});
 }
-//#endregion
-//#region src/internal/runtime/state.ts
+// src/internal/runtime/state.ts
 /** Creates one typed package error from coordinator-owned internal values. */
 function createInternalError(options) {
 	const phase = options.phase ?? phaseForCode(options.code);
@@ -1193,8 +1184,7 @@ function severityRank(severity) {
 		case "fatal": return 3;
 	}
 }
-//#endregion
-//#region src/internal/dom/announcement.ts
+// src/internal/dom/announcement.ts
 /** Presents distinct announcements while leaving scheduling and generation ownership to the coordinator. */
 var CalendarAnnouncementPresenter = class {
 	elements;
@@ -1226,8 +1216,7 @@ var CalendarAnnouncementPresenter = class {
 function isSameAnnouncement(previous, next) {
 	return previous !== null && previous.message === next.message && previous.politeness === next.politeness;
 }
-//#endregion
-//#region src/internal/dom/issue-region.ts
+// src/internal/dom/issue-region.ts
 /** Updates the stable issue region without replacing its Retry control. */
 function presentCalendarIssue(elements, presentation) {
 	const { issue } = presentation;
@@ -1255,8 +1244,7 @@ function clearIssue(elements) {
 	elements.panelTitle.textContent = "";
 	elements.panelMessage.textContent = "";
 }
-//#endregion
-//#region src/internal/dom/heading.ts
+// src/internal/dom/heading.ts
 var CHILD_HEADING_LEVELS = {
 	1: 2,
 	2: 3,
@@ -1273,8 +1261,7 @@ function createHeading(document, level) {
 function getChildHeadingLevel(level) {
 	return CHILD_HEADING_LEVELS[level];
 }
-//#endregion
-//#region src/internal/dom/month-picker.ts
+// src/internal/dom/month-picker.ts
 /** Owns native Popover or dialog state, validation, synchronization, and focus restoration. */
 var CalendarMonthPickerController = class {
 	options;
@@ -1590,8 +1577,7 @@ function installDialogLightDismiss(picker, onCancel) {
 		pressedBackdrop = false;
 	});
 }
-//#endregion
-//#region src/internal/dom/structure.ts
+// src/internal/dom/structure.ts
 /** Creates the stable toolbar, status, grid, and agenda structure. */
 function createCalendarStructure(layoutOptions, options) {
 	options.integrationParents.clear();
@@ -1800,8 +1786,7 @@ function createLiveRegion(document, politeness, role) {
 	region.setAttribute("role", role);
 	return region;
 }
-//#endregion
-//#region src/internal/dom/palette.ts
+// src/internal/dom/palette.ts
 /** Mirrors inherited palette and direction only when their native CSS features are unavailable. */
 var CalendarPalette = class {
 	host;
@@ -1881,8 +1866,7 @@ var CalendarPalette = class {
 		}
 	};
 };
-//#endregion
-//#region src/messages.ts
+// src/messages.ts
 /** Immutable English defaults used when an application does not override a message. */
 var DEFAULT_CALENDAR_MESSAGES = Object.freeze({
 	actionErrorMessage: "The action could not be completed. Try again.",
@@ -1933,8 +1917,7 @@ function formatCalendarMessage(template, values) {
 	};
 	return template.replace(/\{(count|date|eventLabel|total|visible)\}/g, (_match, token) => replacements[token] ?? "");
 }
-//#endregion
-//#region src/internal/dom/month-title.ts
+// src/internal/dom/month-title.ts
 /** Formats and renders one canonical month title plus an aria-hidden compact presentation. */
 var CalendarMonthTitleRenderer = class {
 	compactFormatter;
@@ -1980,8 +1963,7 @@ function setAccessibleLabel(element, value) {
 function setTextContent(element, value) {
 	if (element.textContent !== value) element.textContent = value;
 }
-//#endregion
-//#region src/internal/dom/agenda.ts
+// src/internal/dom/agenda.ts
 /** Creates agenda list and footer content without mutating the stable agenda shell. */
 function createAgendaPresentation(input) {
 	if (!input.hasSnapshot) return freezePresentation(input.titleText, true, [], [], [], null);
@@ -2030,8 +2012,7 @@ function freezePresentation(titleText, listHidden, listItems, footerChildren, ac
 		titleText
 	});
 }
-//#endregion
-//#region src/internal/dom/event-structure.ts
+// src/internal/dom/event-structure.ts
 /** Wires native event controls while leaving action transactions with the coordinator. */
 function installEventActionListeners(options) {
 	const { action, isCurrent, onActivate, onContext, onGridKeydown } = options;
@@ -2077,8 +2058,7 @@ function listen(element, type, listener) {
 function isContextMenuKey(event) {
 	return event.key === "ContextMenu" || event.shiftKey && event.key === "F10";
 }
-//#endregion
-//#region src/internal/dom/event-representation.ts
+// src/internal/dom/event-representation.ts
 /** Creates a complete native event representation without invoking application code. */
 function createEventRepresentation(input) {
 	const event = input.event.event;
@@ -2147,8 +2127,7 @@ function createEventRepresentation(input) {
 function isTimeVisuallyHidden(timeDisplay, surface) {
 	return timeDisplay === "none" || timeDisplay === "grid" && surface === "agenda" || timeDisplay === "agenda" && surface === "grid-summary";
 }
-//#endregion
-//#region src/internal/dom/event-text.ts
+// src/internal/dom/event-text.ts
 /** Localized text and accessible names shared by native event representations. */
 var CalendarEventText = class {
 	locale;
@@ -2193,8 +2172,7 @@ var CalendarEventText = class {
 		return this.timeFormatter;
 	}
 };
-//#endregion
-//#region src/internal/dom/event-accent.ts
+// src/internal/dom/event-accent.ts
 /** Creates the built-in decorative accent used by event representations. */
 function createEventAccent(document, accentColor) {
 	const namespace = "http://www.w3.org/2000/svg";
@@ -2213,15 +2191,13 @@ function createEventAccent(document, accentColor) {
 	marker.append(shape);
 	return marker;
 }
-//#endregion
-//#region src/internal/dom/environment.ts
+// src/internal/dom/environment.ts
 /** Resolves the host's effective text direction with a non-window fallback. */
 function resolveTextDirection(window, host) {
 	if (window !== null && typeof window.getComputedStyle === "function") return window.getComputedStyle(host).direction === "rtl" ? "rtl" : "ltr";
 	return host.closest("[dir]")?.getAttribute("dir")?.toLowerCase() === "rtl" ? "rtl" : "ltr";
 }
-//#endregion
-//#region src/internal/dom/grid-focus.ts
+// src/internal/dom/grid-focus.ts
 /** Creates a collision-safe identity for one rendered event occurrence. */
 function getEventActionKey(surface, dateString, eventId) {
 	return JSON.stringify([
@@ -2367,8 +2343,7 @@ function resolveEventFocusElement(token, actions) {
 function isGridActionToken(token) {
 	return token.kind === "grid-more" || token.kind === "event-action" && token.surface === "grid-summary";
 }
-//#endregion
-//#region src/internal/dom/month-grid.ts
+// src/internal/dom/month-grid.ts
 var DAYS_PER_WEEK$1 = 7;
 var FORCED_COLORS_QUERY = "(forced-colors: active)";
 var SELECTION_ANIMATION_NAME = "lfc-day-selection-reveal";
@@ -2496,8 +2471,7 @@ function renderWeekdayHeadings(container, options) {
 	});
 	container.replaceChildren(...headings);
 }
-//#endregion
-//#region src/internal/runtime/day-grid-actions.ts
+// src/internal/runtime/day-grid-actions.ts
 /** Advertises day shortcuts that stay available in both container presentations. */
 function setDayActionShortcuts(button, hasSummaryAction, overflow, hasContext) {
 	const compactHasAction = hasSummaryAction || (overflow.compact?.action ?? null) !== null;
@@ -2560,8 +2534,7 @@ var DayGridActionCollector = class {
 		return Object.freeze([...this.actions]);
 	}
 };
-//#endregion
-//#region src/icons.ts
+// src/icons.ts
 function createTextIcon(document, text) {
 	const icon = document.createElement("span");
 	icon.className = "lfc-calendar-navigation-icon";
@@ -2575,8 +2548,7 @@ var DEFAULT_CALENDAR_ICONS = Object.freeze({
 	next: (document) => createTextIcon(document, "›"),
 	previous: (document) => createTextIcon(document, "‹")
 });
-//#endregion
-//#region src/internal/runtime/icon-configuration.ts
+// src/internal/runtime/icon-configuration.ts
 var CALENDAR_ICON_SCHEMA = Object.freeze({
 	next: true,
 	previous: true,
@@ -2601,8 +2573,7 @@ function resolveCalendarIcons(icons) {
 	}
 	return Object.freeze(resolved);
 }
-//#endregion
-//#region src/internal/runtime/node-leases.ts
+// src/internal/runtime/node-leases.ts
 var NODE_LEASES = /* @__PURE__ */ new WeakMap();
 /** Returns whether a node is currently leased by any live package subsystem. */
 function hasNodeLease(node) {
@@ -2637,8 +2608,7 @@ function releaseLeasedNodes(nodes, owner) {
 	}
 	return errors;
 }
-//#endregion
-//#region src/internal/runtime/integration-nodes.ts
+// src/internal/runtime/integration-nodes.ts
 /** Owns reversible leases for application nodes integrated with one calendar instance. */
 var IntegrationNodeController = class {
 	options;
@@ -2708,8 +2678,7 @@ var IntegrationNodeController = class {
 		return isSameDocumentNode(this.options.document, node) && isAppendableNode(node) && hasAllowedParent && node !== this.options.host && !node.contains(this.options.host) && !hasNodeLease(node);
 	}
 };
-//#endregion
-//#region src/internal/runtime/event-source-lifecycle.ts
+// src/internal/runtime/event-source-lifecycle.ts
 /** Mutates busy attributes only while the owning request remains current. */
 function setVisibleEventBusyState(host, grid, busy, isCurrent) {
 	for (const element of [host, grid]) {
@@ -2762,8 +2731,7 @@ function createEventSourceErrorOptions(options) {
 		userTitle: options.retained ? options.messages.refreshErrorTitle : options.messages.loadErrorTitle
 	});
 }
-//#endregion
-//#region src/internal/dom/event-overflow.ts
+// src/internal/dom/event-overflow.ts
 /** Creates one stable event-overflow visual with package-owned default content. */
 function createEventOverflowElements(document, variant, text) {
 	const root = document.createElement("span");
@@ -2781,8 +2749,7 @@ function createEventOverflowElements(document, variant, text) {
 		root
 	};
 }
-//#endregion
-//#region src/internal/runtime/event-overflow-presentation.ts
+// src/internal/runtime/event-overflow-presentation.ts
 var COMPACT_NUMBER_FORMAT_OPTIONS = Object.freeze({
 	compactDisplay: "short",
 	maximumFractionDigits: 1,
@@ -2942,8 +2909,7 @@ var CalendarEventOverflowPresenter = class {
 		options.summaries.append(overflowCluster);
 	}
 };
-//#endregion
-//#region src/internal/runtime/action-pipeline.ts
+// src/internal/runtime/action-pipeline.ts
 /** Runs synchronous action bodies and observes promises with per-hook stale-error ownership. */
 var CalendarActionPipeline = class {
 	generations = /* @__PURE__ */ new Map();
@@ -2991,8 +2957,7 @@ var CalendarActionPipeline = class {
 		Promise.resolve(result).then(succeed, fail);
 	}
 };
-//#endregion
-//#region src/internal/runtime/overflow-default.ts
+// src/internal/runtime/overflow-default.ts
 /** Focuses only a current committed agenda and reports successful focus synchronously. */
 function completeEventOverflowDefault(completion, activation, options) {
 	if (completion === null || !options.isCurrent(completion)) return;
@@ -3011,8 +2976,7 @@ function completeEventOverflowDefault(completion, activation, options) {
 	});
 	options.invokeAction(() => onDefault(context));
 }
-//#endregion
-//#region src/internal/runtime/swipe.ts
+// src/internal/runtime/swipe.ts
 var CLICK_SUPPRESSION_RELEASE_DELAY = 400;
 var REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 var SCROLL_IDLE_DELAY = 120;
@@ -3410,8 +3374,7 @@ var SwipeGestureController = class {
 		}, SCROLL_IDLE_DELAY) ?? null;
 	}
 };
-//#endregion
-//#region src/internal/runtime/registered-extension-events.ts
+// src/internal/runtime/registered-extension-events.ts
 var MAXIMUM_EXTENSION_EVENT_PAGE_SIZE = 100;
 /** Lazily projects and pages presentation-safe events for registered extensions. */
 var RegisteredExtensionEventPager = class {
@@ -3459,8 +3422,7 @@ var RegisteredExtensionEventPager = class {
 		return this.cachedEvents;
 	}
 };
-//#endregion
-//#region src/internal/runtime/registered-extensions.ts
+// src/internal/runtime/registered-extensions.ts
 /** Generic lifecycle host for configured first-party extensions. */
 var RegisteredExtensionManager = class {
 	isStateNotificationPending = false;
@@ -3753,8 +3715,7 @@ function invokeDispose(dispose) {
 		return cause;
 	}
 }
-//#endregion
-//#region src/internal/runtime/navigation-revision.ts
+// src/internal/runtime/navigation-revision.ts
 /** Tracks calendar-wide navigation ownership for public and registered-extension navigation. */
 var CalendarNavigationRevisionTracker = class {
 	currentRevision = 0;
@@ -3791,8 +3752,7 @@ var CalendarNavigationRevisionTracker = class {
 		if (revision > this.currentRevision) this.currentRevision = revision;
 	}
 };
-//#endregion
-//#region src/internal/runtime/registered-extension-host.ts
+// src/internal/runtime/registered-extension-host.ts
 /** Owns generic extension lifecycle, event projection, and navigation transactions. */
 var RegisteredExtensionHost = class {
 	eventPager = null;
@@ -3865,8 +3825,7 @@ function createRegisteredExtensionHost(options) {
 	const host = new RegisteredExtensionHost(options);
 	return host.hasExtensions ? host : null;
 }
-//#endregion
-//#region src/internal/runtime/message-configuration.ts
+// src/internal/runtime/message-configuration.ts
 var CALENDAR_MESSAGE_TOKENS = Object.freeze({
 	actionErrorMessage: [],
 	actionErrorTitle: [],
@@ -3940,8 +3899,7 @@ function validateCalendarMessageTokens(key, template) {
 		if (token !== void 0 && !supportedTokens.includes(token)) throw createConfigurationError(`messages.${key} contains unsupported template token "{${token}}".`);
 	}
 }
-//#endregion
-//#region src/internal/runtime/render-hook-element-integrity.ts
+// src/internal/runtime/render-hook-element-integrity.ts
 /** Captures package-owned element topology and markup before consumer render code runs. */
 function captureRenderHookElementIntegrity(elements) {
 	const uniqueElements = [...new Set(elements.filter((element) => element !== null))];
@@ -4012,8 +3970,7 @@ function hasIdenticalAttributes(node, expected) {
 function hasIdenticalChildren(node, expected) {
 	return node.childNodes.length === expected.length && expected.every((child, index) => node.childNodes.item(index) === child);
 }
-//#endregion
-//#region src/internal/runtime/render-hook-visuals.ts
+// src/internal/runtime/render-hook-visuals.ts
 var CUSTOM_EVENT_OVERFLOW_CLASS = "lfc-has-custom-event-overflow";
 var SUPPRESSED_EVENT_OVERFLOW_CLASS = "lfc-is-event-overflow-suppressed";
 /** Owns singleton visual render-hook invocation and package-default recovery. */
@@ -4211,8 +4168,7 @@ function getEventOverflowProtectedElements(options) {
 	if (options.variant === "compact" && options.action === null) protectedElements.push(options.placementBoundary);
 	return Object.freeze(protectedElements);
 }
-//#endregion
-//#region src/internal/runtime/render-hook-nodes.ts
+// src/internal/runtime/render-hook-nodes.ts
 /** Owns render-hook node validation, leasing, append rollback, and mounted revalidation. */
 var RenderHookNodeRenderer = class {
 	nodeOwners = /* @__PURE__ */ new WeakMap();
@@ -4470,8 +4426,7 @@ function resolveSkeletonContributor(contributor) {
 		surface: contributor.surfaces.size === 1 ? contributor.surfaces.values().next().value : void 0
 	});
 }
-//#endregion
-//#region src/internal/runtime/render-hook-context.ts
+// src/internal/runtime/render-hook-context.ts
 /** Creates the stable values retained until an event mount hook is invoked. */
 function createEventMountContext(elements, date, dateString, event, surface, timeText) {
 	return Object.freeze({
@@ -4484,8 +4439,7 @@ function createEventMountContext(elements, date, dateString, event, surface, tim
 		timeText
 	});
 }
-//#endregion
-//#region src/internal/runtime/coordinator.ts
+// src/internal/runtime/coordinator.ts
 var AGENDA_DOM_LIMIT_DEFAULT = 200;
 var AGENDA_DOM_LIMIT_MAXIMUM = 500;
 var AGENDA_DOM_LIMIT_MINIMUM = 50;
@@ -6345,7 +6299,6 @@ var MonthCalendar = class {
 function createCalendar(host, options) {
 	return new MonthCalendar(host, options);
 }
-//#endregion
 export { LitefoldCalendarError, createCalendar };
 
 //# sourceMappingURL=index.js.map

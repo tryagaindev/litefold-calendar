@@ -1,4 +1,4 @@
-//#region src/internal/domain/civil-date.ts
+// src/internal/domain/civil-date.ts
 var MILLISECONDS_PER_DAY = 864e5;
 var MINIMUM_YEAR = 1;
 var MAXIMUM_YEAR = 9999;
@@ -215,8 +215,7 @@ function getDateTimestamp(value) {
 		return null;
 	}
 }
-//#endregion
-//#region src/errors.ts
+// src/errors.ts
 /**
 * A typed calendar failure containing separate diagnostic and user-safe text.
 *
@@ -386,7 +385,6 @@ function resolveRegisteredExtension(value) {
 	if (issuedInterface === void 0 || descriptor.value !== issuedInterface || issuedInterface.protocolVersion !== 1) return null;
 	return issuedInterface.definition;
 }
-//#endregion
 export { parseCalendarDateTime as _, reportCalendarError as a, toUtcDate as b, addCalendarMonths as c, compareDateTimes as d, formatCalendarDate as f, parseCalendarDate as g, isMidnight as h, isAbortError as i, assertCalendarDate as l, getDaysInMonth as m, resolveRegisteredExtension as n, toCalendarIssue as o, getCalendarDateForTimeZone as p, LitefoldCalendarError as r, addCalendarDays as s, createRegisteredExtension as t, compareCalendarDates as u, positiveModulo as v, toUtcDateTime as x, toCalendarDate as y };
 
-//# sourceMappingURL=registered-extension-contract-D6GEApjX.js.map
+//# sourceMappingURL=registered-extension-contract-DvqnF3H8.js.map
